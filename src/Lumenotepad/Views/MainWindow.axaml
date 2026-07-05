@@ -1,0 +1,25 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="using:Lumenotepad.Views"
+        xmlns:controls="using:Lumenotepad.Controls"
+        x:Class="Lumenotepad.Views.MainWindow"
+        Title="Lumenotepad"
+        Width="1180" Height="720" MinWidth="720" MinHeight="460"
+        WindowStartupLocation="CenterScreen"
+        Background="Transparent"
+        TransparencyLevelHint="Mica,AcrylicBlur,Transparent"
+        FontFamily="{StaticResource UiFont}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        WindowDecorations="None">
+    <Grid>
+        <views:MainView x:Name="Host" Opacity="0" RenderTransformOrigin="50%,50%" RenderTransform="scale(0.985)">
+            <views:MainView.Transitions>
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.22" Easing="CubicEaseOut"/>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.26" Easing="CubicEaseOut"/>
+                </Transitions>
+            </views:MainView.Transitions>
+        </views:MainView>
+        <controls:WindowResizeBorder/>
+    </Grid>
+</Window>

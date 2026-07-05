@@ -1,0 +1,34 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Lumenotepad.Views.MainView"
+             xmlns:controls="using:Lumenotepad.Controls">
+    <Grid RowDefinitions="38,*">
+
+        <!-- Title bar -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" x:Name="TitleBar" Background="#01FFFFFF">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="11,0,0,0" Spacing="9">
+                <Border Width="22" Height="22" CornerRadius="7" Background="{StaticResource AccentBrush}">
+                    <TextBlock Text="&#xE82F;" FontFamily="{StaticResource IconFont}" FontSize="13"
+                               Foreground="#04213F" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <TextBlock Text="Lumenotepad" FontSize="13.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                <Button x:Name="MinBtn" Theme="{StaticResource CaptionButton}" Content="&#xE921;"/>
+                <Button x:Name="MaxBtn" Theme="{StaticResource CaptionButton}" Content="&#xE922;"/>
+                <Button x:Name="CloseBtn" Theme="{StaticResource CloseCaptionButton}" Content="&#xE8BB;"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Body placeholder: a translucent glass panel proving the acrylic shows through -->
+        <Border Grid.Row="1" Margin="14" CornerRadius="14"
+                Background="#0FFFFFFF" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+                <TextBlock Text="Lumenotepad" FontSize="26" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                <TextBlock Text="Foundation shell — frosted glass working" FontSize="13"
+                           Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>
