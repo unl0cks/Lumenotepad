@@ -1,5 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Markup.Xaml;
 using Lumenotepad.Platform;
 
 namespace Lumenotepad.Views;
@@ -18,6 +17,4 @@ public partial class MainWindow : Window
             Host.RenderTransform = null;
         };
     }
-
-    private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
 }

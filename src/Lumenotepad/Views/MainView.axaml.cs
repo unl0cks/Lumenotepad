@@ -1,6 +1,5 @@
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Markup.Xaml;
 using Lumenotepad.Platform;
 
 namespace Lumenotepad.Views;
@@ -24,6 +23,4 @@ public partial class MainView : UserControl
     }
 
     private Window? Window => TopLevel.GetTopLevel(this) as Window;
-
-    private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
 }
