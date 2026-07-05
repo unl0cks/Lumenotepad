@@ -20,6 +20,6 @@
                 </Transitions>
             </views:MainView.Transitions>
         </views:MainView>
-        <controls:WindowResizeBorder/>
+        <controls:WindowResizeBorder x:Name="ResizeBorder"/>
     </Grid>
 </Window>
