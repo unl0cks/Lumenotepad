@@ -7,7 +7,7 @@
         Width="1180" Height="720" MinWidth="720" MinHeight="460"
         WindowStartupLocation="CenterScreen"
         Background="Transparent"
-        TransparencyLevelHint="Mica,AcrylicBlur,Transparent"
+        TransparencyLevelHint="AcrylicBlur, Transparent, None"
         FontFamily="{StaticResource UiFont}"
         Foreground="{StaticResource TextPrimaryBrush}"
         WindowDecorations="None">
