@@ -41,13 +41,14 @@ public partial class MainWindow : Window
         // snap-to-top silently fails unless we re-assert them on every state change.
         WinChrome.EnableSnap(this);
 
-        // A chromeless WS_THICKFRAME window maximized via native Aero Snap overhangs each screen edge by ~8px,
-        // clipping the title bar / caption buttons (the maximize BUTTON goes through Avalonia's own path, which
-        // constrains it cleanly). OffScreenMargin is exactly that off-screen amount (0 when floating / cleanly
-        // maximized), so insetting the content by it aligns both paths. Bounds settle a beat late — restagger.
+        // Native Aero Snap maximizes a WS_THICKFRAME window to (-7,-7) + a 14px oversize — a ~7px overhang past
+        // every screen edge that clips the title bar / caption buttons (the maximize BUTTON constrains cleanly to
+        // the work area). Avalonia leaves OffScreenMargin at 0 here, so compute the real overhang from the window
+        // rect vs the monitor work area and inset the content by it. Bounds can settle a beat late — restagger.
         SyncMaximizeMargin();
         Dispatcher.UIThread.Post(SyncMaximizeMargin, DispatcherPriority.Background);
         DispatcherTimer.RunOnce(SyncMaximizeMargin, TimeSpan.FromMilliseconds(120));
+        DispatcherTimer.RunOnce(SyncMaximizeMargin, TimeSpan.FromMilliseconds(400));
 
         if (state == WindowState.Normal)
         {
@@ -61,9 +62,27 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>Inset content by the amount of the window that sits off-screen when maximized (0 when
-    /// floating), so a snap-maximized chromeless window doesn't clip its title bar past the screen edge.</summary>
-    private void SyncMaximizeMargin() => Host.Margin = OffScreenMargin;
+    /// <summary>Inset the content by however much the window overhangs the monitor work area when maximized, so
+    /// a native snap-maximize (which overhangs ~7px per edge) lands pixel-identical to the clean button-maximize.
+    /// Zero inset when floating or cleanly maximized. Computed geometry — Avalonia's OffScreenMargin stays 0 here.</summary>
+    private void SyncMaximizeMargin()
+    {
+        if (WindowState != WindowState.Maximized ||
+            (Screens.ScreenFromWindow(this) ?? Screens.Primary) is not { } scr)
+        {
+            Host.Margin = default;
+            return;
+        }
+
+        var work = scr.WorkingArea;                              // physical px
+        double s = RenderScaling <= 0 ? 1 : RenderScaling;
+        double physW = ClientSize.Width * s, physH = ClientSize.Height * s;
+        double left   = Math.Max(0, work.X - Position.X);
+        double top    = Math.Max(0, work.Y - Position.Y);
+        double right  = Math.Max(0, (Position.X + physW) - (work.X + work.Width));
+        double bottom = Math.Max(0, (Position.Y + physH) - (work.Y + work.Height));
+        Host.Margin = new Thickness(left / s, top / s, right / s, bottom / s);
+    }
 
     /// <summary>Re-apply all native chrome that a state change can silently reset: sizing styles (snap),
     /// rounded corners, and the acrylic backdrop.</summary>
