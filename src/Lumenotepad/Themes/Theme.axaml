@@ -1,0 +1,84 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:controls="using:Lumenotepad.Controls">
+
+    <!-- Palette (Lumen family tokens) -->
+    <Color x:Key="AccentColor">#4DA6FF</Color>
+    <SolidColorBrush x:Key="AccentBrush" Color="#4DA6FF"/>
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#73BAFF"/>
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="#384DA6FF"/>
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#CCFFFFFF"/>
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#80FFFFFF"/>
+    <SolidColorBrush x:Key="ControlHoverBrush" Color="#22FFFFFF"/>
+    <SolidColorBrush x:Key="ControlPressedBrush" Color="#38FFFFFF"/>
+    <SolidColorBrush x:Key="CloseHoverBrush" Color="#E81123"/>
+    <SolidColorBrush x:Key="GlassBorderBrush" Color="#33FFFFFF"/>
+    <SolidColorBrush x:Key="PanelTintBrush" Color="#8C16171C"/>
+
+    <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+    <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI</FontFamily>
+
+    <!-- Round icon button (title-bar app mark, generic actions) -->
+    <ControlTheme x:Key="IconButton" TargetType="Button">
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="FontFamily" Value="{StaticResource IconFont}"/>
+        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Width" Value="34"/>
+        <Setter Property="Height" Value="34"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Panel>
+                    <Border x:Name="bg" Background="{StaticResource ControlHoverBrush}" controls:Squircle.Enabled="True" Opacity="0">
+                        <Border.Transitions><Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.15"/></Transitions></Border.Transitions>
+                    </Border>
+                    <ContentPresenter x:Name="cp" Content="{TemplateBinding Content}"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      FontFamily="{TemplateBinding FontFamily}" FontSize="{TemplateBinding FontSize}"
+                                      Foreground="{TemplateBinding Foreground}" RenderTransformOrigin="50%,50%">
+                        <ContentPresenter.Transitions><Transitions><TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.16"/></Transitions></ContentPresenter.Transitions>
+                    </ContentPresenter>
+                </Panel>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#bg"><Setter Property="Opacity" Value="1"/></Style>
+        <Style Selector="^:pointerover /template/ ContentPresenter#cp"><Setter Property="RenderTransform" Value="scale(1.13)"/></Style>
+        <Style Selector="^:pressed /template/ ContentPresenter#cp"><Setter Property="RenderTransform" Value="scale(0.88)"/></Style>
+        <Style Selector="^:disabled"><Setter Property="Opacity" Value="0.35"/></Style>
+    </ControlTheme>
+
+    <!-- Caption (window) buttons -->
+    <ControlTheme x:Key="CaptionButton" TargetType="Button">
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="FontFamily" Value="{StaticResource IconFont}"/>
+        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+        <Setter Property="Width" Value="44"/>
+        <Setter Property="Height" Value="32"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border x:Name="bg" Background="Transparent" controls:Squircle.Enabled="True">
+                    <Border.Transitions><Transitions><BrushTransition Property="Background" Duration="0:0:0.15"/></Transitions></Border.Transitions>
+                    <ContentPresenter x:Name="cp" Content="{TemplateBinding Content}" FontFamily="{TemplateBinding FontFamily}"
+                                      FontSize="{TemplateBinding FontSize}" Foreground="{TemplateBinding Foreground}"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="50%,50%">
+                        <ContentPresenter.Transitions><Transitions><TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.13"/></Transitions></ContentPresenter.Transitions>
+                    </ContentPresenter>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#bg"><Setter Property="Background" Value="{StaticResource ControlHoverBrush}"/></Style>
+        <Style Selector="^:pointerover"><Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/></Style>
+        <Style Selector="^:pointerover /template/ ContentPresenter#cp"><Setter Property="RenderTransform" Value="scale(1.12)"/></Style>
+        <Style Selector="^:pressed /template/ ContentPresenter#cp"><Setter Property="RenderTransform" Value="scale(0.84)"/></Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="CloseCaptionButton" TargetType="Button" BasedOn="{StaticResource CaptionButton}">
+        <Style Selector="^:pointerover /template/ Border#bg"><Setter Property="Background" Value="{StaticResource CloseHoverBrush}"/></Style>
+        <Style Selector="^:pointerover"><Setter Property="Foreground" Value="White"/></Style>
+    </ControlTheme>
+</ResourceDictionary>
