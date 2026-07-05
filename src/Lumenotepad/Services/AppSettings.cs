@@ -28,7 +28,8 @@ public sealed class AppSettings
         catch { return new AppSettings(); }
     }
 
-    /// <summary>The portable userdata folder beside the running executable.</summary>
-    public static string DefaultDir =>
-        Path.Combine(Path.GetDirectoryName(System.Environment.ProcessPath) ?? ".", "userdata");
+    /// <summary>The portable userdata folder beside the app's assemblies. Uses AppContext.BaseDirectory
+    /// (the app's own folder) rather than ProcessPath, which points at dotnet.exe when launched via
+    /// `dotnet App.dll` and would try to write into a protected install folder.</summary>
+    public static string DefaultDir => Path.Combine(System.AppContext.BaseDirectory, "userdata");
 }

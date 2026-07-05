@@ -4,6 +4,12 @@
 
     <!-- Palette (Lumen family tokens) -->
     <Color x:Key="AccentColor">#4DA6FF</Color>
+    <!-- Make Fluent controls (ListBox selection, etc.) use the brand accent instead of the OS accent. -->
+    <Color x:Key="SystemAccentColor">#4DA6FF</Color>
+    <Color x:Key="SystemAccentColorLight1">#73BAFF</Color>
+    <Color x:Key="SystemAccentColorLight2">#96CCFF</Color>
+    <Color x:Key="SystemAccentColorDark1">#2E8AE6</Color>
+    <Color x:Key="SystemAccentColorDark2">#1F6FBF</Color>
     <SolidColorBrush x:Key="AccentBrush" Color="#4DA6FF"/>
     <SolidColorBrush x:Key="AccentHoverBrush" Color="#73BAFF"/>
     <SolidColorBrush x:Key="AccentSoftBrush" Color="#384DA6FF"/>
