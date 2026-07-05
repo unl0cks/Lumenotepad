@@ -23,6 +23,10 @@ Design north stars:
 
 - **Avalonia 12 / .NET 10**, Windows-first (same stack as Lumen and Lumenote++). Chosen by the owner over WPF
   and over an Avalonia+WebView2 editor, accepting that the rich-text engine is hand-built (see §5, §14).
+- **HARD RULE — zero web components.** No Electron, WebView2, CEF, or any embedded browser/HTML-JS runtime
+  anywhere (owner explicitly rejects them for memory/CPU bloat). The whole UI is native Avalonia. PDF uses
+  **PDFium** — a native C++ library (`pdfium.dll`) via P/Invoke, NOT a browser engine — or MuPDF (also native)
+  as an alternative. Anything that would pull in a web runtime is off the table.
 - **Reused from the family (port/adapt, do not blind-copy):**
   - Design tokens from `Lumen/src/Lumen/Themes/Theme.axaml` — base `#0B0C10`, accent `#4DA6FF` (hover
     `#73BAFF`, soft `#384DA6FF`), text tiers white / `#CCFFFFFF` / `#80FFFFFF`, glass border `#33FFFFFF`,
@@ -82,8 +86,8 @@ headings, alignment, links, and lists: **bullet / numbered / checkbox**, includi
 - **Tags** — OneNote-style taggable items (Important, Question, Idea, …) that are searchable/filterable.
 - **File attachments** — drop a PDF / zip / any file onto a page; stored in the notebook `assets/`.
 - **PDF open + annotate** — open a PDF (and similar fixed-layout files), render its pages, and **write over
-  it**: highlights + typed notes/callouts layered on top, saved alongside the source. Rendering via a
-  PDFium-based .NET library (verify at build).
+  it**: highlights + typed notes/callouts layered on top, saved alongside the source. Rendering via native
+  **PDFium** (`pdfium.dll` via P/Invoke) or MuPDF — not a browser engine (see §2 hard rule); verify at build.
 
 ### Deferred to a future version
 - **Freehand ink / drawing** (pen strokes on the canvas). Freehand pen-on-PDF markup rides along with this.
@@ -197,8 +201,9 @@ userdata/           (runtime) notebooks/, fonts/, settings.json
    Avalonia's text stack **before** committing the full formatting/list feature set. If the stack fights a
    specific behavior (IME, complex selection), surface the tradeoff rather than shipping something janky.
    Evaluate any viable existing Avalonia rich-text component during the slice; plan for custom.
-2. **PDF rendering + annotation.** Confirm a PDFium-based .NET library renders pages acceptably and that an
-   overlay-annotation model round-trips. Deep editing stays out of scope.
+2. **PDF rendering + annotation.** Confirm a native PDFium (or MuPDF) binding renders pages acceptably and that
+   an overlay-annotation model round-trips. Both are native C++ libraries via P/Invoke — no web components, per
+   the §2 hard rule. Deep editing stays out of scope.
 3. **DWM acrylic glass.** Proven in Lumenote++; port the approach. Verify the Light/Dark/Lumen × Full-theme
    material table renders correctly per §7.
 4. **Runtime font loading + installer.** Confirm fonts in `userdata/fonts/` load into Avalonia at runtime and
