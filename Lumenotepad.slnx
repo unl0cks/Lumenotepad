@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/Lumenotepad/Lumenotepad.csproj" />
+  <Project Path="tests/Lumenotepad.Tests/Lumenotepad.Tests.csproj" />
+</Solution>
