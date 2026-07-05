@@ -128,6 +128,12 @@ is the contrasting material** — glass paper under a solid frame, or solid pape
 Implementation: theme = a set of swappable resource brushes + a per-surface material flag (glass vs solid).
 The canvas surface reads `Theme × FullTheme (× paper tone)` from that table.
 
+**Additional frame themes (owner-requested):** beyond Light / Dark / Lumen, ship **Pink** and **Light blue** as
+extra solid frame themes that participate in the same Full-theme matrix (solid frame → glass canvas by default).
+Palettes: Light blue / periwinkle `#EDF2FB #E2EAFC #D7E3FC #CCDBFD #C1D3FE #B6CCFE #ABC4FF`; Pink `#FFE5EC
+#FFC2D1 #FFB3C6 #FF8FAB #FB6F92`. All five themes land together when the theme engine is built (M6) — it does not
+exist yet; the app is currently hardcoded to the dark glass look.
+
 ## 8. Preferences + the advanced gate
 
 - A clean window in plain sections: **Appearance · Editor · Notebooks & storage · Fonts · About**. Sensible
