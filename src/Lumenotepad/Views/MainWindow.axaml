@@ -10,6 +10,8 @@
         TransparencyLevelHint="AcrylicBlur, Transparent, None"
         FontFamily="{StaticResource UiFont}"
         Foreground="{StaticResource TextPrimaryBrush}"
+        TextOptions.TextRenderingMode="Antialias"
+        RenderOptions.TextRenderingMode="Antialias"
         WindowDecorations="None">
     <Grid>
         <views:MainView x:Name="Host" Opacity="0" RenderTransformOrigin="50%,50%" RenderTransform="scale(0.985)">

@@ -27,6 +27,11 @@ public sealed partial class Section : ObservableObject
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     [ObservableProperty] private string _name = "";
     public ObservableCollection<Page> Pages { get; set; } = new();
+
+    /// <summary>Transient UI flag: this section's tab is in inline-rename mode. Never persisted.</summary>
+    [ObservableProperty]
+    [property: System.Text.Json.Serialization.JsonIgnore]
+    private bool _isEditing;
 }
 
 /// <summary>A single page. Content (the freeform canvas) arrives in M3; for now just a title.</summary>

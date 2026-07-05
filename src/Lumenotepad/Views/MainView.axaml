@@ -42,6 +42,20 @@
             <Setter Property="Margin" Value="0,0,5,0"/>
             <Setter Property="CornerRadius" Value="8"/>
         </Style>
+        <!-- inline rename box (section tab) -->
+        <Style Selector="TextBox.inlineedit">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="MinWidth" Value="64"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBox.inlineedit /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#1FFFFFFF"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="6"/>
+        </Style>
     </UserControl.Styles>
 
     <Grid RowDefinitions="38,*">
@@ -116,18 +130,21 @@
                                 Command="{Binding DeleteNotebookCommand}" ToolTip.Tip="Delete notebook"/>
                     </Grid>
 
-                    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,10,0,4">
+                    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,10,0,4">
                         <TextBlock Text="Sections" FontSize="11" FontWeight="SemiBold"
                                    Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"/>
                         <Button Grid.Column="2" Theme="{StaticResource IconButton}" Width="24" Height="24" FontSize="12"
                                 FontFamily="{StaticResource IconFont}" Content="&#xE710;"
                                 Command="{Binding AddSectionCommand}" ToolTip.Tip="New section"/>
-                        <Button Grid.Column="3" Theme="{StaticResource IconButton}" Width="24" Height="24" FontSize="12"
+                        <Button x:Name="RenameSectionBtn" Grid.Column="3" Theme="{StaticResource IconButton}" Width="24" Height="24"
+                                FontSize="12" FontFamily="{StaticResource IconFont}" Content="&#xE70F;"
+                                ToolTip.Tip="Rename section"/>
+                        <Button Grid.Column="4" Theme="{StaticResource IconButton}" Width="24" Height="24" FontSize="12"
                                 FontFamily="{StaticResource IconFont}" Content="&#xE74D;"
                                 Command="{Binding DeleteSectionCommand}" ToolTip.Tip="Delete section"/>
                     </Grid>
                     <ScrollViewer DockPanel.Dock="Top" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                        <ListBox Classes="sections" Background="Transparent" BorderThickness="0" Padding="0"
+                        <ListBox x:Name="SectionsList" Classes="sections" Background="Transparent" BorderThickness="0" Padding="0"
                                  ItemsSource="{Binding SelectedNotebook.Sections}"
                                  SelectedItem="{Binding SelectedSection, Mode=TwoWay}">
                             <ListBox.ItemsPanel>
@@ -135,15 +152,16 @@
                             </ListBox.ItemsPanel>
                             <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="models:Section">
-                                    <TextBlock Text="{Binding Name}" FontSize="12.5"/>
+                                    <Panel>
+                                        <TextBlock Text="{Binding Name}" FontSize="12.5" VerticalAlignment="Center"
+                                                   IsVisible="{Binding !IsEditing}"/>
+                                        <TextBox Classes="inlineedit" FontSize="12.5" Text="{Binding Name, Mode=TwoWay}"
+                                                 IsVisible="{Binding IsEditing}"/>
+                                    </Panel>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
                     </ScrollViewer>
-
-                    <TextBox x:Name="SectionName" DockPanel.Dock="Top" Classes="rename" Margin="0,4,0,0"
-                             FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" Watermark="Section name"
-                             Text="{Binding SelectedSection.Name, Mode=TwoWay}"/>
 
                     <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,12,0,4">
                         <TextBlock Text="Pages" FontSize="11" FontWeight="SemiBold"
