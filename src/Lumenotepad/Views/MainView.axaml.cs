@@ -41,6 +41,7 @@ public partial class MainView : UserControl
         // Formatting toolbar drives the editor; dock menu re-docks it via the VM (persisted).
         Toolbar.Target = Editor;
         Toolbar.DockRequested += pos => { if (Vm is { } vm) vm.ToolbarPosition = pos; };
+        Toolbar.ScopeRequested += scope => { if (Vm is { } vm) vm.ToolbarScope = scope; };
 
         // Section inline rename: double-click a tab, the rename button, or right-click → Rename.
         RenameSectionBtn.Click += (_, _) => BeginRenameSection(Vm?.SelectedSection);
@@ -69,19 +70,27 @@ public partial class MainView : UserControl
             _hookedVm.PropertyChanged += OnVmPropertyChanged;
             _hookedVm.DocsDirtied += OnDocsDirtied;
             SyncEditorDocument();
-            ApplyToolbarPosition(_hookedVm.ToolbarPosition);
+            ApplyToolbarPlacement();
         }
     }
 
-    private void ApplyToolbarPosition(string pos)
+    /// <summary>Place the toolbar per the VM: docked to a side of either the WINDOW body or the PAGE box.</summary>
+    private void ApplyToolbarPlacement()
     {
-        var dock = pos switch
+        if (Vm is not { } vm) return;
+        var dock = vm.ToolbarPosition switch
         {
             "Left" => Avalonia.Controls.Dock.Left,
             "Right" => Avalonia.Controls.Dock.Right,
             "Bottom" => Avalonia.Controls.Dock.Bottom,
             _ => Avalonia.Controls.Dock.Top,
         };
+        var host = vm.ToolbarScope == "Page" ? PageDock : BodyDock;
+        if (!ReferenceEquals(Toolbar.Parent, host))
+        {
+            (Toolbar.Parent as Panel)?.Children.Remove(Toolbar);
+            host.Children.Insert(0, Toolbar);      // DockPanel: last child fills, so docked items go first
+        }
         DockPanel.SetDock(Toolbar, dock);
         Toolbar.SetVertical(dock is Avalonia.Controls.Dock.Left or Avalonia.Controls.Dock.Right);
     }
@@ -101,8 +110,8 @@ public partial class MainView : UserControl
     private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(MainViewModel.SelectedPage)) SyncEditorDocument();
-        else if (e.PropertyName == nameof(MainViewModel.ToolbarPosition) && Vm is { } vm)
-            ApplyToolbarPosition(vm.ToolbarPosition);
+        else if (e.PropertyName is nameof(MainViewModel.ToolbarPosition) or nameof(MainViewModel.ToolbarScope))
+            ApplyToolbarPlacement();
     }
 
     private void SyncEditorDocument()

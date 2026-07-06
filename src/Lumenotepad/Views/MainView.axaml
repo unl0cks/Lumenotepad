@@ -88,7 +88,7 @@
         </Grid>
 
         <!-- ============ Body: dockable toolbar + (rail | nav | canvas) ============ -->
-        <DockPanel Grid.Row="1">
+        <DockPanel Grid.Row="1" x:Name="BodyDock">
         <v:FormatToolbar x:Name="Toolbar" DockPanel.Dock="Top"/>
         <Grid ColumnDefinitions="Auto,Auto,*">
 
@@ -192,7 +192,7 @@
             <!-- Page: title + rich-text editor (M3 slice: one region; the freeform canvas layers on next) -->
             <Border Grid.Column="2" Margin="14" CornerRadius="14"
                     Background="#0BFFFFFF" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
-                <DockPanel Margin="26,22">
+                <DockPanel x:Name="PageDock" Margin="26,22">
                     <TextBox x:Name="PageTitle" DockPanel.Dock="Top" Classes="rename"
                              FontSize="26" FontWeight="SemiBold" PlaceholderText="Page title"
                              IsVisible="{Binding SelectedPage, Converter={x:Static conv:ObjectConverters.IsNotNull}}"

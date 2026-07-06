@@ -233,7 +233,7 @@ public sealed class RichTextEditor : Control
                 if (run.Highlight is { } hl && BrushFor(hl) is { } hlBrush && len > 0)
                 {
                     foreach (var r in _layouts[pi].HitTestTextRange(acc, len))
-                        ctx.FillRectangle(hlBrush, new Rect(r.X, r.Y + top, r.Width, r.Height));
+                        ctx.FillRectangle(hlBrush, new Rect(r.X, r.Y + top, r.Width, r.Height), 3f);
                 }
                 acc += len;
             }
@@ -269,7 +269,7 @@ public sealed class RichTextEditor : Control
         if (_caretVisible && IsFocused)
         {
             var rect = CaretRect();
-            ctx.FillRectangle(CaretBrush, new Rect(rect.X, rect.Y, 1.6, rect.Height));
+            ctx.FillRectangle(CaretBrush, new Rect(rect.X, rect.Y, 1.6, rect.Height), 0.8f);
         }
     }
 

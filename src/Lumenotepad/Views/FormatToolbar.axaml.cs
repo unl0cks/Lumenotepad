@@ -34,6 +34,10 @@ public partial class FormatToolbar : UserControl
     /// <summary>Raised when the user picks a dock side ("Top"/"Left"/"Right"/"Bottom").</summary>
     public event Action<string>? DockRequested;
 
+    /// <summary>Raised when the user picks a dock scope: "Window" (toolbar hugs the window edge)
+    /// or "Page" (toolbar lives inside the page box).</summary>
+    public event Action<string>? ScopeRequested;
+
     public RichTextEditor? Target
     {
         get => _target;
@@ -56,6 +60,14 @@ public partial class FormatToolbar : UserControl
         StrikeBtn.Click += (_, _) => Do(e => e.ToggleStrike());
         SizeMinus.Click += (_, _) => NudgeSize(-1);
         SizePlus.Click += (_, _) => NudgeSize(+1);
+        SizeBox.KeyDown += (_, e) =>
+        {
+            if (e.Key != Avalonia.Input.Key.Enter) return;
+            ApplyTypedSize();
+            _target?.Focus();
+            e.Handled = true;
+        };
+        SizeBox.LostFocus += (_, _) => ApplyTypedSize();
 
         BuildSwatches(HighlightSwatches, Highlights, hex => Do(e => e.ApplyHighlight(hex)), HighlightBtn);
         BuildSwatches(ColorSwatches, TextColors, hex => Do(e => e.ApplyColor(hex)), ColorBtn);
@@ -85,8 +97,27 @@ public partial class FormatToolbar : UserControl
     {
         if (_target is null) return;
         double cur = _target.CurrentFormat.Size ?? _target.FontSize;
-        double next = Math.Clamp(cur + delta, 8, 72);
-        Do(e => e.ApplySize(Math.Abs(next - e.FontSize) < 0.01 ? null : next));
+        SetSize(cur + delta, focusEditor: true);
+    }
+
+    /// <summary>Apply whatever number is typed in the size box (invalid input just re-syncs the display).</summary>
+    private void ApplyTypedSize()
+    {
+        if (_target is null) return;
+        if (double.TryParse(SizeBox.Text, System.Globalization.NumberStyles.Float,
+                            System.Globalization.CultureInfo.CurrentCulture, out var v))
+            SetSize(v, focusEditor: false);
+        else
+            UpdateFromEditor();
+    }
+
+    private void SetSize(double size, bool focusEditor)
+    {
+        if (_target is null) return;
+        size = Math.Clamp(size, 8, 72);
+        double? value = Math.Abs(size - _target.FontSize) < 0.01 ? null : size;
+        _target.ApplySize(value);
+        if (focusEditor) _target.Focus();
         UpdateFromEditor();
     }
 
@@ -129,6 +160,13 @@ public partial class FormatToolbar : UserControl
             item.Click += (_, _) => DockRequested?.Invoke(pos);
             flyout.Items.Add(item);
         }
+        flyout.Items.Add(new Separator());
+        var winScope = new MenuItem { Header = "Attach to window" };
+        winScope.Click += (_, _) => ScopeRequested?.Invoke("Window");
+        var pageScope = new MenuItem { Header = "Attach to page" };
+        pageScope.Click += (_, _) => ScopeRequested?.Invoke("Page");
+        flyout.Items.Add(winScope);
+        flyout.Items.Add(pageScope);
         DockBtn.Flyout = flyout;
         DockBtn.Click += (_, _) => flyout.ShowAt(DockBtn);
     }
@@ -146,7 +184,8 @@ public partial class FormatToolbar : UserControl
             StrikeBtn.Classes.Set("on", f.Strike);
             HighlightBtn.Classes.Set("on", f.Highlight is not null);
             ColorBtn.Classes.Set("on", f.Color is not null);
-            SizeText.Text = (f.Size ?? _target.FontSize).ToString("0");
+            if (!SizeBox.IsFocused)                       // don't clobber a number mid-typing
+                SizeBox.Text = (f.Size ?? _target.FontSize).ToString("0");
             FontList.SelectedItem = f.Font ?? "(Default)";
         }
         finally { _syncing = false; }

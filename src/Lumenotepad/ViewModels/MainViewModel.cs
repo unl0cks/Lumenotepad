@@ -26,6 +26,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _isRailVisible = true;
     [ObservableProperty] private bool _isPagesVisible = true;
     [ObservableProperty] private string _toolbarPosition = "Top";   // "Top" | "Left" | "Right" | "Bottom"
+    [ObservableProperty] private string _toolbarScope = "Window";   // "Window" | "Page"
 
     private readonly AppSettings? _settings;
     private readonly string? _settingsDir;
@@ -41,6 +42,7 @@ public partial class MainViewModel : ObservableObject
         {
             _settings = AppSettings.Load(settingsDir);
             ToolbarPosition = _settings.ToolbarPosition;
+            ToolbarScope = _settings.ToolbarScope;
         }
         _workspace = store.LoadOrSeed();
         SelectedNotebook = Notebooks.FirstOrDefault();
@@ -50,6 +52,13 @@ public partial class MainViewModel : ObservableObject
     {
         if (_settings is null || _settingsDir is null) return;
         _settings.ToolbarPosition = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnToolbarScopeChanged(string value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.ToolbarScope = value;
         _settings.Save(_settingsDir);
     }
 

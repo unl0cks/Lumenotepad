@@ -11,6 +11,7 @@ public sealed class AppSettings
     public string AccentColor { get; set; } = "#4DA6FF";
     public double BlurStrength { get; set; } = 0.6;         // 0..1
     public string ToolbarPosition { get; set; } = "Top";    // "Top" | "Left" | "Right" | "Bottom"
+    public string ToolbarScope { get; set; } = "Window";    // "Window" (window edge) | "Page" (inside the page box)
 
     private const string FileName = "settings.json";
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
