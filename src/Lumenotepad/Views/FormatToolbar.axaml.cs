@@ -75,15 +75,38 @@ public partial class FormatToolbar : UserControl
         BuildDockMenu();
     }
 
-    /// <summary>Reflow for a side dock: vertical strip, flyouts open sideways.</summary>
-    public void SetVertical(bool vertical)
+    /// <summary>Reflow for the dock side + scope: orientation, breathing-room margins, and flyouts
+    /// opening away from the docked edge.</summary>
+    public void SetPlacement(Dock dock, bool pageScope)
     {
+        bool vertical = dock is Dock.Left or Dock.Right;
         Panel.Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;
         SizeGroup.Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;
-        var placement = vertical ? PlacementMode.Right : PlacementMode.Bottom;
+        Chrome.Padding = vertical ? new Thickness(4, 6) : new Thickness(6, 4);
+
+        var placement = dock switch
+        {
+            Dock.Left => PlacementMode.Right,
+            Dock.Right => PlacementMode.Left,
+            Dock.Bottom => PlacementMode.Top,
+            _ => PlacementMode.Bottom,
+        };
         foreach (var b in new[] { HighlightBtn, ColorBtn, FontBtn })
             if (b.Flyout is PopupFlyoutBase pf) pf.Placement = placement;
         if (DockBtn.Flyout is PopupFlyoutBase df) df.Placement = placement;
+
+        // Inside the page box the strip needs an inset from the rounded edge + a gap toward the content;
+        // on the window edges the vertical strips need air toward the neighboring panel.
+        Margin = (pageScope, dock) switch
+        {
+            (true, Dock.Top) => new Thickness(14, 12, 14, 0),
+            (true, Dock.Bottom) => new Thickness(14, 0, 14, 12),
+            (true, Dock.Left) => new Thickness(12, 14, 0, 14),
+            (true, Dock.Right) => new Thickness(0, 14, 12, 14),
+            (false, Dock.Left) => new Thickness(6, 4, 2, 4),
+            (false, Dock.Right) => new Thickness(2, 4, 6, 4),
+            _ => new Thickness(0),
+        };
     }
 
     private void Do(Action<RichTextEditor> action)

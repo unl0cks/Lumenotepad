@@ -192,12 +192,12 @@
             <!-- Page: title + rich-text editor (M3 slice: one region; the freeform canvas layers on next) -->
             <Border Grid.Column="2" Margin="14" CornerRadius="14"
                     Background="#0BFFFFFF" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
-                <DockPanel x:Name="PageDock" Margin="26,22">
-                    <TextBox x:Name="PageTitle" DockPanel.Dock="Top" Classes="rename"
+                <DockPanel x:Name="PageDock">
+                    <TextBox x:Name="PageTitle" DockPanel.Dock="Top" Classes="rename" Margin="26,22,26,0"
                              FontSize="26" FontWeight="SemiBold" PlaceholderText="Page title"
                              IsVisible="{Binding SelectedPage, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
                              Text="{Binding SelectedPage.Title, Mode=TwoWay}"/>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,12,0,0">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="26,12,26,22">
                         <editor:RichTextEditor x:Name="Editor" MinHeight="200"/>
                     </ScrollViewer>
                 </DockPanel>

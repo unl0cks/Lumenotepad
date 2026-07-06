@@ -92,7 +92,7 @@ public partial class MainView : UserControl
             host.Children.Insert(0, Toolbar);      // DockPanel: last child fills, so docked items go first
         }
         DockPanel.SetDock(Toolbar, dock);
-        Toolbar.SetVertical(dock is Avalonia.Controls.Dock.Left or Avalonia.Controls.Dock.Right);
+        Toolbar.SetPlacement(dock, vm.ToolbarScope == "Page");
     }
 
     // Debounced autosave: flush dirty page docs after ~0.9s of typing idle.
