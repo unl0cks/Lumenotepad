@@ -50,10 +50,22 @@ public sealed class Paragraph
     /// per-paragraph layout and rebuild only what changed (keystroke cost stays O(1), not O(document)).</summary>
     public int Version;
 
+    /// <summary>Bullet style key: null = none; "dot" | "arrow" | "star" | "heart" | "flower" | "spark"
+    /// (cute glyph bullets), "num" (numbered), "check" (checkbox).</summary>
+    public string? Bullet;
+
+    /// <summary>Ticked state for "check" bullets.</summary>
+    public bool Checked;
+
     public int Length => Runs.Sum(r => r.Text.Length);
     public string Text => string.Concat(Runs.Select(r => r.Text));
 
-    public Paragraph Clone() => new() { Runs = Runs.Select(r => r.Clone()).ToList() };
+    public Paragraph Clone() => new()
+    {
+        Runs = Runs.Select(r => r.Clone()).ToList(),
+        Bullet = Bullet,
+        Checked = Checked,
+    };
 
     /// <summary>Ensure a run boundary exists exactly at <paramref name="offset"/>; returns the index of the
     /// run that STARTS at that offset (== Runs.Count when offset == Length).</summary>
@@ -185,7 +197,8 @@ public sealed class RichDocument
         Clamp(ref pos);
         var para = Paragraphs[pos.Para];
         int runIdx = para.SplitAt(pos.Off);
-        var next = new Paragraph { Runs = para.Runs.Skip(runIdx).ToList() };
+        // The new paragraph continues the list (standard list behavior); the tick state does not carry over.
+        var next = new Paragraph { Runs = para.Runs.Skip(runIdx).ToList(), Bullet = para.Bullet };
         para.Runs.RemoveRange(runIdx, para.Runs.Count - runIdx);
         para.Version++;
         Paragraphs.Insert(pos.Para + 1, next);
@@ -286,6 +299,42 @@ public sealed class RichDocument
                 if (run.Text.Length > 0) yield return (run, pi, ri);
             }
         }
+    }
+
+    /// <summary>Set (or clear, with null) the bullet style on every paragraph the range touches.
+    /// The tick state resets when the style changes away from "check".</summary>
+    public void SetBullet(DocPos a, DocPos b, string? style)
+    {
+        Clamp(ref a); Clamp(ref b);
+        if (a > b) (a, b) = (b, a);
+        for (int pi = a.Para; pi <= b.Para; pi++)
+        {
+            var para = Paragraphs[pi];
+            para.Bullet = style;
+            if (style != "check") para.Checked = false;
+            para.Version++;
+        }
+        OnChanged();
+    }
+
+    /// <summary>Every paragraph in the range already has exactly this bullet style.</summary>
+    public bool BulletAll(DocPos a, DocPos b, string? style)
+    {
+        Clamp(ref a); Clamp(ref b);
+        if (a > b) (a, b) = (b, a);
+        for (int pi = a.Para; pi <= b.Para; pi++)
+            if (Paragraphs[pi].Bullet != style) return false;
+        return true;
+    }
+
+    /// <summary>Flip a checkbox paragraph's ticked state.</summary>
+    public void ToggleChecked(int paraIndex)
+    {
+        if (paraIndex < 0 || paraIndex >= Paragraphs.Count) return;
+        var para = Paragraphs[paraIndex];
+        para.Checked = !para.Checked;
+        para.Version++;
+        OnChanged();
     }
 
     // ---- snapshots (undo/redo) ----

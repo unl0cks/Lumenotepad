@@ -141,8 +141,15 @@ public sealed class RichTextEditor : Control
         _contentHeight = _layouts.Count > 0 ? y - ParagraphSpacing : 0;
     }
 
+    /// <summary>Gutter width for bulleted/numbered/checkbox paragraphs.</summary>
+    private const double BulletIndent = 26;
+
+    private double IndentOf(int pi) =>
+        pi >= 0 && pi < _doc.Paragraphs.Count && _doc.Paragraphs[pi].Bullet is not null ? BulletIndent : 0;
+
     private TextLayout BuildLayout(Paragraph p, double width)
     {
+        if (p.Bullet is not null && double.IsFinite(width)) width -= BulletIndent;
         double maxWidth = double.IsFinite(width) && width > 1 ? width : double.PositiveInfinity;
         if (p.Runs.Count == 0)
             return new TextLayout("", new Typeface(FontFamily), FontSize, Foreground,
@@ -233,7 +240,7 @@ public sealed class RichTextEditor : Control
                 if (run.Highlight is { } hl && BrushFor(hl) is { } hlBrush && len > 0)
                 {
                     foreach (var r in _layouts[pi].HitTestTextRange(acc, len))
-                        ctx.FillRectangle(hlBrush, new Rect(r.X, r.Y + top, r.Width, r.Height), 3f);
+                        ctx.FillRectangle(hlBrush, new Rect(r.X + IndentOf(pi), r.Y + top, r.Width, r.Height), 3f);
                 }
                 acc += len;
             }
@@ -251,19 +258,22 @@ public sealed class RichTextEditor : Control
                 if (end > start)
                 {
                     foreach (var r in _layouts[pi].HitTestTextRange(start, end - start))
-                        ctx.FillRectangle(SelectionBrush, new Rect(r.X, r.Y + top, Math.Max(r.Width, 2), r.Height));
+                        ctx.FillRectangle(SelectionBrush, new Rect(r.X + IndentOf(pi), r.Y + top, Math.Max(r.Width, 2), r.Height), 3f);
                 }
                 else if (_doc.Paragraphs[pi].Length == 0)
                 {
                     // fully-selected empty paragraph → a thin stub so the selection reads continuously
-                    ctx.FillRectangle(SelectionBrush, new Rect(0, top, 6, _layouts[pi].Height));
+                    ctx.FillRectangle(SelectionBrush, new Rect(IndentOf(pi), top, 6, _layouts[pi].Height), 3f);
                 }
             }
         }
 
-        // text
+        // bullets + text
         for (int i = 0; i < _layouts.Count; i++)
-            _layouts[i].Draw(ctx, new Point(0, ParagraphTop(i)));
+        {
+            DrawBullet(ctx, i, ParagraphTop(i));
+            _layouts[i].Draw(ctx, new Point(IndentOf(i), ParagraphTop(i)));
+        }
 
         // caret
         if (_caretVisible && IsFocused)
@@ -273,13 +283,69 @@ public sealed class RichTextEditor : Control
         }
     }
 
+    // ---- bullet glyphs: style key → (glyph, size, color). "num" and "check" are drawn specially. ----
+    private static readonly Dictionary<string, (string Glyph, double Size, string Color)> BulletGlyphs = new()
+    {
+        ["dot"] = ("●", 9, "#4DA6FF"),
+        ["arrow"] = ("➤", 11, "#4DA6FF"),
+        ["star"] = ("★", 12, "#E9B865"),
+        ["heart"] = ("♥", 12, "#E27BA6"),
+        ["flower"] = ("✿", 12, "#7FD1A6"),
+        ["spark"] = ("✦", 12, "#FFD966"),
+    };
+
+    private static readonly FontFamily GlyphFont = new("Segoe UI Symbol, Segoe UI Emoji, Segoe UI");
+
+    private void DrawBullet(DrawingContext ctx, int pi, double top)
+    {
+        var p = _doc.Paragraphs[pi];
+        if (p.Bullet is null) return;
+        double lineH = _layouts[pi].TextLines.Count > 0 ? _layouts[pi].TextLines[0].Height : FontSize * 1.35;
+        double cx = BulletIndent / 2 - 2;
+        double cy = top + lineH / 2;
+
+        if (p.Bullet == "check")
+        {
+            var box = new Rect(cx - 7.5, cy - 7.5, 15, 15);
+            if (p.Checked)
+            {
+                ctx.DrawRectangle(BrushFor("#4DA6FF"), null, box, 4, 4);
+                var pen = new Pen(Brushes.White, 1.8) { LineCap = PenLineCap.Round };
+                ctx.DrawLine(pen, new Point(cx - 4, cy + 0.5), new Point(cx - 1, cy + 3.5));
+                ctx.DrawLine(pen, new Point(cx - 1, cy + 3.5), new Point(cx + 4.5, cy - 3));
+            }
+            else
+            {
+                ctx.DrawRectangle(null, new Pen(BrushFor("#66FFFFFF"), 1.5), box, 4, 4);
+            }
+            return;
+        }
+
+        if (p.Bullet == "num")
+        {
+            int n = 1;
+            for (int j = pi - 1; j >= 0 && _doc.Paragraphs[j].Bullet == "num"; j--) n++;
+            var ft = new FormattedText($"{n}.", System.Globalization.CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight, new Typeface(FontFamily), 12.5, BrushFor("#CCFFFFFF"));
+            ctx.DrawText(ft, new Point(BulletIndent - 7 - ft.Width, cy - ft.Height / 2));
+            return;
+        }
+
+        if (BulletGlyphs.TryGetValue(p.Bullet, out var g))
+        {
+            var ft = new FormattedText(g.Glyph, System.Globalization.CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight, new Typeface(GlyphFont), g.Size, BrushFor(g.Color));
+            ctx.DrawText(ft, new Point(cx - ft.Width / 2, cy - ft.Height / 2));
+        }
+    }
+
     private Rect CaretRect()
     {
         var p = _caret;
         _doc.Clamp(ref p);
         if (p.Para >= _layouts.Count) return new Rect(0, 0, 1.6, FontSize * 1.35);
         var r = _layouts[p.Para].HitTestTextPosition(p.Off);
-        return new Rect(r.X, r.Y + ParagraphTop(p.Para), r.Width, r.Height <= 0 ? FontSize * 1.35 : r.Height);
+        return new Rect(r.X + IndentOf(p.Para), r.Y + ParagraphTop(p.Para), r.Width, r.Height <= 0 ? FontSize * 1.35 : r.Height);
     }
 
     private (DocPos a, DocPos b) SelOrdered() => _anchor <= _caret ? (_anchor, _caret) : (_caret, _anchor);
@@ -297,7 +363,7 @@ public sealed class RichTextEditor : Control
             double h = _layouts[i].Height + (i < _layouts.Count - 1 ? ParagraphSpacing : 0);
             if (pt.Y < y + h || i == _layouts.Count - 1)
             {
-                var hit = _layouts[i].HitTestPoint(new Point(pt.X, Math.Max(0, pt.Y - y)));
+                var hit = _layouts[i].HitTestPoint(new Point(Math.Max(0, pt.X - IndentOf(i)), Math.Max(0, pt.Y - y)));
                 return new DocPos(i, hit.TextPosition);
             }
             y += h;
@@ -399,12 +465,20 @@ public sealed class RichTextEditor : Control
             case Key.Enter:
                 PushUndo();
                 if (HasSelection) DeleteSelection();
-                _caret = _anchor = _doc.SplitParagraph(_caret);
+                // Enter on an EMPTY list item escapes the list instead of continuing it (standard behavior).
+                if (_doc.Paragraphs[_caret.Para].Bullet is not null && _doc.Paragraphs[_caret.Para].Length == 0)
+                    _doc.SetBullet(_caret, _caret, null);
+                else
+                    _caret = _anchor = _doc.SplitParagraph(_caret);
                 AfterEdit();
                 break;
             case Key.Back:
                 PushUndo(typing: !HasSelection && !ctrl);
                 if (HasSelection) DeleteSelection();
+                else if (_caret.Off == 0 && _doc.Paragraphs[_caret.Para].Bullet is not null)
+                {
+                    _doc.SetBullet(_caret, _caret, null);   // Backspace at a list item's start clears the bullet first
+                }
                 else
                 {
                     var prev = ctrl ? PrevWordPos(_caret) : _doc.Move(_caret, -1);   // Ctrl+Backspace = delete word
@@ -441,6 +515,12 @@ public sealed class RichTextEditor : Control
                 break;
             case Key.H when ctrl && shift:
                 ToggleDefaultHighlight();
+                break;
+            case Key.D8 when ctrl && shift:              // Ctrl+Shift+8 — dot bullets
+                ApplyBullet("dot");
+                break;
+            case Key.D7 when ctrl && shift:              // Ctrl+Shift+7 — numbered list
+                ApplyBullet("num");
                 break;
             case Key.Z when ctrl:
                 Undo(); AfterEdit(pushedUndo: false);
@@ -482,6 +562,29 @@ public sealed class RichTextEditor : Control
                 Strike = _doc.RangeAll(a, b, r => r.Strike),
             };
         }
+    }
+
+    /// <summary>Bullet style of the paragraph at the selection start (null = none) — for toolbar state.</summary>
+    public string? CurrentBullet
+    {
+        get
+        {
+            var (a, _) = SelOrdered();
+            _doc.Clamp(ref a);
+            return _doc.Paragraphs[a.Para].Bullet;
+        }
+    }
+
+    /// <summary>Apply a bullet style to every paragraph the selection touches. Picking the style the
+    /// paragraphs already have (or null) clears it.</summary>
+    public void ApplyBullet(string? style)
+    {
+        PushUndo();
+        var (a, b) = SelOrdered();
+        bool clear = style is null || _doc.BulletAll(a, b, style);
+        _doc.SetBullet(a, b, clear ? null : style);
+        _typingBurst = false;
+        RaiseSelectionChanged();
     }
 
     public void ToggleBold() => ToggleFlag(r => r.Bold, (r, v) => r.Bold = v, f => f with { Bold = !f.Bold });
@@ -692,6 +795,21 @@ public sealed class RichTextEditor : Control
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         Focus();
         var pos = PosFromPoint(pt);
+
+        // Click on a checkbox in the gutter toggles it (single click, first line of the paragraph).
+        if (e.ClickCount == 1 && pt.X <= BulletIndent && _doc.Paragraphs[pos.Para].Bullet == "check")
+        {
+            double top = ParagraphTop(pos.Para);
+            double lineH = _layouts.Count > pos.Para && _layouts[pos.Para].TextLines.Count > 0
+                ? _layouts[pos.Para].TextLines[0].Height : FontSize * 1.35;
+            if (pt.Y >= top && pt.Y <= top + lineH)
+            {
+                PushUndo();
+                _doc.ToggleChecked(pos.Para);
+                e.Handled = true;
+                return;
+            }
+        }
 
         if (e.ClickCount == 2) { SelectWordAt(pos); }
         else if (e.ClickCount >= 3)

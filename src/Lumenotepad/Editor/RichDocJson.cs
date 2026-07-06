@@ -26,6 +26,8 @@ public static class RichDocJson
     private sealed class ParaDto
     {
         [JsonPropertyName("runs")] public List<RunDto> Runs { get; set; } = new();
+        [JsonPropertyName("bul")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Bul { get; set; }
+        [JsonPropertyName("chk")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Chk { get; set; }
     }
 
     private sealed class DocDto
@@ -42,6 +44,8 @@ public static class RichDocJson
         {
             Paras = doc.Paragraphs.Select(p => new ParaDto
             {
+                Bul = p.Bullet,
+                Chk = p.Checked,
                 Runs = p.Runs.Select(r => new RunDto
                 {
                     T = r.Text, B = r.Bold, I = r.Italic, U = r.Underline, S = r.Strike,
@@ -65,7 +69,7 @@ public static class RichDocJson
         doc.Paragraphs.Clear();
         foreach (var p in dto.Paras)
         {
-            var para = new Paragraph();
+            var para = new Paragraph { Bullet = p.Bul, Checked = p.Chk };
             foreach (var r in p.Runs.Where(r => r.T.Length > 0))
                 para.Runs.Add(new RichRun
                 {

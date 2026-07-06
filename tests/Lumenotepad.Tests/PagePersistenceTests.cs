@@ -28,6 +28,22 @@ public class RichDocJsonTests
     }
 
     [Fact]
+    public void RoundTrip_preservesBulletsAndCheckedState()
+    {
+        var doc = new RichDocument();
+        doc.InsertText(new DocPos(0, 0), "buy milk\nwalk dog");
+        doc.SetBullet(new DocPos(0, 0), new DocPos(1, 0), "check");
+        doc.ToggleChecked(0);
+
+        var restored = RichDocJson.FromJson(RichDocJson.ToJson(doc));
+
+        Assert.Equal("check", restored.Paragraphs[0].Bullet);
+        Assert.True(restored.Paragraphs[0].Checked);
+        Assert.Equal("check", restored.Paragraphs[1].Bullet);
+        Assert.False(restored.Paragraphs[1].Checked);
+    }
+
+    [Fact]
     public void RoundTrip_preservesFullFormatSet()
     {
         var doc = new RichDocument();

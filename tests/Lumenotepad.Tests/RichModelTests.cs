@@ -101,6 +101,41 @@ public class RichModelTests
     }
 
     [Fact]
+    public void SetBullet_appliesAcrossRange_andBulletAllDetects()
+    {
+        var d = Doc("one\ntwo\nthree");
+        d.SetBullet(new DocPos(0, 0), new DocPos(1, 0), "dot");
+        Assert.Equal("dot", d.Paragraphs[0].Bullet);
+        Assert.Equal("dot", d.Paragraphs[1].Bullet);
+        Assert.Null(d.Paragraphs[2].Bullet);
+        Assert.True(d.BulletAll(new DocPos(0, 0), new DocPos(1, 0), "dot"));
+        Assert.False(d.BulletAll(new DocPos(0, 0), new DocPos(2, 0), "dot"));
+    }
+
+    [Fact]
+    public void SplitParagraph_inheritsBullet_butNotChecked()
+    {
+        var d = Doc("task one");
+        d.SetBullet(new DocPos(0, 0), new DocPos(0, 0), "check");
+        d.ToggleChecked(0);
+        d.SplitParagraph(d.End);
+
+        Assert.Equal("check", d.Paragraphs[1].Bullet);
+        Assert.True(d.Paragraphs[0].Checked);
+        Assert.False(d.Paragraphs[1].Checked);
+    }
+
+    [Fact]
+    public void SetBullet_awayFromCheck_resetsChecked()
+    {
+        var d = Doc("task");
+        d.SetBullet(new DocPos(0, 0), new DocPos(0, 0), "check");
+        d.ToggleChecked(0);
+        d.SetBullet(new DocPos(0, 0), new DocPos(0, 0), "dot");
+        Assert.False(d.Paragraphs[0].Checked);
+    }
+
+    [Fact]
     public void Move_crossesParagraphBoundaries()
     {
         var d = Doc("ab\ncd");

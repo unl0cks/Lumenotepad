@@ -71,6 +71,7 @@ public partial class FormatToolbar : UserControl
 
         BuildSwatches(HighlightSwatches, Highlights, hex => Do(e => e.ApplyHighlight(hex)), HighlightBtn);
         BuildSwatches(ColorSwatches, TextColors, hex => Do(e => e.ApplyColor(hex)), ColorBtn);
+        BuildBulletChoices();
         BuildFontList();
         BuildDockMenu();
     }
@@ -91,7 +92,7 @@ public partial class FormatToolbar : UserControl
             Dock.Bottom => PlacementMode.Top,
             _ => PlacementMode.Bottom,
         };
-        foreach (var b in new[] { HighlightBtn, ColorBtn, FontBtn })
+        foreach (var b in new[] { BulletBtn, HighlightBtn, ColorBtn, FontBtn })
             if (b.Flyout is PopupFlyoutBase pf) pf.Placement = placement;
         if (DockBtn.Flyout is PopupFlyoutBase df) df.Placement = placement;
 
@@ -160,6 +161,32 @@ public partial class FormatToolbar : UserControl
         }
     }
 
+    private static readonly (string? Key, string Glyph, string Name)[] Bullets =
+    {
+        (null, "∅", "None"),
+        ("dot", "●", "Bullet"), ("arrow", "➤", "Arrow"), ("star", "★", "Star"),
+        ("heart", "♥", "Heart"), ("flower", "✿", "Flower"), ("spark", "✦", "Spark"),
+        ("num", "1.", "Numbered list"), ("check", "☑", "Checklist"),
+    };
+
+    private void BuildBulletChoices()
+    {
+        foreach (var (key, glyph, name) in Bullets)
+        {
+            var b = new Button
+            {
+                Width = 30, Height = 30, FontSize = 13,
+                FontFamily = new FontFamily("Segoe UI Symbol, Segoe UI Emoji, Segoe UI"),
+                Content = glyph,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+            };
+            ToolTip.SetTip(b, name);
+            b.Click += (_, _) => { Do(e => e.ApplyBullet(key)); BulletBtn.Flyout?.Hide(); };
+            BulletChoices.Children.Add(b);
+        }
+    }
+
     private void BuildFontList()
     {
         var names = FontManager.Current.SystemFonts.Select(f => f.Name)
@@ -207,6 +234,7 @@ public partial class FormatToolbar : UserControl
             StrikeBtn.Classes.Set("on", f.Strike);
             HighlightBtn.Classes.Set("on", f.Highlight is not null);
             ColorBtn.Classes.Set("on", f.Color is not null);
+            BulletBtn.Classes.Set("on", _target.CurrentBullet is not null);
             if (!SizeBox.IsFocused)                       // don't clobber a number mid-typing
                 SizeBox.Text = (f.Size ?? _target.FontSize).ToString("0");
             FontList.SelectedItem = f.Font ?? "(Default)";

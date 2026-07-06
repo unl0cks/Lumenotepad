@@ -44,6 +44,15 @@
             <Button x:Name="StrikeBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
                     FontFamily="{StaticResource IconFont}" Content="&#xEDE0;" ToolTip.Tip="Strikethrough (Ctrl+Shift+S)"/>
 
+            <Button x:Name="BulletBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
+                    FontFamily="{StaticResource IconFont}" Content="&#xE8FD;" ToolTip.Tip="Bullets &amp; lists (Ctrl+Shift+8)">
+                <Button.Flyout>
+                    <Flyout Placement="Bottom">
+                        <StackPanel Orientation="Horizontal" Spacing="4" x:Name="BulletChoices"/>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
+
             <Button x:Name="HighlightBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
                     FontFamily="{StaticResource IconFont}" Content="&#xE7E6;" ToolTip.Tip="Highlight (Ctrl+Shift+H)">
                 <Button.Flyout>
