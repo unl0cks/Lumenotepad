@@ -82,7 +82,7 @@ public partial class FormatToolbar : UserControl
         bool vertical = dock is Dock.Left or Dock.Right;
         Panel.Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;
         SizeGroup.Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;
-        Chrome.Padding = vertical ? new Thickness(4, 6) : new Thickness(6, 4);
+        Chrome.Padding = vertical ? new Thickness(2, 6) : new Thickness(6, 4);
 
         var placement = dock switch
         {
@@ -101,10 +101,10 @@ public partial class FormatToolbar : UserControl
         {
             (true, Dock.Top) => new Thickness(14, 12, 14, 0),
             (true, Dock.Bottom) => new Thickness(14, 0, 14, 12),
-            (true, Dock.Left) => new Thickness(12, 14, 0, 14),
-            (true, Dock.Right) => new Thickness(0, 14, 12, 14),
-            (false, Dock.Left) => new Thickness(6, 4, 2, 4),
-            (false, Dock.Right) => new Thickness(2, 4, 6, 4),
+            (true, Dock.Left) => new Thickness(7, 14, 0, 14),
+            (true, Dock.Right) => new Thickness(0, 14, 7, 14),
+            (false, Dock.Left) => new Thickness(3, 4, 0, 4),
+            (false, Dock.Right) => new Thickness(0, 4, 3, 4),
             _ => new Thickness(0),
         };
     }

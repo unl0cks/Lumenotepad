@@ -65,14 +65,14 @@
             <StackPanel x:Name="SizeGroup" Orientation="Horizontal" Spacing="0">
                 <Button x:Name="SizeMinus" Theme="{StaticResource IconButton}" Width="24" Height="30" FontSize="11"
                         FontFamily="{StaticResource IconFont}" Content="&#xE949;" ToolTip.Tip="Smaller"/>
-                <TextBox x:Name="SizeBox" Width="34" Height="26" FontSize="12" Text="15"
+                <TextBox x:Name="SizeBox" Width="30" Height="26" FontSize="12" Text="15"
                          VerticalAlignment="Center" VerticalContentAlignment="Center"
                          TextAlignment="Center" ToolTip.Tip="Font size — type a number and press Enter"/>
                 <Button x:Name="SizePlus" Theme="{StaticResource IconButton}" Width="24" Height="30" FontSize="11"
                         FontFamily="{StaticResource IconFont}" Content="&#xE948;" ToolTip.Tip="Larger"/>
             </StackPanel>
 
-            <Button x:Name="FontBtn" Theme="{StaticResource IconButton}" Width="34" Height="30" FontSize="13"
+            <Button x:Name="FontBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="13"
                     Content="Aa" ToolTip.Tip="Font">
                 <Button.Flyout>
                     <Flyout Placement="Bottom">
