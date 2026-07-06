@@ -125,7 +125,7 @@
 
                     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto">
                         <TextBox x:Name="NotebookName" Classes="rename" FontSize="16" FontWeight="SemiBold"
-                                 Watermark="Notebook" Text="{Binding SelectedNotebook.Name, Mode=TwoWay}"/>
+                                 PlaceholderText="Notebook" Text="{Binding SelectedNotebook.Name, Mode=TwoWay}"/>
                         <Button Grid.Column="1" Theme="{StaticResource IconButton}" Width="28" Height="28" FontSize="13"
                                 FontFamily="{StaticResource IconFont}" Content="&#xE74D;"
                                 Command="{Binding DeleteNotebookCommand}" ToolTip.Tip="Delete notebook"/>
@@ -192,7 +192,7 @@
                     Background="#0BFFFFFF" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
                 <DockPanel Margin="26,22">
                     <TextBox x:Name="PageTitle" DockPanel.Dock="Top" Classes="rename"
-                             FontSize="26" FontWeight="SemiBold" Watermark="Page title"
+                             FontSize="26" FontWeight="SemiBold" PlaceholderText="Page title"
                              IsVisible="{Binding SelectedPage, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
                              Text="{Binding SelectedPage.Title, Mode=TwoWay}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,12,0,0">

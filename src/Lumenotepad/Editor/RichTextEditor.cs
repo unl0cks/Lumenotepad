@@ -153,6 +153,9 @@ public sealed class RichTextEditor : Control
 
     public override void Render(DrawingContext ctx)
     {
+        // A control with no rendered fill is NOT hit-testable — clicks would pass straight through and
+        // the editor could never take focus. Transparent still registers for hit-testing.
+        ctx.FillRectangle(Brushes.Transparent, new Rect(Bounds.Size));
         EnsureLayouts(Bounds.Width);
 
         // selection highlight
