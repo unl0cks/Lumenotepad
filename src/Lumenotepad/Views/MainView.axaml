@@ -87,8 +87,10 @@
             </StackPanel>
         </Grid>
 
-        <!-- ============ Body: rail | nav | canvas ============ -->
-        <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*">
+        <!-- ============ Body: dockable toolbar + (rail | nav | canvas) ============ -->
+        <DockPanel Grid.Row="1">
+        <v:FormatToolbar x:Name="Toolbar" DockPanel.Dock="Top"/>
+        <Grid ColumnDefinitions="Auto,Auto,*">
 
             <!-- Notebooks rail -->
             <Border Grid.Column="0" Width="64" IsVisible="{Binding IsRailVisible}"
@@ -201,5 +203,6 @@
                 </DockPanel>
             </Border>
         </Grid>
+        </DockPanel>
     </Grid>
 </UserControl>

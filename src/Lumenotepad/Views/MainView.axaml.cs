@@ -38,6 +38,10 @@ public partial class MainView : UserControl
         // The editor edits the selected page's document (session-only in the M3 slice).
         DataContextChanged += (_, _) => HookVm();
 
+        // Formatting toolbar drives the editor; dock menu re-docks it via the VM (persisted).
+        Toolbar.Target = Editor;
+        Toolbar.DockRequested += pos => { if (Vm is { } vm) vm.ToolbarPosition = pos; };
+
         // Section inline rename: double-click a tab, the rename button, or right-click → Rename.
         RenameSectionBtn.Click += (_, _) => BeginRenameSection(Vm?.SelectedSection);
         SectionsList.DoubleTapped += (_, e) => BeginRenameSection((e.Source as StyledElement)?.DataContext as Section);
@@ -65,7 +69,21 @@ public partial class MainView : UserControl
             _hookedVm.PropertyChanged += OnVmPropertyChanged;
             _hookedVm.DocsDirtied += OnDocsDirtied;
             SyncEditorDocument();
+            ApplyToolbarPosition(_hookedVm.ToolbarPosition);
         }
+    }
+
+    private void ApplyToolbarPosition(string pos)
+    {
+        var dock = pos switch
+        {
+            "Left" => Avalonia.Controls.Dock.Left,
+            "Right" => Avalonia.Controls.Dock.Right,
+            "Bottom" => Avalonia.Controls.Dock.Bottom,
+            _ => Avalonia.Controls.Dock.Top,
+        };
+        DockPanel.SetDock(Toolbar, dock);
+        Toolbar.SetVertical(dock is Avalonia.Controls.Dock.Left or Avalonia.Controls.Dock.Right);
     }
 
     // Debounced autosave: flush dirty page docs after ~0.9s of typing idle.
@@ -83,6 +101,8 @@ public partial class MainView : UserControl
     private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(MainViewModel.SelectedPage)) SyncEditorDocument();
+        else if (e.PropertyName == nameof(MainViewModel.ToolbarPosition) && Vm is { } vm)
+            ApplyToolbarPosition(vm.ToolbarPosition);
     }
 
     private void SyncEditorDocument()

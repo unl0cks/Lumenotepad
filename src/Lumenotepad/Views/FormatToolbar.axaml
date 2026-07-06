@@ -1,0 +1,80 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Lumenotepad.Views.FormatToolbar">
+
+    <UserControl.Styles>
+        <!-- active (format applies at caret/selection) -->
+        <Style Selector="Button.on"><Setter Property="Foreground" Value="{StaticResource AccentBrush}"/></Style>
+        <Style Selector="Button.on /template/ Border#bg">
+            <Setter Property="Background" Value="{StaticResource AccentSoftBrush}"/>
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
+        <!-- swatch buttons inside flyouts -->
+        <Style Selector="Button.swatch">
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="CornerRadius" Value="7"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderBrush" Value="#33FFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="Button.swatch:pointerover"><Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/></Style>
+    </UserControl.Styles>
+
+    <Border x:Name="Chrome" Padding="5,3">
+        <StackPanel x:Name="Panel" Orientation="Horizontal" Spacing="1">
+
+            <Button x:Name="BoldBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
+                    FontFamily="{StaticResource IconFont}" Content="&#xE8DD;" ToolTip.Tip="Bold (Ctrl+B)"/>
+            <Button x:Name="ItalicBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
+                    FontFamily="{StaticResource IconFont}" Content="&#xE8DB;" ToolTip.Tip="Italic (Ctrl+I)"/>
+            <Button x:Name="UnderBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
+                    FontFamily="{StaticResource IconFont}" Content="&#xE8DC;" ToolTip.Tip="Underline (Ctrl+U)"/>
+            <Button x:Name="StrikeBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
+                    FontFamily="{StaticResource IconFont}" Content="&#xEDE0;" ToolTip.Tip="Strikethrough (Ctrl+Shift+S)"/>
+
+            <Button x:Name="HighlightBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
+                    FontFamily="{StaticResource IconFont}" Content="&#xE7E6;" ToolTip.Tip="Highlight (Ctrl+Shift+H)">
+                <Button.Flyout>
+                    <Flyout Placement="Bottom">
+                        <StackPanel Orientation="Horizontal" Spacing="6" x:Name="HighlightSwatches"/>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
+
+            <Button x:Name="ColorBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
+                    FontFamily="{StaticResource IconFont}" Content="&#xE8D3;" ToolTip.Tip="Text color">
+                <Button.Flyout>
+                    <Flyout Placement="Bottom">
+                        <StackPanel Orientation="Horizontal" Spacing="6" x:Name="ColorSwatches"/>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
+
+            <StackPanel x:Name="SizeGroup" Orientation="Horizontal" Spacing="0">
+                <Button x:Name="SizeMinus" Theme="{StaticResource IconButton}" Width="24" Height="30" FontSize="11"
+                        FontFamily="{StaticResource IconFont}" Content="&#xE949;" ToolTip.Tip="Smaller"/>
+                <Border Width="26" Height="30">
+                    <TextBlock x:Name="SizeText" Text="15" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <Button x:Name="SizePlus" Theme="{StaticResource IconButton}" Width="24" Height="30" FontSize="11"
+                        FontFamily="{StaticResource IconFont}" Content="&#xE948;" ToolTip.Tip="Larger"/>
+            </StackPanel>
+
+            <Button x:Name="FontBtn" Theme="{StaticResource IconButton}" Width="34" Height="30" FontSize="13"
+                    Content="Aa" ToolTip.Tip="Font">
+                <Button.Flyout>
+                    <Flyout Placement="Bottom">
+                        <StackPanel Width="230" Spacing="6">
+                            <TextBlock Text="Font" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}"/>
+                            <ListBox x:Name="FontList" MaxHeight="320" Background="Transparent" FontSize="13"/>
+                        </StackPanel>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
+
+            <Button x:Name="DockBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
+                    FontFamily="{StaticResource IconFont}" Content="&#xE712;" ToolTip.Tip="Toolbar position"/>
+        </StackPanel>
+    </Border>
+</UserControl>

@@ -10,6 +10,7 @@ public sealed class AppSettings
     public bool FullTheme { get; set; }                     // canvas matches frame material when true
     public string AccentColor { get; set; } = "#4DA6FF";
     public double BlurStrength { get; set; } = 0.6;         // 0..1
+    public string ToolbarPosition { get; set; } = "Top";    // "Top" | "Left" | "Right" | "Bottom"
 
     private const string FileName = "settings.json";
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };

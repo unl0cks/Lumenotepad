@@ -25,15 +25,32 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private Page? _selectedPage;
     [ObservableProperty] private bool _isRailVisible = true;
     [ObservableProperty] private bool _isPagesVisible = true;
+    [ObservableProperty] private string _toolbarPosition = "Top";   // "Top" | "Left" | "Right" | "Bottom"
+
+    private readonly AppSettings? _settings;
+    private readonly string? _settingsDir;
 
     // Designer / default: use the portable userdata folder beside the exe.
-    public MainViewModel() : this(new WorkspaceStore(AppSettings.DefaultDir)) { }
+    public MainViewModel() : this(new WorkspaceStore(AppSettings.DefaultDir), AppSettings.DefaultDir) { }
 
-    public MainViewModel(WorkspaceStore store)
+    public MainViewModel(WorkspaceStore store, string? settingsDir = null)
     {
         _store = store;
+        _settingsDir = settingsDir;
+        if (settingsDir is not null)
+        {
+            _settings = AppSettings.Load(settingsDir);
+            ToolbarPosition = _settings.ToolbarPosition;
+        }
         _workspace = store.LoadOrSeed();
         SelectedNotebook = Notebooks.FirstOrDefault();
+    }
+
+    partial void OnToolbarPositionChanged(string value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.ToolbarPosition = value;
+        _settings.Save(_settingsDir);
     }
 
     /// <summary>Persist the whole tree (called after every structural change / rename).</summary>
