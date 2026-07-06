@@ -4,6 +4,7 @@
              xmlns:vm="using:Lumenotepad.ViewModels"
              xmlns:models="using:Lumenotepad.Models"
              xmlns:v="using:Lumenotepad.Views"
+             xmlns:editor="using:Lumenotepad.Editor"
              xmlns:conv="using:Avalonia.Data.Converters"
              x:DataType="vm:MainViewModel">
 
@@ -186,7 +187,7 @@
                 </DockPanel>
             </Border>
 
-            <!-- Canvas placeholder -->
+            <!-- Page: title + rich-text editor (M3 slice: one region; the freeform canvas layers on next) -->
             <Border Grid.Column="2" Margin="14" CornerRadius="14"
                     Background="#0BFFFFFF" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
                 <DockPanel Margin="26,22">
@@ -194,9 +195,9 @@
                              FontSize="26" FontWeight="SemiBold" Watermark="Page title"
                              IsVisible="{Binding SelectedPage, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
                              Text="{Binding SelectedPage.Title, Mode=TwoWay}"/>
-                    <TextBlock VerticalAlignment="Center" HorizontalAlignment="Center"
-                               Foreground="{StaticResource TextMutedBrush}" FontSize="13"
-                               Text="Your freeform canvas lives here — coming in M3."/>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,12,0,0">
+                        <editor:RichTextEditor x:Name="Editor" MinHeight="200"/>
+                    </ScrollViewer>
                 </DockPanel>
             </Border>
         </Grid>

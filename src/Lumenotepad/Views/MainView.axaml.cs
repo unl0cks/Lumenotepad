@@ -35,6 +35,9 @@ public partial class MainView : UserControl
             box.KeyDown += (s, e) => { if (e.Key == Key.Enter) { Vm?.Save(); ((Control?)s)?.Focus(); } };
         }
 
+        // The editor edits the selected page's document (session-only in the M3 slice).
+        DataContextChanged += (_, _) => HookVm();
+
         // Section inline rename: double-click a tab, the rename button, or right-click → Rename.
         RenameSectionBtn.Click += (_, _) => BeginRenameSection(Vm?.SelectedSection);
         SectionsList.DoubleTapped += (_, e) => BeginRenameSection((e.Source as StyledElement)?.DataContext as Section);
@@ -45,6 +48,29 @@ public partial class MainView : UserControl
 
     private MainViewModel? Vm => DataContext as MainViewModel;
     private Window? Window => TopLevel.GetTopLevel(this) as Window;
+
+    private MainViewModel? _hookedVm;
+
+    private void HookVm()
+    {
+        if (_hookedVm is not null) _hookedVm.PropertyChanged -= OnVmPropertyChanged;
+        _hookedVm = Vm;
+        if (_hookedVm is not null)
+        {
+            _hookedVm.PropertyChanged += OnVmPropertyChanged;
+            SyncEditorDocument();
+        }
+    }
+
+    private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainViewModel.SelectedPage)) SyncEditorDocument();
+    }
+
+    private void SyncEditorDocument()
+    {
+        if (Vm?.SelectedPage is { } page) Editor.Document = Vm.DocumentFor(page);
+    }
 
     private void BeginRenameSection(Section? sec)
     {

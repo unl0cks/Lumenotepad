@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Lumenotepad.Editor;
 using Lumenotepad.Models;
 using Lumenotepad.Services;
 
@@ -36,6 +38,17 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>Persist the whole tree (called after every structural change / rename).</summary>
     public void Save() => _store.Save(_workspace);
+
+    // M3 slice: per-page rich documents, session-only (the persisted page format lands with M3.2).
+    private readonly Dictionary<string, RichDocument> _docs = new();
+
+    /// <summary>The rich document for a page (created on first access; kept for the session).</summary>
+    public RichDocument DocumentFor(Page page)
+    {
+        if (!_docs.TryGetValue(page.Id, out var doc))
+            _docs[page.Id] = doc = new RichDocument();
+        return doc;
+    }
 
     // Selecting a notebook drops into its first section; selecting a section drops into its first page.
     partial void OnSelectedNotebookChanged(Notebook? value) => SelectedSection = value?.Sections.FirstOrDefault();
