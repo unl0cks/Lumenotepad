@@ -21,6 +21,10 @@ public sealed class Paragraph
 {
     public List<RichRun> Runs = new();
 
+    /// <summary>Bumped by RichDocument on every mutation of this paragraph, so views can cache a
+    /// per-paragraph layout and rebuild only what changed (keystroke cost stays O(1), not O(document)).</summary>
+    public int Version;
+
     public int Length => Runs.Sum(r => r.Text.Length);
     public string Text => string.Concat(Runs.Select(r => r.Text));
 
@@ -129,6 +133,7 @@ public sealed class RichDocument
                 int runIdx = para.SplitAt(cur.Off);
                 para.Runs.Insert(runIdx, new RichRun { Text = lines[i], Bold = bold, Italic = italic });
                 para.Normalize();
+                para.Version++;
                 cur = cur with { Off = cur.Off + lines[i].Length };
             }
         }
@@ -151,6 +156,7 @@ public sealed class RichDocument
         int runIdx = para.SplitAt(pos.Off);
         var next = new Paragraph { Runs = para.Runs.Skip(runIdx).ToList() };
         para.Runs.RemoveRange(runIdx, para.Runs.Count - runIdx);
+        para.Version++;
         Paragraphs.Insert(pos.Para + 1, next);
         return new DocPos(pos.Para + 1, 0);
     }
@@ -169,6 +175,7 @@ public sealed class RichDocument
             int i2 = para.SplitAt(b.Off);
             para.Runs.RemoveRange(i1, i2 - i1);
             para.Normalize();
+            para.Version++;
         }
         else
         {
@@ -181,6 +188,7 @@ public sealed class RichDocument
             first.Runs.AddRange(last.Runs);          // merge the tail of the last paragraph up
             Paragraphs.RemoveRange(a.Para + 1, b.Para - a.Para);
             first.Normalize();
+            first.Version++;
         }
         OnChanged();
     }
@@ -227,6 +235,7 @@ public sealed class RichDocument
             int i2 = para.SplitAt(end);
             for (int i = i1; i < i2; i++) mutate(para.Runs[i]);
             para.Normalize();
+            para.Version++;
         }
         OnChanged();
     }

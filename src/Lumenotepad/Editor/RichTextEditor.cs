@@ -56,8 +56,12 @@ public sealed class RichTextEditor : Control
     private readonly Stack<(DocSnapshot Snap, DocPos Caret, DocPos Anchor)> _redo = new();
     private bool _typingBurst;
 
-    // ---- layout cache ----
+    // ---- layout cache: one TextLayout per paragraph, keyed by (paragraph, version, width) so a keystroke
+    // rebuilds ONLY the paragraph it touched (O(1) per edit, not O(document)) ----
     private readonly List<TextLayout> _layouts = new();
+    private readonly Dictionary<Paragraph, (TextLayout Layout, int Version, double Width)> _cache = new();
+    private double[] _tops = Array.Empty<double>();
+    private double _contentHeight;
     private double _layoutWidth = -1;
     private bool _layoutsDirty = true;
 
@@ -85,13 +89,41 @@ public sealed class RichTextEditor : Control
 
     private void EnsureLayouts(double width)
     {
-        if (!_layoutsDirty && Math.Abs(width - _layoutWidth) < 0.5 && _layouts.Count == _doc.Paragraphs.Count)
+        double w = double.IsFinite(width) && width > 1 ? width : double.PositiveInfinity;
+        if (!_layoutsDirty && Math.Abs(w - _layoutWidth) < 0.5 && _layouts.Count == _doc.Paragraphs.Count)
             return;
-        _layoutWidth = width;
+        _layoutWidth = w;
         _layoutsDirty = false;
-        foreach (var l in _layouts) l.Dispose();
+
         _layouts.Clear();
-        foreach (var p in _doc.Paragraphs) _layouts.Add(BuildLayout(p, width));
+        var next = new Dictionary<Paragraph, (TextLayout, int, double)>(_doc.Paragraphs.Count);
+        foreach (var p in _doc.Paragraphs)
+        {
+            TextLayout layout;
+            if (_cache.TryGetValue(p, out var e) && e.Version == p.Version && Math.Abs(e.Width - w) < 0.5)
+                layout = e.Layout;                                     // untouched paragraph → reuse
+            else
+            {
+                if (_cache.TryGetValue(p, out var stale)) stale.Layout.Dispose();
+                layout = BuildLayout(p, w);
+            }
+            _cache.Remove(p);                                          // claimed (whatever's left is disposed below)
+            next[p] = (layout, p.Version, w);
+            _layouts.Add(layout);
+        }
+        foreach (var orphan in _cache.Values) orphan.Layout.Dispose();  // paragraphs deleted from the doc
+        _cache.Clear();
+        foreach (var kv in next) _cache[kv.Key] = kv.Value;
+
+        // cumulative paragraph tops (Render/hit-testing read these instead of re-walking heights)
+        if (_tops.Length != _layouts.Count) _tops = new double[_layouts.Count];
+        double y = 0;
+        for (int i = 0; i < _layouts.Count; i++)
+        {
+            _tops[i] = y;
+            y += _layouts[i].Height + ParagraphSpacing;
+        }
+        _contentHeight = _layouts.Count > 0 ? y - ParagraphSpacing : 0;
     }
 
     private TextLayout BuildLayout(Paragraph p, double width)
@@ -134,19 +166,12 @@ public sealed class RichTextEditor : Control
         }
     }
 
-    private double ParagraphTop(int para)
-    {
-        double y = 0;
-        for (int i = 0; i < para && i < _layouts.Count; i++)
-            y += _layouts[i].Height + ParagraphSpacing;
-        return y;
-    }
+    private double ParagraphTop(int para) => para >= 0 && para < _tops.Length ? _tops[para] : 0;
 
     protected override Size MeasureOverride(Size availableSize)
     {
         EnsureLayouts(availableSize.Width);
-        double h = _layouts.Sum(l => l.Height) + ParagraphSpacing * Math.Max(0, _layouts.Count - 1);
-        return new Size(availableSize.Width, h + 4);
+        return new Size(availableSize.Width, _contentHeight + 4);
     }
 
     // =========================== rendering ===========================
