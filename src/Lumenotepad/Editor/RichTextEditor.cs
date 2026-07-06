@@ -76,7 +76,17 @@ public sealed class RichTextEditor : Control
         LostFocus += (_, _) => { _blink.Stop(); _caretVisible = false; InvalidateVisual(); };
     }
 
-    private void OnDocChanged() => InvalidateLayouts();
+    private void OnDocChanged()
+    {
+        // Incremental relayout on the spot (only touched paragraphs rebuild), then invalidate measure ONLY
+        // if the content height actually changed — otherwise a full window layout pass runs per keystroke.
+        if (_layoutWidth < 0) { InvalidateLayouts(); return; }
+        double prevH = _contentHeight;
+        _layoutsDirty = true;
+        EnsureLayouts(_layoutWidth);
+        if (Math.Abs(_contentHeight - prevH) > 0.5) InvalidateMeasure();
+        InvalidateVisual();
+    }
 
     private void InvalidateLayouts()
     {
@@ -325,6 +335,12 @@ public sealed class RichTextEditor : Control
             case Key.Left or Key.Right when !ctrl:
                 MoveCaret(_doc.Move(_caret, e.Key == Key.Right ? 1 : -1), shift);
                 break;
+            case Key.Left when ctrl:
+                MoveCaret(PrevWordPos(_caret), shift);
+                break;
+            case Key.Right when ctrl:
+                MoveCaret(NextWordPos(_caret), shift);
+                break;
             case Key.Up or Key.Down:
                 MoveCaretVertical(e.Key == Key.Down ? 1 : -1, shift);
                 break;
@@ -341,21 +357,21 @@ public sealed class RichTextEditor : Control
                 AfterEdit();
                 break;
             case Key.Back:
-                PushUndo(typing: !HasSelection);
+                PushUndo(typing: !HasSelection && !ctrl);
                 if (HasSelection) DeleteSelection();
                 else
                 {
-                    var prev = _doc.Move(_caret, -1);
+                    var prev = ctrl ? PrevWordPos(_caret) : _doc.Move(_caret, -1);   // Ctrl+Backspace = delete word
                     if (prev != _caret) { _doc.DeleteRange(prev, _caret); _caret = _anchor = prev; }
                 }
                 AfterEdit();
                 break;
             case Key.Delete:
-                PushUndo(typing: !HasSelection);
+                PushUndo(typing: !HasSelection && !ctrl);
                 if (HasSelection) DeleteSelection();
                 else
                 {
-                    var next = _doc.Move(_caret, 1);
+                    var next = ctrl ? NextWordPos(_caret) : _doc.Move(_caret, 1);    // Ctrl+Delete = delete next word
                     if (next != _caret) _doc.DeleteRange(_caret, next);
                 }
                 AfterEdit();
@@ -475,8 +491,15 @@ public sealed class RichTextEditor : Control
         Dispatcher.UIThread.Post(() =>
         {
             EnsureLayouts(Bounds.Width);
-            var r = CaretRect();
-            this.BringIntoView(r.Inflate(new Thickness(0, 12)));
+            var r = CaretRect().Inflate(new Thickness(0, 12));
+            // Skip the ScrollViewer round-trip entirely when the caret is already visible — poking it on
+            // every keystroke costs a layout pass even when nothing needs to scroll.
+            if (this.FindAncestorOfType<ScrollViewer>() is { } sv)
+            {
+                var visible = new Rect(sv.Offset.X, sv.Offset.Y, sv.Viewport.Width, sv.Viewport.Height);
+                if (visible.Contains(r)) return;
+            }
+            this.BringIntoView(r);
         }, DispatcherPriority.Background);
     }
 
@@ -579,6 +602,42 @@ public sealed class RichTextEditor : Control
     {
         base.OnPointerReleased(e);
         if (_dragging) { _dragging = false; e.Pointer.Capture(null); }
+    }
+
+    private static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c == '_';
+
+    /// <summary>Start of the previous word (Windows convention): skip whitespace, then the run of
+    /// same-class characters. At paragraph start, crosses to the previous paragraph's end.</summary>
+    private DocPos PrevWordPos(DocPos p)
+    {
+        _doc.Clamp(ref p);
+        if (p.Off == 0) return _doc.Move(p, -1);
+        var text = _doc.Paragraphs[p.Para].Text;
+        int i = p.Off;
+        while (i > 0 && char.IsWhiteSpace(text[i - 1])) i--;
+        if (i > 0)
+        {
+            bool word = IsWordChar(text[i - 1]);
+            while (i > 0 && !char.IsWhiteSpace(text[i - 1]) && IsWordChar(text[i - 1]) == word) i--;
+        }
+        return p with { Off = i };
+    }
+
+    /// <summary>Start of the next word: skip the current run of same-class characters, then whitespace.
+    /// At paragraph end, crosses to the next paragraph's start.</summary>
+    private DocPos NextWordPos(DocPos p)
+    {
+        _doc.Clamp(ref p);
+        var text = _doc.Paragraphs[p.Para].Text;
+        if (p.Off >= text.Length) return _doc.Move(p, 1);
+        int i = p.Off;
+        if (!char.IsWhiteSpace(text[i]))
+        {
+            bool word = IsWordChar(text[i]);
+            while (i < text.Length && !char.IsWhiteSpace(text[i]) && IsWordChar(text[i]) == word) i++;
+        }
+        while (i < text.Length && char.IsWhiteSpace(text[i])) i++;
+        return p with { Off = i };
     }
 
     private void SelectWordAt(DocPos pos)
