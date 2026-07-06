@@ -27,6 +27,26 @@ public class RichDocJsonTests
         Assert.True(restored.RangeAll(new DocPos(2, 0), new DocPos(2, 6), r => r.Italic));
     }
 
+    [Fact]
+    public void RoundTrip_preservesFullFormatSet()
+    {
+        var doc = new RichDocument();
+        doc.InsertText(new DocPos(0, 0), "styled", new RunFormat(
+            Bold: true, Italic: false, Underline: true, Strike: true,
+            Highlight: "#66FFD666", Color: "#FF8FAB", Size: 22, Font: "Caveat"));
+
+        var restored = RichDocJson.FromJson(RichDocJson.ToJson(doc));
+        var run = restored.Paragraphs[0].Runs[0];
+
+        Assert.True(run.Bold);
+        Assert.True(run.Underline);
+        Assert.True(run.Strike);
+        Assert.Equal("#66FFD666", run.Highlight);
+        Assert.Equal("#FF8FAB", run.Color);
+        Assert.Equal(22, run.Size);
+        Assert.Equal("Caveat", run.Font);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]

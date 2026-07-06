@@ -49,7 +49,12 @@ public sealed class RichTextEditor : Control
     private bool _caretVisible = true;
     private readonly DispatcherTimer _blink = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private double _desiredX = -1;           // sticky column for up/down
-    private bool _pendingBold, _pendingItalic, _hasPending;   // Ctrl+B/I with a collapsed selection
+    private RunFormat _pending;              // format toggled at a collapsed caret → applies to next typed text
+    private bool _hasPending;
+
+    /// <summary>Raised when the caret/selection moves or formatting changes — toolbars refresh from this.</summary>
+    public event Action? SelectionChanged;
+    private void RaiseSelectionChanged() => SelectionChanged?.Invoke();
 
     // ---- undo ----
     private readonly Stack<(DocSnapshot Snap, DocPos Caret, DocPos Anchor)> _undo = new();
@@ -164,16 +169,40 @@ public sealed class RichTextEditor : Control
                 int end = acc + r.Text.Length;
                 if (index < end)
                 {
-                    var typeface = new Typeface(_e.FontFamily,
+                    var typeface = new Typeface(
+                        r.Font is { Length: > 0 } f ? new FontFamily(f) : _e.FontFamily,
                         r.Italic ? FontStyle.Italic : FontStyle.Normal,
                         r.Bold ? FontWeight.Bold : FontWeight.Normal);
-                    var props = new GenericTextRunProperties(typeface, _e.FontSize, foregroundBrush: _e.Foreground);
+                    TextDecorationCollection? deco =
+                        (r.Underline, r.Strike) switch
+                        {
+                            (true, true) => new TextDecorationCollection(
+                                TextDecorations.Underline.Concat(TextDecorations.Strikethrough)),
+                            (true, false) => TextDecorations.Underline,
+                            (false, true) => TextDecorations.Strikethrough,
+                            _ => null,
+                        };
+                    var props = new GenericTextRunProperties(typeface, r.Size ?? _e.FontSize,
+                        textDecorations: deco, foregroundBrush: BrushFor(r.Color) ?? _e.Foreground);
                     return new TextCharacters(r.Text.Substring(index - acc), props);
                 }
                 acc = end;
             }
             return null;
         }
+    }
+
+    private static readonly Dictionary<string, IBrush> _brushCache = new();
+
+    /// <summary>Parse-and-cache a hex color; null/invalid → null (caller falls back to the default).</summary>
+    private static IBrush? BrushFor(string? hex)
+    {
+        if (string.IsNullOrEmpty(hex)) return null;
+        if (_brushCache.TryGetValue(hex, out var b)) return b;
+        try { b = new SolidColorBrush(Color.Parse(hex)); }
+        catch { return null; }
+        _brushCache[hex] = b;
+        return b;
     }
 
     private double ParagraphTop(int para) => para >= 0 && para < _tops.Length ? _tops[para] : 0;
@@ -192,6 +221,23 @@ public sealed class RichTextEditor : Control
         // the editor could never take focus. Transparent still registers for hit-testing.
         ctx.FillRectangle(Brushes.Transparent, new Rect(Bounds.Size));
         EnsureLayouts(Bounds.Width);
+
+        // run highlights (drawn manually — guaranteed, no reliance on TextLayout background support)
+        for (int pi = 0; pi < _layouts.Count && pi < _doc.Paragraphs.Count; pi++)
+        {
+            int acc = 0;
+            double top = ParagraphTop(pi);
+            foreach (var run in _doc.Paragraphs[pi].Runs)
+            {
+                int len = run.Text.Length;
+                if (run.Highlight is { } hl && BrushFor(hl) is { } hlBrush && len > 0)
+                {
+                    foreach (var r in _layouts[pi].HitTestTextRange(acc, len))
+                        ctx.FillRectangle(hlBrush, new Rect(r.X, r.Y + top, r.Width, r.Height));
+                }
+                acc += len;
+            }
+        }
 
         // selection highlight
         var (selA, selB) = SelOrdered();
@@ -316,8 +362,8 @@ public sealed class RichTextEditor : Control
         PushUndo(typing: !HasSelection);
         if (HasSelection) DeleteSelection();
 
-        var (bold, italic) = _hasPending ? (_pendingBold, _pendingItalic) : _doc.FormatAt(_caret);
-        _caret = _anchor = _doc.InsertText(_caret, text, bold, italic);
+        var fmt = _hasPending ? _pending : _doc.FormatAt(_caret);
+        _caret = _anchor = _doc.InsertText(_caret, text, fmt);
         _hasPending = false;
         AfterEdit();
         e.Handled = true;
@@ -379,12 +425,22 @@ public sealed class RichTextEditor : Control
             case Key.A when ctrl:
                 _anchor = new DocPos(0, 0); _caret = _doc.End;
                 InvalidateVisual();
+                RaiseSelectionChanged();
                 break;
             case Key.B when ctrl:
-                ToggleFormat(isBold: true);
+                ToggleBold();
                 break;
             case Key.I when ctrl:
-                ToggleFormat(isBold: false);
+                ToggleItalic();
+                break;
+            case Key.U when ctrl:
+                ToggleUnderline();
+                break;
+            case Key.S when ctrl && shift:
+                ToggleStrike();
+                break;
+            case Key.H when ctrl && shift:
+                ToggleDefaultHighlight();
                 break;
             case Key.Z when ctrl:
                 Undo(); AfterEdit(pushedUndo: false);
@@ -408,24 +464,91 @@ public sealed class RichTextEditor : Control
         if (handled) e.Handled = true;
     }
 
-    /// <summary>Toggle bold/italic on the selection, or set the pending format for the next typed text.</summary>
-    public void ToggleFormat(bool isBold)
+    /// <summary>The format the caret currently "carries" (pending toggles, or the char before the caret;
+    /// for a selection the boolean flags reflect whole-range state). Toolbars read this on SelectionChanged.</summary>
+    public RunFormat CurrentFormat
+    {
+        get
+        {
+            if (_hasPending && !HasSelection) return _pending;
+            if (!HasSelection) return _doc.FormatAt(_caret);
+            var (a, b) = SelOrdered();
+            var f = _doc.FormatAt(_doc.Move(a, 1));
+            return f with
+            {
+                Bold = _doc.RangeAll(a, b, r => r.Bold),
+                Italic = _doc.RangeAll(a, b, r => r.Italic),
+                Underline = _doc.RangeAll(a, b, r => r.Underline),
+                Strike = _doc.RangeAll(a, b, r => r.Strike),
+            };
+        }
+    }
+
+    public void ToggleBold() => ToggleFlag(r => r.Bold, (r, v) => r.Bold = v, f => f with { Bold = !f.Bold });
+    public void ToggleItalic() => ToggleFlag(r => r.Italic, (r, v) => r.Italic = v, f => f with { Italic = !f.Italic });
+    public void ToggleUnderline() => ToggleFlag(r => r.Underline, (r, v) => r.Underline = v, f => f with { Underline = !f.Underline });
+    public void ToggleStrike() => ToggleFlag(r => r.Strike, (r, v) => r.Strike = v, f => f with { Strike = !f.Strike });
+
+    /// <summary>Apply a highlight color to the selection (null clears), or set it pending at the caret.</summary>
+    public void ApplyHighlight(string? hex) => ApplyValue(r => r.Highlight = hex, f => f with { Highlight = hex });
+    /// <summary>Apply a text color to the selection (null = theme default), or set it pending at the caret.</summary>
+    public void ApplyColor(string? hex) => ApplyValue(r => r.Color = hex, f => f with { Color = hex });
+    /// <summary>Apply a font size to the selection (null = editor default), or set it pending at the caret.</summary>
+    public void ApplySize(double? size) => ApplyValue(r => r.Size = size, f => f with { Size = size });
+    /// <summary>Apply a font family to the selection (null = editor default), or set it pending at the caret.</summary>
+    public void ApplyFont(string? family) => ApplyValue(r => r.Font = family, f => f with { Font = family });
+
+    /// <summary>Ctrl+Shift+H: toggle the default yellow highlight.</summary>
+    public void ToggleDefaultHighlight()
+    {
+        const string yellow = "#66FFD666";
+        if (HasSelection)
+        {
+            var (a, b) = SelOrdered();
+            ApplyHighlight(_doc.RangeAll(a, b, r => r.Highlight is not null) ? null : yellow);
+        }
+        else
+        {
+            var cur = _hasPending ? _pending : _doc.FormatAt(_caret);
+            ApplyHighlight(cur.Highlight is null ? yellow : null);
+        }
+    }
+
+    private void ToggleFlag(Func<RichRun, bool> get, Action<RichRun, bool> set, Func<RunFormat, RunFormat> flipPending)
     {
         if (HasSelection)
         {
             PushUndo();
             var (a, b) = SelOrdered();
-            bool all = _doc.RangeAll(a, b, r => isBold ? r.Bold : r.Italic);
-            _doc.ApplyFormat(a, b, r => { if (isBold) r.Bold = !all; else r.Italic = !all; });
+            bool all = _doc.RangeAll(a, b, get);
+            _doc.ApplyFormat(a, b, r => set(r, !all));
             _typingBurst = false;
             InvalidateVisual();
         }
         else
         {
-            var cur = _hasPending ? (_pendingBold, _pendingItalic) : _doc.FormatAt(_caret);
-            (_pendingBold, _pendingItalic) = isBold ? (!cur.Item1, cur.Item2) : (cur.Item1, !cur.Item2);
+            _pending = flipPending(_hasPending ? _pending : _doc.FormatAt(_caret));
             _hasPending = true;
         }
+        RaiseSelectionChanged();
+    }
+
+    private void ApplyValue(Action<RichRun> mutate, Func<RunFormat, RunFormat> setPending)
+    {
+        if (HasSelection)
+        {
+            PushUndo();
+            var (a, b) = SelOrdered();
+            _doc.ApplyFormat(a, b, mutate);
+            _typingBurst = false;
+            InvalidateVisual();
+        }
+        else
+        {
+            _pending = setPending(_hasPending ? _pending : _doc.FormatAt(_caret));
+            _hasPending = true;
+        }
+        RaiseSelectionChanged();
     }
 
     private void MoveCaret(DocPos to, bool extend)
@@ -439,6 +562,7 @@ public sealed class RichTextEditor : Control
         ResetBlink();
         BringCaretIntoView();
         InvalidateVisual();
+        RaiseSelectionChanged();
     }
 
     private void MoveCaretVertical(int dir, bool extend)
@@ -478,6 +602,7 @@ public sealed class RichTextEditor : Control
         ResetBlink();
         BringCaretIntoView();
         InvalidateVisual();
+        RaiseSelectionChanged();
     }
 
     private void ResetBlink()
@@ -550,8 +675,7 @@ public sealed class RichTextEditor : Control
             if (string.IsNullOrEmpty(text)) return;
             PushUndo();
             if (HasSelection) DeleteSelection();
-            var (bold, italic) = _doc.FormatAt(_caret);
-            _caret = _anchor = _doc.InsertText(_caret, text, bold, italic);
+            _caret = _anchor = _doc.InsertText(_caret, text, _doc.FormatAt(_caret));
             AfterEdit();
         }
         catch { }
@@ -587,6 +711,7 @@ public sealed class RichTextEditor : Control
         _desiredX = -1;
         ResetBlink();
         InvalidateVisual();
+        RaiseSelectionChanged();
         e.Handled = true;
     }
 

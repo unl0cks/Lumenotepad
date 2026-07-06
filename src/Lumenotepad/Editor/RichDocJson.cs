@@ -15,6 +15,12 @@ public static class RichDocJson
         [JsonPropertyName("t")] public string T { get; set; } = "";
         [JsonPropertyName("b")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool B { get; set; }
         [JsonPropertyName("i")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool I { get; set; }
+        [JsonPropertyName("u")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool U { get; set; }
+        [JsonPropertyName("s")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool S { get; set; }
+        [JsonPropertyName("hl")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Hl { get; set; }
+        [JsonPropertyName("c")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? C { get; set; }
+        [JsonPropertyName("fs")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public double? Fs { get; set; }
+        [JsonPropertyName("f")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? F { get; set; }
     }
 
     private sealed class ParaDto
@@ -36,7 +42,11 @@ public static class RichDocJson
         {
             Paras = doc.Paragraphs.Select(p => new ParaDto
             {
-                Runs = p.Runs.Select(r => new RunDto { T = r.Text, B = r.Bold, I = r.Italic }).ToList(),
+                Runs = p.Runs.Select(r => new RunDto
+                {
+                    T = r.Text, B = r.Bold, I = r.Italic, U = r.Underline, S = r.Strike,
+                    Hl = r.Highlight, C = r.Color, Fs = r.Size, F = r.Font,
+                }).ToList(),
             }).ToList(),
         };
         return JsonSerializer.Serialize(dto, Options);
@@ -57,7 +67,11 @@ public static class RichDocJson
         {
             var para = new Paragraph();
             foreach (var r in p.Runs.Where(r => r.T.Length > 0))
-                para.Runs.Add(new RichRun { Text = r.T, Bold = r.B, Italic = r.I });
+                para.Runs.Add(new RichRun
+                {
+                    Text = r.T, Bold = r.B, Italic = r.I, Underline = r.U, Strike = r.S,
+                    Highlight = r.Hl, Color = r.C, Size = r.Fs, Font = r.F,
+                });
             doc.Paragraphs.Add(para);
         }
         if (doc.Paragraphs.Count == 0) doc.Paragraphs.Add(new Paragraph());

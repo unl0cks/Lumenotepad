@@ -11,10 +11,35 @@ public sealed class RichRun
     public string Text = "";
     public bool Bold;
     public bool Italic;
+    public bool Underline;
+    public bool Strike;
+    public string? Highlight;   // hex ("#FFD666") or null = none
+    public string? Color;       // hex or null = theme default
+    public double? Size;        // null = editor default
+    public string? Font;        // family name or null = editor default
 
-    public RichRun Clone() => new() { Text = Text, Bold = Bold, Italic = Italic };
-    public bool SameFormat(RichRun o) => Bold == o.Bold && Italic == o.Italic;
+    public RichRun Clone() => new()
+    {
+        Text = Text, Bold = Bold, Italic = Italic, Underline = Underline, Strike = Strike,
+        Highlight = Highlight, Color = Color, Size = Size, Font = Font,
+    };
+
+    public bool SameFormat(RichRun o) =>
+        Bold == o.Bold && Italic == o.Italic && Underline == o.Underline && Strike == o.Strike &&
+        Highlight == o.Highlight && Color == o.Color && Size == o.Size && Font == o.Font;
+
+    public RunFormat Format => new(Bold, Italic, Underline, Strike, Highlight, Color, Size, Font);
+    public void SetFormat(RunFormat f)
+    {
+        Bold = f.Bold; Italic = f.Italic; Underline = f.Underline; Strike = f.Strike;
+        Highlight = f.Highlight; Color = f.Color; Size = f.Size; Font = f.Font;
+    }
 }
+
+/// <summary>A complete character format — what the caret "carries" and what runs store.</summary>
+public readonly record struct RunFormat(
+    bool Bold, bool Italic, bool Underline, bool Strike,
+    string? Highlight, string? Color, double? Size, string? Font);
 
 /// <summary>A paragraph = an ordered list of runs (zero runs = an empty paragraph).</summary>
 public sealed class Paragraph
@@ -117,9 +142,13 @@ public sealed class RichDocument
         return p.Para > 0 ? new DocPos(p.Para - 1, Paragraphs[p.Para - 1].Length) : p;
     }
 
+    /// <summary>Insert text (may contain '\n' → paragraph splits) with bold/italic only (test/back-compat).</summary>
+    public DocPos InsertText(DocPos pos, string text, bool bold = false, bool italic = false)
+        => InsertText(pos, text, new RunFormat(bold, italic, false, false, null, null, null, null));
+
     /// <summary>Insert text (may contain '\n' → paragraph splits) with the given formatting.
     /// Returns the position after the inserted text.</summary>
-    public DocPos InsertText(DocPos pos, string text, bool bold = false, bool italic = false)
+    public DocPos InsertText(DocPos pos, string text, RunFormat fmt)
     {
         Clamp(ref pos);
         var lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
@@ -131,7 +160,9 @@ public sealed class RichDocument
             {
                 var para = Paragraphs[cur.Para];
                 int runIdx = para.SplitAt(cur.Off);
-                para.Runs.Insert(runIdx, new RichRun { Text = lines[i], Bold = bold, Italic = italic });
+                var run = new RichRun { Text = lines[i] };
+                run.SetFormat(fmt);
+                para.Runs.Insert(runIdx, run);
                 para.Normalize();
                 para.Version++;
                 cur = cur with { Off = cur.Off + lines[i].Length };
@@ -195,20 +226,19 @@ public sealed class RichDocument
 
     /// <summary>Formatting of the character just before the position (what typing "continues"), or the
     /// first run's format at paragraph start.</summary>
-    public (bool Bold, bool Italic) FormatAt(DocPos pos)
+    public RunFormat FormatAt(DocPos pos)
     {
         Clamp(ref pos);
         var para = Paragraphs[pos.Para];
-        if (para.Runs.Count == 0) return (false, false);
+        if (para.Runs.Count == 0) return default;
         int acc = 0;
         foreach (var r in para.Runs)
         {
             int end = acc + r.Text.Length;
-            if (pos.Off <= end && (pos.Off > acc || acc == 0)) return (r.Bold, r.Italic);
+            if (pos.Off <= end && (pos.Off > acc || acc == 0)) return r.Format;
             acc = end;
         }
-        var lastRun = para.Runs[^1];
-        return (lastRun.Bold, lastRun.Italic);
+        return para.Runs[^1].Format;
     }
 
     public bool RangeAll(DocPos a, DocPos b, Func<RichRun, bool> pred)
