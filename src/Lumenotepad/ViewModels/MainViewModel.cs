@@ -39,15 +39,48 @@ public partial class MainViewModel : ObservableObject
     /// <summary>Persist the whole tree (called after every structural change / rename).</summary>
     public void Save() => _store.Save(_workspace);
 
-    // M3 slice: per-page rich documents, session-only (the persisted page format lands with M3.2).
-    private readonly Dictionary<string, RichDocument> _docs = new();
+    // Per-page rich documents: loaded from disk on first access, dirty-tracked on edit, saved by
+    // FlushDirtyDocs (the view debounces it while typing; page switch and window close flush too).
+    private readonly Dictionary<string, (RichDocument Doc, Notebook Owner)> _docs = new();
+    private readonly HashSet<string> _dirty = new();
 
-    /// <summary>The rich document for a page (created on first access; kept for the session).</summary>
+    /// <summary>Raised whenever any page document changes — the view uses it to debounce an autosave.</summary>
+    public event Action? DocsDirtied;
+
+    /// <summary>The rich document for a page (loaded from its notebook folder on first access).</summary>
     public RichDocument DocumentFor(Page page)
     {
-        if (!_docs.TryGetValue(page.Id, out var doc))
-            _docs[page.Id] = doc = new RichDocument();
+        if (_docs.TryGetValue(page.Id, out var entry)) return entry.Doc;
+        var owner = FindOwner(page) ?? SelectedNotebook ?? Notebooks.First();
+        var doc = _store.LoadPageDoc(owner, page.Id) ?? new RichDocument();
+        doc.Changed += () => { _dirty.Add(page.Id); DocsDirtied?.Invoke(); };
+        _docs[page.Id] = (doc, owner);
         return doc;
+    }
+
+    /// <summary>Write every dirty page document to disk.</summary>
+    public void FlushDirtyDocs()
+    {
+        foreach (var id in _dirty.ToList())
+        {
+            if (_docs.TryGetValue(id, out var entry))
+                _store.SavePageDoc(entry.Owner, id, entry.Doc);
+        }
+        _dirty.Clear();
+    }
+
+    private Notebook? FindOwner(Page page) =>
+        Notebooks.FirstOrDefault(nb => nb.Sections.Any(s => s.Pages.Contains(page)));
+
+    /// <summary>Drop cached/dirty state (and optionally the file) for pages that no longer exist.</summary>
+    private void ForgetPageDoc(Page page, bool deleteFile)
+    {
+        if (_docs.TryGetValue(page.Id, out var entry) && deleteFile)
+            _store.DeletePageDoc(entry.Owner, page.Id);
+        else if (deleteFile && FindOwner(page) is { } owner)
+            _store.DeletePageDoc(owner, page.Id);
+        _docs.Remove(page.Id);
+        _dirty.Remove(page.Id);
     }
 
     // Selecting a notebook drops into its first section; selecting a section drops into its first page.
@@ -92,6 +125,8 @@ public partial class MainViewModel : ObservableObject
     {
         nb ??= SelectedNotebook;
         if (nb is null) return;
+        foreach (var page in nb.Sections.SelectMany(s => s.Pages))
+            ForgetPageDoc(page, deleteFile: false);           // whole folder goes away below
         int idx = Notebooks.IndexOf(nb);
         Notebooks.Remove(nb);
         _store.DeleteNotebook(nb);
@@ -104,6 +139,7 @@ public partial class MainViewModel : ObservableObject
     {
         sec ??= SelectedSection;
         if (sec is null || SelectedNotebook is not { } nb) return;
+        foreach (var page in sec.Pages) ForgetPageDoc(page, deleteFile: true);
         int idx = nb.Sections.IndexOf(sec);
         nb.Sections.Remove(sec);
         SelectedSection = nb.Sections.ElementAtOrDefault(Math.Max(0, idx - 1));
@@ -115,6 +151,7 @@ public partial class MainViewModel : ObservableObject
     {
         pg ??= SelectedPage;
         if (pg is null || SelectedSection is not { } sec) return;
+        ForgetPageDoc(pg, deleteFile: true);
         int idx = sec.Pages.IndexOf(pg);
         sec.Pages.Remove(pg);
         SelectedPage = sec.Pages.ElementAtOrDefault(Math.Max(0, idx - 1));

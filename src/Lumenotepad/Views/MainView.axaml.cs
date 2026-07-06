@@ -50,16 +50,34 @@ public partial class MainView : UserControl
     private Window? Window => TopLevel.GetTopLevel(this) as Window;
 
     private MainViewModel? _hookedVm;
+    private Avalonia.Threading.DispatcherTimer? _autosave;
 
     private void HookVm()
     {
-        if (_hookedVm is not null) _hookedVm.PropertyChanged -= OnVmPropertyChanged;
+        if (_hookedVm is not null)
+        {
+            _hookedVm.PropertyChanged -= OnVmPropertyChanged;
+            _hookedVm.DocsDirtied -= OnDocsDirtied;
+        }
         _hookedVm = Vm;
         if (_hookedVm is not null)
         {
             _hookedVm.PropertyChanged += OnVmPropertyChanged;
+            _hookedVm.DocsDirtied += OnDocsDirtied;
             SyncEditorDocument();
         }
+    }
+
+    // Debounced autosave: flush dirty page docs after ~0.9s of typing idle.
+    private void OnDocsDirtied()
+    {
+        if (_autosave is null)
+        {
+            _autosave = new Avalonia.Threading.DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(900) };
+            _autosave.Tick += (_, _) => { _autosave!.Stop(); Vm?.FlushDirtyDocs(); };
+        }
+        _autosave.Stop();
+        _autosave.Start();
     }
 
     private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -69,6 +87,7 @@ public partial class MainView : UserControl
 
     private void SyncEditorDocument()
     {
+        Vm?.FlushDirtyDocs();                      // the page being left saves immediately
         if (Vm?.SelectedPage is { } page) Editor.Document = Vm.DocumentFor(page);
     }
 

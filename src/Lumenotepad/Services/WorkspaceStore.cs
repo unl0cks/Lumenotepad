@@ -84,4 +84,33 @@ public sealed class WorkspaceStore
         var dir = Path.Combine(_root, nb.Folder);
         try { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); } catch { }
     }
+
+    // ---- page content (one JSON per page in <notebook>/pages/) ----
+
+    private string PageDocPath(Notebook nb, string pageId) =>
+        Path.Combine(_root, nb.Folder, "pages", pageId + ".page.json");
+
+    public void SavePageDoc(Notebook nb, string pageId, Editor.RichDocument doc)
+    {
+        if (string.IsNullOrEmpty(nb.Folder)) return;   // notebook not persisted yet (Save assigns folders)
+        var path = PageDocPath(nb, pageId);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, Editor.RichDocJson.ToJson(doc));
+    }
+
+    /// <summary>The page's saved content, or null if it has none yet.</summary>
+    public Editor.RichDocument? LoadPageDoc(Notebook nb, string pageId)
+    {
+        if (string.IsNullOrEmpty(nb.Folder)) return null;
+        var path = PageDocPath(nb, pageId);
+        if (!File.Exists(path)) return null;
+        try { return Editor.RichDocJson.FromJson(File.ReadAllText(path)); }
+        catch { return null; }
+    }
+
+    public void DeletePageDoc(Notebook nb, string pageId)
+    {
+        if (string.IsNullOrEmpty(nb.Folder)) return;
+        try { File.Delete(PageDocPath(nb, pageId)); } catch { }
+    }
 }

@@ -13,6 +13,12 @@ public partial class MainWindow : Window
         InitializeComponent();
     }
 
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        base.OnClosing(e);
+        (DataContext as ViewModels.MainViewModel)?.FlushDirtyDocs();   // never lose the last keystrokes
+    }
+
     protected override void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
