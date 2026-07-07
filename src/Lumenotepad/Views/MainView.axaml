@@ -126,7 +126,8 @@
                 <DockPanel Margin="12,12,12,0">
 
                     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto">
-                        <TextBox x:Name="NotebookName" Classes="rename" FontSize="16" FontWeight="SemiBold"
+                        <TextBox x:Name="NotebookName" Theme="{StaticResource RoundedFieldTextBox}" Classes="rename"
+                                 FontSize="16" FontWeight="SemiBold"
                                  PlaceholderText="Notebook" Text="{Binding SelectedNotebook.Name, Mode=TwoWay}"/>
                         <Button Grid.Column="1" Theme="{StaticResource IconButton}" Width="28" Height="28" FontSize="13"
                                 FontFamily="{StaticResource IconFont}" Content="&#xE74D;"
@@ -158,7 +159,8 @@
                                     <Panel>
                                         <TextBlock Text="{Binding Name}" FontSize="12.5" VerticalAlignment="Center"
                                                    IsVisible="{Binding !IsEditing}"/>
-                                        <TextBox Classes="inlineedit" FontSize="12.5" Text="{Binding Name, Mode=TwoWay}"
+                                        <TextBox Classes="inlineedit" Theme="{StaticResource RoundedFieldTextBox}"
+                                                 FontSize="12.5" Text="{Binding Name, Mode=TwoWay}"
                                                  IsVisible="{Binding IsEditing}"/>
                                     </Panel>
                                 </DataTemplate>
@@ -194,6 +196,7 @@
                     Background="#0BFFFFFF" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
                 <DockPanel x:Name="PageDock">
                     <TextBox x:Name="PageTitle" DockPanel.Dock="Top" Classes="rename" Margin="26,22,26,0"
+                             Theme="{StaticResource RoundedFieldTextBox}"
                              FontSize="26" FontWeight="SemiBold" PlaceholderText="Page title"
                              IsVisible="{Binding SelectedPage, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
                              Text="{Binding SelectedPage.Title, Mode=TwoWay}"/>

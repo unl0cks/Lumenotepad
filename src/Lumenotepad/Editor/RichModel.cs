@@ -57,6 +57,11 @@ public sealed class Paragraph
     /// <summary>Ticked state for "check" bullets.</summary>
     public bool Checked;
 
+    /// <summary>Style overrides for the NUMBER of a "num" paragraph. null = inherit the corresponding
+    /// flag from the paragraph's first text run (numbers match their text by default; a future
+    /// preferences/context UI can override them independently).</summary>
+    public bool? NumBold, NumItalic, NumUnderline, NumStrike;
+
     public int Length => Runs.Sum(r => r.Text.Length);
     public string Text => string.Concat(Runs.Select(r => r.Text));
 
@@ -65,6 +70,7 @@ public sealed class Paragraph
         Runs = Runs.Select(r => r.Clone()).ToList(),
         Bullet = Bullet,
         Checked = Checked,
+        NumBold = NumBold, NumItalic = NumItalic, NumUnderline = NumUnderline, NumStrike = NumStrike,
     };
 
     /// <summary>Ensure a run boundary exists exactly at <paramref name="offset"/>; returns the index of the

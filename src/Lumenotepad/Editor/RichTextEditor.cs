@@ -141,15 +141,25 @@ public sealed class RichTextEditor : Control
         _contentHeight = _layouts.Count > 0 ? y - ParagraphSpacing : 0;
     }
 
-    /// <summary>Gutter width for bulleted/numbered/checkbox paragraphs.</summary>
+    /// <summary>Base gutter width for bulleted/numbered/checkbox paragraphs (scales with the text size).</summary>
     private const double BulletIndent = 26;
 
+    /// <summary>How much bigger/smaller this paragraph's bullet should render, tracking its text size
+    /// (taken from the first run) relative to the editor default.</summary>
+    private double ScaleOf(Paragraph p)
+    {
+        double eff = p.Runs.Count > 0 ? p.Runs[0].Size ?? FontSize : FontSize;
+        return Math.Clamp(eff / FontSize, 0.75, 2.5);
+    }
+
+    private double IndentOf(Paragraph p) => p.Bullet is null ? 0 : BulletIndent * Math.Max(1, ScaleOf(p));
+
     private double IndentOf(int pi) =>
-        pi >= 0 && pi < _doc.Paragraphs.Count && _doc.Paragraphs[pi].Bullet is not null ? BulletIndent : 0;
+        pi >= 0 && pi < _doc.Paragraphs.Count ? IndentOf(_doc.Paragraphs[pi]) : 0;
 
     private TextLayout BuildLayout(Paragraph p, double width)
     {
-        if (p.Bullet is not null && double.IsFinite(width)) width -= BulletIndent;
+        if (p.Bullet is not null && double.IsFinite(width)) width -= IndentOf(p);
         double maxWidth = double.IsFinite(width) && width > 1 ? width : double.PositiveInfinity;
         if (p.Runs.Count == 0)
             return new TextLayout("", new Typeface(FontFamily), FontSize, Foreground,
@@ -300,23 +310,26 @@ public sealed class RichTextEditor : Control
     {
         var p = _doc.Paragraphs[pi];
         if (p.Bullet is null) return;
+        double s = ScaleOf(p);                                // bullets track their paragraph's text size
+        double indent = IndentOf(p);
         double lineH = _layouts[pi].TextLines.Count > 0 ? _layouts[pi].TextLines[0].Height : FontSize * 1.35;
-        double cx = BulletIndent / 2 - 2;
+        double cx = indent / 2 - 2 * s;
         double cy = top + lineH / 2;
 
         if (p.Bullet == "check")
         {
-            var box = new Rect(cx - 7.5, cy - 7.5, 15, 15);
+            double half = 7.5 * s;
+            var box = new Rect(cx - half, cy - half, half * 2, half * 2);
             if (p.Checked)
             {
-                ctx.DrawRectangle(BrushFor("#4DA6FF"), null, box, 4, 4);
-                var pen = new Pen(Brushes.White, 1.8) { LineCap = PenLineCap.Round };
-                ctx.DrawLine(pen, new Point(cx - 4, cy + 0.5), new Point(cx - 1, cy + 3.5));
-                ctx.DrawLine(pen, new Point(cx - 1, cy + 3.5), new Point(cx + 4.5, cy - 3));
+                ctx.DrawRectangle(BrushFor("#4DA6FF"), null, box, 4 * s, 4 * s);
+                var pen = new Pen(Brushes.White, 1.8 * s) { LineCap = PenLineCap.Round };
+                ctx.DrawLine(pen, new Point(cx - 4 * s, cy + 0.5 * s), new Point(cx - 1 * s, cy + 3.5 * s));
+                ctx.DrawLine(pen, new Point(cx - 1 * s, cy + 3.5 * s), new Point(cx + 4.5 * s, cy - 3 * s));
             }
             else
             {
-                ctx.DrawRectangle(null, new Pen(BrushFor("#66FFFFFF"), 1.5), box, 4, 4);
+                ctx.DrawRectangle(null, new Pen(BrushFor("#66FFFFFF"), 1.5 * s), box, 4 * s, 4 * s);
             }
             return;
         }
@@ -325,16 +338,34 @@ public sealed class RichTextEditor : Control
         {
             int n = 1;
             for (int j = pi - 1; j >= 0 && _doc.Paragraphs[j].Bullet == "num"; j--) n++;
+            // The number inherits its text's bold/italic/underline/strike unless overridden per flag.
+            var fr = p.Runs.Count > 0 ? p.Runs[0] : null;
+            bool bold = p.NumBold ?? fr?.Bold ?? false;
+            bool italic = p.NumItalic ?? fr?.Italic ?? false;
+            bool under = p.NumUnderline ?? fr?.Underline ?? false;
+            bool strike = p.NumStrike ?? fr?.Strike ?? false;
+            var brush = BrushFor("#CCFFFFFF")!;
             var ft = new FormattedText($"{n}.", System.Globalization.CultureInfo.CurrentCulture,
-                FlowDirection.LeftToRight, new Typeface(FontFamily), 12.5, BrushFor("#CCFFFFFF"));
-            ctx.DrawText(ft, new Point(BulletIndent - 7 - ft.Width, cy - ft.Height / 2));
+                FlowDirection.LeftToRight,
+                new Typeface(FontFamily, italic ? FontStyle.Italic : FontStyle.Normal,
+                             bold ? FontWeight.Bold : FontWeight.Normal),
+                12.5 * s, brush);
+            var origin = new Point(indent - 7 - ft.Width, cy - ft.Height / 2);
+            ctx.DrawText(ft, origin);
+            var decoPen = new Pen(brush, Math.Max(1, s));
+            if (under)
+                ctx.DrawLine(decoPen, new Point(origin.X, origin.Y + ft.Height * 0.92),
+                                      new Point(origin.X + ft.Width, origin.Y + ft.Height * 0.92));
+            if (strike)
+                ctx.DrawLine(decoPen, new Point(origin.X, origin.Y + ft.Height * 0.55),
+                                      new Point(origin.X + ft.Width, origin.Y + ft.Height * 0.55));
             return;
         }
 
         if (BulletGlyphs.TryGetValue(p.Bullet, out var g))
         {
             var ft = new FormattedText(g.Glyph, System.Globalization.CultureInfo.CurrentCulture,
-                FlowDirection.LeftToRight, new Typeface(GlyphFont), g.Size, BrushFor(g.Color));
+                FlowDirection.LeftToRight, new Typeface(GlyphFont), g.Size * s, BrushFor(g.Color));
             ctx.DrawText(ft, new Point(cx - ft.Width / 2, cy - ft.Height / 2));
         }
     }
@@ -797,18 +828,12 @@ public sealed class RichTextEditor : Control
         var pos = PosFromPoint(pt);
 
         // Click on a checkbox in the gutter toggles it (single click, first line of the paragraph).
-        if (e.ClickCount == 1 && pt.X <= BulletIndent && _doc.Paragraphs[pos.Para].Bullet == "check")
+        if (e.ClickCount == 1 && IsOverCheckbox(pt, out int checkPara))
         {
-            double top = ParagraphTop(pos.Para);
-            double lineH = _layouts.Count > pos.Para && _layouts[pos.Para].TextLines.Count > 0
-                ? _layouts[pos.Para].TextLines[0].Height : FontSize * 1.35;
-            if (pt.Y >= top && pt.Y <= top + lineH)
-            {
-                PushUndo();
-                _doc.ToggleChecked(pos.Para);
-                e.Handled = true;
-                return;
-            }
+            PushUndo();
+            _doc.ToggleChecked(checkPara);
+            e.Handled = true;
+            return;
         }
 
         if (e.ClickCount == 2) { SelectWordAt(pos); }
@@ -833,12 +858,36 @@ public sealed class RichTextEditor : Control
         e.Handled = true;
     }
 
+    private static readonly Cursor IbeamCursor = new(StandardCursorType.Ibeam);
+    private static readonly Cursor HandCursor = new(StandardCursorType.Hand);
+
+    /// <summary>Is the point on a checkbox glyph (its paragraph's gutter, first line)?</summary>
+    private bool IsOverCheckbox(Point pt, out int paraIndex)
+    {
+        paraIndex = -1;
+        var pos = PosFromPoint(pt);
+        if (pos.Para >= _doc.Paragraphs.Count || _doc.Paragraphs[pos.Para].Bullet != "check") return false;
+        if (pt.X > IndentOf(pos.Para)) return false;
+        double top = ParagraphTop(pos.Para);
+        double lineH = _layouts.Count > pos.Para && _layouts[pos.Para].TextLines.Count > 0
+            ? _layouts[pos.Para].TextLines[0].Height : FontSize * 1.35;
+        if (pt.Y < top || pt.Y > top + lineH) return false;
+        paraIndex = pos.Para;
+        return true;
+    }
+
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
-        if (!_dragging) return;
-        _caret = PosFromPoint(e.GetPosition(this));
-        InvalidateVisual();
+        var pt = e.GetPosition(this);
+        if (_dragging)
+        {
+            _caret = PosFromPoint(pt);
+            InvalidateVisual();
+            return;
+        }
+        // Checkboxes are clickable — show a pointing hand over them, the I-beam everywhere else.
+        Cursor = IsOverCheckbox(pt, out _) ? HandCursor : IbeamCursor;
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)

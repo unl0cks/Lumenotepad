@@ -11,5 +11,26 @@
     </Application.Resources>
     <Application.Styles>
         <FluentTheme />
+
+        <!-- Slim, rounded, glass-friendly scrollbars everywhere -->
+        <Style Selector="ScrollBar">
+            <Setter Property="AllowAutoHide" Value="True"/>
+        </Style>
+        <Style Selector="ScrollBar:vertical">
+            <Setter Property="Width" Value="9"/>
+        </Style>
+        <Style Selector="ScrollBar:horizontal">
+            <Setter Property="Height" Value="9"/>
+        </Style>
+        <Style Selector="ScrollBar Thumb">
+            <Setter Property="Background" Value="#2EFFFFFF"/>
+            <Setter Property="CornerRadius" Value="4"/>
+        </Style>
+        <Style Selector="ScrollBar Thumb:pointerover">
+            <Setter Property="Background" Value="#52FFFFFF"/>
+        </Style>
+        <Style Selector="ScrollBar Thumb:pressed">
+            <Setter Property="Background" Value="#70FFFFFF"/>
+        </Style>
     </Application.Styles>
 </Application>

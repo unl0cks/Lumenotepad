@@ -56,6 +56,44 @@
         <Style Selector="^:disabled"><Setter Property="Opacity" Value="0.35"/></Style>
     </ControlTheme>
 
+    <!-- ============== Single-line text field with ROUNDED selection ============== -->
+    <!-- Minimal template around RoundedTextPresenter: real SelectionBrush is transparent (the stock
+         presenter has no corner-radius hook), the presenter paints rounded accent rects itself. -->
+    <ControlTheme x:Key="RoundedFieldTextBox" TargetType="TextBox">
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}"/>
+        <Setter Property="SelectionBrush" Value="Transparent"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding" Value="4,2"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="PART_BorderElement" Background="{TemplateBinding Background}" CornerRadius="6">
+                    <ScrollViewer Name="PART_ScrollViewer" Padding="{TemplateBinding Padding}"
+                                  HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                        <Panel>
+                            <controls:TextSelectionUnderlay Brush="#554DA6FF"
+                                Presenter="{Binding #PART_TextPresenter}"/>
+                            <TextBlock Name="watermark" Text="{TemplateBinding PlaceholderText}"
+                                       Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"
+                                       IsVisible="{TemplateBinding Text, Converter={x:Static StringConverters.IsNullOrEmpty}}"/>
+                            <TextPresenter Name="PART_TextPresenter"
+                                Text="{TemplateBinding Text, Mode=TwoWay}"
+                                CaretIndex="{TemplateBinding CaretIndex}"
+                                SelectionStart="{TemplateBinding SelectionStart}"
+                                SelectionEnd="{TemplateBinding SelectionEnd}"
+                                TextAlignment="{TemplateBinding TextAlignment}"
+                                TextWrapping="NoWrap"
+                                CaretBrush="{TemplateBinding CaretBrush}"
+                                SelectionBrush="{TemplateBinding SelectionBrush}"
+                                VerticalAlignment="Center"/>
+                        </Panel>
+                    </ScrollViewer>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </ControlTheme>
+
     <!-- Caption (window) buttons -->
     <ControlTheme x:Key="CaptionButton" TargetType="Button">
         <Setter Property="Focusable" Value="False"/>
