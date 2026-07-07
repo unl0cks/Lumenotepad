@@ -195,15 +195,39 @@
             <Border Grid.Column="2" Margin="14" CornerRadius="14"
                     Background="#0BFFFFFF" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
                 <DockPanel x:Name="PageDock">
-                    <TextBox x:Name="PageTitle" DockPanel.Dock="Top" Classes="rename" Margin="26,22,26,0"
-                             Theme="{StaticResource RoundedFieldTextBox}"
-                             FontSize="26" FontWeight="SemiBold" PlaceholderText="Page title"
-                             IsVisible="{Binding SelectedPage, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
-                             Text="{Binding SelectedPage.Title, Mode=TwoWay}"/>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
-                                  Margin="16,12,16,16">
-                        <editor:NoteCanvas x:Name="PageCanvas"/>
-                    </ScrollViewer>
+                    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="26,22,26,0"
+                          IsVisible="{Binding SelectedPage, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
+                        <TextBox x:Name="PageTitle" Classes="rename"
+                                 Theme="{StaticResource RoundedFieldTextBox}"
+                                 FontSize="26" FontWeight="SemiBold" PlaceholderText="Page title"
+                                 Text="{Binding SelectedPage.Title, Mode=TwoWay}"/>
+                        <Button x:Name="HistoryBtn" Grid.Column="1" Theme="{StaticResource IconButton}"
+                                Width="30" Height="30" FontSize="14" Margin="8,0,0,0" VerticalAlignment="Center"
+                                FontFamily="{StaticResource IconFont}" Content="&#xE81C;"
+                                IsVisible="{Binding DeletedHistory}" ToolTip.Tip="Deleted containers"/>
+                    </Grid>
+                    <Panel>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                                      Margin="16,12,16,16">
+                            <editor:NoteCanvas x:Name="PageCanvas"/>
+                        </ScrollViewer>
+                        <!-- Deleted-containers history: drag a card onto the page to bring it back -->
+                        <Border x:Name="TrashPanel" IsVisible="False" Width="238"
+                                HorizontalAlignment="Right" VerticalAlignment="Stretch" Margin="0,10,12,12"
+                                CornerRadius="10" Background="#E8191B24"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                            <DockPanel Margin="12,10,12,12">
+                                <TextBlock DockPanel.Dock="Top" Text="Deleted containers"
+                                           FontSize="13" FontWeight="SemiBold"/>
+                                <TextBlock DockPanel.Dock="Top" Text="Drag one onto the page to bring it back."
+                                           FontSize="11" Foreground="{StaticResource TextMutedBrush}"
+                                           TextWrapping="Wrap" Margin="0,4,0,10"/>
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel x:Name="TrashList" Spacing="6"/>
+                                </ScrollViewer>
+                            </DockPanel>
+                        </Border>
+                    </Panel>
                 </DockPanel>
             </Border>
         </Grid>

@@ -18,6 +18,7 @@ public static class CanvasDocJson
         [JsonPropertyName("x")] public double X { get; set; }
         [JsonPropertyName("y")] public double Y { get; set; }
         [JsonPropertyName("w")] public double W { get; set; } = NoteBox.DefaultWidth;
+        [JsonPropertyName("h")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double H { get; set; }
         [JsonPropertyName("paras")] public List<RichDocJson.ParaDto> Paras { get; set; } = new();
     }
 
@@ -25,17 +26,26 @@ public static class CanvasDocJson
     {
         [JsonPropertyName("v")] public int V { get; set; } = 2;
         [JsonPropertyName("boxes")] public List<BoxDto> Boxes { get; set; } = new();
+        [JsonPropertyName("trash")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<BoxDto>? Trash { get; set; }
     }
+
+    private static BoxDto ToDto(NoteBox b) => new()
+    {
+        X = b.X, Y = b.Y, W = b.Width, H = b.H,
+        Paras = RichDocJson.ToDtos(b.Doc),
+    };
+
+    private static NoteBox FromDto(BoxDto b) => new(RichDocJson.FromDtos(b.Paras))
+    {
+        X = b.X, Y = b.Y, Width = b.W, H = b.H,
+    };
 
     public static string ToJson(CanvasDocument canvas)
     {
         var dto = new CanvasDto
         {
-            Boxes = canvas.Boxes.Select(b => new BoxDto
-            {
-                X = b.X, Y = b.Y, W = b.Width,
-                Paras = RichDocJson.ToDtos(b.Doc),
-            }).ToList(),
+            Boxes = canvas.Boxes.Select(ToDto).ToList(),
+            Trash = canvas.Trash.Count > 0 ? canvas.Trash.Select(ToDto).ToList() : null,
         };
         return JsonSerializer.Serialize(dto, RichDocJson.Options);
     }
@@ -53,8 +63,13 @@ public static class CanvasDocJson
             {
                 var dto = JsonSerializer.Deserialize<CanvasDto>(json);
                 if (dto is not null)
+                {
                     foreach (var b in dto.Boxes)
-                        canvas.AddBox(b.X, b.Y, b.W, RichDocJson.FromDtos(b.Paras));
+                        canvas.AddBox(b.X, b.Y, b.W, RichDocJson.FromDtos(b.Paras)).H = b.H;
+                    if (dto.Trash is not null)                       // trash docs hook on restore, not here
+                        foreach (var b in dto.Trash)
+                            canvas.Trash.Add(FromDto(b));
+                }
                 return canvas;
             }
         }

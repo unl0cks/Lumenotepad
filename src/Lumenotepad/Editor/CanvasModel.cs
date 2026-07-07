@@ -3,16 +3,20 @@ using System.Collections.Generic;
 
 namespace Lumenotepad.Editor;
 
-/// <summary>One movable note container on a page canvas: a rich document with a position and width.
-/// Height always follows content, so it is not stored. Pure model — no Avalonia dependencies.</summary>
+/// <summary>One movable note container on a page canvas: a rich document with a position, a width,
+/// and an optional height floor (<see cref="H"/> = 0 means the height simply follows content;
+/// dragging the bottom/corner handle sets a floor the box won't shrink under).
+/// Pure model — no Avalonia dependencies.</summary>
 public sealed class NoteBox
 {
     public const double DefaultWidth = 360;
     public const double MinWidth = 140;
+    public const double MinHeight = 42;
 
     public double X { get; set; }
     public double Y { get; set; }
     public double Width { get; set; } = DefaultWidth;
+    public double H { get; set; }                    // 0 = auto (content height)
     public RichDocument Doc { get; }
 
     public NoteBox(RichDocument? doc = null) => Doc = doc ?? new RichDocument();
@@ -25,12 +29,14 @@ public sealed class NoteBox
         doc.Paragraphs.Count == 1 && doc.Paragraphs[0].Runs.Count == 0 && doc.Paragraphs[0].Bullet is null;
 }
 
-/// <summary>A page's freeform canvas: any number of note boxes. <see cref="Changed"/> fires on
-/// add/remove, geometry commits, and any edit inside any box's document — one hook drives the
-/// page's dirty-tracking/autosave.</summary>
+/// <summary>A page's freeform canvas: any number of note boxes, plus the page's deleted-container
+/// history (<see cref="Trash"/>, newest first) that boxes can be restored from. <see cref="Changed"/>
+/// fires on add/remove/trash/restore, geometry commits, and any edit inside any live box's document —
+/// one hook drives the page's dirty-tracking/autosave.</summary>
 public sealed class CanvasDocument
 {
     public List<NoteBox> Boxes { get; } = new();
+    public List<NoteBox> Trash { get; } = new();
 
     public event Action? Changed;
 
@@ -48,10 +54,31 @@ public sealed class CanvasDocument
         return box;
     }
 
+    /// <summary>Permanently remove a box (empty-box evaporation, or deletion with history disabled).</summary>
     public void RemoveBox(NoteBox box)
     {
         if (!Boxes.Remove(box)) return;
         box.Doc.Changed -= OnBoxDocChanged;
+        Changed?.Invoke();
+    }
+
+    /// <summary>Move a box into the page's deleted history (newest first).</summary>
+    public void DeleteToTrash(NoteBox box)
+    {
+        if (!Boxes.Remove(box)) return;
+        box.Doc.Changed -= OnBoxDocChanged;
+        Trash.Insert(0, box);
+        Changed?.Invoke();
+    }
+
+    /// <summary>Bring a deleted box back, optionally at a new position (drag-drop target point).</summary>
+    public void RestoreFromTrash(NoteBox box, double? x = null, double? y = null)
+    {
+        if (!Trash.Remove(box)) return;
+        if (x is not null) box.X = Math.Max(0, x.Value);
+        if (y is not null) box.Y = Math.Max(0, y.Value);
+        box.Doc.Changed += OnBoxDocChanged;
+        Boxes.Add(box);
         Changed?.Invoke();
     }
 

@@ -59,6 +59,31 @@ public class CanvasModelTests
     }
 
     [Fact]
+    public void DeleteToTrash_and_Restore_moveBoxesAndRehookEdits()
+    {
+        var canvas = new CanvasDocument();
+        var box = canvas.AddBox(50, 60);
+        box.Doc.InsertText(new DocPos(0, 0), "keep me");
+
+        canvas.DeleteToTrash(box);
+        Assert.Empty(canvas.Boxes);
+        Assert.Same(box, Assert.Single(canvas.Trash));
+
+        int n = 0;
+        canvas.Changed += () => n++;
+        box.Doc.InsertText(box.Doc.End, "!");           // edits while trashed don't bubble
+        Assert.Equal(0, n);
+
+        canvas.RestoreFromTrash(box, 200, 300);
+        Assert.Equal(1, n);                             // the restore itself raises Changed
+        Assert.Empty(canvas.Trash);
+        Assert.Equal(200, Assert.Single(canvas.Boxes).X);
+
+        box.Doc.InsertText(box.Doc.End, "?");           // edits bubble again after restore
+        Assert.Equal(2, n);
+    }
+
+    [Fact]
     public void IsEmpty_reflectsContent_includingBareBullets()
     {
         var box = new NoteBox();
@@ -97,6 +122,28 @@ public class CanvasJsonTests
         Assert.True(restored.Boxes[0].Doc.RangeAll(new DocPos(0, 0), restored.Boxes[0].Doc.End, r => r.Bold));
         Assert.Equal("beta\ngamma", restored.Boxes[1].Doc.GetText());
         Assert.Equal("star", restored.Boxes[1].Doc.Paragraphs[0].Bullet);
+    }
+
+    [Fact]
+    public void V2_roundTrip_preservesTrashAndHeightFloor()
+    {
+        var canvas = new CanvasDocument();
+        var live = canvas.AddBox(0, 0, 300);
+        live.H = 250;
+        live.Doc.InsertText(new DocPos(0, 0), "alive");
+        var dead = canvas.AddBox(40, 40);
+        dead.Doc.InsertText(new DocPos(0, 0), "deleted");
+        canvas.DeleteToTrash(dead);
+
+        var restored = CanvasDocJson.FromJson(CanvasDocJson.ToJson(canvas));
+
+        Assert.Equal(250, Assert.Single(restored.Boxes).H);
+        var trashed = Assert.Single(restored.Trash);
+        Assert.Equal("deleted", trashed.Doc.GetText());
+
+        restored.RestoreFromTrash(trashed);              // reloaded trash restores cleanly
+        Assert.Equal(2, restored.Boxes.Count);
+        Assert.Empty(restored.Trash);
     }
 
     [Fact]

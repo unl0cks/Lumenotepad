@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -8,12 +9,18 @@ using Avalonia.Threading;
 
 namespace Lumenotepad.Editor;
 
-/// <summary>The freeform page canvas (the OneNote model): any number of movable, width-resizable
-/// note containers, each holding its own rich document. Click empty space to start a new container
-/// there; a container that loses focus while still empty evaporates.</summary>
+/// <summary>The freeform page canvas (the OneNote model): any number of movable, resizable note
+/// containers, each holding its own rich document. Click empty space to start a new container
+/// there; a container that loses focus while still empty evaporates. Deleted containers go to the
+/// page's history and can be dragged back onto the canvas.</summary>
 public sealed class NoteCanvas : Panel
 {
+    /// <summary>In-process drag-drop format for restoring a box from the deleted history.</summary>
+    public static readonly DataFormat<NoteBox> TrashFormat =
+        DataFormat.CreateInProcessFormat<NoteBox>("lumenotepad-trash-box");
+
     private CanvasDocument? _doc;
+    private bool _canResize = true;
 
     /// <summary>The page's canvas document; setting it rebuilds all container views.</summary>
     public CanvasDocument? Document
@@ -22,12 +29,50 @@ public sealed class NoteCanvas : Panel
         set { _doc = value; Rebuild(); }
     }
 
+    /// <summary>Whether containers show resize handles ("Resizable pages" preference).</summary>
+    public bool CanResize
+    {
+        get => _canResize;
+        set
+        {
+            _canResize = value;
+            foreach (var child in Children) ((NoteBoxView)child).RefreshChrome();
+        }
+    }
+
+    /// <summary>Whether deleting a container keeps it in the page history ("Deleted pages history" preference).</summary>
+    public bool HistoryEnabled { get; set; } = true;
+
+    /// <summary>Asked before a container is deleted via its ✕ button / menu; null = no prompt.</summary>
+    public Func<Task<bool>>? ConfirmDelete { get; set; }
+
     /// <summary>The editor of the most recently focused container (what the toolbar targets).</summary>
     public RichTextEditor? ActiveEditor { get; private set; }
     public event Action<RichTextEditor?>? ActiveEditorChanged;
 
-    // An un-rendered control is not hit-testable — bare-canvas clicks would fall through.
-    public NoteCanvas() => Background = Brushes.Transparent;
+    /// <summary>Raised when the deleted history changes (delete/restore) so panels can refresh.</summary>
+    public event Action? TrashChanged;
+
+    public NoteCanvas()
+    {
+        // An un-rendered control is not hit-testable — bare-canvas clicks would fall through.
+        Background = Brushes.Transparent;
+
+        DragDrop.SetAllowDrop(this, true);
+        AddHandler(DragDrop.DragOverEvent, (_, e) =>
+        {
+            e.DragEffects = e.DataTransfer.Contains(TrashFormat) ? DragDropEffects.Move : DragDropEffects.None;
+            e.Handled = true;
+        });
+        AddHandler(DragDrop.DropEvent, (_, e) =>
+        {
+            var box = e.DataTransfer.TryGetValue(TrashFormat);
+            if (box is null || _doc is null || !_doc.Trash.Contains(box)) return;
+            var p = e.GetPosition(this);
+            RestoreBox(box, p.X - 11, p.Y - 16);
+            e.Handled = true;
+        });
+    }
 
     private void Rebuild()
     {
@@ -47,7 +92,7 @@ public sealed class NoteCanvas : Panel
             var v = (NoteBoxView)child;
             v.Measure(new Size(v.Box.Width, double.PositiveInfinity));
             w = Math.Max(w, v.Box.X + v.Box.Width);
-            h = Math.Max(h, v.Box.Y + v.DesiredSize.Height);
+            h = Math.Max(h, v.Box.Y + Math.Max(v.DesiredSize.Height, v.Box.H));
         }
         return new Size(w + 220, h + 320);        // breathing room so the page can always grow by clicking
     }
@@ -57,7 +102,7 @@ public sealed class NoteCanvas : Panel
         foreach (var child in Children)
         {
             var v = (NoteBoxView)child;
-            v.Arrange(new Rect(v.Box.X, v.Box.Y, v.Box.Width, v.DesiredSize.Height));
+            v.Arrange(new Rect(v.Box.X, v.Box.Y, v.Box.Width, Math.Max(v.DesiredSize.Height, v.Box.H)));
         }
         return finalSize;
     }
@@ -82,6 +127,15 @@ public sealed class NoteCanvas : Panel
         return view;
     }
 
+    /// <summary>Bring a box back from the deleted history, optionally at a new spot.</summary>
+    public void RestoreBox(NoteBox box, double? x = null, double? y = null)
+    {
+        if (_doc is null) return;
+        _doc.RestoreFromTrash(box, x, y);
+        AddBoxView(box);
+        TrashChanged?.Invoke();
+    }
+
     internal void SetActive(RichTextEditor? editor)
     {
         if (ReferenceEquals(ActiveEditor, editor)) return;
@@ -89,9 +143,32 @@ public sealed class NoteCanvas : Panel
         ActiveEditorChanged?.Invoke(editor);
     }
 
-    internal void DeleteBox(NoteBoxView view)
+    /// <summary>✕ button / context-menu delete: confirm, then trash (or remove outright when the
+    /// history is disabled). Empty boxes skip the prompt — there is nothing to lose.</summary>
+    internal async void RequestDelete(NoteBoxView view)
+    {
+        if (_doc is null || !_doc.Boxes.Contains(view.Box)) return;
+        if (!view.Box.IsEmpty && ConfirmDelete is not null && !await ConfirmDelete()) return;
+        if (HistoryEnabled && !view.Box.IsEmpty)
+        {
+            _doc.DeleteToTrash(view.Box);
+            DetachView(view);
+            TrashChanged?.Invoke();
+        }
+        else
+        {
+            DeleteBoxPermanently(view);
+        }
+    }
+
+    internal void DeleteBoxPermanently(NoteBoxView view)
     {
         _doc?.RemoveBox(view.Box);
+        DetachView(view);
+    }
+
+    private void DetachView(NoteBoxView view)
+    {
         Children.Remove(view);
         if (ReferenceEquals(ActiveEditor, view.Editor)) SetActive(null);
         InvalidateMeasure();
@@ -105,20 +182,24 @@ public sealed class NoteCanvas : Panel
         {
             if (_doc is null || !_doc.Boxes.Contains(view.Box)) return;
             if (!view.Box.IsEmpty || view.IsKeyboardFocusWithin) return;
-            DeleteBox(view);
+            DeleteBoxPermanently(view);
         }, DispatcherPriority.Background);
     }
 }
 
-/// <summary>One container: hover/focus chrome, a top drag-grip (right-click → delete), the editor,
-/// and a right-edge width-resize strip. Geometry lives on the NoteBox model; the canvas arranges
+/// <summary>One container: hover/focus chrome, a top drag-grip, a ✕ delete button, the editor, and
+/// right/bottom/corner resize handles. Geometry lives on the NoteBox model; the canvas arranges
 /// from it, so drags just mutate the model and re-measure.</summary>
 internal sealed class NoteBoxView : Panel
 {
+    private enum DragMode { Move, Width, Height, Both }
+
     private static readonly IBrush HoverBorder = new SolidColorBrush(Color.Parse("#26FFFFFF"));
     private static readonly IBrush FocusBorder = new SolidColorBrush(Color.Parse("#4D4DA6FF"));
     private static readonly IBrush GripFill = new SolidColorBrush(Color.Parse("#12FFFFFF"));
     private static readonly IBrush GripBarFill = new SolidColorBrush(Color.Parse("#3DFFFFFF"));
+    private static readonly IBrush CloseFg = new SolidColorBrush(Color.Parse("#8CFFFFFF"));
+    private static readonly IBrush CloseHoverBg = new SolidColorBrush(Color.Parse("#66E81123"));
 
     internal NoteBox Box { get; }
     internal RichTextEditor Editor { get; }
@@ -127,7 +208,11 @@ internal sealed class NoteBoxView : Panel
     private readonly Border _chrome;
     private readonly Border _grip;
     private readonly Border _gripBar;
-    private readonly Border _resize;
+    private readonly Border _close;
+    private readonly TextBlock _closeGlyph;
+    private readonly Border _resizeRight;
+    private readonly Border _resizeBottom;
+    private readonly Border _resizeCorner;
     private bool _hover;
 
     public NoteBoxView(NoteCanvas canvas, NoteBox box)
@@ -144,7 +229,7 @@ internal sealed class NoteBoxView : Panel
         };
         _grip = new Border
         {
-            Height = 15, Background = Brushes.Transparent, Child = _gripBar,
+            Height = 17, Background = Brushes.Transparent, Child = _gripBar,
             CornerRadius = new CornerRadius(9, 9, 0, 0),
             Cursor = new Cursor(StandardCursorType.SizeAll),
         };
@@ -161,56 +246,96 @@ internal sealed class NoteBoxView : Panel
             Background = Brushes.Transparent,
         };
 
-        _resize = new Border
+        _closeGlyph = new TextBlock
+        {
+            Text = "", FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
+            FontSize = 7.5, Foreground = CloseFg,
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+        };
+        _close = new Border
+        {
+            Width = 17, Height = 17, CornerRadius = new CornerRadius(0, 9, 0, 6),
+            Background = Brushes.Transparent, Child = _closeGlyph, IsVisible = false,
+            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top,
+            Cursor = new Cursor(StandardCursorType.Hand),
+        };
+        _close.PointerEntered += (_, _) => { _close.Background = CloseHoverBg; _closeGlyph.Foreground = Brushes.White; };
+        _close.PointerExited += (_, _) => { _close.Background = Brushes.Transparent; _closeGlyph.Foreground = CloseFg; };
+        _close.PointerPressed += (_, e) => e.Handled = true;      // don't start a grip drag from the ✕
+        _close.PointerReleased += (_, e) => { _canvas.RequestDelete(this); e.Handled = true; };
+
+        _resizeRight = new Border
         {
             Width = 7, HorizontalAlignment = HorizontalAlignment.Right,
-            Background = Brushes.Transparent,
-            Cursor = new Cursor(StandardCursorType.SizeWestEast),
+            Background = Brushes.Transparent, Cursor = new Cursor(StandardCursorType.SizeWestEast),
+        };
+        _resizeBottom = new Border
+        {
+            Height = 7, VerticalAlignment = VerticalAlignment.Bottom,
+            Background = Brushes.Transparent, Cursor = new Cursor(StandardCursorType.SizeNorthSouth),
+        };
+        _resizeCorner = new Border
+        {
+            Width = 14, Height = 14,
+            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom,
+            Background = Brushes.Transparent, Cursor = new Cursor(StandardCursorType.BottomRightCorner),
         };
 
         Children.Add(_chrome);
-        Children.Add(_resize);
+        Children.Add(_resizeRight);
+        Children.Add(_resizeBottom);
+        Children.Add(_resizeCorner);
+        Children.Add(_close);
 
-        PointerEntered += (_, _) => { _hover = true; UpdateChrome(); };
-        PointerExited += (_, _) => { _hover = false; UpdateChrome(); };
-        Editor.GotFocus += (_, _) => { _canvas.SetActive(Editor); UpdateChrome(); };
-        Editor.LostFocus += (_, _) => { UpdateChrome(); _canvas.OnEditorLostFocus(this); };
+        PointerEntered += (_, _) => { _hover = true; RefreshChrome(); };
+        PointerExited += (_, _) => { _hover = false; RefreshChrome(); };
+        Editor.GotFocus += (_, _) => { _canvas.SetActive(Editor); RefreshChrome(); };
+        Editor.LostFocus += (_, _) => { RefreshChrome(); _canvas.OnEditorLostFocus(this); };
 
-        WireDrag(_grip, move: true);
-        WireDrag(_resize, move: false);
+        WireDrag(_grip, DragMode.Move);
+        WireDrag(_resizeRight, DragMode.Width);
+        WireDrag(_resizeBottom, DragMode.Height);
+        WireDrag(_resizeCorner, DragMode.Both);
 
         _grip.ContextRequested += (_, e) =>
         {
             var menu = new ContextMenu();
             var del = new MenuItem { Header = "Delete container" };
-            del.Click += (_, _) => _canvas.DeleteBox(this);
+            del.Click += (_, _) => _canvas.RequestDelete(this);
             menu.Items.Add(del);
             menu.Open(_grip);
             e.Handled = true;
         };
+
+        RefreshChrome();
     }
 
     internal void FocusEditor() => Editor.Focus();
 
-    private void UpdateChrome()
+    internal void RefreshChrome()
     {
         bool focused = Editor.IsFocused;
+        bool active = _hover || focused;
         _chrome.BorderBrush = focused ? FocusBorder : _hover ? HoverBorder : Brushes.Transparent;
-        _grip.Background = _hover || focused ? GripFill : Brushes.Transparent;
-        _gripBar.IsVisible = _hover || focused;
+        _grip.Background = active ? GripFill : Brushes.Transparent;
+        _gripBar.IsVisible = active;
+        _close.IsVisible = active;
+        // Hidden handles are also not hit-testable — the "Resizable pages" preference off = no resizing.
+        _resizeRight.IsVisible = _resizeBottom.IsVisible = _resizeCorner.IsVisible = _canvas.CanResize;
     }
 
     private Point _dragStart;
-    private (double X, double Y, double W) _dragOrigin;
+    private (double X, double Y, double W, double H) _dragOrigin;
     private bool _dragging;
 
-    private void WireDrag(Control handle, bool move)
+    private void WireDrag(Control handle, DragMode mode)
     {
         handle.PointerPressed += (_, e) =>
         {
             if (!e.GetCurrentPoint(handle).Properties.IsLeftButtonPressed) return;
             _dragStart = e.GetPosition(_canvas);
-            _dragOrigin = (Box.X, Box.Y, Box.Width);
+            // Height origin = what's on screen now, so the first drag pixel moves from there.
+            _dragOrigin = (Box.X, Box.Y, Box.Width, Box.H > 0 ? Box.H : Bounds.Height);
             _dragging = true;
             e.Pointer.Capture(handle);
             e.Handled = true;
@@ -219,15 +344,16 @@ internal sealed class NoteBoxView : Panel
         {
             if (!_dragging) return;
             var p = e.GetPosition(_canvas);
-            if (move)
+            double dx = p.X - _dragStart.X, dy = p.Y - _dragStart.Y;
+            if (mode == DragMode.Move)
             {
-                Box.X = Math.Max(0, _dragOrigin.X + p.X - _dragStart.X);
-                Box.Y = Math.Max(0, _dragOrigin.Y + p.Y - _dragStart.Y);
+                Box.X = Math.Max(0, _dragOrigin.X + dx);
+                Box.Y = Math.Max(0, _dragOrigin.Y + dy);
             }
-            else
-            {
-                Box.Width = Math.Clamp(_dragOrigin.W + p.X - _dragStart.X, NoteBox.MinWidth, 1600);
-            }
+            if (mode is DragMode.Width or DragMode.Both)
+                Box.Width = Math.Clamp(_dragOrigin.W + dx, NoteBox.MinWidth, 1600);
+            if (mode is DragMode.Height or DragMode.Both)
+                Box.H = Math.Clamp(_dragOrigin.H + dy, NoteBox.MinHeight, 4000);
             _canvas.InvalidateMeasure();
             e.Handled = true;
         };

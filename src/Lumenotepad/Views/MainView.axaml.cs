@@ -3,8 +3,12 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Lumenotepad.Editor;
 using Lumenotepad.Models;
 using Lumenotepad.Platform;
 using Lumenotepad.ViewModels;
@@ -40,6 +44,19 @@ public partial class MainView : UserControl
 
         // The toolbar follows whichever note container was focused last; dock menu re-docks it (persisted).
         PageCanvas.ActiveEditorChanged += ed => { if (ed is not null) Toolbar.Target = ed; };
+
+        // Deleting a container asks first; the deleted history panel lists what can come back.
+        PageCanvas.ConfirmDelete = () => ConfirmDialog.Show(Window!,
+            "Delete this container?",
+            PageCanvas.HistoryEnabled
+                ? "It will move to this page's deleted history — you can drag it back onto the page anytime."
+                : "The deleted history is turned off, so this can't be undone.");
+        PageCanvas.TrashChanged += () => { if (TrashPanel.IsVisible) RefreshTrashPanel(); };
+        HistoryBtn.Click += (_, _) =>
+        {
+            TrashPanel.IsVisible = !TrashPanel.IsVisible;
+            if (TrashPanel.IsVisible) RefreshTrashPanel();
+        };
         Toolbar.DockRequested += pos => { if (Vm is { } vm) vm.ToolbarPosition = pos; };
         Toolbar.ScopeRequested += scope => { if (Vm is { } vm) vm.ToolbarScope = scope; };
 
@@ -71,7 +88,17 @@ public partial class MainView : UserControl
             _hookedVm.DocsDirtied += OnDocsDirtied;
             SyncEditorDocument();
             ApplyToolbarPlacement();
+            ApplyCanvasPrefs();
         }
+    }
+
+    /// <summary>Push the (future preferences window's) canvas toggles onto the canvas.</summary>
+    private void ApplyCanvasPrefs()
+    {
+        if (Vm is not { } vm) return;
+        PageCanvas.CanResize = vm.ResizablePages;
+        PageCanvas.HistoryEnabled = vm.DeletedHistory;
+        if (!vm.DeletedHistory) TrashPanel.IsVisible = false;
     }
 
     /// <summary>Place the toolbar per the VM: docked to a side of either the WINDOW body or the PAGE box.</summary>
@@ -112,12 +139,77 @@ public partial class MainView : UserControl
         if (e.PropertyName == nameof(MainViewModel.SelectedPage)) SyncEditorDocument();
         else if (e.PropertyName is nameof(MainViewModel.ToolbarPosition) or nameof(MainViewModel.ToolbarScope))
             ApplyToolbarPlacement();
+        else if (e.PropertyName is nameof(MainViewModel.ResizablePages) or nameof(MainViewModel.DeletedHistory))
+            ApplyCanvasPrefs();
     }
 
     private void SyncEditorDocument()
     {
         Vm?.FlushDirtyDocs();                      // the page being left saves immediately
         PageCanvas.Document = Vm?.SelectedPage is { } page ? Vm.DocumentFor(page) : null;
+        if (PageCanvas.Document is null) TrashPanel.IsVisible = false;
+        else if (TrashPanel.IsVisible) RefreshTrashPanel();
+    }
+
+    // ---- deleted-containers history panel ----
+
+    private void RefreshTrashPanel()
+    {
+        TrashList.Children.Clear();
+        if (PageCanvas.Document is not { } doc) return;
+        if (doc.Trash.Count == 0)
+        {
+            TrashList.Children.Add(new TextBlock
+            {
+                Text = "Nothing here yet.", FontSize = 12,
+                Foreground = (IBrush)this.FindResource("TextMutedBrush")!,
+            });
+            return;
+        }
+        foreach (var box in doc.Trash.ToList())
+            TrashList.Children.Add(BuildTrashChip(box));
+    }
+
+    private Control BuildTrashChip(NoteBox box)
+    {
+        var preview = box.Doc.GetText().Replace('\n', ' ').Trim();
+        if (preview.Length == 0) preview = "(empty container)";
+        else if (preview.Length > 64) preview = preview[..64] + "…";
+
+        var text = new TextBlock
+        {
+            Text = preview, FontSize = 12, TextWrapping = TextWrapping.Wrap, MaxLines = 2,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var restore = new Button
+        {
+            Theme = (ControlTheme)this.FindResource("IconButton")!,
+            Width = 24, Height = 24, FontSize = 12, Content = "",
+            FontFamily = (FontFamily)this.FindResource("IconFont")!,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        ToolTip.SetTip(restore, "Put back where it was");
+        restore.Click += (_, _) => PageCanvas.RestoreBox(box);
+
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        grid.Children.Add(text);
+        Grid.SetColumn(restore, 1);
+        grid.Children.Add(restore);
+
+        var chip = new Border
+        {
+            Background = new SolidColorBrush(Color.Parse("#14FFFFFF")),
+            CornerRadius = new CornerRadius(8), Padding = new Thickness(9, 7),
+            Cursor = new Cursor(StandardCursorType.Hand), Child = grid,
+        };
+        chip.PointerPressed += async (_, e) =>
+        {
+            if (!e.GetCurrentPoint(chip).Properties.IsLeftButtonPressed) return;
+            var data = new DataTransfer();
+            data.Add(DataTransferItem.Create(NoteCanvas.TrashFormat, box));
+            await DragDrop.DoDragDropAsync(e, data, DragDropEffects.Move);
+        };
+        return chip;
     }
 
     private void BeginRenameSection(Section? sec)

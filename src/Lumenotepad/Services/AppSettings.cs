@@ -12,6 +12,8 @@ public sealed class AppSettings
     public double BlurStrength { get; set; } = 0.6;         // 0..1
     public string ToolbarPosition { get; set; } = "Top";    // "Top" | "Left" | "Right" | "Bottom"
     public string ToolbarScope { get; set; } = "Window";    // "Window" (window edge) | "Page" (inside the page box)
+    public bool ResizablePages { get; set; } = true;        // note containers show resize handles
+    public bool DeletedHistory { get; set; } = true;        // deleted containers kept per page, restorable
 
     private const string FileName = "settings.json";
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
