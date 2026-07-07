@@ -65,7 +65,12 @@ public partial class MainView : UserControl
         SectionsList.DoubleTapped += (_, e) => BeginRenameSection((e.Source as StyledElement)?.DataContext as Section);
         SectionsList.AddHandler(LostFocusEvent, OnSectionEditLostFocus, RoutingStrategies.Bubble, handledEventsToo: true);
         SectionsList.AddHandler(KeyDownEvent, OnSectionEditKeyDown, RoutingStrategies.Bubble, handledEventsToo: true);
+
+        // Delete lives on the right-click menu now (no delete buttons), always behind an "are you sure" prompt.
         SectionsList.ContextRequested += OnSectionsContextRequested;
+        NotebooksList.ContextRequested += OnNotebooksContextRequested;
+        PagesList.ContextRequested += OnPagesContextRequested;
+        NotebookName.ContextRequested += OnNotebookNameContextRequested;
     }
 
     private MainViewModel? Vm => DataContext as MainViewModel;
@@ -244,17 +249,69 @@ public partial class MainView : UserControl
         if (e.Key is Key.Enter or Key.Escape) { CommitSection(sec); SectionsList.Focus(); e.Handled = true; }
     }
 
+    // ---- right-click delete menus (with confirm) for notebooks, sections, pages ----
+
     private void OnSectionsContextRequested(object? sender, ContextRequestedEventArgs e)
     {
         if ((e.Source as StyledElement)?.DataContext is not Section sec) return;
         if (Vm is { } vm) vm.SelectedSection = sec;
-        var menu = new ContextMenu();
         var rename = new MenuItem { Header = "Rename" };
         rename.Click += (_, _) => BeginRenameSection(sec);
         var delete = new MenuItem { Header = "Delete section" };
-        delete.Click += (_, _) => Vm?.DeleteSectionCommand.Execute(sec);
-        menu.Items.Add(rename);
-        menu.Items.Add(delete);
+        delete.Click += (_, _) => ConfirmThenDelete(
+            "Delete this section?",
+            $"“{Label(sec.Name)}” and all its pages will be permanently deleted. This can't be undone.",
+            () => Vm?.DeleteSectionCommand.Execute(sec));
+        OpenMenu(e, rename, delete);
+    }
+
+    private void OnNotebooksContextRequested(object? sender, ContextRequestedEventArgs e)
+    {
+        if ((e.Source as StyledElement)?.DataContext is not Notebook nb) return;
+        if (Vm is { } vm) vm.SelectedNotebook = nb;
+        var delete = new MenuItem { Header = "Delete notebook" };
+        delete.Click += (_, _) => ConfirmThenDelete(
+            "Delete this notebook?",
+            $"“{Label(nb.Name)}” and all its sections and pages will be permanently deleted. This can't be undone.",
+            () => Vm?.DeleteNotebookCommand.Execute(nb));
+        OpenMenu(e, delete);
+    }
+
+    private void OnNotebookNameContextRequested(object? sender, ContextRequestedEventArgs e)
+    {
+        if (Vm?.SelectedNotebook is not { } nb) return;
+        var delete = new MenuItem { Header = "Delete notebook" };
+        delete.Click += (_, _) => ConfirmThenDelete(
+            "Delete this notebook?",
+            $"“{Label(nb.Name)}” and all its sections and pages will be permanently deleted. This can't be undone.",
+            () => Vm?.DeleteNotebookCommand.Execute(nb));
+        OpenMenu(e, delete);
+    }
+
+    private void OnPagesContextRequested(object? sender, ContextRequestedEventArgs e)
+    {
+        if ((e.Source as StyledElement)?.DataContext is not Models.Page pg) return;
+        if (Vm is { } vm) vm.SelectedPage = pg;
+        var delete = new MenuItem { Header = "Delete page" };
+        delete.Click += (_, _) => ConfirmThenDelete(
+            "Delete this page?",
+            $"“{Label(pg.Title)}” will be permanently deleted. This can't be undone.",
+            () => Vm?.DeletePageCommand.Execute(pg));
+        OpenMenu(e, delete);
+    }
+
+    private static string Label(string? s) => string.IsNullOrWhiteSpace(s) ? "Untitled" : s;
+
+    private static void OpenMenu(ContextRequestedEventArgs e, params MenuItem[] items)
+    {
+        var menu = new ContextMenu();
+        foreach (var i in items) menu.Items.Add(i);
         if (e.Source is Control c) { menu.Open(c); e.Handled = true; }
+    }
+
+    private async void ConfirmThenDelete(string title, string message, System.Action delete)
+    {
+        if (Window is not { } w) return;
+        if (await ConfirmDialog.Show(w, title, message)) delete();
     }
 }

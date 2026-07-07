@@ -4,11 +4,13 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Lumenotepad.Platform;
 
 namespace Lumenotepad.Views;
 
-/// <summary>Small Lumen-styled confirm prompt: borderless rounded dark card, Cancel + a red
-/// destructive button. Enter confirms, Escape cancels, the card itself can be dragged.</summary>
+/// <summary>Small Lumen-styled confirm prompt. A solid, opaque, DWM-rounded window (NOT a transparent
+/// one — a chromeless transparent window paints its unpainted area black, which showed as a dark square
+/// around the card). Cancel + a red destructive button; Enter confirms, Escape cancels, drag anywhere.</summary>
 public static class ConfirmDialog
 {
     public static async Task<bool> Show(Window owner, string title, string message,
@@ -21,9 +23,9 @@ public static class ConfirmDialog
             SizeToContent = SizeToContent.WidthAndHeight,
             CanResize = false,
             ShowInTaskbar = false,
-            Background = Brushes.Transparent,
-            TransparencyLevelHint = new[] { WindowTransparencyLevel.Transparent },
+            Background = new SolidColorBrush(Color.Parse("#1B1D27")),   // opaque: no transparent ring to go black
         };
+        win.Opened += (_, _) => WinChrome.RoundCorners(win, true);
 
         var titleText = new TextBlock
         {
@@ -58,14 +60,13 @@ public static class ConfirmDialog
         stack.Children.Add(msgText);
         stack.Children.Add(buttons);
 
+        // A hairline top border reads as a lifted edge; the window itself carries the fill + rounded corners.
         var card = new Border
         {
-            Background = new SolidColorBrush(Color.Parse("#F5171922")),
-            BorderBrush = new SolidColorBrush(Color.Parse("#33FFFFFF")),
+            Background = Brushes.Transparent,
+            BorderBrush = new SolidColorBrush(Color.Parse("#26FFFFFF")),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(12),
-            BoxShadow = BoxShadows.Parse("0 6 24 0 #66000000"),
-            Margin = new Thickness(14),           // room for the shadow inside the transparent window
+            CornerRadius = new CornerRadius(9),
             Child = stack,
         };
         card.PointerPressed += (_, e) =>

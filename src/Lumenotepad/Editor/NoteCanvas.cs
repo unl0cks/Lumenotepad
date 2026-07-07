@@ -315,8 +315,10 @@ internal sealed class NoteBoxView : Panel
     internal void RefreshChrome()
     {
         bool focused = Editor.IsFocused;
-        bool active = _hover || focused;
-        _chrome.BorderBrush = focused ? FocusBorder : _hover ? HoverBorder : Brushes.Transparent;
+        // Capturing the pointer on a resize/grip handle drops the box's own IsPointerOver (so PointerExited
+        // fires and would blank the border mid-drag) — treat an active drag as "keep the chrome lit".
+        bool active = _hover || focused || _dragging;
+        _chrome.BorderBrush = _dragging || focused ? FocusBorder : _hover ? HoverBorder : Brushes.Transparent;
         _grip.Background = active ? GripFill : Brushes.Transparent;
         _gripBar.IsVisible = active;
         _close.IsVisible = active;
@@ -337,6 +339,7 @@ internal sealed class NoteBoxView : Panel
             // Height origin = what's on screen now, so the first drag pixel moves from there.
             _dragOrigin = (Box.X, Box.Y, Box.Width, Box.H > 0 ? Box.H : Bounds.Height);
             _dragging = true;
+            RefreshChrome();                          // lock the border visible for the whole drag
             e.Pointer.Capture(handle);
             e.Handled = true;
         };
@@ -362,6 +365,7 @@ internal sealed class NoteBoxView : Panel
             if (!_dragging) return;
             _dragging = false;
             e.Pointer.Capture(null);
+            RefreshChrome();                          // back to hover/focus-driven now the drag is done
             _canvas.Document?.CommitGeometry();      // persist the final geometry once
             e.Handled = true;
         };
