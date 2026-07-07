@@ -35,11 +35,11 @@ public partial class MainView : UserControl
             box.KeyDown += (s, e) => { if (e.Key == Key.Enter) { Vm?.Save(); ((Control?)s)?.Focus(); } };
         }
 
-        // The editor edits the selected page's document (session-only in the M3 slice).
+        // The canvas edits the selected page's document.
         DataContextChanged += (_, _) => HookVm();
 
-        // Formatting toolbar drives the editor; dock menu re-docks it via the VM (persisted).
-        Toolbar.Target = Editor;
+        // The toolbar follows whichever note container was focused last; dock menu re-docks it (persisted).
+        PageCanvas.ActiveEditorChanged += ed => { if (ed is not null) Toolbar.Target = ed; };
         Toolbar.DockRequested += pos => { if (Vm is { } vm) vm.ToolbarPosition = pos; };
         Toolbar.ScopeRequested += scope => { if (Vm is { } vm) vm.ToolbarScope = scope; };
 
@@ -117,7 +117,7 @@ public partial class MainView : UserControl
     private void SyncEditorDocument()
     {
         Vm?.FlushDirtyDocs();                      // the page being left saves immediately
-        if (Vm?.SelectedPage is { } page) Editor.Document = Vm.DocumentFor(page);
+        PageCanvas.Document = Vm?.SelectedPage is { } page ? Vm.DocumentFor(page) : null;
     }
 
     private void BeginRenameSection(Section? sec)

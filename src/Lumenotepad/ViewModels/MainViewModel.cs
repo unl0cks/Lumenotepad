@@ -65,20 +65,20 @@ public partial class MainViewModel : ObservableObject
     /// <summary>Persist the whole tree (called after every structural change / rename).</summary>
     public void Save() => _store.Save(_workspace);
 
-    // Per-page rich documents: loaded from disk on first access, dirty-tracked on edit, saved by
+    // Per-page canvas documents: loaded from disk on first access, dirty-tracked on edit, saved by
     // FlushDirtyDocs (the view debounces it while typing; page switch and window close flush too).
-    private readonly Dictionary<string, (RichDocument Doc, Notebook Owner)> _docs = new();
+    private readonly Dictionary<string, (CanvasDocument Doc, Notebook Owner)> _docs = new();
     private readonly HashSet<string> _dirty = new();
 
     /// <summary>Raised whenever any page document changes — the view uses it to debounce an autosave.</summary>
     public event Action? DocsDirtied;
 
-    /// <summary>The rich document for a page (loaded from its notebook folder on first access).</summary>
-    public RichDocument DocumentFor(Page page)
+    /// <summary>The canvas document for a page (loaded from its notebook folder on first access).</summary>
+    public CanvasDocument DocumentFor(Page page)
     {
         if (_docs.TryGetValue(page.Id, out var entry)) return entry.Doc;
         var owner = FindOwner(page) ?? SelectedNotebook ?? Notebooks.First();
-        var doc = _store.LoadPageDoc(owner, page.Id) ?? new RichDocument();
+        var doc = _store.LoadPageDoc(owner, page.Id) ?? new CanvasDocument();
         doc.Changed += () => { _dirty.Add(page.Id); DocsDirtied?.Invoke(); };
         _docs[page.Id] = (doc, owner);
         return doc;

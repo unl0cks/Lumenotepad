@@ -191,7 +191,7 @@
                 </DockPanel>
             </Border>
 
-            <!-- Page: title + rich-text editor (M3 slice: one region; the freeform canvas layers on next) -->
+            <!-- Page: title + freeform canvas of note containers -->
             <Border Grid.Column="2" Margin="14" CornerRadius="14"
                     Background="#0BFFFFFF" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
                 <DockPanel x:Name="PageDock">
@@ -200,8 +200,9 @@
                              FontSize="26" FontWeight="SemiBold" PlaceholderText="Page title"
                              IsVisible="{Binding SelectedPage, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
                              Text="{Binding SelectedPage.Title, Mode=TwoWay}"/>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="26,12,26,22">
-                        <editor:RichTextEditor x:Name="Editor" MinHeight="200"/>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                                  Margin="16,12,16,16">
+                        <editor:NoteCanvas x:Name="PageCanvas"/>
                     </ScrollViewer>
                 </DockPanel>
             </Border>

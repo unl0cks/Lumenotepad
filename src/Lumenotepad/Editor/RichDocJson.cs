@@ -5,12 +5,13 @@ using System.Text.Json.Serialization;
 
 namespace Lumenotepad.Editor;
 
-/// <summary>JSON persistence for <see cref="RichDocument"/> — the on-disk page content format.
-/// Human-readable, versioned, defaults omitted so files stay small:
-/// <c>{"v":1,"paras":[{"runs":[{"t":"hello","b":true}]}]}</c></summary>
+/// <summary>JSON mapping for <see cref="RichDocument"/> content. The v1 page format was a bare
+/// document (<c>{"v":1,"paras":[…]}</c>); pages now persist as a canvas of boxes via
+/// <see cref="CanvasDocJson"/>, which reuses these DTOs per box. Human-readable, defaults omitted
+/// so files stay small: <c>{"runs":[{"t":"hello","b":true}]}</c></summary>
 public static class RichDocJson
 {
-    private sealed class RunDto
+    internal sealed class RunDto
     {
         [JsonPropertyName("t")] public string T { get; set; } = "";
         [JsonPropertyName("b")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool B { get; set; }
@@ -23,7 +24,7 @@ public static class RichDocJson
         [JsonPropertyName("f")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? F { get; set; }
     }
 
-    private sealed class ParaDto
+    internal sealed class ParaDto
     {
         [JsonPropertyName("runs")] public List<RunDto> Runs { get; set; } = new();
         [JsonPropertyName("bul")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Bul { get; set; }
@@ -40,39 +41,28 @@ public static class RichDocJson
         [JsonPropertyName("paras")] public List<ParaDto> Paras { get; set; } = new();
     }
 
-    private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
+    internal static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
 
-    public static string ToJson(RichDocument doc)
-    {
-        var dto = new DocDto
+    internal static List<ParaDto> ToDtos(RichDocument doc) =>
+        doc.Paragraphs.Select(p => new ParaDto
         {
-            Paras = doc.Paragraphs.Select(p => new ParaDto
+            Bul = p.Bullet,
+            Chk = p.Checked,
+            Nb = p.NumBold, Ni = p.NumItalic, Nu = p.NumUnderline, Ns = p.NumStrike,
+            Runs = p.Runs.Select(r => new RunDto
             {
-                Bul = p.Bullet,
-                Chk = p.Checked,
-                Nb = p.NumBold, Ni = p.NumItalic, Nu = p.NumUnderline, Ns = p.NumStrike,
-                Runs = p.Runs.Select(r => new RunDto
-                {
-                    T = r.Text, B = r.Bold, I = r.Italic, U = r.Underline, S = r.Strike,
-                    Hl = r.Highlight, C = r.Color, Fs = r.Size, F = r.Font,
-                }).ToList(),
+                T = r.Text, B = r.Bold, I = r.Italic, U = r.Underline, S = r.Strike,
+                Hl = r.Highlight, C = r.Color, Fs = r.Size, F = r.Font,
             }).ToList(),
-        };
-        return JsonSerializer.Serialize(dto, Options);
-    }
+        }).ToList();
 
-    /// <summary>Parse a document; null/corrupt input yields a fresh empty document (never throws).</summary>
-    public static RichDocument FromJson(string? json)
+    /// <summary>Rebuild a document from para DTOs; always yields at least one paragraph.</summary>
+    internal static RichDocument FromDtos(List<ParaDto>? paras)
     {
         var doc = new RichDocument();
-        if (string.IsNullOrWhiteSpace(json)) return doc;
-        DocDto? dto;
-        try { dto = JsonSerializer.Deserialize<DocDto>(json); }
-        catch { return doc; }
-        if (dto is null || dto.Paras.Count == 0) return doc;
-
+        if (paras is null || paras.Count == 0) return doc;
         doc.Paragraphs.Clear();
-        foreach (var p in dto.Paras)
+        foreach (var p in paras)
         {
             var para = new Paragraph
             {
@@ -89,5 +79,18 @@ public static class RichDocJson
         }
         if (doc.Paragraphs.Count == 0) doc.Paragraphs.Add(new Paragraph());
         return doc;
+    }
+
+    public static string ToJson(RichDocument doc) =>
+        JsonSerializer.Serialize(new DocDto { Paras = ToDtos(doc) }, Options);
+
+    /// <summary>Parse a v1 document; null/corrupt input yields a fresh empty document (never throws).</summary>
+    public static RichDocument FromJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new RichDocument();
+        DocDto? dto;
+        try { dto = JsonSerializer.Deserialize<DocDto>(json); }
+        catch { return new RichDocument(); }
+        return FromDtos(dto?.Paras);
     }
 }

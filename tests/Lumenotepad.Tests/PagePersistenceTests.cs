@@ -89,14 +89,19 @@ public class PageDocStoreTests
             ws.Notebooks.Add(nb);
             store.Save(ws);                                   // assigns nb.Folder
 
-            var doc = new RichDocument();
-            doc.InsertText(new DocPos(0, 0), "photosynthesis notes", bold: true);
-            store.SavePageDoc(nb, "page1", doc);
+            var canvas = new CanvasDocument();
+            var box = canvas.AddBox(24, 48, 400);
+            box.Doc.InsertText(new DocPos(0, 0), "photosynthesis notes", bold: true);
+            store.SavePageDoc(nb, "page1", canvas);
 
             var loaded = store.LoadPageDoc(nb, "page1");
             Assert.NotNull(loaded);
-            Assert.Equal("photosynthesis notes", loaded!.GetText());
-            Assert.True(loaded.RangeAll(new DocPos(0, 0), loaded.End, r => r.Bold));
+            var lb = Assert.Single(loaded!.Boxes);
+            Assert.Equal(24, lb.X);
+            Assert.Equal(48, lb.Y);
+            Assert.Equal(400, lb.Width);
+            Assert.Equal("photosynthesis notes", lb.Doc.GetText());
+            Assert.True(lb.Doc.RangeAll(new DocPos(0, 0), lb.Doc.End, r => r.Bold));
 
             Assert.Null(store.LoadPageDoc(nb, "missing"));
 
@@ -117,13 +122,15 @@ public class VmPersistenceTests
         {
             var vm1 = new MainViewModel(new WorkspaceStore(dir));
             var page = vm1.SelectedPage!;
-            var doc = vm1.DocumentFor(page);
-            doc.InsertText(new DocPos(0, 0), "remember me");
+            var canvas = vm1.DocumentFor(page);
+            canvas.AddBox(10, 20).Doc.InsertText(new DocPos(0, 0), "remember me");
             vm1.FlushDirtyDocs();
 
             var vm2 = new MainViewModel(new WorkspaceStore(dir));
             var reloaded = vm2.DocumentFor(vm2.SelectedPage!);
-            Assert.Equal("remember me", reloaded.GetText());
+            var box = Assert.Single(reloaded.Boxes);
+            Assert.Equal(10, box.X);
+            Assert.Equal("remember me", box.Doc.GetText());
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
