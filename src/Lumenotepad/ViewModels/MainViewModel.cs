@@ -12,8 +12,12 @@ namespace Lumenotepad.ViewModels;
 
 public partial class MainViewModel : ObservableObject
 {
-    private static readonly string[] NotebookColors =
-        { "#4DA6FF", "#3E9C6B", "#E27BA6", "#E0A64D", "#9B7BE2", "#4DC6C0" };
+    /// <summary>The notebook cover palette (also the swatches offered by the gallery's Color menu).</summary>
+    public static readonly (string Hex, string Name)[] NotebookColors =
+    {
+        ("#4DA6FF", "Blue"), ("#3E9C6B", "Green"), ("#E27BA6", "Pink"),
+        ("#E0A64D", "Amber"), ("#9B7BE2", "Purple"), ("#4DC6C0", "Teal"),
+    };
 
     private readonly WorkspaceStore _store;
     private readonly Workspace _workspace;
@@ -25,6 +29,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private Page? _selectedPage;
     [ObservableProperty] private bool _isRailVisible = true;
     [ObservableProperty] private bool _isPagesVisible = true;
+    [ObservableProperty] private bool _isHomeVisible = true;       // launch lands on the notebook gallery
     [ObservableProperty] private string _toolbarPosition = "Top";   // "Top" | "Left" | "Right" | "Bottom"
     [ObservableProperty] private string _toolbarScope = "Window";   // "Window" | "Page"
     [ObservableProperty] private bool _resizablePages = true;       // future prefs: "Resizable pages"
@@ -134,12 +139,33 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void AddNotebook()
     {
-        var nb = new Notebook { Name = "New notebook", Color = NotebookColors[Notebooks.Count % NotebookColors.Length] };
+        var nb = new Notebook { Name = "New notebook", Color = NotebookColors[Notebooks.Count % NotebookColors.Length].Hex };
         var sec = new Section { Name = "Notes" };
         sec.Pages.Add(new Page { Title = "Untitled page" });
         nb.Sections.Add(sec);
         Notebooks.Add(nb);
         SelectedNotebook = nb;
+        IsHomeVisible = false;                 // a fresh notebook opens right away (name it, start writing)
+        Save();
+    }
+
+    [RelayCommand]
+    private void OpenNotebook(Notebook nb)
+    {
+        SelectedNotebook = nb;
+        IsHomeVisible = false;
+    }
+
+    [RelayCommand]
+    private void GoHome()
+    {
+        FlushDirtyDocs();                      // leaving the editor saves immediately
+        IsHomeVisible = true;
+    }
+
+    public void SetNotebookColor(Notebook nb, string hex)
+    {
+        nb.Color = hex;
         Save();
     }
 

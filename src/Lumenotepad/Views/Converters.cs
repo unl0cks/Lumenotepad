@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 
@@ -22,5 +23,14 @@ public static class Converters
     {
         try { return new SolidColorBrush(Color.Parse(string.IsNullOrWhiteSpace(hex) ? "#4DA6FF" : hex)); }
         catch { return new SolidColorBrush(Color.Parse("#4DA6FF")); }
+    });
+
+    /// <summary>Gallery-card subtitle: "3 sections · 12 pages".</summary>
+    public static readonly IValueConverter NotebookStats = new FuncValueConverter<Models.Notebook?, string>(nb =>
+    {
+        if (nb is null) return "";
+        int secs = nb.Sections.Count;
+        int pages = nb.Sections.Sum(s => s.Pages.Count);
+        return $"{secs} {(secs == 1 ? "section" : "sections")} · {pages} {(pages == 1 ? "page" : "pages")}";
     });
 }

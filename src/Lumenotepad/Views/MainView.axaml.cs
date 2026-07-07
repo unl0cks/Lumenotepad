@@ -71,6 +71,10 @@ public partial class MainView : UserControl
         NotebooksList.ContextRequested += OnNotebooksContextRequested;
         PagesList.ContextRequested += OnPagesContextRequested;
         NotebookName.ContextRequested += OnNotebookNameContextRequested;
+
+        // Homepage gallery: click a card to open it, right-click for open/rename/color/delete.
+        HomeCards.AddHandler(TappedEvent, OnHomeCardTapped);
+        HomeCards.ContextRequested += OnHomeCardContextRequested;
     }
 
     private MainViewModel? Vm => DataContext as MainViewModel;
@@ -146,6 +150,13 @@ public partial class MainView : UserControl
             ApplyToolbarPlacement();
         else if (e.PropertyName is nameof(MainViewModel.ResizablePages) or nameof(MainViewModel.DeletedHistory))
             ApplyCanvasPrefs();
+        else if (e.PropertyName == nameof(MainViewModel.IsHomeVisible) && Vm is { IsHomeVisible: true } vm)
+        {
+            // Card subtitles (section/page counts) are computed by a converter, so re-realize the
+            // cards when coming home — counts changed while editing.
+            HomeCards.ItemsSource = null;
+            HomeCards.ItemsSource = vm.Notebooks;
+        }
     }
 
     private void SyncEditorDocument()
@@ -298,6 +309,55 @@ public partial class MainView : UserControl
             $"“{Label(pg.Title)}” will be permanently deleted. This can't be undone.",
             () => Vm?.DeletePageCommand.Execute(pg));
         OpenMenu(e, delete);
+    }
+
+    // ---- homepage gallery ----
+
+    private void OnHomeCardTapped(object? sender, TappedEventArgs e)
+    {
+        if ((e.Source as StyledElement)?.DataContext is Notebook nb)
+            Vm?.OpenNotebookCommand.Execute(nb);
+    }
+
+    private void OnHomeCardContextRequested(object? sender, ContextRequestedEventArgs e)
+    {
+        if ((e.Source as StyledElement)?.DataContext is not Notebook nb) return;
+
+        var open = new MenuItem { Header = "Open" };
+        open.Click += (_, _) => Vm?.OpenNotebookCommand.Execute(nb);
+
+        var rename = new MenuItem { Header = "Rename" };
+        rename.Click += (_, _) =>
+        {
+            Vm?.OpenNotebookCommand.Execute(nb);
+            Dispatcher.UIThread.Post(() => { NotebookName.Focus(); NotebookName.SelectAll(); },
+                                     DispatcherPriority.Background);
+        };
+
+        var color = new MenuItem { Header = "Color" };
+        foreach (var (hex, name) in MainViewModel.NotebookColors)
+        {
+            var swatch = new MenuItem
+            {
+                Header = name,
+                Icon = new Border
+                {
+                    Width = 14, Height = 14, CornerRadius = new CornerRadius(4),
+                    Background = new SolidColorBrush(Color.Parse(hex)),
+                },
+            };
+            string chosen = hex;
+            swatch.Click += (_, _) => Vm?.SetNotebookColor(nb, chosen);
+            color.Items.Add(swatch);
+        }
+
+        var delete = new MenuItem { Header = "Delete notebook" };
+        delete.Click += (_, _) => ConfirmThenDelete(
+            "Delete this notebook?",
+            $"“{Label(nb.Name)}” and all its sections and pages will be permanently deleted. This can't be undone.",
+            () => Vm?.DeleteNotebookCommand.Execute(nb));
+
+        OpenMenu(e, open, rename, color, delete);
     }
 
     private static string Label(string? s) => string.IsNullOrWhiteSpace(s) ? "Untitled" : s;

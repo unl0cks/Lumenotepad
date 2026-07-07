@@ -43,6 +43,41 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public void Homepage_launchesVisible_openAndReturnNavigate()
+    {
+        var vm = NewVm(out var dir);
+        try
+        {
+            Assert.True(vm.IsHomeVisible);                   // launch lands on the gallery
+
+            var nb = vm.Notebooks[0];
+            vm.OpenNotebookCommand.Execute(nb);
+            Assert.False(vm.IsHomeVisible);
+            Assert.Same(nb, vm.SelectedNotebook);
+
+            vm.GoHomeCommand.Execute(null);
+            Assert.True(vm.IsHomeVisible);
+
+            vm.AddNotebookCommand.Execute(null);             // a fresh notebook opens right away
+            Assert.False(vm.IsHomeVisible);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void SetNotebookColor_updatesAndPersists()
+    {
+        var vm = NewVm(out var dir);
+        try
+        {
+            vm.SetNotebookColor(vm.Notebooks[0], "#E27BA6");
+            var vm2 = new MainViewModel(new WorkspaceStore(dir));
+            Assert.Equal("#E27BA6", vm2.Notebooks[0].Color);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public void DeletePage_selectsNeighbor()
     {
         var vm = NewVm(out var dir);

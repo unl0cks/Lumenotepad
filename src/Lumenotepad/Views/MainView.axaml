@@ -43,6 +43,16 @@
             <Setter Property="Margin" Value="0,0,5,0"/>
             <Setter Property="CornerRadius" Value="8"/>
         </Style>
+        <!-- homepage notebook cards -->
+        <Style Selector="Border.nbcard">
+            <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
+            <Setter Property="Transitions">
+                <Transitions><TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.14" Easing="CubicEaseOut"/></Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.nbcard:pointerover">
+            <Setter Property="RenderTransform" Value="scale(1.035)"/>
+        </Style>
         <!-- inline rename box (section tab) -->
         <Style Selector="TextBox.inlineedit">
             <Setter Property="Padding" Value="0"/>
@@ -72,11 +82,17 @@
             </StackPanel>
 
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0">
+                <Button x:Name="HomeBtn" Theme="{StaticResource IconButton}" Width="34" Height="34" FontSize="15"
+                        FontFamily="{StaticResource IconFont}" Content="&#xE80F;"
+                        IsVisible="{Binding !IsHomeVisible}"
+                        Command="{Binding GoHomeCommand}" ToolTip.Tip="All notebooks"/>
                 <Button x:Name="RailToggle" Theme="{StaticResource IconButton}" Width="34" Height="34" FontSize="15"
                         FontFamily="{StaticResource IconFont}" Content="&#xE8A1;"
+                        IsVisible="{Binding !IsHomeVisible}"
                         Command="{Binding ToggleRailCommand}" ToolTip.Tip="Show / hide notebooks"/>
                 <Button x:Name="PagesToggle" Theme="{StaticResource IconButton}" Width="34" Height="34" FontSize="15"
                         FontFamily="{StaticResource IconFont}" Content="&#xE8A5;"
+                        IsVisible="{Binding !IsHomeVisible}"
                         Command="{Binding TogglePagesCommand}" ToolTip.Tip="Show / hide pages"/>
             </StackPanel>
 
@@ -87,8 +103,57 @@
             </StackPanel>
         </Grid>
 
-        <!-- ============ Body: dockable toolbar + (rail | nav | canvas) ============ -->
-        <DockPanel Grid.Row="1" x:Name="BodyDock">
+        <!-- ============ Body: homepage gallery OR the editor (toolbar + rail | nav | canvas) ============ -->
+        <Panel Grid.Row="1">
+
+        <!-- Homepage: the notebook gallery -->
+        <ScrollViewer x:Name="HomeHost" IsVisible="{Binding IsHomeVisible}" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="36,26,36,32" Spacing="20" MaxWidth="1100">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Spacing="3" VerticalAlignment="Center">
+                        <TextBlock Text="Notebooks" FontSize="24" FontWeight="SemiBold"/>
+                        <TextBlock Text="Pick up where you left off, or start something new."
+                                   FontSize="12.5" Foreground="{StaticResource TextMutedBrush}"/>
+                    </StackPanel>
+                    <Button x:Name="NewNotebookBtn" Grid.Column="1" VerticalAlignment="Center" Cursor="Hand"
+                            Command="{Binding AddNotebookCommand}" CornerRadius="10" Padding="14,8"
+                            Background="{StaticResource AccentSoftBrush}" Foreground="{StaticResource TextPrimaryBrush}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="&#xE710;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center"/>
+                            <TextBlock Text="New notebook" FontSize="13"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
+                <ItemsControl x:Name="HomeCards" ItemsSource="{Binding Notebooks}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="models:Notebook">
+                            <Border Classes="nbcard" Width="196" Height="132" Margin="0,0,16,16"
+                                    CornerRadius="14" ClipToBounds="True" Cursor="Hand"
+                                    Background="{Binding Color, Converter={x:Static v:Converters.HexBrush}}">
+                                <Grid RowDefinitions="*,Auto">
+                                    <TextBlock Text="{Binding Name, Converter={x:Static v:Converters.Initials}}"
+                                               FontSize="30" FontWeight="Bold" Foreground="#59FFFFFF"
+                                               Margin="16,12,0,0"/>
+                                    <Border Grid.Row="1" Background="#4D000000" Padding="14,9">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
+                                                       Foreground="White" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding ., Converter={x:Static v:Converters.NotebookStats}}"
+                                                       FontSize="11" Foreground="#B3FFFFFF"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+
+        <DockPanel x:Name="BodyDock" IsVisible="{Binding !IsHomeVisible}">
         <v:FormatToolbar x:Name="Toolbar" DockPanel.Dock="Top"/>
         <Grid ColumnDefinitions="Auto,Auto,*">
 
@@ -221,5 +286,7 @@
             </Border>
         </Grid>
         </DockPanel>
+
+        </Panel>
     </Grid>
 </UserControl>
