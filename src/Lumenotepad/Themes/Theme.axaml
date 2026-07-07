@@ -60,6 +60,8 @@
     <!-- Minimal template around RoundedTextPresenter: real SelectionBrush is transparent (the stock
          presenter has no corner-radius hook), the presenter paints rounded accent rects itself. -->
     <ControlTheme x:Key="RoundedFieldTextBox" TargetType="TextBox">
+        <!-- Standalone theme (no BasedOn) = Fluent's Cursor setter is lost; restore it. -->
+        <Setter Property="Cursor" Value="IBeam"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
         <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}"/>
         <Setter Property="SelectionBrush" Value="Transparent"/>
@@ -92,6 +94,79 @@
                 </Border>
             </ControlTemplate>
         </Setter>
+    </ControlTheme>
+
+    <!-- ============== Slim glass scrollbars ============== -->
+    <!-- Full ControlTheme replacement: Fluent's scrollbar keeps its chunky expanded state (track
+         plate + arrow RepeatButtons) no matter what plain styles say, so the template is rebuilt
+         from just Track + pill Thumb. Clicking the empty track still pages via the PART buttons. -->
+    <ControlTheme x:Key="SlimScrollPageButton" TargetType="RepeatButton">
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Template">
+            <ControlTemplate><Border Background="Transparent"/></ControlTemplate>
+        </Setter>
+    </ControlTheme>
+
+    <ControlTheme x:Key="SlimScrollThumb" TargetType="Thumb">
+        <Setter Property="Background" Value="#2EFFFFFF"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="{TemplateBinding Background}" CornerRadius="3">
+                    <Border.Transitions><Transitions><BrushTransition Property="Background" Duration="0:0:0.12"/></Transitions></Border.Transitions>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover"><Setter Property="Background" Value="#52FFFFFF"/></Style>
+        <Style Selector="^:pressed"><Setter Property="Background" Value="#70FFFFFF"/></Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="{x:Type ScrollBar}" TargetType="ScrollBar">
+        <Setter Property="Background" Value="Transparent"/>
+        <Style Selector="^:vertical">
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}">
+                        <Track Minimum="{TemplateBinding Minimum}"
+                               Maximum="{TemplateBinding Maximum}"
+                               Value="{TemplateBinding Value, Mode=TwoWay}"
+                               ViewportSize="{TemplateBinding ViewportSize}"
+                               Orientation="Vertical"
+                               IsDirectionReversed="True">
+                            <Track.DecreaseButton>
+                                <RepeatButton Name="PART_PageUpButton" Theme="{StaticResource SlimScrollPageButton}"/>
+                            </Track.DecreaseButton>
+                            <Track.IncreaseButton>
+                                <RepeatButton Name="PART_PageDownButton" Theme="{StaticResource SlimScrollPageButton}"/>
+                            </Track.IncreaseButton>
+                            <Thumb Theme="{StaticResource SlimScrollThumb}" Margin="2,0" MinHeight="24"/>
+                        </Track>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="^:horizontal">
+            <Setter Property="Height" Value="10"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}">
+                        <Track Minimum="{TemplateBinding Minimum}"
+                               Maximum="{TemplateBinding Maximum}"
+                               Value="{TemplateBinding Value, Mode=TwoWay}"
+                               ViewportSize="{TemplateBinding ViewportSize}"
+                               Orientation="Horizontal">
+                            <Track.DecreaseButton>
+                                <RepeatButton Name="PART_PageUpButton" Theme="{StaticResource SlimScrollPageButton}"/>
+                            </Track.DecreaseButton>
+                            <Track.IncreaseButton>
+                                <RepeatButton Name="PART_PageDownButton" Theme="{StaticResource SlimScrollPageButton}"/>
+                            </Track.IncreaseButton>
+                            <Thumb Theme="{StaticResource SlimScrollThumb}" Margin="0,2" MinWidth="24"/>
+                        </Track>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
     </ControlTheme>
 
     <!-- Caption (window) buttons -->
