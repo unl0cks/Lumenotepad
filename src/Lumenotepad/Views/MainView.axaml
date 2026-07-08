@@ -12,7 +12,7 @@
         <!-- flat, borderless rename fields -->
         <Style Selector="TextBox.rename">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}"/>
         </Style>
         <Style Selector="TextBox.rename /template/ Border#PART_BorderElement">
             <Setter Property="Background" Value="Transparent"/>
@@ -58,13 +58,20 @@
         <Style Selector="Border.nbcard:pointerover">
             <Setter Property="RenderTransform" Value="scale(1.035)"/>
         </Style>
+        <!-- "Flat covers" preference: the gloss overlays vanish, shadow + caption scrim stay -->
+        <Style Selector="ItemsControl.flat Border.cardfx">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="ListBox.flat Border.cardfx">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
         <!-- inline rename box (section tab) -->
         <Style Selector="TextBox.inlineedit">
             <Setter Property="Padding" Value="0"/>
             <Setter Property="MinHeight" Value="0"/>
             <Setter Property="MinWidth" Value="64"/>
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
         <Style Selector="TextBox.inlineedit /template/ Border#PART_BorderElement">
@@ -77,9 +84,9 @@
     <Grid RowDefinitions="38,*">
 
         <!-- ============ Title bar ============ -->
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto" x:Name="TitleBar" Background="#01FFFFFF">
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto" x:Name="TitleBar" Background="{DynamicResource FrameBackgroundBrush}">
             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="11,0,0,0" Spacing="9">
-                <Border Width="22" Height="22" CornerRadius="7" Background="{StaticResource AccentBrush}">
+                <Border Width="22" Height="22" CornerRadius="7" Background="{DynamicResource AccentBrush}">
                     <TextBlock Text="&#xE82F;" FontFamily="{StaticResource IconFont}" FontSize="13"
                                Foreground="#04213F" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
@@ -87,6 +94,8 @@
             </StackPanel>
 
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0">
+                <Button x:Name="PrefsBtn" Theme="{StaticResource IconButton}" Width="34" Height="34" FontSize="15"
+                        FontFamily="{StaticResource IconFont}" Content="&#xE713;" ToolTip.Tip="Preferences"/>
                 <Button x:Name="HomeBtn" Theme="{StaticResource IconButton}" Width="34" Height="34" FontSize="15"
                         FontFamily="{StaticResource IconFont}" Content="&#xE80F;"
                         IsVisible="{Binding !IsHomeVisible}"
@@ -109,16 +118,17 @@
         </Grid>
 
         <!-- ============ Body: homepage gallery OR the editor (toolbar + rail | nav | canvas) ============ -->
-        <Panel Grid.Row="1">
+        <Panel Grid.Row="1" Background="{DynamicResource CanvasBackgroundBrush}">
 
         <!-- Homepage: the notebook gallery -->
         <ScrollViewer x:Name="HomeHost" IsVisible="{Binding IsHomeVisible}" VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="36,26,36,32" Spacing="20" MaxWidth="1100">
                 <Grid ColumnDefinitions="*,Auto">
                     <StackPanel Spacing="3" VerticalAlignment="Center">
-                        <TextBlock Text="Notebooks" FontSize="24" FontWeight="SemiBold"/>
+                        <TextBlock Text="Notebooks" FontSize="24" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource CanvasTextBrush}"/>
                         <TextBlock Text="Pick up where you left off, or start something new."
-                                   FontSize="12.5" Foreground="{StaticResource TextMutedBrush}"/>
+                                   FontSize="12.5" Foreground="{DynamicResource CanvasTextMutedBrush}"/>
                     </StackPanel>
                     <Button x:Name="NewNotebookBtn" Grid.Column="1" VerticalAlignment="Center"
                             Theme="{StaticResource LumenButton}" Command="{Binding AddNotebookCommand}">
@@ -149,30 +159,38 @@
                                         <!-- optional photo cover (rounded via brush fill, sits under the scrim) -->
                                         <Border CornerRadius="13"
                                                 Background="{Binding CoverPath, Converter={x:Static v:Converters.CoverImage}}"/>
-                                        <!-- ONE continuous overlay: top gloss → clear → dark scrim the labels sit on.
-                                             No separate label strip, so the cover never hard-cuts mid-card. -->
-                                        <Border CornerRadius="13" BorderThickness="0,1,0,0" BorderBrush="#38FFFFFF">
+                                        <!-- top-lit gloss + hairline: hidden by the "Flat covers" preference -->
+                                        <Border Classes="cardfx" CornerRadius="13" BorderThickness="0,1,0,0" BorderBrush="#38FFFFFF">
                                             <Border.Background>
                                                 <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
                                                     <GradientStop Offset="0" Color="#2BFFFFFF"/>
-                                                    <GradientStop Offset="0.40" Color="#00FFFFFF"/>
-                                                    <GradientStop Offset="0.68" Color="#40000000"/>
-                                                    <GradientStop Offset="1" Color="#80000000"/>
+                                                    <GradientStop Offset="0.45" Color="#00FFFFFF"/>
+                                                    <GradientStop Offset="1" Color="#26000000"/>
                                                 </LinearGradientBrush>
                                             </Border.Background>
-                                            <Panel>
-                                                <TextBlock Text="{Binding Name, Converter={x:Static v:Converters.Initials}}"
-                                                           FontSize="30" FontWeight="Bold" Foreground="#59FFFFFF"
-                                                           Margin="16,12,0,0"
-                                                           IsVisible="{Binding CoverPath, Converter={x:Static conv:ObjectConverters.IsNull}}"/>
-                                                <StackPanel Spacing="2" Margin="14,0,14,10" VerticalAlignment="Bottom">
-                                                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
-                                                               Foreground="White" TextTrimming="CharacterEllipsis"/>
-                                                    <TextBlock Text="{Binding ., Converter={x:Static v:Converters.NotebookStats}}"
-                                                               FontSize="11" Foreground="#CCFFFFFF"/>
-                                                </StackPanel>
-                                            </Panel>
                                         </Border>
+                                        <!-- caption scrim: always on (keeps labels readable on photos and flat covers) -->
+                                        <Border CornerRadius="13">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
+                                                    <GradientStop Offset="0.45" Color="#00000000"/>
+                                                    <GradientStop Offset="0.70" Color="#38000000"/>
+                                                    <GradientStop Offset="1" Color="#73000000"/>
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                        </Border>
+                                        <Panel>
+                                            <TextBlock Text="{Binding Name, Converter={x:Static v:Converters.Initials}}"
+                                                       FontSize="30" FontWeight="Bold" Foreground="#59FFFFFF"
+                                                       Margin="16,12,0,0"
+                                                       IsVisible="{Binding CoverPath, Converter={x:Static conv:ObjectConverters.IsNull}}"/>
+                                            <StackPanel Spacing="2" Margin="14,0,14,10" VerticalAlignment="Bottom">
+                                                <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
+                                                           Foreground="White" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding ., Converter={x:Static v:Converters.NotebookStats}}"
+                                                           FontSize="11" Foreground="#CCFFFFFF"/>
+                                            </StackPanel>
+                                        </Panel>
                                     </Panel>
                                 </Border>
                             </Panel>
@@ -188,7 +206,8 @@
 
             <!-- Notebooks rail -->
             <Border Grid.Column="0" Width="64" IsVisible="{Binding IsRailVisible}"
-                    BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="0,0,1,0">
+                    Background="{DynamicResource FrameBackgroundBrush}"
+                    BorderBrush="{DynamicResource FrameBorderBrush}" BorderThickness="0,0,1,0">
                 <DockPanel Margin="0,10">
                     <Button DockPanel.Dock="Bottom" Theme="{StaticResource IconButton}" Width="40" Height="40"
                             HorizontalAlignment="Center" Margin="0,8,0,0" FontFamily="{StaticResource IconFont}"
@@ -201,12 +220,23 @@
                             <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="models:Notebook">
                                     <Border Width="40" Height="40" CornerRadius="12" BorderThickness="1"
-                                            Background="{Binding Color, Converter={x:Static v:Converters.CoverGradient}}"
+                                            Background="{Binding Color, Converter={x:Static v:Converters.HexBrush}}"
                                             BorderBrush="{Binding Color, Converter={x:Static v:Converters.CoverBorder}}"
                                             ToolTip.Tip="{Binding Name}">
-                                        <TextBlock Text="{Binding Name, Converter={x:Static v:Converters.Initials}}"
-                                                   Foreground="White" FontSize="13" FontWeight="SemiBold"
-                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <Panel>
+                                            <Border Classes="cardfx" CornerRadius="11">
+                                                <Border.Background>
+                                                    <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
+                                                        <GradientStop Offset="0" Color="#2EFFFFFF"/>
+                                                        <GradientStop Offset="0.5" Color="#00FFFFFF"/>
+                                                        <GradientStop Offset="1" Color="#2E000000"/>
+                                                    </LinearGradientBrush>
+                                                </Border.Background>
+                                            </Border>
+                                            <TextBlock Text="{Binding Name, Converter={x:Static v:Converters.Initials}}"
+                                                       Foreground="White" FontSize="13" FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Panel>
                                     </Border>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
@@ -217,7 +247,8 @@
 
             <!-- Sections + pages -->
             <Border Grid.Column="1" Width="224" IsVisible="{Binding IsPagesVisible}"
-                    BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="0,0,1,0">
+                    Background="{DynamicResource FrameBackgroundBrush}"
+                    BorderBrush="{DynamicResource FrameBorderBrush}" BorderThickness="0,0,1,0">
                 <DockPanel Margin="12,12,12,0">
 
                     <TextBox x:Name="NotebookName" DockPanel.Dock="Top" Theme="{StaticResource RoundedFieldTextBox}"
@@ -226,7 +257,7 @@
 
                     <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,10,0,4">
                         <TextBlock Text="Sections" FontSize="11" FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"/>
+                                   Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
                         <Button Grid.Column="2" Theme="{StaticResource IconButton}" Width="24" Height="24" FontSize="12"
                                 FontFamily="{StaticResource IconFont}" Content="&#xE710;"
                                 Command="{Binding AddSectionCommand}" ToolTip.Tip="New section"/>
@@ -257,7 +288,7 @@
 
                     <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,12,0,4">
                         <TextBlock Text="Pages" FontSize="11" FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"/>
+                                   Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
                         <Button Grid.Column="2" Theme="{StaticResource IconButton}" Width="24" Height="24" FontSize="12"
                                 FontFamily="{StaticResource IconFont}" Content="&#xE710;"
                                 Command="{Binding AddPageCommand}" ToolTip.Tip="New page"/>
@@ -277,12 +308,13 @@
 
             <!-- Page: title + freeform canvas of note containers -->
             <Border Grid.Column="2" Margin="14" CornerRadius="14"
-                    Background="#0BFFFFFF" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                    Background="{DynamicResource PaperBackgroundBrush}" BorderBrush="{DynamicResource PaperBorderBrush}" BorderThickness="1">
                 <DockPanel x:Name="PageDock">
                     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="26,22,26,0"
                           IsVisible="{Binding SelectedPage, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
                         <TextBox x:Name="PageTitle" Classes="rename"
                                  Theme="{StaticResource RoundedFieldTextBox}"
+                                 Foreground="{DynamicResource PaperTextBrush}"
                                  FontSize="26" FontWeight="SemiBold" PlaceholderText="Page title"
                                  Text="{Binding SelectedPage.Title, Mode=TwoWay}"/>
                         <Button x:Name="HistoryBtn" Grid.Column="1" Theme="{StaticResource IconButton}"
@@ -299,12 +331,12 @@
                         <Border x:Name="TrashPanel" IsVisible="False" Width="238"
                                 HorizontalAlignment="Right" VerticalAlignment="Stretch" Margin="0,10,12,12"
                                 CornerRadius="10" Background="#E8191B24"
-                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                BorderBrush="#33FFFFFF" BorderThickness="1">
                             <DockPanel Margin="12,10,12,12">
                                 <TextBlock DockPanel.Dock="Top" Text="Deleted containers"
                                            FontSize="13" FontWeight="SemiBold"/>
                                 <TextBlock DockPanel.Dock="Top" Text="Drag one onto the page to bring it back."
-                                           FontSize="11" Foreground="{StaticResource TextMutedBrush}"
+                                           FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
                                            TextWrapping="Wrap" Margin="0,4,0,10"/>
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                                     <StackPanel x:Name="TrashList" Spacing="6"/>

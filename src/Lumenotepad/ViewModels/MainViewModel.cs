@@ -47,8 +47,15 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _isHomeVisible = true;       // launch lands on the notebook gallery
     [ObservableProperty] private string _toolbarPosition = "Top";   // "Top" | "Left" | "Right" | "Bottom"
     [ObservableProperty] private string _toolbarScope = "Window";   // "Window" | "Page"
-    [ObservableProperty] private bool _resizablePages = true;       // future prefs: "Resizable pages"
-    [ObservableProperty] private bool _deletedHistory = true;       // future prefs: "Deleted pages history"
+    [ObservableProperty] private bool _resizablePages = true;       // prefs: "Resizable pages"
+    [ObservableProperty] private bool _deletedHistory = true;       // prefs: "Deleted pages history"
+    [ObservableProperty] private string _theme = "Lumen";           // prefs: frame theme
+    [ObservableProperty] private bool _fullTheme;                   // prefs: canvas matches frame
+    [ObservableProperty] private bool _paperLight;                  // prefs: Lumen+FullOff light paper
+    [ObservableProperty] private bool _flatCovers;                  // prefs: solid covers, shadow kept
+
+    /// <summary>The Light-paper toggle only means something on Lumen with Full theme off.</summary>
+    public bool PaperToggleEnabled => Theme == "Lumen" && !FullTheme;
 
     private readonly AppSettings? _settings;
     private readonly string? _settingsDir;
@@ -67,6 +74,10 @@ public partial class MainViewModel : ObservableObject
             ToolbarScope = _settings.ToolbarScope;
             ResizablePages = _settings.ResizablePages;
             DeletedHistory = _settings.DeletedHistory;
+            Theme = _settings.Theme;
+            FullTheme = _settings.FullTheme;
+            PaperLight = _settings.PaperLight;
+            FlatCovers = _settings.FlatCovers;
         }
         _workspace = store.LoadOrSeed();
         SelectedNotebook = Notebooks.FirstOrDefault();
@@ -97,6 +108,36 @@ public partial class MainViewModel : ObservableObject
     {
         if (_settings is null || _settingsDir is null) return;
         _settings.DeletedHistory = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnThemeChanged(string value)
+    {
+        OnPropertyChanged(nameof(PaperToggleEnabled));
+        if (_settings is null || _settingsDir is null) return;
+        _settings.Theme = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnFullThemeChanged(bool value)
+    {
+        OnPropertyChanged(nameof(PaperToggleEnabled));
+        if (_settings is null || _settingsDir is null) return;
+        _settings.FullTheme = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnPaperLightChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.PaperLight = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnFlatCoversChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.FlatCovers = value;
         _settings.Save(_settingsDir);
     }
 

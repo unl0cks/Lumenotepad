@@ -11,6 +11,35 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        DataContextChanged += (_, _) => HookThemeVm();
+    }
+
+    private ViewModels.MainViewModel? _themeVm;
+
+    private void HookThemeVm()
+    {
+        if (_themeVm is not null) _themeVm.PropertyChanged -= OnThemePropertyChanged;
+        _themeVm = DataContext as ViewModels.MainViewModel;
+        if (_themeVm is not null)
+        {
+            _themeVm.PropertyChanged += OnThemePropertyChanged;
+            ApplyTheme();
+        }
+    }
+
+    private void OnThemePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(ViewModels.MainViewModel.Theme)
+            or nameof(ViewModels.MainViewModel.FullTheme)
+            or nameof(ViewModels.MainViewModel.PaperLight))
+            ApplyTheme();
+    }
+
+    private void ApplyTheme()
+    {
+        if (_themeVm is not { } vm || Application.Current is not { } app) return;
+        Services.ThemeManager.Apply(app, Services.ThemePalettes.Resolve(vm.Theme, vm.FullTheme, vm.PaperLight));
+        Services.ThemeManager.ApplyChrome(this);
     }
 
     protected override void OnClosing(WindowClosingEventArgs e)
@@ -96,6 +125,6 @@ public partial class MainWindow : Window
     {
         WinChrome.EnableSnap(this);
         WinChrome.RoundCorners(this, true);
-        DwmAcrylic.Apply(this, DwmAcrylic.Backdrop.Acrylic, dark: true);
+        Services.ThemeManager.ApplyChrome(this);   // acrylic + immersive dark per the active theme
     }
 }

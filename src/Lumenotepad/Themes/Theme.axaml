@@ -22,6 +22,24 @@
     <SolidColorBrush x:Key="GlassBorderBrush" Color="#33FFFFFF"/>
     <SolidColorBrush x:Key="PanelTintBrush" Color="#8C16171C"/>
 
+    <!-- Theme-engine tokens (defaults = Lumen glass; ThemeManager overwrites them all at runtime,
+         DynamicResource consumers restyle live). Regions: FRAME (title bar/rails/nav), CANVAS
+         (body backdrop + homepage), PAPER (the page box + note containers). -->
+    <SolidColorBrush x:Key="FrameBackgroundBrush" Color="#02FFFFFF"/>
+    <SolidColorBrush x:Key="FrameBorderBrush" Color="#33FFFFFF"/>
+    <SolidColorBrush x:Key="CanvasBackgroundBrush" Color="#00000000"/>
+    <SolidColorBrush x:Key="CanvasTextBrush" Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="CanvasTextMutedBrush" Color="#80FFFFFF"/>
+    <SolidColorBrush x:Key="PaperBackgroundBrush" Color="#0BFFFFFF"/>
+    <SolidColorBrush x:Key="PaperBorderBrush" Color="#33FFFFFF"/>
+    <SolidColorBrush x:Key="PaperTextBrush" Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="PaperTextMutedBrush" Color="#80FFFFFF"/>
+    <SolidColorBrush x:Key="FieldSelectionBrush" Color="#554DA6FF"/>
+    <SolidColorBrush x:Key="ScrollThumbBrush" Color="#2EFFFFFF"/>
+    <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#52FFFFFF"/>
+    <SolidColorBrush x:Key="ScrollThumbPressedBrush" Color="#70FFFFFF"/>
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#FF14161C"/>
+
     <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
     <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI</FontFamily>
 
@@ -35,9 +53,9 @@
     <!-- Prominent filled button: gradient fill, 1px deep border, hover veil, pressed shrink.
          (Fluent's Button theme swaps Background on hover, killing custom fills — hence own template.) -->
     <ControlTheme x:Key="LumenButton" TargetType="Button">
-        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
-        <Setter Property="Background" Value="{StaticResource AccentGradientBrush}"/>
-        <Setter Property="BorderBrush" Value="{StaticResource AccentDeepBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource AccentGradientBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentDeepBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="10"/>
         <Setter Property="Padding" Value="14,8"/>
@@ -74,7 +92,7 @@
         <Setter Property="Focusable" Value="False"/>
         <Setter Property="FontFamily" Value="{StaticResource IconFont}"/>
         <Setter Property="FontSize" Value="16"/>
-        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Width" Value="34"/>
         <Setter Property="Height" Value="34"/>
@@ -82,7 +100,7 @@
         <Setter Property="Template">
             <ControlTemplate>
                 <Panel>
-                    <Border x:Name="bg" Background="{StaticResource ControlHoverBrush}" controls:Squircle.Enabled="True" Opacity="0">
+                    <Border x:Name="bg" Background="{DynamicResource ControlHoverBrush}" controls:Squircle.Enabled="True" Opacity="0">
                         <Border.Transitions><Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.15"/></Transitions></Border.Transitions>
                     </Border>
                     <ContentPresenter x:Name="cp" Content="{TemplateBinding Content}"
@@ -106,8 +124,8 @@
     <ControlTheme x:Key="RoundedFieldTextBox" TargetType="TextBox">
         <!-- Standalone theme (no BasedOn) = Fluent's Cursor setter is lost; restore it. -->
         <Setter Property="Cursor" Value="IBeam"/>
-        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
-        <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}"/>
         <Setter Property="SelectionBrush" Value="Transparent"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Padding" Value="4,2"/>
@@ -118,10 +136,10 @@
                     <ScrollViewer Name="PART_ScrollViewer" Padding="{TemplateBinding Padding}"
                                   HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
                         <Panel>
-                            <controls:TextSelectionUnderlay Brush="#554DA6FF"
+                            <controls:TextSelectionUnderlay Brush="{DynamicResource FieldSelectionBrush}"
                                 Presenter="{Binding #PART_TextPresenter}"/>
                             <TextBlock Name="watermark" Text="{TemplateBinding PlaceholderText}"
-                                       Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"
                                        IsVisible="{TemplateBinding Text, Converter={x:Static StringConverters.IsNullOrEmpty}}"/>
                             <TextPresenter Name="PART_TextPresenter"
                                 Text="{TemplateBinding Text, Mode=TwoWay}"
@@ -152,7 +170,7 @@
     </ControlTheme>
 
     <ControlTheme x:Key="SlimScrollThumb" TargetType="Thumb">
-        <Setter Property="Background" Value="#2EFFFFFF"/>
+        <Setter Property="Background" Value="{DynamicResource ScrollThumbBrush}"/>
         <Setter Property="Template">
             <ControlTemplate>
                 <Border Background="{TemplateBinding Background}" CornerRadius="3">
@@ -160,8 +178,8 @@
                 </Border>
             </ControlTemplate>
         </Setter>
-        <Style Selector="^:pointerover"><Setter Property="Background" Value="#52FFFFFF"/></Style>
-        <Style Selector="^:pressed"><Setter Property="Background" Value="#70FFFFFF"/></Style>
+        <Style Selector="^:pointerover"><Setter Property="Background" Value="{DynamicResource ScrollThumbHoverBrush}"/></Style>
+        <Style Selector="^:pressed"><Setter Property="Background" Value="{DynamicResource ScrollThumbPressedBrush}"/></Style>
     </ControlTheme>
 
     <ControlTheme x:Key="{x:Type ScrollBar}" TargetType="ScrollBar">
@@ -218,7 +236,7 @@
         <Setter Property="Focusable" Value="False"/>
         <Setter Property="FontFamily" Value="{StaticResource IconFont}"/>
         <Setter Property="FontSize" Value="10"/>
-        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
         <Setter Property="Width" Value="44"/>
         <Setter Property="Height" Value="32"/>
         <Setter Property="Cursor" Value="Hand"/>
@@ -234,8 +252,8 @@
                 </Border>
             </ControlTemplate>
         </Setter>
-        <Style Selector="^:pointerover /template/ Border#bg"><Setter Property="Background" Value="{StaticResource ControlHoverBrush}"/></Style>
-        <Style Selector="^:pointerover"><Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/></Style>
+        <Style Selector="^:pointerover /template/ Border#bg"><Setter Property="Background" Value="{DynamicResource ControlHoverBrush}"/></Style>
+        <Style Selector="^:pointerover"><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/></Style>
         <Style Selector="^:pointerover /template/ ContentPresenter#cp"><Setter Property="RenderTransform" Value="scale(1.12)"/></Style>
         <Style Selector="^:pressed /template/ ContentPresenter#cp"><Setter Property="RenderTransform" Value="scale(0.84)"/></Style>
     </ControlTheme>

@@ -76,6 +76,18 @@ public partial class MainView : UserControl
         // Homepage gallery: click a card to open it, right-click for open/rename/color/delete.
         HomeCards.AddHandler(TappedEvent, OnHomeCardTapped);
         HomeCards.ContextRequested += OnHomeCardContextRequested;
+
+        PrefsBtn.Click += (_, _) => OpenPreferences();
+    }
+
+    private PreferencesWindow? _prefs;
+
+    private void OpenPreferences()
+    {
+        if (_prefs is not null) { _prefs.Activate(); return; }
+        _prefs = new PreferencesWindow { DataContext = Vm };
+        _prefs.Closed += (_, _) => _prefs = null;
+        if (Window is { } w) _prefs.Show(w);
     }
 
     private MainViewModel? Vm => DataContext as MainViewModel;
@@ -102,13 +114,22 @@ public partial class MainView : UserControl
         }
     }
 
-    /// <summary>Push the (future preferences window's) canvas toggles onto the canvas.</summary>
+    /// <summary>Push the preferences-window canvas toggles onto the canvas.</summary>
     private void ApplyCanvasPrefs()
     {
         if (Vm is not { } vm) return;
         PageCanvas.CanResize = vm.ResizablePages;
         PageCanvas.HistoryEnabled = vm.DeletedHistory;
         if (!vm.DeletedHistory) TrashPanel.IsVisible = false;
+        ApplyFlatCovers();
+    }
+
+    /// <summary>"Flat covers": a class on the hosts hides every Border.cardfx gloss overlay.</summary>
+    private void ApplyFlatCovers()
+    {
+        bool flat = Vm?.FlatCovers ?? false;
+        HomeCards.Classes.Set("flat", flat);
+        NotebooksList.Classes.Set("flat", flat);
     }
 
     /// <summary>Place the toolbar per the VM: docked to a side of either the WINDOW body or the PAGE box.</summary>
@@ -151,6 +172,15 @@ public partial class MainView : UserControl
             ApplyToolbarPlacement();
         else if (e.PropertyName is nameof(MainViewModel.ResizablePages) or nameof(MainViewModel.DeletedHistory))
             ApplyCanvasPrefs();
+        else if (e.PropertyName == nameof(MainViewModel.FlatCovers))
+            ApplyFlatCovers();
+        else if (e.PropertyName is nameof(MainViewModel.Theme)
+                 or nameof(MainViewModel.FullTheme) or nameof(MainViewModel.PaperLight))
+        {
+            // Note containers read their paper-region brushes at construction — rebuild them.
+            PageCanvas.Document = PageCanvas.Document;
+            if (TrashPanel.IsVisible) RefreshTrashPanel();
+        }
         else if (e.PropertyName == nameof(MainViewModel.IsHomeVisible) && Vm is { IsHomeVisible: true } vm)
         {
             // Card subtitles (section/page counts) are computed by a converter, so re-realize the

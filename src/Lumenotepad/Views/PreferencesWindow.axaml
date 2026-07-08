@@ -1,0 +1,124 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Lumenotepad.ViewModels"
+        x:Class="Lumenotepad.Views.PreferencesWindow"
+        x:DataType="vm:MainViewModel"
+        Title="Preferences"
+        Width="460" SizeToContent="Height" CanResize="False"
+        WindowDecorations="None" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="{StaticResource UiFont}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
+        TextOptions.TextRenderingMode="Antialias"
+        Background="{DynamicResource WindowBackgroundBrush}">
+
+    <Window.Styles>
+        <Style Selector="TextBlock.section">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+            <Setter Property="Margin" Value="0,14,0,2"/>
+        </Style>
+        <Style Selector="TextBlock.hint">
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.label">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="ToggleSwitch">
+            <Setter Property="OnContent" Value="{x:Null}"/>
+            <Setter Property="OffContent" Value="{x:Null}"/>
+            <Setter Property="MinWidth" Value="0"/>
+        </Style>
+        <!-- theme picker chips -->
+        <Style Selector="ListBox.themepick ListBoxItem">
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Margin" Value="0,0,6,6"/>
+            <Setter Property="CornerRadius" Value="9"/>
+        </Style>
+    </Window.Styles>
+
+    <DockPanel>
+        <!-- mini title bar -->
+        <Grid DockPanel.Dock="Top" Height="36" ColumnDefinitions="*,Auto" x:Name="PrefsTitleBar"
+              Background="Transparent">
+            <TextBlock Text="Preferences" FontSize="13" FontWeight="SemiBold"
+                       VerticalAlignment="Center" Margin="16,0,0,0"/>
+            <Button x:Name="CloseBtn" Grid.Column="1" Theme="{StaticResource CloseCaptionButton}" Content="&#xE8BB;"/>
+        </Grid>
+
+        <StackPanel Margin="20,4,20,18" Spacing="6">
+
+            <TextBlock Classes="section" Text="APPEARANCE" Margin="0,0,0,2"/>
+
+            <TextBlock Classes="label" Text="Theme"/>
+            <ListBox x:Name="ThemeList" Classes="themepick" Background="Transparent" BorderThickness="0" Padding="0">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+            </ListBox>
+
+            <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="label" Text="Full theme"/>
+                    <TextBlock Classes="hint" Text="The page canvas matches the frame material instead of contrasting it."/>
+                </StackPanel>
+                <ToggleSwitch Grid.Column="1" IsChecked="{Binding FullTheme, Mode=TwoWay}" VerticalAlignment="Center"/>
+            </Grid>
+
+            <Grid ColumnDefinitions="*,Auto" IsEnabled="{Binding PaperToggleEnabled}">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="label" Text="Light paper"/>
+                    <TextBlock Classes="hint" Text="Lumen with Full theme off: write on light paper instead of dark."/>
+                </StackPanel>
+                <ToggleSwitch Grid.Column="1" IsChecked="{Binding PaperLight, Mode=TwoWay}" VerticalAlignment="Center"/>
+            </Grid>
+
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="label" Text="Flat covers"/>
+                    <TextBlock Classes="hint" Text="Notebook covers use their plain color — no gloss, shadows stay."/>
+                </StackPanel>
+                <ToggleSwitch Grid.Column="1" IsChecked="{Binding FlatCovers, Mode=TwoWay}" VerticalAlignment="Center"/>
+            </Grid>
+
+            <TextBlock Classes="section" Text="LAYOUT"/>
+
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Classes="label" Text="Toolbar position"/>
+                <ComboBox x:Name="ToolbarPosBox" Grid.Column="1" Width="120"/>
+            </Grid>
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="label" Text="Attach toolbar to"/>
+                    <TextBlock Classes="hint" Text="The window edge, or the page box itself."/>
+                </StackPanel>
+                <ComboBox x:Name="ToolbarScopeBox" Grid.Column="1" Width="120" VerticalAlignment="Center"/>
+            </Grid>
+
+            <TextBlock Classes="section" Text="CANVAS"/>
+
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="label" Text="Resizable pages"/>
+                    <TextBlock Classes="hint" Text="Note containers show width, height and corner resize handles."/>
+                </StackPanel>
+                <ToggleSwitch Grid.Column="1" IsChecked="{Binding ResizablePages, Mode=TwoWay}" VerticalAlignment="Center"/>
+            </Grid>
+
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="label" Text="Deleted pages history"/>
+                    <TextBlock Classes="hint" Text="Deleted containers are kept per page and can be dragged back."/>
+                </StackPanel>
+                <ToggleSwitch Grid.Column="1" IsChecked="{Binding DeletedHistory, Mode=TwoWay}" VerticalAlignment="Center"/>
+            </Grid>
+
+            <TextBlock Classes="hint" Margin="0,16,0,0"
+                       Text="Advanced settings (encodings, hashes, per-bullet colors…) arrive in a later update behind a confirmation."/>
+        </StackPanel>
+    </DockPanel>
+</Window>

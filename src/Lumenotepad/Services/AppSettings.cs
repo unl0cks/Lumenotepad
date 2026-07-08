@@ -6,8 +6,10 @@ namespace Lumenotepad.Services;
 /// <summary>Portable app settings persisted as JSON in the beside-the-exe userdata folder.</summary>
 public sealed class AppSettings
 {
-    public string Theme { get; set; } = "Lumen";          // "Light" | "Dark" | "Lumen"
+    public string Theme { get; set; } = "Lumen";          // "Lumen" | "Dark" | "Light" | "Pink" | "Light blue"
     public bool FullTheme { get; set; }                     // canvas matches frame material when true
+    public bool PaperLight { get; set; }                    // Lumen + FullTheme off: light paper instead of dark
+    public bool FlatCovers { get; set; }                    // solid notebook covers (no gradient), shadow kept
     public string AccentColor { get; set; } = "#4DA6FF";
     public double BlurStrength { get; set; } = 0.6;         // 0..1
     public string ToolbarPosition { get; set; } = "Top";    // "Top" | "Left" | "Right" | "Bottom"

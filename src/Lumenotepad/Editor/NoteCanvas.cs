@@ -194,11 +194,12 @@ internal sealed class NoteBoxView : Panel
 {
     private enum DragMode { Move, Width, Height, Both }
 
-    private static readonly IBrush HoverBorder = new SolidColorBrush(Color.Parse("#26FFFFFF"));
-    private static readonly IBrush FocusBorder = new SolidColorBrush(Color.Parse("#4D4DA6FF"));
-    private static readonly IBrush GripFill = new SolidColorBrush(Color.Parse("#12FFFFFF"));
-    private static readonly IBrush GripBarFill = new SolidColorBrush(Color.Parse("#3DFFFFFF"));
-    private static readonly IBrush CloseFg = new SolidColorBrush(Color.Parse("#8CFFFFFF"));
+    // Paper-region theme tokens, read at construction (theme changes rebuild the canvas views).
+    private readonly IBrush HoverBorder;
+    private readonly IBrush FocusBorder;
+    private readonly IBrush GripFill;
+    private readonly IBrush GripBarFill;
+    private readonly IBrush CloseFg;
     private static readonly IBrush CloseHoverBg = new SolidColorBrush(Color.Parse("#66E81123"));
 
     internal NoteBox Box { get; }
@@ -219,7 +220,22 @@ internal sealed class NoteBoxView : Panel
     {
         _canvas = canvas;
         Box = box;
-        Editor = new RichTextEditor { Document = box.Doc, Margin = new Thickness(10, 3, 10, 9) };
+
+        var t = Services.ThemeManager.Current;
+        static IBrush B(string hex) => new SolidColorBrush(Color.Parse(hex));
+        HoverBorder = B(t.NoteChromeHover);
+        FocusBorder = B(t.NoteChromeFocus);
+        GripFill = B(t.NoteGripFill);
+        GripBarFill = B(t.NoteGripBar);
+        CloseFg = B(Services.ThemePalettes.Alpha(t.PaperText, 0x8C));
+
+        Editor = new RichTextEditor
+        {
+            Document = box.Doc, Margin = new Thickness(10, 3, 10, 9),
+            Foreground = B(t.PaperText),
+            CaretBrush = B(t.Accent),
+            SelectionBrush = B(t.FieldSelection),
+        };
 
         _gripBar = new Border
         {
