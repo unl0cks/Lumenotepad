@@ -14,6 +14,9 @@ public class ThemePalettesTests
         hex.TrimStart('#').Length == 6 ||
         byte.Parse(hex.TrimStart('#')[..2], System.Globalization.NumberStyles.HexNumber) >= 0xF0;
 
+    private static bool IsTranslucent(string hex) => !IsOpaque(hex) &&
+        byte.Parse(hex.TrimStart('#')[..2], System.Globalization.NumberStyles.HexNumber) > 0x00;
+
     [Fact]
     public void Lumen_fullOff_isGlassFrameWithSolidDarkPaper()
     {
@@ -48,15 +51,16 @@ public class ThemePalettesTests
     [InlineData("Light", false)]
     [InlineData("Pink", false)]
     [InlineData("Light blue", false)]
-    public void SolidThemes_fullOff_solidFrameGlassPaper(string theme, bool darkChrome)
+    public void SolidThemes_fullOff_solidCanvasWithFrostedPaperOnly(string theme, bool darkChrome)
     {
         var t = ThemePalettes.Resolve(theme, fullTheme: false, paperLight: false);
         Assert.True(IsOpaque(t.FrameBackground));
-        Assert.True(IsGlassy(t.PaperBackground));      // contrasting glass paper
-        Assert.True(IsGlassy(t.CanvasBackground));
-        Assert.Equal("#FFFFFFFF", t.PaperText);        // glass regions always read light
+        Assert.True(IsOpaque(t.CanvasBackground));     // the body around the page is NOT glass
+        Assert.True(IsTranslucent(t.PaperBackground)); // only the page box reads frosted
+        Assert.Equal(t.TextPrimary, t.PaperText);      // one text family — frost sits on the canvas
+        Assert.Equal(t.TextPrimary, t.CanvasText);
         Assert.Equal(darkChrome, t.DarkChrome);
-        Assert.True(t.GlassWindow);
+        Assert.False(t.GlassWindow);                   // no acrylic backdrop outside Lumen
     }
 
     [Theory]
@@ -68,7 +72,8 @@ public class ThemePalettesTests
     {
         var t = ThemePalettes.Resolve(theme, fullTheme: true, paperLight: false);
         Assert.True(IsOpaque(t.FrameBackground));
-        Assert.True(IsOpaque(t.PaperBackground) || !IsGlassy(t.PaperBackground));
+        Assert.True(IsOpaque(t.CanvasBackground));
+        Assert.False(IsTranslucent(t.PaperBackground));
         Assert.False(t.GlassWindow);
         Assert.Equal(t.TextPrimary, t.PaperText);      // one text family everywhere
     }

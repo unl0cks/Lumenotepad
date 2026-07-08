@@ -71,7 +71,11 @@ public static class ThemeManager
         app.RequestedThemeVariant = t.DarkChrome ? ThemeVariant.Dark : ThemeVariant.Light;
     }
 
-    /// <summary>Re-tint a window's native chrome for the active theme (backdrop + immersive dark).</summary>
+    /// <summary>Re-tint a window's native chrome for the active theme: immersive dark, and the
+    /// acrylic backdrop ONLY when the theme actually shows glass — solid themes are fully painted,
+    /// and skipping the backdrop there avoids DWM's maximize/snap artifacts.</summary>
     public static void ApplyChrome(Window window) =>
-        Platform.DwmAcrylic.Apply(window, Platform.DwmAcrylic.Backdrop.Acrylic, dark: Current.DarkChrome);
+        Platform.DwmAcrylic.Apply(window,
+            Current.GlassWindow ? Platform.DwmAcrylic.Backdrop.Acrylic : Platform.DwmAcrylic.Backdrop.None,
+            dark: Current.DarkChrome);
 }

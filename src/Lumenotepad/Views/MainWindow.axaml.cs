@@ -95,6 +95,13 @@ public partial class MainWindow : Window
             DispatcherTimer.RunOnce(ReassertChrome, TimeSpan.FromMilliseconds(150));
             DispatcherTimer.RunOnce(ReassertChrome, TimeSpan.FromMilliseconds(450));   // slow frame restores
         }
+        else if (state == WindowState.Maximized)
+        {
+            // Snap-maximize can leave the acrylic backdrop showing DWM's snap-animation surface
+            // (a stuck bright wash). Re-assert the backdrop once the maximize settles.
+            DispatcherTimer.RunOnce(() => Services.ThemeManager.ApplyChrome(this), TimeSpan.FromMilliseconds(120));
+            DispatcherTimer.RunOnce(() => Services.ThemeManager.ApplyChrome(this), TimeSpan.FromMilliseconds(450));
+        }
     }
 
     /// <summary>Inset the content by however much the window overhangs the monitor work area when maximized, so

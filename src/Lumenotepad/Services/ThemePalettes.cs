@@ -83,8 +83,10 @@ public static class ThemePalettes
             : t with { PaperBackground = "#191B22", PaperBorder = "#30FFFFFF" };
     }
 
-    /// <summary>Solid-frame themes. Full theme ON = solid canvas + solid paper in the same family;
-    /// OFF = glass canvas + glass paper (over the dark acrylic → light text in those regions).</summary>
+    /// <summary>Solid-frame themes: the whole window is opaque (no acrylic — glass is Lumen's
+    /// specialty). Full theme ON = the paper is a solid family surface; OFF (default) = the paper
+    /// is a FROSTED translucent tint over the solid canvas, so only the page box reads glassy —
+    /// never the body around it (owner correction 2026-07-08).</summary>
     private static ThemeTokens Solid(
         string accent, bool dark, string frameBg, string frameBorder,
         string solidCanvas, string solidPaper, string solidPaperBorder, bool fullTheme)
@@ -93,38 +95,25 @@ public static class ThemePalettes
         t = t with
         {
             FrameBackground = frameBg, FrameBorder = frameBorder,
-            WindowBackground = Alpha(frameBg, 0xFF), DarkChrome = dark,
+            WindowBackground = Alpha(frameBg, 0xFF), DarkChrome = dark, GlassWindow = false,
+            CanvasBackground = solidCanvas,
+            CanvasText = t.TextPrimary, CanvasTextMuted = t.TextMuted,
+            PaperText = t.TextPrimary, PaperTextMuted = t.TextMuted,
+            NoteChromeHover = dark ? "#26FFFFFF" : "#1F000000",
+            NoteGripFill = dark ? "#12FFFFFF" : "#0E000000",
+            NoteGripBar = dark ? "#3DFFFFFF" : "#38000000",
+            ScrollThumb = dark ? "#2EFFFFFF" : "#33000000",
+            ScrollThumbHover = dark ? "#52FFFFFF" : "#4D000000",
+            ScrollThumbPressed = dark ? "#70FFFFFF" : "#66000000",
         };
 
-        if (fullTheme)
-        {
-            // Everything solid — canvas and paper adopt the theme family, no glass anywhere.
-            return t with
+        return fullTheme
+            ? t with { PaperBackground = solidPaper, PaperBorder = solidPaperBorder }
+            : t with
             {
-                CanvasBackground = solidCanvas,
-                CanvasText = t.TextPrimary, CanvasTextMuted = t.TextMuted,
-                PaperBackground = solidPaper, PaperBorder = solidPaperBorder,
-                PaperText = t.TextPrimary, PaperTextMuted = t.TextMuted,
-                NoteChromeHover = dark ? "#26FFFFFF" : "#1F000000",
-                NoteGripFill = dark ? "#12FFFFFF" : "#0E000000",
-                NoteGripBar = dark ? "#3DFFFFFF" : "#38000000",
-                ScrollThumb = dark ? "#2EFFFFFF" : "#33000000",
-                ScrollThumbHover = dark ? "#52FFFFFF" : "#4D000000",
-                ScrollThumbPressed = dark ? "#70FFFFFF" : "#66000000",
-                GlassWindow = false,
+                PaperBackground = dark ? "#14FFFFFF" : "#A6FFFFFF",
+                PaperBorder = dark ? "#30FFFFFF" : solidPaperBorder,
             };
-        }
-
-        // Glass canvas + glass paper under the solid frame (the default, contrasting look).
-        return t with
-        {
-            CanvasBackground = "#00000000", CanvasText = "#FFFFFFFF", CanvasTextMuted = "#80FFFFFF",
-            PaperBackground = "#0BFFFFFF", PaperBorder = "#33FFFFFF",
-            PaperText = "#FFFFFFFF", PaperTextMuted = "#80FFFFFF",
-            NoteChromeHover = "#26FFFFFF", NoteGripFill = "#12FFFFFF", NoteGripBar = "#3DFFFFFF",
-            ScrollThumb = "#2EFFFFFF", ScrollThumbHover = "#52FFFFFF", ScrollThumbPressed = "#70FFFFFF",
-            GlassWindow = true,
-        };
     }
 
     /// <summary>Baseline for dark/glass frames: light text and white-alpha controls everywhere.</summary>

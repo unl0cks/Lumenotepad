@@ -21,6 +21,7 @@ internal static class Program
 
         var dir = Path.Combine(Path.GetTempPath(), "lnp-repro-" + Guid.NewGuid().ToString("N"));
         var vm = new MainViewModel(new WorkspaceStore(dir));
+        vm.ToolbarScope = "Window";
         vm.AddNotebookCommand.Execute(null);
         vm.SetNotebookColor(vm.Notebooks[0], "#4DA6FF");
         vm.SetNotebookColor(vm.Notebooks[1], "#FB6F92");
@@ -37,6 +38,7 @@ internal static class Program
         foreach (var (theme, full, paperLight, name) in new[]
         {
             ("Lumen", false, false, "lumen-off"),
+            ("Dark", false, false, "dark-off"),
             ("Lumen", false, true, "lumen-lightpaper"),
             ("Light", true, false, "light-full"),
             ("Light", false, false, "light-off"),

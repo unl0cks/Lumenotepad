@@ -108,6 +108,28 @@ public partial class FormatToolbar : UserControl
             (false, Dock.Right) => new Thickness(0, 4, 3, 4),
             _ => new Thickness(0),
         };
+
+        // Docked to the window, the strip is frame furniture: frame fill + a hairline toward the
+        // content, so its icons sit on the frame color on every theme. Inside the page it stays bare.
+        if (pageScope)
+        {
+            Chrome.ClearValue(Border.BackgroundProperty);
+            Chrome.ClearValue(Border.BorderBrushProperty);
+            Chrome.BorderThickness = new Thickness(0);
+        }
+        else
+        {
+            Chrome.Bind(Border.BackgroundProperty, this.GetResourceObservable("FrameBackgroundBrush"));
+            Chrome.Bind(Border.BorderBrushProperty, this.GetResourceObservable("FrameBorderBrush"));
+            Chrome.BorderThickness = dock switch
+            {
+                Dock.Left => new Thickness(0, 0, 1, 0),
+                Dock.Right => new Thickness(1, 0, 0, 0),
+                Dock.Bottom => new Thickness(0, 1, 0, 0),
+                _ => new Thickness(0, 0, 0, 1),
+            };
+            Margin = new Thickness(0);   // flush with the window edge, like the panels
+        }
     }
 
     private void Do(Action<RichTextEditor> action)
