@@ -18,6 +18,12 @@ public sealed partial class Notebook : ObservableObject
     public string Folder { get; set; } = "";
     [ObservableProperty] private string _name = "";
     [ObservableProperty] private string _color = "#4DA6FF";
+    /// <summary>Cover image file name inside the notebook folder ("" = color cover).</summary>
+    [ObservableProperty] private string _cover = "";
+    /// <summary>Absolute path of the cover image, hydrated by the store on load. Never persisted.</summary>
+    [ObservableProperty]
+    [property: System.Text.Json.Serialization.JsonIgnore]
+    private string? _coverPath;
     public ObservableCollection<Section> Sections { get; set; } = new();
 }
 

@@ -65,6 +65,32 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public void SetAndClearNotebookCover_copiesFileAndPersists()
+    {
+        var vm = NewVm(out var dir);
+        try
+        {
+            var src = Path.Combine(dir, "photo.png");
+            File.WriteAllBytes(src, new byte[] { 1, 2, 3 });
+
+            vm.SetNotebookCover(vm.Notebooks[0], src);
+            Assert.Equal("cover.png", vm.Notebooks[0].Cover);
+            Assert.True(File.Exists(vm.Notebooks[0].CoverPath));
+
+            var vm2 = new MainViewModel(new WorkspaceStore(dir));
+            Assert.Equal("cover.png", vm2.Notebooks[0].Cover);
+            Assert.True(File.Exists(vm2.Notebooks[0].CoverPath));   // hydrated on load
+
+            vm2.ClearNotebookCover(vm2.Notebooks[0]);
+            Assert.Equal("", vm2.Notebooks[0].Cover);
+            Assert.Null(vm2.Notebooks[0].CoverPath);
+            var vm3 = new MainViewModel(new WorkspaceStore(dir));
+            Assert.Null(vm3.Notebooks[0].CoverPath);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public void SetNotebookColor_updatesAndPersists()
     {
         var vm = NewVm(out var dir);

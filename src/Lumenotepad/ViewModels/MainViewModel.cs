@@ -184,6 +184,23 @@ public partial class MainViewModel : ObservableObject
         Save();
     }
 
+    public void SetNotebookCover(Notebook nb, string sourcePath)
+    {
+        var dest = _store.SaveCover(nb, sourcePath);
+        if (dest is null) return;
+        nb.Cover = System.IO.Path.GetFileName(dest);
+        nb.CoverPath = dest;
+        Save();
+    }
+
+    public void ClearNotebookCover(Notebook nb)
+    {
+        _store.DeleteCover(nb);
+        nb.Cover = "";
+        nb.CoverPath = null;
+        Save();
+    }
+
     [RelayCommand]
     private void AddSection()
     {

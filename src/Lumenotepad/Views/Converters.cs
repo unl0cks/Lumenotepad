@@ -57,6 +57,17 @@ public static class Converters
     public static readonly IValueConverter CoverBorder = new FuncValueConverter<string?, IBrush>(hex =>
         new SolidColorBrush(Shade(SafeParse(hex), -0.38)));
 
+    /// <summary>Absolute cover-image path → a fill brush for the card (null = keep the color cover).</summary>
+    public static readonly IValueConverter CoverImage = new FuncValueConverter<string?, IBrush?>(path =>
+    {
+        if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path)) return null;
+        try
+        {
+            return new ImageBrush(new Avalonia.Media.Imaging.Bitmap(path)) { Stretch = Stretch.UniformToFill };
+        }
+        catch { return null; }
+    });
+
     /// <summary>Gallery-card subtitle: "3 sections · 12 pages".</summary>
     public static readonly IValueConverter NotebookStats = new FuncValueConverter<Models.Notebook?, string>(nb =>
     {

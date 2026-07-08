@@ -34,7 +34,13 @@ public sealed class WorkspaceStore
             try
             {
                 var nb = JsonSerializer.Deserialize<Notebook>(File.ReadAllText(nbFile));
-                if (nb is not null) { nb.Folder = folder; ws.Notebooks.Add(nb); }
+                if (nb is not null)
+                {
+                    nb.Folder = folder;
+                    var cover = Path.Combine(_root, folder, nb.Cover);
+                    nb.CoverPath = nb.Cover.Length > 0 && File.Exists(cover) ? cover : null;
+                    ws.Notebooks.Add(nb);
+                }
             }
             catch { /* skip a corrupt notebook rather than losing the whole workspace */ }
         }
@@ -83,6 +89,32 @@ public sealed class WorkspaceStore
         if (string.IsNullOrEmpty(nb.Folder)) return;
         var dir = Path.Combine(_root, nb.Folder);
         try { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); } catch { }
+    }
+
+    /// <summary>Copy an image into the notebook folder as its cover (replacing any old one).
+    /// Returns the new absolute path, or null if the notebook has no folder yet.</summary>
+    public string? SaveCover(Notebook nb, string sourcePath)
+    {
+        if (string.IsNullOrEmpty(nb.Folder)) return null;
+        var dir = Path.Combine(_root, nb.Folder);
+        Directory.CreateDirectory(dir);
+        DeleteCoverFiles(dir);
+        var dest = Path.Combine(dir, "cover" + Path.GetExtension(sourcePath).ToLowerInvariant());
+        File.Copy(sourcePath, dest, overwrite: true);
+        return dest;
+    }
+
+    public void DeleteCover(Notebook nb)
+    {
+        if (string.IsNullOrEmpty(nb.Folder)) return;
+        DeleteCoverFiles(Path.Combine(_root, nb.Folder));
+    }
+
+    private static void DeleteCoverFiles(string dir)
+    {
+        if (!Directory.Exists(dir)) return;
+        foreach (var f in Directory.GetFiles(dir, "cover.*"))
+            try { File.Delete(f); } catch { }
     }
 
     // ---- page content (one JSON per page in <notebook>/pages/) ----

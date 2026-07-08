@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -349,13 +350,44 @@ public partial class MainView : UserControl
             color.Items.Add(fam);
         }
 
+        var cover = new MenuItem { Header = "Choose cover image…" };
+        cover.Click += async (_, _) => await PickCover(nb);
+
         var delete = new MenuItem { Header = "Delete notebook" };
         delete.Click += (_, _) => ConfirmThenDelete(
             "Delete this notebook?",
             $"“{Label(nb.Name)}” and all its sections and pages will be permanently deleted. This can't be undone.",
             () => Vm?.DeleteNotebookCommand.Execute(nb));
 
-        OpenMenu(e, open, rename, color, delete);
+        if (nb.CoverPath is not null)
+        {
+            var removeCover = new MenuItem { Header = "Remove cover image" };
+            removeCover.Click += (_, _) => Vm?.ClearNotebookCover(nb);
+            OpenMenu(e, open, rename, color, cover, removeCover, delete);
+        }
+        else
+        {
+            OpenMenu(e, open, rename, color, cover, delete);
+        }
+    }
+
+    private async System.Threading.Tasks.Task PickCover(Notebook nb)
+    {
+        if (Vm is null || TopLevel.GetTopLevel(this)?.StorageProvider is not { } sp) return;
+        var files = await sp.OpenFilePickerAsync(new Avalonia.Platform.Storage.FilePickerOpenOptions
+        {
+            Title = "Choose a cover image",
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new Avalonia.Platform.Storage.FilePickerFileType("Images")
+                {
+                    Patterns = new[] { "*.png", "*.jpg", "*.jpeg", "*.webp", "*.bmp" },
+                },
+            },
+        });
+        if (files.Count == 0) return;
+        if (files[0].TryGetLocalPath() is { } path) Vm.SetNotebookCover(nb, path);
     }
 
     private static Border Swatch(string hex)

@@ -145,29 +145,35 @@
                                         CornerRadius="14" Cursor="Hand" BorderThickness="1"
                                         Background="{Binding Color, Converter={x:Static v:Converters.HexBrush}}"
                                         BorderBrush="{Binding Color, Converter={x:Static v:Converters.CoverBorder}}">
-                                    <!-- ONE continuous overlay: top gloss → clear → dark scrim the labels sit on.
-                                         No separate label strip, so the cover never hard-cuts mid-card. -->
-                                    <Border CornerRadius="13" BorderThickness="0,1,0,0" BorderBrush="#38FFFFFF">
-                                        <Border.Background>
-                                            <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
-                                                <GradientStop Offset="0" Color="#2BFFFFFF"/>
-                                                <GradientStop Offset="0.40" Color="#00FFFFFF"/>
-                                                <GradientStop Offset="0.68" Color="#40000000"/>
-                                                <GradientStop Offset="1" Color="#80000000"/>
-                                            </LinearGradientBrush>
-                                        </Border.Background>
-                                        <Panel>
-                                            <TextBlock Text="{Binding Name, Converter={x:Static v:Converters.Initials}}"
-                                                       FontSize="30" FontWeight="Bold" Foreground="#59FFFFFF"
-                                                       Margin="16,12,0,0"/>
-                                            <StackPanel Spacing="2" Margin="14,0,14,10" VerticalAlignment="Bottom">
-                                                <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
-                                                           Foreground="White" TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Text="{Binding ., Converter={x:Static v:Converters.NotebookStats}}"
-                                                           FontSize="11" Foreground="#CCFFFFFF"/>
-                                            </StackPanel>
-                                        </Panel>
-                                    </Border>
+                                    <Panel>
+                                        <!-- optional photo cover (rounded via brush fill, sits under the scrim) -->
+                                        <Border CornerRadius="13"
+                                                Background="{Binding CoverPath, Converter={x:Static v:Converters.CoverImage}}"/>
+                                        <!-- ONE continuous overlay: top gloss → clear → dark scrim the labels sit on.
+                                             No separate label strip, so the cover never hard-cuts mid-card. -->
+                                        <Border CornerRadius="13" BorderThickness="0,1,0,0" BorderBrush="#38FFFFFF">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
+                                                    <GradientStop Offset="0" Color="#2BFFFFFF"/>
+                                                    <GradientStop Offset="0.40" Color="#00FFFFFF"/>
+                                                    <GradientStop Offset="0.68" Color="#40000000"/>
+                                                    <GradientStop Offset="1" Color="#80000000"/>
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                            <Panel>
+                                                <TextBlock Text="{Binding Name, Converter={x:Static v:Converters.Initials}}"
+                                                           FontSize="30" FontWeight="Bold" Foreground="#59FFFFFF"
+                                                           Margin="16,12,0,0"
+                                                           IsVisible="{Binding CoverPath, Converter={x:Static conv:ObjectConverters.IsNull}}"/>
+                                                <StackPanel Spacing="2" Margin="14,0,14,10" VerticalAlignment="Bottom">
+                                                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
+                                                               Foreground="White" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding ., Converter={x:Static v:Converters.NotebookStats}}"
+                                                               FontSize="11" Foreground="#CCFFFFFF"/>
+                                                </StackPanel>
+                                            </Panel>
+                                        </Border>
+                                    </Panel>
                                 </Border>
                             </Panel>
                         </DataTemplate>
