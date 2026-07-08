@@ -13,5 +13,6 @@
     <PackageReference Include="Avalonia.Headless" />
     <PackageReference Include="Avalonia.Skia" />
     <PackageReference Include="Avalonia.Themes.Fluent" />
+    <ProjectReference Include="..\..\src\Lumenotepad\Lumenotepad.csproj" />
   </ItemGroup>
 </Project>

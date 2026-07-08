@@ -43,20 +43,20 @@
             <Setter Property="Margin" Value="0,0,5,0"/>
             <Setter Property="CornerRadius" Value="8"/>
         </Style>
-        <!-- homepage notebook cards -->
+        <!-- homepage notebook cards. The SHADOW lives on a separate static underlay (see the card
+             template): animated visuals get compositor layers clipped to their layout slot, so a
+             shadow (or animated shadow) on the scaling card itself gets cut off on live GPU
+             rendering — invisible in headless renders, very visible on the acrylic window. -->
         <Style Selector="Border.nbcard">
             <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
-            <Setter Property="BoxShadow" Value="0 3 12 0 #59000000"/>
             <Setter Property="Transitions">
                 <Transitions>
                     <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.14" Easing="CubicEaseOut"/>
-                    <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.14"/>
                 </Transitions>
             </Setter>
         </Style>
         <Style Selector="Border.nbcard:pointerover">
             <Setter Property="RenderTransform" Value="scale(1.035)"/>
-            <Setter Property="BoxShadow" Value="0 7 20 0 #73000000"/>
         </Style>
         <!-- inline rename box (section tab) -->
         <Style Selector="TextBox.inlineedit">
@@ -134,9 +134,12 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="models:Notebook">
-                            <!-- Fixed cell with slack around the card: the hover scale (and shadow) grows into
-                                 the cell's own padding, so nothing can clip it at the item boundary. -->
-                            <Panel Width="206" Height="146" Margin="0,0,8,8">
+                            <!-- Fixed cell sized so EVERYTHING (static shadow halo + hover growth) fits fully
+                                 inside it — nothing ever draws past the item boundary, so nothing can clip. -->
+                            <Panel Width="224" Height="162" Margin="0,0,2,2">
+                                <Border Width="196" Height="132" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        CornerRadius="14" Background="#01000000" IsHitTestVisible="False"
+                                        BoxShadow="0 2 10 0 #59000000"/>
                                 <Border Classes="nbcard" Width="196" Height="132"
                                         HorizontalAlignment="Center" VerticalAlignment="Center"
                                         CornerRadius="14" Cursor="Hand" BorderThickness="1"
