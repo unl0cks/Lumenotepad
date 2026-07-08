@@ -217,18 +217,41 @@ public partial class FormatToolbar : UserControl
         }
     }
 
+    private bool _extendedFonts;
+
+    /// <summary>"Extended font list" preference: every installed family vs the curated shortlist.</summary>
+    public void SetExtendedFonts(bool extended)
+    {
+        if (_extendedFonts == extended && FontList.ItemsSource is not null) return;
+        _extendedFonts = extended;
+        RefreshFontList();
+    }
+
     private void BuildFontList()
     {
-        var names = FontManager.Current.SystemFonts.Select(f => f.Name)
-            .Where(n => !string.IsNullOrWhiteSpace(n)).Distinct().OrderBy(n => n).ToList();
-        names.Insert(0, "(Default)");
-        FontList.ItemsSource = names;
+        // Each entry previews in its own face (bundled fonts resolve via the embedded collection).
+        FontList.ItemTemplate = new Avalonia.Controls.Templates.FuncDataTemplate<string>((name, _) =>
+            new TextBlock
+            {
+                Text = name,
+                FontFamily = name == "(Default)"
+                    ? new FontFamily("Segoe UI Variable Text, Segoe UI")
+                    : Services.AppFonts.Family(name),
+            });
+        RefreshFontList();
         FontList.SelectionChanged += (_, _) =>
         {
             if (_syncing || FontList.SelectedItem is not string name) return;
             Do(e => e.ApplyFont(name == "(Default)" ? null : name));
             FontBtn.Flyout?.Hide();
         };
+    }
+
+    private void RefreshFontList()
+    {
+        var names = new System.Collections.Generic.List<string> { "(Default)" };
+        names.AddRange(Services.AppFonts.ListNames(_extendedFonts));
+        FontList.ItemsSource = names;
     }
 
     private void BuildDockMenu()

@@ -62,6 +62,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _paperLight;                  // prefs: Lumen+FullOff light paper
     [ObservableProperty] private bool _flatCovers;                  // prefs: solid covers, shadow kept
     [ObservableProperty] private bool _glossyAccents = true;        // prefs: gloss on chips + selected pills
+    [ObservableProperty] private bool _extendedFonts;               // prefs: full font list vs curated
 
     /// <summary>The Light-paper toggle only means something on Lumen with Full theme off.</summary>
     public bool PaperToggleEnabled => Theme == "Lumen" && !FullTheme;
@@ -142,6 +143,7 @@ public partial class MainViewModel : ObservableObject
             PaperLight = _settings.PaperLight;
             FlatCovers = _settings.FlatCovers;
             GlossyAccents = _settings.GlossyAccents;
+            ExtendedFonts = _settings.ExtendedFonts;
         }
         _workspace = store.LoadOrSeed();
         SelectedNotebook = Notebooks.FirstOrDefault();
@@ -213,6 +215,13 @@ public partial class MainViewModel : ObservableObject
         _settings.Save(_settingsDir);
     }
 
+    partial void OnExtendedFontsChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.ExtendedFonts = value;
+        _settings.Save(_settingsDir);
+    }
+
     // ---- gallery ordering (the order persists via order.json) ----
 
     public void SortNotebooksByName() =>
@@ -230,6 +239,15 @@ public partial class MainViewModel : ObservableObject
         if (i == j) return;
         Notebooks.Move(i, j);
         Save();
+    }
+
+    /// <summary>Drag rearrange: place a notebook at an exact gallery slot (persist on drag end).</summary>
+    public void MoveNotebookTo(Notebook nb, int index, bool save)
+    {
+        int i = Notebooks.IndexOf(nb);
+        index = Math.Clamp(index, 0, Notebooks.Count - 1);
+        if (i >= 0 && i != index) Notebooks.Move(i, index);
+        if (save) Save();
     }
 
     private DateTime LatestEdit(Notebook nb) =>
@@ -294,9 +312,27 @@ public partial class MainViewModel : ObservableObject
         _dirty.Remove(page.Id);
     }
 
-    // Selecting a notebook drops into its first section; selecting a section drops into its first page.
+    // Selecting a notebook drops into its first section; selecting a section drops into its first
+    // page. The null-guards matter: when a ListBox's ItemsSource swaps (e.g. switching sections),
+    // it pushes null into the selection AFTER the cascade ran — without the guard the page area
+    // goes blank until the user clicks a page by hand.
     partial void OnSelectedNotebookChanged(Notebook? value) => SelectedSection = value?.Sections.FirstOrDefault();
-    partial void OnSelectedSectionChanged(Section? value) => SelectedPage = value?.Pages.FirstOrDefault();
+
+    partial void OnSelectedSectionChanged(Section? value)
+    {
+        if (value is null && SelectedNotebook is { Sections.Count: > 0 } nb)
+        {
+            SelectedSection = nb.Sections[0];
+            return;
+        }
+        SelectedPage = value?.Pages.FirstOrDefault();
+    }
+
+    partial void OnSelectedPageChanged(Page? value)
+    {
+        if (value is null && SelectedSection is { Pages.Count: > 0 } sec)
+            SelectedPage = sec.Pages[0];
+    }
 
     [RelayCommand]
     private void AddNotebook()

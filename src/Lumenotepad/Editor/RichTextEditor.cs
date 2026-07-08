@@ -187,7 +187,7 @@ public sealed class RichTextEditor : Control
                 if (index < end)
                 {
                     var typeface = new Typeface(
-                        r.Font is { Length: > 0 } f ? new FontFamily(f) : _e.FontFamily,
+                        r.Font is { Length: > 0 } f ? Services.AppFonts.Family(f) : _e.FontFamily,
                         r.Italic ? FontStyle.Italic : FontStyle.Normal,
                         r.Bold ? FontWeight.Bold : FontWeight.Normal);
                     TextDecorationCollection? deco =
@@ -306,6 +306,14 @@ public sealed class RichTextEditor : Control
 
     private static readonly FontFamily GlyphFont = new("Segoe UI Symbol, Segoe UI Emoji, Segoe UI");
 
+    /// <summary>The editor foreground with adjusted opacity — bullet furniture (numbers, empty
+    /// checkboxes) must follow the paper's text color to stay visible on light paper.</summary>
+    private IBrush ForegroundAlpha(double opacity)
+    {
+        var c = (Foreground as ISolidColorBrush)?.Color ?? Colors.White;
+        return new SolidColorBrush(c, opacity);
+    }
+
     private void DrawBullet(DrawingContext ctx, int pi, double top)
     {
         var p = _doc.Paragraphs[pi];
@@ -322,14 +330,15 @@ public sealed class RichTextEditor : Control
             var box = new Rect(cx - half, cy - half, half * 2, half * 2);
             if (p.Checked)
             {
-                ctx.DrawRectangle(BrushFor("#4DA6FF"), null, box, 4 * s, 4 * s);
+                ctx.DrawRectangle(CaretBrush, null, box, 4 * s, 4 * s);   // accent per theme
                 var pen = new Pen(Brushes.White, 1.8 * s) { LineCap = PenLineCap.Round };
                 ctx.DrawLine(pen, new Point(cx - 4 * s, cy + 0.5 * s), new Point(cx - 1 * s, cy + 3.5 * s));
                 ctx.DrawLine(pen, new Point(cx - 1 * s, cy + 3.5 * s), new Point(cx + 4.5 * s, cy - 3 * s));
             }
             else
             {
-                ctx.DrawRectangle(null, new Pen(BrushFor("#66FFFFFF"), 1.5 * s), box, 4 * s, 4 * s);
+                // Foreground-derived, not white — white boxes vanish on light paper.
+                ctx.DrawRectangle(null, new Pen(ForegroundAlpha(0.45), 1.5 * s), box, 4 * s, 4 * s);
             }
             return;
         }
@@ -344,7 +353,7 @@ public sealed class RichTextEditor : Control
             bool italic = p.NumItalic ?? fr?.Italic ?? false;
             bool under = p.NumUnderline ?? fr?.Underline ?? false;
             bool strike = p.NumStrike ?? fr?.Strike ?? false;
-            var brush = BrushFor("#CCFFFFFF")!;
+            var brush = ForegroundAlpha(0.8);   // follows the paper text color, not hardcoded white
             var ft = new FormattedText($"{n}.", System.Globalization.CultureInfo.CurrentCulture,
                 FlowDirection.LeftToRight,
                 new Typeface(FontFamily, italic ? FontStyle.Italic : FontStyle.Normal,

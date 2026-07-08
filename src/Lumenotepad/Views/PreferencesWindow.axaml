@@ -93,6 +93,14 @@
                 <ToggleSwitch Grid.Column="1" IsChecked="{Binding GlossyAccents, Mode=TwoWay}" VerticalAlignment="Center"/>
             </Grid>
 
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="label" Text="Extended font list"/>
+                    <TextBlock Classes="hint" Text="Offer every installed font in the toolbar's font menu instead of the essentials."/>
+                </StackPanel>
+                <ToggleSwitch Grid.Column="1" IsChecked="{Binding ExtendedFonts, Mode=TwoWay}" VerticalAlignment="Center"/>
+            </Grid>
+
             <TextBlock Classes="section" Text="LAYOUT"/>
 
             <Grid ColumnDefinitions="*,Auto">

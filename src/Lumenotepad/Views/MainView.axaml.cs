@@ -86,8 +86,57 @@ public partial class MainView : UserControl
         HomePrefsBtn.Click += (_, _) => OpenPreferences();
         SortBtn.Click += (_, _) => OpenSortMenu();
 
+        // Rearrange mode: cards wiggle and can be dragged into new slots (click the button again to stop).
+        RearrangeBtn.Click += (_, _) => SetRearranging(!_rearranging);
+        HomeCards.AddHandler(PointerPressedEvent, OnRearrangePressed, RoutingStrategies.Tunnel);
+        HomeCards.PointerMoved += OnRearrangeMoved;
+        HomeCards.PointerReleased += OnRearrangeReleased;
+
         // Keep the canvas plate's punched hole aligned with the page box (margin 14, radius 14).
         CanvasPlate.SizeChanged += (_, _) => UpdateCanvasPlateClip();
+    }
+
+    // ---- gallery rearrange mode ----
+
+    private bool _rearranging;
+    private Notebook? _dragNotebook;
+
+    private void SetRearranging(bool on)
+    {
+        _rearranging = on;
+        _dragNotebook = null;
+        HomeCards.Classes.Set("rearrange", on);
+        RearrangeBtn.Classes.Set("on", on);
+    }
+
+    private void OnRearrangePressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!_rearranging) return;
+        if ((e.Source as StyledElement)?.DataContext is not Notebook nb) return;
+        _dragNotebook = nb;
+        e.Pointer.Capture(HomeCards);
+        e.Handled = true;
+    }
+
+    private void OnRearrangeMoved(object? sender, PointerEventArgs e)
+    {
+        if (_dragNotebook is null || Vm is null) return;
+        foreach (var container in HomeCards.GetRealizedContainers())
+        {
+            var p = e.GetPosition(container);
+            if (p.X < 0 || p.Y < 0 || p.X > container.Bounds.Width || p.Y > container.Bounds.Height) continue;
+            int target = HomeCards.IndexFromContainer(container);
+            if (target >= 0) Vm.MoveNotebookTo(_dragNotebook, target, save: false);
+            break;
+        }
+    }
+
+    private void OnRearrangeReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_dragNotebook is null) return;
+        _dragNotebook = null;
+        e.Pointer.Capture(null);
+        Vm?.Save();
     }
 
     private void OpenSortMenu()
@@ -152,6 +201,7 @@ public partial class MainView : UserControl
             ApplyToolbarPlacement();
             ApplyCanvasPrefs();
             ApplyGlossyAccents();
+            Toolbar.SetExtendedFonts(_hookedVm.ExtendedFonts);
         }
     }
 
@@ -227,6 +277,10 @@ public partial class MainView : UserControl
             ApplyFlatCovers();
         else if (e.PropertyName == nameof(MainViewModel.GlossyAccents))
             ApplyGlossyAccents();
+        else if (e.PropertyName == nameof(MainViewModel.ExtendedFonts))
+            Toolbar.SetExtendedFonts(Vm?.ExtendedFonts ?? false);
+        else if (e.PropertyName == nameof(MainViewModel.IsHomeVisible) && _rearranging)
+            SetRearranging(false);                 // leaving home always exits rearrange mode
         else if (e.PropertyName is nameof(MainViewModel.Theme)
                  or nameof(MainViewModel.FullTheme) or nameof(MainViewModel.PaperLight))
         {
@@ -399,12 +453,14 @@ public partial class MainView : UserControl
 
     private void OnHomeCardTapped(object? sender, TappedEventArgs e)
     {
+        if (_rearranging) return;
         if ((e.Source as StyledElement)?.DataContext is Notebook nb)
             Vm?.OpenNotebookCommand.Execute(nb);
     }
 
     private void OnHomeCardContextRequested(object? sender, ContextRequestedEventArgs e)
     {
+        if (_rearranging) return;
         if ((e.Source as StyledElement)?.DataContext is not Notebook nb) return;
 
         var open = new MenuItem { Header = "Open" };

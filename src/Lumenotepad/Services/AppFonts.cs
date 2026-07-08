@@ -1,0 +1,47 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Avalonia.Media;
+
+namespace Lumenotepad.Services;
+
+/// <summary>The app's font catalog: the four BUNDLED faces (shipped as embedded resources, always
+/// available on any machine), a curated shortlist of familiar system fonts, and — behind the
+/// "Extended font list" preference — everything installed.</summary>
+public static class AppFonts
+{
+    /// <summary>The embedded collection key registered in Program.BuildAvaloniaApp.</summary>
+    public const string CollectionUri = "fonts:lumenotepad";
+
+    /// <summary>Family names inside Assets/Fonts (must match the fonts' internal names).</summary>
+    public static readonly string[] Bundled = { "Bebas Neue", "Caveat", "Gambarino", "Yuyu" };
+
+    /// <summary>The owner's default shortlist (only those actually installed are offered).</summary>
+    public static readonly string[] Curated =
+    {
+        "Arial", "Helvetica", "Helvetica Neue", "Verdana", "Tahoma", "Trebuchet MS",
+        "Times New Roman", "Georgia", "Garamond", "Courier New", "Impact", "Consolas",
+        "Century Gothic", "Roboto", "Cambria", "Segoe UI", "Calibri", "Lucida Sans",
+    };
+
+    /// <summary>Resolve a stored family name to a usable FontFamily (bundled names route to the
+    /// embedded collection; anything else resolves against the system).</summary>
+    public static FontFamily Family(string name) =>
+        Bundled.Contains(name, StringComparer.OrdinalIgnoreCase)
+            ? new FontFamily($"{CollectionUri}#{name}")
+            : new FontFamily(name);
+
+    /// <summary>The names offered by the toolbar's font menu: bundled first, then the curated
+    /// shortlist (or every installed family when <paramref name="extended"/>).</summary>
+    public static IReadOnlyList<string> ListNames(bool extended)
+    {
+        var installed = FontManager.Current.SystemFonts.Select(f => f.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        IEnumerable<string> rest = extended
+            ? installed.OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase)
+            : Curated.Where(installed.Contains);
+        return Bundled.OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase)
+            .Concat(rest.Where(n => !Bundled.Contains(n, StringComparer.OrdinalIgnoreCase)))
+            .ToList();
+    }
+}

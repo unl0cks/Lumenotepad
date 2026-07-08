@@ -5,10 +5,12 @@
     <UserControl.Styles>
         <!-- Attached to the PAGE the strip sits on paper (dark glass on light themes!) — its
              icons must follow the paper region's text, not the frame's. -->
-        <Style Selector="UserControl.onpaper Button">
+        <!-- :is() — a plain type selector matches the EXACT type only; FormatToolbar is a
+             UserControl SUBCLASS, so "UserControl.onpaper" would never match. -->
+        <Style Selector=":is(UserControl).onpaper Button">
             <Setter Property="Foreground" Value="{DynamicResource PaperTextBrush}"/>
         </Style>
-        <Style Selector="UserControl.onpaper TextBox">
+        <Style Selector=":is(UserControl).onpaper TextBox">
             <Setter Property="Foreground" Value="{DynamicResource PaperTextBrush}"/>
         </Style>
         <!-- active (format applies at caret/selection) -->

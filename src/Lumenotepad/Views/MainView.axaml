@@ -68,15 +68,26 @@
         <Style Selector="ListBox.glossy ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource AccentGradientBrush}"/>
         </Style>
-        <!-- "Jump back in" chips -->
+        <!-- "Jump back in" chips: NO scale hover — a transitioned transform gets a compositor
+             layer clipped to the layout slot (the notebook-card lesson), cutting the chip's edge. -->
         <Style Selector="Border.recentchip">
-            <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
             <Setter Property="Transitions">
-                <Transitions><TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" Easing="CubicEaseOut"/></Transitions>
+                <Transitions><BrushTransition Property="BorderBrush" Duration="0:0:0.12"/></Transitions>
             </Setter>
         </Style>
         <Style Selector="Border.recentchip:pointerover">
-            <Setter Property="RenderTransform" Value="scale(1.03)"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <!-- Rearrange mode: Apple-style wiggle while cards are draggable -->
+        <Style Selector="ItemsControl.rearrange Border.nbcard">
+            <Setter Property="Cursor" Value="SizeAll"/>
+            <Style.Animations>
+                <Animation Duration="0:0:0.3" IterationCount="INFINITE">
+                    <KeyFrame Cue="0%"><Setter Property="RotateTransform.Angle" Value="-1.1"/></KeyFrame>
+                    <KeyFrame Cue="50%"><Setter Property="RotateTransform.Angle" Value="1.1"/></KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="RotateTransform.Angle" Value="-1.1"/></KeyFrame>
+                </Animation>
+            </Style.Animations>
         </Style>
         <!-- "Flat covers" preference: the gloss overlays vanish, shadow + caption scrim stay -->
         <Style Selector="ItemsControl.flat Border.cardfx">
@@ -105,7 +116,7 @@
 
         <!-- ============ Title bar ============ -->
         <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto" x:Name="TitleBar" Background="{DynamicResource FrameBackgroundBrush}">
-            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0" Spacing="9">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0" Spacing="9">
                 <Border Width="22" Height="22" CornerRadius="7" Background="{DynamicResource AccentBrush}">
                     <TextBlock Text="&#xE82F;" FontFamily="{StaticResource IconFont}" FontSize="13"
                                Foreground="#04213F" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -131,7 +142,7 @@
                         Command="{Binding TogglePagesCommand}" ToolTip.Tip="Show / hide pages"/>
             </StackPanel>
 
-            <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="0,0,5,0">
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="0,0,3,0">
                 <Button x:Name="MinBtn" Theme="{StaticResource CaptionButton}" Content="&#xE921;"/>
                 <Button x:Name="MaxBtn" Theme="{StaticResource CaptionButton}" Content="&#xE922;"/>
                 <Button x:Name="CloseBtn" Theme="{StaticResource CloseCaptionButton}" Content="&#xE8BB;"/>
@@ -155,6 +166,10 @@
                                    FontSize="12.5" Foreground="{DynamicResource CanvasTextMutedBrush}"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <Button x:Name="RearrangeBtn" Theme="{StaticResource IconButton}" Width="34" Height="34"
+                                FontSize="15" FontFamily="{StaticResource IconFont}" Content="&#xE76F;"
+                                Foreground="{DynamicResource CanvasTextBrush}"
+                                ToolTip.Tip="Rearrange notebooks (drag them around, click again when done)"/>
                         <Button x:Name="SortBtn" Theme="{StaticResource IconButton}" Width="34" Height="34"
                                 FontSize="15" FontFamily="{StaticResource IconFont}" Content="&#xE8CB;"
                                 Foreground="{DynamicResource CanvasTextBrush}" ToolTip.Tip="Sort notebooks"/>
@@ -208,10 +223,7 @@
                     </ItemsControl>
                 </StackPanel>
 
-                <TextBlock Text="NOTEBOOKS" FontSize="11" FontWeight="SemiBold" Margin="0,2,0,-8"
-                           Foreground="{DynamicResource CanvasTextMutedBrush}"
-                           IsVisible="{Binding HasRecents}"/>
-                <ItemsControl x:Name="HomeCards" ItemsSource="{Binding Notebooks}">
+                <ItemsControl x:Name="HomeCards" ItemsSource="{Binding Notebooks}" Margin="0,6,0,0">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
