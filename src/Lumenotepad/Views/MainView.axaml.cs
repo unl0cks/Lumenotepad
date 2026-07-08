@@ -387,7 +387,13 @@ public partial class MainView : UserControl
             },
         });
         if (files.Count == 0) return;
-        if (files[0].TryGetLocalPath() is { } path) Vm.SetNotebookCover(nb, path);
+        if (files[0].TryGetLocalPath() is not { } path || Window is not { } w) return;
+
+        // Let the user frame the part of the image the card shows (fixed card aspect).
+        var cropped = await CoverCropDialog.Show(w, path);
+        if (cropped is null) return;
+        try { Vm.SetNotebookCover(nb, cropped); }
+        finally { try { System.IO.File.Delete(cropped); } catch { } }
     }
 
     private static Border Swatch(string hex)
