@@ -34,6 +34,8 @@ public static class ThemeManager
         Brush("CanvasBackgroundBrush", t.CanvasBackground);
         Brush("CanvasTextBrush", t.CanvasText);
         Brush("CanvasTextMutedBrush", t.CanvasTextMuted);
+        Brush("CanvasChipBrush", t.CanvasChip);
+        Brush("CanvasChipBorderBrush", t.CanvasChipBorder);
         Brush("PaperBackgroundBrush", t.PaperBackground);
         Brush("PaperBorderBrush", t.PaperBorder);
         Brush("PaperTextBrush", t.PaperText);

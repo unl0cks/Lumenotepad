@@ -3,6 +3,14 @@
              x:Class="Lumenotepad.Views.FormatToolbar">
 
     <UserControl.Styles>
+        <!-- Attached to the PAGE the strip sits on paper (dark glass on light themes!) — its
+             icons must follow the paper region's text, not the frame's. -->
+        <Style Selector="UserControl.onpaper Button">
+            <Setter Property="Foreground" Value="{DynamicResource PaperTextBrush}"/>
+        </Style>
+        <Style Selector="UserControl.onpaper TextBox">
+            <Setter Property="Foreground" Value="{DynamicResource PaperTextBrush}"/>
+        </Style>
         <!-- active (format applies at caret/selection) -->
         <Style Selector="Button.on"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Style>
         <Style Selector="Button.on /template/ Border#bg">

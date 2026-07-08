@@ -9,7 +9,7 @@
         Background="Transparent"
         TransparencyLevelHint="AcrylicBlur, Transparent, None"
         FontFamily="{StaticResource UiFont}"
-        Foreground="{StaticResource TextPrimaryBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
         TextOptions.TextRenderingMode="Antialias"
         WindowDecorations="None">
     <Grid>

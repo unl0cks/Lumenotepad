@@ -83,9 +83,29 @@ public partial class MainView : UserControl
         });
 
         PrefsBtn.Click += (_, _) => OpenPreferences();
+        HomePrefsBtn.Click += (_, _) => OpenPreferences();
+        SortBtn.Click += (_, _) => OpenSortMenu();
 
         // Keep the canvas plate's punched hole aligned with the page box (margin 14, radius 14).
         CanvasPlate.SizeChanged += (_, _) => UpdateCanvasPlateClip();
+    }
+
+    private void OpenSortMenu()
+    {
+        var byName = new MenuItem { Header = "Sort by name" };
+        byName.Click += (_, _) => Vm?.SortNotebooksByName();
+        var byRecent = new MenuItem { Header = "Recently edited first" };
+        byRecent.Click += (_, _) => Vm?.SortNotebooksByRecent();
+        var hint = new MenuItem
+        {
+            Header = "Custom order: right-click a card → Move", IsEnabled = false, FontSize = 11.5,
+        };
+        var menu = new MenuFlyout();
+        menu.Items.Add(byName);
+        menu.Items.Add(byRecent);
+        menu.Items.Add(new Separator());
+        menu.Items.Add(hint);
+        menu.ShowAt(SortBtn);
     }
 
     private void UpdateCanvasPlateClip()
@@ -131,6 +151,7 @@ public partial class MainView : UserControl
             SyncEditorDocument();
             ApplyToolbarPlacement();
             ApplyCanvasPrefs();
+            ApplyGlossyAccents();
         }
     }
 
@@ -150,6 +171,16 @@ public partial class MainView : UserControl
         bool flat = Vm?.FlatCovers ?? false;
         HomeCards.Classes.Set("flat", flat);
         NotebooksList.Classes.Set("flat", flat);
+    }
+
+    /// <summary>"Glossy accents": gloss on the recents chips + accent-gradient selected pills.</summary>
+    private void ApplyGlossyAccents()
+    {
+        bool glossy = Vm?.GlossyAccents ?? true;
+        RecentList.Classes.Set("glossy", glossy);
+        SectionsList.Classes.Set("glossy", glossy);
+        PagesList.Classes.Set("glossy", glossy);
+        NotebooksList.Classes.Set("glossy", glossy);
     }
 
     /// <summary>Place the toolbar per the VM: docked to a side of either the WINDOW body or the PAGE box.</summary>
@@ -194,6 +225,8 @@ public partial class MainView : UserControl
             ApplyCanvasPrefs();
         else if (e.PropertyName == nameof(MainViewModel.FlatCovers))
             ApplyFlatCovers();
+        else if (e.PropertyName == nameof(MainViewModel.GlossyAccents))
+            ApplyGlossyAccents();
         else if (e.PropertyName is nameof(MainViewModel.Theme)
                  or nameof(MainViewModel.FullTheme) or nameof(MainViewModel.PaperLight))
         {
@@ -400,6 +433,11 @@ public partial class MainView : UserControl
             color.Items.Add(fam);
         }
 
+        var moveLeft = new MenuItem { Header = "Move left" };
+        moveLeft.Click += (_, _) => Vm?.MoveNotebook(nb, -1);
+        var moveRight = new MenuItem { Header = "Move right" };
+        moveRight.Click += (_, _) => Vm?.MoveNotebook(nb, +1);
+
         var cover = new MenuItem { Header = "Choose cover image…" };
         cover.Click += async (_, _) => await PickCover(nb);
 
@@ -413,11 +451,11 @@ public partial class MainView : UserControl
         {
             var removeCover = new MenuItem { Header = "Remove cover image" };
             removeCover.Click += (_, _) => Vm?.ClearNotebookCover(nb);
-            OpenMenu(e, open, rename, color, cover, removeCover, delete);
+            OpenMenu(e, open, rename, moveLeft, moveRight, color, cover, removeCover, delete);
         }
         else
         {
-            OpenMenu(e, open, rename, color, cover, delete);
+            OpenMenu(e, open, rename, moveLeft, moveRight, color, cover, delete);
         }
     }
 

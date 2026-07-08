@@ -85,6 +85,14 @@
                 <ToggleSwitch Grid.Column="1" IsChecked="{Binding FlatCovers, Mode=TwoWay}" VerticalAlignment="Center"/>
             </Grid>
 
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="label" Text="Glossy accents"/>
+                    <TextBlock Classes="hint" Text="Selected tabs, rows and homepage chips get the top-lit gloss."/>
+                </StackPanel>
+                <ToggleSwitch Grid.Column="1" IsChecked="{Binding GlossyAccents, Mode=TwoWay}" VerticalAlignment="Center"/>
+            </Grid>
+
             <TextBlock Classes="section" Text="LAYOUT"/>
 
             <Grid ColumnDefinitions="*,Auto">

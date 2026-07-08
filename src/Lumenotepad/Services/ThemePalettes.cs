@@ -13,6 +13,7 @@ public sealed record ThemeTokens(
     string ControlHover, string ControlPressed,
     string ScrollThumb, string ScrollThumbHover, string ScrollThumbPressed,
     string CanvasBackground, string CanvasText, string CanvasTextMuted,
+    string CanvasChip, string CanvasChipBorder,
     string PaperBackground, string PaperBorder, string PaperText, string PaperTextMuted,
     string FieldSelection,
     string NoteChromeHover, string NoteChromeFocus, string NoteGripFill, string NoteGripBar,
@@ -99,6 +100,8 @@ public static class ThemePalettes
             WindowBackground = Alpha(frameBg, 0xFF), DarkChrome = dark,
             CanvasBackground = solidCanvas,
             CanvasText = t.TextPrimary, CanvasTextMuted = t.TextMuted,
+            CanvasChip = dark ? "#1AFFFFFF" : "#FFFFFFFF",
+            CanvasChipBorder = dark ? "#3AFFFFFF" : "#24000000",
         };
 
         if (fullTheme)
@@ -135,6 +138,7 @@ public static class ThemePalettes
         ControlHover: "#22FFFFFF", ControlPressed: "#38FFFFFF",
         ScrollThumb: "#2EFFFFFF", ScrollThumbHover: "#52FFFFFF", ScrollThumbPressed: "#70FFFFFF",
         CanvasBackground: "#00000000", CanvasText: "#FFFFFFFF", CanvasTextMuted: "#80FFFFFF",
+        CanvasChip: "#14FFFFFF", CanvasChipBorder: "#33FFFFFF",
         PaperBackground: "#0BFFFFFF", PaperBorder: "#33FFFFFF",
         PaperText: "#FFFFFFFF", PaperTextMuted: "#80FFFFFF",
         FieldSelection: Alpha(accent, 0x55),

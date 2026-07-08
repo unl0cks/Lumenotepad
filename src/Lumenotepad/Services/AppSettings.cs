@@ -10,6 +10,7 @@ public sealed class AppSettings
     public bool FullTheme { get; set; }                     // canvas matches frame material when true
     public bool PaperLight { get; set; }                    // Lumen + FullTheme off: light paper instead of dark
     public bool FlatCovers { get; set; }                    // solid notebook covers (no gradient), shadow kept
+    public bool GlossyAccents { get; set; } = true;         // top-lit gloss on chips + selected pills
     public string AccentColor { get; set; } = "#4DA6FF";
     public double BlurStrength { get; set; } = 0.6;         // 0..1
     public string ToolbarPosition { get; set; } = "Top";    // "Top" | "Left" | "Right" | "Bottom"

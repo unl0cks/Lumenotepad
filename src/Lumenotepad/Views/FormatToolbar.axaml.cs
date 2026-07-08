@@ -80,6 +80,7 @@ public partial class FormatToolbar : UserControl
     /// opening away from the docked edge.</summary>
     public void SetPlacement(Dock dock, bool pageScope)
     {
+        Classes.Set("onpaper", pageScope);
         bool vertical = dock is Dock.Left or Dock.Right;
         Panel.Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;
         SizeGroup.Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;

@@ -61,6 +61,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _fullTheme;                   // prefs: canvas matches frame
     [ObservableProperty] private bool _paperLight;                  // prefs: Lumen+FullOff light paper
     [ObservableProperty] private bool _flatCovers;                  // prefs: solid covers, shadow kept
+    [ObservableProperty] private bool _glossyAccents = true;        // prefs: gloss on chips + selected pills
 
     /// <summary>The Light-paper toggle only means something on Lumen with Full theme off.</summary>
     public bool PaperToggleEnabled => Theme == "Lumen" && !FullTheme;
@@ -140,6 +141,7 @@ public partial class MainViewModel : ObservableObject
             FullTheme = _settings.FullTheme;
             PaperLight = _settings.PaperLight;
             FlatCovers = _settings.FlatCovers;
+            GlossyAccents = _settings.GlossyAccents;
         }
         _workspace = store.LoadOrSeed();
         SelectedNotebook = Notebooks.FirstOrDefault();
@@ -202,6 +204,47 @@ public partial class MainViewModel : ObservableObject
         if (_settings is null || _settingsDir is null) return;
         _settings.FlatCovers = value;
         _settings.Save(_settingsDir);
+    }
+
+    partial void OnGlossyAccentsChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.GlossyAccents = value;
+        _settings.Save(_settingsDir);
+    }
+
+    // ---- gallery ordering (the order persists via order.json) ----
+
+    public void SortNotebooksByName() =>
+        Reorder(Notebooks.OrderBy(n => n.Name, StringComparer.CurrentCultureIgnoreCase).ToList());
+
+    public void SortNotebooksByRecent() =>
+        Reorder(Notebooks.OrderByDescending(LatestEdit).ToList());
+
+    /// <summary>Manual rearrange: shift a notebook left/right in the gallery.</summary>
+    public void MoveNotebook(Notebook nb, int delta)
+    {
+        int i = Notebooks.IndexOf(nb);
+        if (i < 0) return;
+        int j = Math.Clamp(i + delta, 0, Notebooks.Count - 1);
+        if (i == j) return;
+        Notebooks.Move(i, j);
+        Save();
+    }
+
+    private DateTime LatestEdit(Notebook nb) =>
+        nb.Sections.SelectMany(s => s.Pages)
+          .Select(p => _store.PageDocTime(nb, p.Id) ?? DateTime.MinValue)
+          .DefaultIfEmpty(DateTime.MinValue).Max();
+
+    private void Reorder(List<Notebook> order)
+    {
+        for (int i = 0; i < order.Count; i++)
+        {
+            int cur = Notebooks.IndexOf(order[i]);
+            if (cur != i) Notebooks.Move(cur, i);
+        }
+        Save();
     }
 
     /// <summary>Persist the whole tree (called after every structural change / rename).</summary>

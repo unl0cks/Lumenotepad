@@ -30,6 +30,8 @@
     <SolidColorBrush x:Key="CanvasBackgroundBrush" Color="#00000000"/>
     <SolidColorBrush x:Key="CanvasTextBrush" Color="#FFFFFFFF"/>
     <SolidColorBrush x:Key="CanvasTextMutedBrush" Color="#80FFFFFF"/>
+    <SolidColorBrush x:Key="CanvasChipBrush" Color="#14FFFFFF"/>
+    <SolidColorBrush x:Key="CanvasChipBorderBrush" Color="#33FFFFFF"/>
     <SolidColorBrush x:Key="PaperBackgroundBrush" Color="#0BFFFFFF"/>
     <SolidColorBrush x:Key="PaperBorderBrush" Color="#33FFFFFF"/>
     <SolidColorBrush x:Key="PaperTextBrush" Color="#FFFFFFFF"/>
@@ -53,7 +55,8 @@
     <!-- Prominent filled button: gradient fill, 1px deep border, hover veil, pressed shrink.
          (Fluent's Button theme swaps Background on hover, killing custom fills — hence own template.) -->
     <ControlTheme x:Key="LumenButton" TargetType="Button">
-        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <!-- accent fills always carry light text, whatever the theme -->
+        <Setter Property="Foreground" Value="White"/>
         <Setter Property="Background" Value="{DynamicResource AccentGradientBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource AccentDeepBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>

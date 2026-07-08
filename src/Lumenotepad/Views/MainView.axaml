@@ -58,6 +58,16 @@
         <Style Selector="Border.nbcard:pointerover">
             <Setter Property="RenderTransform" Value="scale(1.035)"/>
         </Style>
+        <!-- "Glossy accents" preference: top-lit gloss on chips + selected pills -->
+        <Style Selector="Border.chipfx">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="ItemsControl.glossy Border.chipfx">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
+        <Style Selector="ListBox.glossy ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentGradientBrush}"/>
+        </Style>
         <!-- "Jump back in" chips -->
         <Style Selector="Border.recentchip">
             <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
@@ -95,7 +105,7 @@
 
         <!-- ============ Title bar ============ -->
         <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto" x:Name="TitleBar" Background="{DynamicResource FrameBackgroundBrush}">
-            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="11,0,0,0" Spacing="9">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0" Spacing="9">
                 <Border Width="22" Height="22" CornerRadius="7" Background="{DynamicResource AccentBrush}">
                     <TextBlock Text="&#xE82F;" FontFamily="{StaticResource IconFont}" FontSize="13"
                                Foreground="#04213F" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -105,7 +115,8 @@
 
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0">
                 <Button x:Name="PrefsBtn" Theme="{StaticResource IconButton}" Width="34" Height="34" FontSize="15"
-                        FontFamily="{StaticResource IconFont}" Content="&#xE713;" ToolTip.Tip="Preferences"/>
+                        FontFamily="{StaticResource IconFont}" Content="&#xE713;"
+                        IsVisible="{Binding !IsHomeVisible}" ToolTip.Tip="Preferences"/>
                 <Button x:Name="HomeBtn" Theme="{StaticResource IconButton}" Width="34" Height="34" FontSize="15"
                         FontFamily="{StaticResource IconFont}" Content="&#xE80F;"
                         IsVisible="{Binding !IsHomeVisible}"
@@ -120,7 +131,7 @@
                         Command="{Binding TogglePagesCommand}" ToolTip.Tip="Show / hide pages"/>
             </StackPanel>
 
-            <StackPanel Grid.Column="3" Orientation="Horizontal">
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="0,0,5,0">
                 <Button x:Name="MinBtn" Theme="{StaticResource CaptionButton}" Content="&#xE921;"/>
                 <Button x:Name="MaxBtn" Theme="{StaticResource CaptionButton}" Content="&#xE922;"/>
                 <Button x:Name="CloseBtn" Theme="{StaticResource CloseCaptionButton}" Content="&#xE8BB;"/>
@@ -143,13 +154,18 @@
                         <TextBlock Text="{Binding HomeSubtitle}"
                                    FontSize="12.5" Foreground="{DynamicResource CanvasTextMutedBrush}"/>
                     </StackPanel>
-                    <Button x:Name="NewNotebookBtn" Grid.Column="1" VerticalAlignment="Center"
-                            Theme="{StaticResource LumenButton}" Command="{Binding AddNotebookCommand}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="&#xE710;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center"/>
-                            <TextBlock Text="New notebook" FontSize="13"/>
-                        </StackPanel>
-                    </Button>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <Button x:Name="SortBtn" Theme="{StaticResource IconButton}" Width="34" Height="34"
+                                FontSize="15" FontFamily="{StaticResource IconFont}" Content="&#xE8CB;"
+                                Foreground="{DynamicResource CanvasTextBrush}" ToolTip.Tip="Sort notebooks"/>
+                        <Button x:Name="NewNotebookBtn"
+                                Theme="{StaticResource LumenButton}" Command="{Binding AddNotebookCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="&#xE710;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBlock Text="New notebook" FontSize="13"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                 </Grid>
                 <!-- recently edited pages, one click from anywhere -->
                 <StackPanel Spacing="8" IsVisible="{Binding HasRecents}">
@@ -161,20 +177,31 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:RecentPage">
-                                <Border Classes="recentchip" Margin="0,0,10,10" CornerRadius="10" Padding="12,8"
-                                        Background="{DynamicResource PaperBackgroundBrush}"
-                                        BorderBrush="{DynamicResource PaperBorderBrush}" BorderThickness="1"
+                                <Border Classes="recentchip" Margin="0,0,10,10" CornerRadius="10"
+                                        Background="{DynamicResource CanvasChipBrush}"
+                                        BorderBrush="{DynamicResource CanvasChipBorderBrush}" BorderThickness="1"
                                         Cursor="Hand">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
-                                        <Border Width="10" Height="10" CornerRadius="5" VerticalAlignment="Center"
-                                                Background="{Binding Color, Converter={x:Static v:Converters.HexBrush}}"/>
-                                        <StackPanel Spacing="1">
-                                            <TextBlock Text="{Binding Title}" FontSize="12.5" FontWeight="SemiBold"
-                                                       Foreground="{DynamicResource CanvasTextBrush}"/>
-                                            <TextBlock Text="{Binding Detail}" FontSize="10.5"
-                                                       Foreground="{DynamicResource CanvasTextMutedBrush}"/>
+                                    <Panel>
+                                        <Border Classes="chipfx" CornerRadius="9" IsHitTestVisible="False">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
+                                                    <GradientStop Offset="0" Color="#21FFFFFF"/>
+                                                    <GradientStop Offset="0.5" Color="#00FFFFFF"/>
+                                                    <GradientStop Offset="1" Color="#14000000"/>
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                        </Border>
+                                        <StackPanel Orientation="Horizontal" Spacing="9" Margin="12,8">
+                                            <Border Width="10" Height="10" CornerRadius="5" VerticalAlignment="Center"
+                                                    Background="{Binding Color, Converter={x:Static v:Converters.HexBrush}}"/>
+                                            <StackPanel Spacing="1">
+                                                <TextBlock Text="{Binding Title}" FontSize="12.5" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource CanvasTextBrush}"/>
+                                                <TextBlock Text="{Binding Detail}" FontSize="10.5"
+                                                           Foreground="{DynamicResource CanvasTextMutedBrush}"/>
+                                            </StackPanel>
                                         </StackPanel>
-                                    </StackPanel>
+                                    </Panel>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -245,6 +272,16 @@
                 </ItemsControl>
             </StackPanel>
         </ScrollViewer>
+
+        <!-- Preferences, homepage style: a proper filled button floating bottom-right -->
+        <Button x:Name="HomePrefsBtn" Theme="{StaticResource LumenButton}"
+                IsVisible="{Binding IsHomeVisible}"
+                HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,24,20">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="&#xE713;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center"/>
+                <TextBlock Text="Preferences" FontSize="13"/>
+            </StackPanel>
+        </Button>
 
         <DockPanel x:Name="BodyDock" IsVisible="{Binding !IsHomeVisible}">
         <v:FormatToolbar x:Name="Toolbar" DockPanel.Dock="Top"/>
