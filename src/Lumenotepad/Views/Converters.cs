@@ -46,9 +46,9 @@ public static class Converters
             EndPoint = new Avalonia.RelativePoint(0.5, 1, Avalonia.RelativeUnit.Relative),
             GradientStops =
             {
-                new GradientStop(Shade(c, 0.10), 0),
+                new GradientStop(Shade(c, 0.17), 0),
                 new GradientStop(c, 0.45),
-                new GradientStop(Shade(c, -0.14), 1),
+                new GradientStop(Shade(c, -0.20), 1),
             },
         };
     });

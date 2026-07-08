@@ -46,12 +46,17 @@
         <!-- homepage notebook cards -->
         <Style Selector="Border.nbcard">
             <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
+            <Setter Property="BoxShadow" Value="0 3 12 0 #59000000"/>
             <Setter Property="Transitions">
-                <Transitions><TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.14" Easing="CubicEaseOut"/></Transitions>
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.14" Easing="CubicEaseOut"/>
+                    <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.14"/>
+                </Transitions>
             </Setter>
         </Style>
         <Style Selector="Border.nbcard:pointerover">
             <Setter Property="RenderTransform" Value="scale(1.035)"/>
+            <Setter Property="BoxShadow" Value="0 7 20 0 #73000000"/>
         </Style>
         <!-- inline rename box (section tab) -->
         <Style Selector="TextBox.inlineedit">
@@ -129,24 +134,42 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="models:Notebook">
-                            <Border Classes="nbcard" Width="196" Height="132" Margin="0,0,16,16"
-                                    CornerRadius="14" Cursor="Hand" BorderThickness="1"
-                                    Background="{Binding Color, Converter={x:Static v:Converters.CoverGradient}}"
-                                    BorderBrush="{Binding Color, Converter={x:Static v:Converters.CoverBorder}}">
-                                <Grid RowDefinitions="*,Auto">
-                                    <TextBlock Text="{Binding Name, Converter={x:Static v:Converters.Initials}}"
-                                               FontSize="30" FontWeight="Bold" Foreground="#59FFFFFF"
-                                               Margin="16,12,0,0"/>
-                                    <Border Grid.Row="1" Background="#4D000000" Padding="14,9" CornerRadius="0,0,13,13">
-                                        <StackPanel Spacing="2">
-                                            <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
-                                                       Foreground="White" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="{Binding ., Converter={x:Static v:Converters.NotebookStats}}"
-                                                       FontSize="11" Foreground="#B3FFFFFF"/>
-                                        </StackPanel>
+                            <!-- Fixed cell with slack around the card: the hover scale (and shadow) grows into
+                                 the cell's own padding, so nothing can clip it at the item boundary. -->
+                            <Panel Width="206" Height="146" Margin="0,0,8,8">
+                                <Border Classes="nbcard" Width="196" Height="132"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        CornerRadius="14" Cursor="Hand" BorderThickness="1"
+                                        Background="{Binding Color, Converter={x:Static v:Converters.HexBrush}}"
+                                        BorderBrush="{Binding Color, Converter={x:Static v:Converters.CoverBorder}}">
+                                    <!-- Top-lit look lives on this overlay, NOT the shadowed border: BoxShadow +
+                                         a gradient background mis-renders at rounded corners (fill escapes the
+                                         rounding), so the shadowed surface stays solid. -->
+                                    <Border CornerRadius="13" BorderThickness="0,1,0,0" BorderBrush="#38FFFFFF">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
+                                                <GradientStop Offset="0" Color="#2BFFFFFF"/>
+                                                <GradientStop Offset="0.45" Color="#00FFFFFF"/>
+                                                <GradientStop Offset="1" Color="#33000000"/>
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                        <Grid RowDefinitions="*,Auto">
+                                            <TextBlock Text="{Binding Name, Converter={x:Static v:Converters.Initials}}"
+                                                       FontSize="30" FontWeight="Bold" Foreground="#59FFFFFF"
+                                                       Margin="16,12,0,0"/>
+                                            <Border Grid.Row="1" Background="#4A000000" Padding="14,9" CornerRadius="0,0,13,13"
+                                                    BorderThickness="0,1,0,0" BorderBrush="#1AFFFFFF">
+                                                <StackPanel Spacing="2">
+                                                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
+                                                               Foreground="White" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding ., Converter={x:Static v:Converters.NotebookStats}}"
+                                                               FontSize="11" Foreground="#B3FFFFFF"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
                                     </Border>
-                                </Grid>
-                            </Border>
+                                </Border>
+                            </Panel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
