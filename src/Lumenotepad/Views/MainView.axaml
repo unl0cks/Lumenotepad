@@ -27,26 +27,55 @@
         <!-- rail chips -->
         <Style Selector="ListBox.rail ListBoxItem">
             <Setter Property="Padding" Value="0"/>
-            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
             <Setter Property="CornerRadius" Value="12"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <!-- selected notebook: gentle scale + a very faint glow in the notebook's OWN color -->
+        <Style Selector="ListBox.rail ListBoxItem Border.railchip">
+            <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.16" Easing="CubicEaseOut"/>
+                    <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.16"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="ListBox.rail ListBoxItem:selected Border.railchip">
+            <Setter Property="RenderTransform" Value="scale(1.09)"/>
+            <Setter Property="BoxShadow" Value="{ReflectionBinding Color, Converter={x:Static v:Converters.GlowShadow}}"/>
         </Style>
         <!-- page rows -->
         <Style Selector="ListBox.pages ListBoxItem">
             <Setter Property="Padding" Value="9,6"/>
-            <Setter Property="Margin" Value="0,1"/>
+            <Setter Property="Margin" Value="0,2"/>
             <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
+        </Style>
+        <Style Selector="ListBox.pages ListBoxItem:selected">
+            <Setter Property="RenderTransform" Value="scale(1.03)"/>
+        </Style>
+        <Style Selector="ListBox.pages ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="BoxShadow" Value="{DynamicResource AccentGlowShadow}"/>
         </Style>
         <!-- section tabs -->
         <Style Selector="ListBox.sections ListBoxItem">
             <Setter Property="Padding" Value="10,4"/>
-            <Setter Property="Margin" Value="0,0,5,0"/>
+            <Setter Property="Margin" Value="3,0,5,3"/>
             <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
         </Style>
-        <!-- homepage notebook cards. The SHADOW lives on a separate static underlay (see the card
-             template): animated visuals get compositor layers clipped to their layout slot, so a
-             shadow (or animated shadow) on the scaling card itself gets cut off on live GPU
-             rendering — invisible in headless renders, very visible on the acrylic window. -->
+        <Style Selector="ListBox.sections ListBoxItem:selected">
+            <Setter Property="RenderTransform" Value="scale(1.04)"/>
+        </Style>
+        <Style Selector="ListBox.sections ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="BoxShadow" Value="{DynamicResource AccentGlowShadow}"/>
+        </Style>
+        <!-- homepage notebook cards. Hover/grab SCALE lives on Border.nbcard; the rearrange WIGGLE
+             lives on the separate Border.wigglewrap parent — a keyframe Animation targeting
+             RotateTransform.Angle forces its host's RenderTransform to a RotateTransform, which
+             would break a TransformOperations scale transition on the same element. Compositor
+             layers clip to the layout SLOT, so the shadow (static underlay) + growth fit the cell. -->
         <Style Selector="Border.nbcard">
             <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
             <Setter Property="Transitions">
@@ -55,8 +84,8 @@
                 </Transitions>
             </Setter>
         </Style>
-        <Style Selector="Border.nbcard:pointerover">
-            <Setter Property="RenderTransform" Value="scale(1.035)"/>
+        <Style Selector="ItemsControl:not(.rearrange) Border.nbcard:pointerover">
+            <Setter Property="RenderTransform" Value="scale(1.04)"/>
         </Style>
         <!-- "Glossy accents" preference: top-lit gloss on chips + selected pills -->
         <Style Selector="Border.chipfx">
@@ -68,24 +97,32 @@
         <Style Selector="ListBox.glossy ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource AccentGradientBrush}"/>
         </Style>
-        <!-- "Jump back in" chips: NO scale hover — a transitioned transform gets a compositor
-             layer clipped to the layout slot (the notebook-card lesson), cutting the chip's edge. -->
+        <!-- "Jump back in" chips: scale hover, with symmetric margin slack so the grown render
+             stays inside the layout slot (no compositor clip). -->
         <Style Selector="Border.recentchip">
+            <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
             <Setter Property="Transitions">
-                <Transitions><BrushTransition Property="BorderBrush" Duration="0:0:0.12"/></Transitions>
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" Easing="CubicEaseOut"/>
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.12"/>
+                </Transitions>
             </Setter>
         </Style>
         <Style Selector="Border.recentchip:pointerover">
+            <Setter Property="RenderTransform" Value="scale(1.04)"/>
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
         </Style>
-        <!-- Rearrange mode: Apple-style wiggle while cards are draggable -->
+        <!-- Rearrange mode: Apple-style wiggle (on the wrapper) + grab hand cursor (on the card) -->
         <Style Selector="ItemsControl.rearrange Border.nbcard">
-            <Setter Property="Cursor" Value="SizeAll"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="ItemsControl.rearrange Border.wigglewrap">
+            <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
             <Style.Animations>
                 <Animation Duration="0:0:0.3" IterationCount="INFINITE">
-                    <KeyFrame Cue="0%"><Setter Property="RotateTransform.Angle" Value="-1.1"/></KeyFrame>
-                    <KeyFrame Cue="50%"><Setter Property="RotateTransform.Angle" Value="1.1"/></KeyFrame>
-                    <KeyFrame Cue="100%"><Setter Property="RotateTransform.Angle" Value="-1.1"/></KeyFrame>
+                    <KeyFrame Cue="0%"><Setter Property="RotateTransform.Angle" Value="-1.2"/></KeyFrame>
+                    <KeyFrame Cue="50%"><Setter Property="RotateTransform.Angle" Value="1.2"/></KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="RotateTransform.Angle" Value="-1.2"/></KeyFrame>
                 </Animation>
             </Style.Animations>
         </Style>
@@ -192,7 +229,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:RecentPage">
-                                <Border Classes="recentchip" Margin="0,0,10,10" CornerRadius="10"
+                                <Border Classes="recentchip" Margin="4,4,14,14" CornerRadius="10"
                                         Background="{DynamicResource CanvasChipBrush}"
                                         BorderBrush="{DynamicResource CanvasChipBorderBrush}" BorderThickness="1"
                                         Cursor="Hand">
@@ -235,8 +272,11 @@
                                 <Border Width="196" Height="132" HorizontalAlignment="Center" VerticalAlignment="Center"
                                         CornerRadius="14" Background="#01000000" IsHitTestVisible="False"
                                         BoxShadow="0 2 10 0 #59000000"/>
+                                <!-- wiggle wrapper: rotates in rearrange mode, leaving the card's own
+                                     RenderTransform free for hover / grab scale -->
+                                <Border Classes="wigglewrap" Width="196" Height="132"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center" Background="Transparent">
                                 <Border Classes="nbcard" Width="196" Height="132"
-                                        HorizontalAlignment="Center" VerticalAlignment="Center"
                                         CornerRadius="14" Cursor="Hand" BorderThickness="1"
                                         Background="{Binding Color, Converter={x:Static v:Converters.HexBrush}}"
                                         BorderBrush="{Binding Color, Converter={x:Static v:Converters.CoverBorder}}">
@@ -278,6 +318,7 @@
                                         </Panel>
                                     </Panel>
                                 </Border>
+                                </Border>
                             </Panel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -314,7 +355,7 @@
                                  SelectedItem="{Binding SelectedNotebook, Mode=TwoWay}">
                             <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="models:Notebook">
-                                    <Border Width="40" Height="40" CornerRadius="12" BorderThickness="1"
+                                    <Border Classes="railchip" Width="40" Height="40" CornerRadius="12" BorderThickness="1"
                                             Background="{Binding Color, Converter={x:Static v:Converters.HexBrush}}"
                                             BorderBrush="{Binding Color, Converter={x:Static v:Converters.CoverBorder}}"
                                             ToolTip.Tip="{Binding Name}">

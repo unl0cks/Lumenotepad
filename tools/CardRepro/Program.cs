@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using Lumenotepad.Services;
 using Lumenotepad.ViewModels;
 using Lumenotepad.Views;
@@ -13,57 +14,57 @@ internal static class Program
     [STAThread]
     private static void Main()
     {
-        // The REAL app + MainView rendered headlessly — here: sample theme-matrix cells to PNG.
         AppBuilder.Configure<Lumenotepad.App>()
+            .ConfigureFonts(fonts => fonts.AddFontCollection(new Avalonia.Media.Fonts.EmbeddedFontCollection(
+                new System.Uri(AppFonts.CollectionUri),
+                new System.Uri("avares://Lumenotepad/Assets/Fonts"))))
             .UseSkia()
             .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false })
             .SetupWithoutStarting();
 
         var dir = Path.Combine(Path.GetTempPath(), "lnp-repro-" + Guid.NewGuid().ToString("N"));
         var vm = new MainViewModel(new WorkspaceStore(dir));
-        vm.ToolbarScope = "Window";
         vm.AddNotebookCommand.Execute(null);
-        vm.SetNotebookColor(vm.Notebooks[0], "#4DA6FF");
-        vm.SetNotebookColor(vm.Notebooks[1], "#FB6F92");
+        vm.GoHomeCommand.Execute(null);
 
-        var window = new Window
-        {
-            Width = 1180, Height = 720,
-            Background = new SolidColorBrush(Color.Parse("#4A505E")),   // stand-in for the acrylic backdrop
-            Content = new MainView { DataContext = vm },
-        };
+        var window = new Window { Width = 1180, Height = 720, Content = new MainView { DataContext = vm } };
         window.Show();
-        window.SetRenderScaling(1.5);
+        window.SetRenderScaling(1.0);
+        Dispatch();
 
-        foreach (var (theme, full, paperLight, name) in new[]
+        // Hover the first card → confirm scale applies now.
+        var card = window.GetVisualDescendants().OfType<Border>().FirstOrDefault(b => b.Classes.Contains("nbcard"));
+        if (card is not null)
         {
-            ("Lumen", false, false, "lumen-off"),
-            ("Dark", false, false, "dark-off"),
-            ("Lumen", false, true, "lumen-lightpaper"),
-            ("Light", true, false, "light-full"),
-            ("Light", false, false, "light-off"),
-            ("Pink", true, false, "pink-full"),
-            ("Light blue", true, false, "blue-full"),
-        })
-        {
-            vm.Theme = theme;
-            vm.FullTheme = full;
-            vm.PaperLight = paperLight;
-            ThemeManager.Apply(Application.Current!, ThemePalettes.Resolve(theme, full, paperLight));
-
-            // one shot on the editor, one on the homepage. Headless synchronous bindings let the
-            // sections ListBox null-push the cascaded selection — re-assert it by hand here.
-            vm.OpenNotebookCommand.Execute(vm.Notebooks[0]);
-            vm.SelectedSection ??= vm.Notebooks[0].Sections.FirstOrDefault();
-            vm.SelectedPage ??= vm.SelectedSection?.Pages.FirstOrDefault();
-            var doc = vm.DocumentFor(vm.SelectedPage!);
-            if (doc.Boxes.Count == 0)
-                doc.AddBox(30, 20, 420).Doc.InsertText(new Lumenotepad.Editor.DocPos(0, 0), "Theme check: the quick brown fox.");
-            Save(window, $"theme-{name}-editor");
-
-            vm.GoHomeCommand.Execute(null);
-            Save(window, $"theme-{name}-home");
+            card.Transitions = null;   // headless clock doesn't tick transitions — read the target directly
+            window.MouseMove(new Point(-5, -5));
+            Dispatch();
+            var mid = card.TranslatePoint(new Point(card.Bounds.Width / 2, card.Bounds.Height / 2), window) ?? default;
+            window.MouseMove(mid);
+            Dispatch();
+            Console.WriteLine($"[card] pointerover={card.IsPointerOver} transform={card.RenderTransform?.Value}");
         }
+        Save(window, "home-hover");
+
+        // Editor: the selected section/page/notebook should look selected by default.
+        window.MouseMove(new Point(-5, -5));
+        vm.OpenNotebookCommand.Execute(vm.Notebooks[0]);
+        vm.SelectedSection ??= vm.Notebooks[0].Sections[0];
+        vm.SelectedPage ??= vm.SelectedSection?.Pages[0];
+        Dispatch();
+        Save(window, "editor-selection");
+
+        // Same under the Light theme (glow color follows accent).
+        vm.Theme = "Light";
+        ThemeManager.Apply(Application.Current!, ThemePalettes.Resolve("Light", false, false));
+        Dispatch();
+        Save(window, "editor-selection-light");
+        Console.WriteLine("done");
+    }
+
+    private static void Dispatch()
+    {
+        for (int i = 0; i < 6; i++) Avalonia.Threading.Dispatcher.UIThread.RunJobs();
     }
 
     private static void Save(Window window, string name)

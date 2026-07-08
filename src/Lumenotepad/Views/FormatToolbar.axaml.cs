@@ -230,11 +230,11 @@ public partial class FormatToolbar : UserControl
     private void BuildFontList()
     {
         // Each entry previews in its own face (bundled fonts resolve via the embedded collection).
-        FontList.ItemTemplate = new Avalonia.Controls.Templates.FuncDataTemplate<string>((name, _) =>
+        FontList.ItemTemplate = new Avalonia.Controls.Templates.FuncDataTemplate<string?>((name, _) =>
             new TextBlock
             {
                 Text = name,
-                FontFamily = name == "(Default)"
+                FontFamily = string.IsNullOrEmpty(name) || name == "(Default)"
                     ? new FontFamily("Segoe UI Variable Text, Segoe UI")
                     : Services.AppFonts.Family(name),
             });

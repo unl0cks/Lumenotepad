@@ -57,6 +57,13 @@ public static class Converters
     public static readonly IValueConverter CoverBorder = new FuncValueConverter<string?, IBrush>(hex =>
         new SolidColorBrush(Shade(SafeParse(hex), -0.38)));
 
+    /// <summary>Notebook color → a very faint glow (for the selected rail chip).</summary>
+    public static readonly IValueConverter GlowShadow = new FuncValueConverter<string?, BoxShadows>(hex =>
+    {
+        var c = SafeParse(hex);
+        return BoxShadows.Parse($"0 0 9 0 #80{c.R:X2}{c.G:X2}{c.B:X2}");
+    });
+
     // Covers decoded at card size (full-resolution photos re-rasterizing every hover-animation
     // frame is what made card hover lag) and cached per path+mtime.
     private static readonly System.Collections.Generic.Dictionary<string, (DateTime Stamp, IBrush Brush)> CoverCache = new();

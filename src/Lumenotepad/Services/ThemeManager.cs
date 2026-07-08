@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Styling;
+using Avalonia.Media.Immutable;
 
 namespace Lumenotepad.Services;
 
@@ -61,6 +62,10 @@ public static class ThemeManager
                 new GradientStop(Color.Parse(t.AccentGradBottom), 1),
             },
         };
+
+        // A very faint accent glow (BoxShadows can't take a DynamicResource color, so bake it here
+        // and refresh on every theme change) for selected section/page rows.
+        r["AccentGlowShadow"] = BoxShadows.Parse($"0 0 7 0 {ThemePalettes.Alpha(t.Accent, 0x66)}");
 
         // Fluent's own controls (menus, flyouts, list selection) follow the accent + variant.
         var accent = Color.Parse(t.Accent);

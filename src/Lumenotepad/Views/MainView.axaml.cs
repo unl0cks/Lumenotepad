@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Transformation;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.Threading;
@@ -109,11 +110,19 @@ public partial class MainView : UserControl
         RearrangeBtn.Classes.Set("on", on);
     }
 
+    private Border? _grabbedCard;
+
     private void OnRearrangePressed(object? sender, PointerPressedEventArgs e)
     {
         if (!_rearranging) return;
         if ((e.Source as StyledElement)?.DataContext is not Notebook nb) return;
         _dragNotebook = nb;
+        // "Snap up" like grabbing it (Apple-style): the card pops bigger while held.
+        _grabbedCard = (e.Source as Visual)?.FindAncestorOfType<Border>(includeSelf: true) is { } b
+            && b.Classes.Contains("nbcard") ? b
+            : (e.Source as Visual)?.GetVisualAncestors().OfType<Border>().FirstOrDefault(x => x.Classes.Contains("nbcard"));
+        if (_grabbedCard is not null)
+            _grabbedCard.RenderTransform = TransformOperations.Parse("scale(1.09)");
         e.Pointer.Capture(HomeCards);
         e.Handled = true;
     }
@@ -135,6 +144,11 @@ public partial class MainView : UserControl
     {
         if (_dragNotebook is null) return;
         _dragNotebook = null;
+        if (_grabbedCard is not null)
+        {
+            _grabbedCard.RenderTransform = TransformOperations.Parse("scale(1)");
+            _grabbedCard = null;
+        }
         e.Pointer.Capture(null);
         Vm?.Save();
     }

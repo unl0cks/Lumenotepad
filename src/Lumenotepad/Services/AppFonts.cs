@@ -25,11 +25,13 @@ public static class AppFonts
     };
 
     /// <summary>Resolve a stored family name to a usable FontFamily (bundled names route to the
-    /// embedded collection; anything else resolves against the system).</summary>
-    public static FontFamily Family(string name) =>
-        Bundled.Contains(name, StringComparer.OrdinalIgnoreCase)
-            ? new FontFamily($"{CollectionUri}#{name}")
-            : new FontFamily(name);
+    /// embedded collection; anything else resolves against the system). Null/blank → the UI default
+    /// — virtualized list recycling briefly rebuilds item templates with a null datum, and
+    /// <c>new FontFamily(null)</c> throws.</summary>
+    public static FontFamily Family(string? name) =>
+        string.IsNullOrWhiteSpace(name) ? FontFamily.Default
+        : Bundled.Contains(name, StringComparer.OrdinalIgnoreCase) ? new FontFamily($"{CollectionUri}#{name}")
+        : new FontFamily(name);
 
     /// <summary>The names offered by the toolbar's font menu: bundled first, then the curated
     /// shortlist (or every installed family when <paramref name="extended"/>).</summary>
