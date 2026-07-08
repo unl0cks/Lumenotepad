@@ -334,21 +334,19 @@ public partial class MainView : UserControl
                                      DispatcherPriority.Background);
         };
 
+        // Color → 9 hue families, each expanding into its 5 shades.
         var color = new MenuItem { Header = "Color" };
-        foreach (var (hex, name) in MainViewModel.NotebookColors)
+        foreach (var (family, shades) in MainViewModel.NotebookPalette)
         {
-            var swatch = new MenuItem
+            var fam = new MenuItem { Header = family, Icon = Swatch(shades[2].Hex) };
+            foreach (var (shadeName, hex) in shades)
             {
-                Header = name,
-                Icon = new Border
-                {
-                    Width = 14, Height = 14, CornerRadius = new CornerRadius(4),
-                    Background = new SolidColorBrush(Color.Parse(hex)),
-                },
-            };
-            string chosen = hex;
-            swatch.Click += (_, _) => Vm?.SetNotebookColor(nb, chosen);
-            color.Items.Add(swatch);
+                var item = new MenuItem { Header = shadeName, Icon = Swatch(hex) };
+                string chosen = hex;
+                item.Click += (_, _) => Vm?.SetNotebookColor(nb, chosen);
+                fam.Items.Add(item);
+            }
+            color.Items.Add(fam);
         }
 
         var delete = new MenuItem { Header = "Delete notebook" };
@@ -358,6 +356,18 @@ public partial class MainView : UserControl
             () => Vm?.DeleteNotebookCommand.Execute(nb));
 
         OpenMenu(e, open, rename, color, delete);
+    }
+
+    private static Border Swatch(string hex)
+    {
+        var c = Color.Parse(hex);
+        return new Border
+        {
+            Width = 14, Height = 14, CornerRadius = new CornerRadius(4),
+            Background = new SolidColorBrush(c),
+            BorderBrush = new SolidColorBrush(Converters.Shade(c, -0.38)),
+            BorderThickness = new Thickness(1),
+        };
     }
 
     private static string Label(string? s) => string.IsNullOrWhiteSpace(s) ? "Untitled" : s;

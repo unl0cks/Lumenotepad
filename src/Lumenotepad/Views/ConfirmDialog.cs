@@ -37,14 +37,27 @@ public static class ConfirmDialog
             Foreground = new SolidColorBrush(Color.Parse("#B3FFFFFF")), Margin = new Thickness(0, 8, 0, 18),
         };
 
-        static Button MakeButton(string text, string bg) => new()
+        // Same top-lit gradient + deep border language as the rest of the filled buttons.
+        var lumenTheme = Avalonia.Application.Current?.FindResource("LumenButton") as Avalonia.Styling.ControlTheme;
+        Button MakeButton(string text, string top, string bottom, string border) => new()
         {
             Content = text, FontSize = 12.5, Padding = new Thickness(16, 7),
-            Background = new SolidColorBrush(Color.Parse(bg)), Foreground = Brushes.White,
-            CornerRadius = new CornerRadius(8), Cursor = new Cursor(StandardCursorType.Hand),
+            Theme = lumenTheme, Foreground = Brushes.White,
+            CornerRadius = new CornerRadius(8),
+            Background = new LinearGradientBrush
+            {
+                StartPoint = new RelativePoint(0.5, 0, RelativeUnit.Relative),
+                EndPoint = new RelativePoint(0.5, 1, RelativeUnit.Relative),
+                GradientStops =
+                {
+                    new GradientStop(Color.Parse(top), 0),
+                    new GradientStop(Color.Parse(bottom), 1),
+                },
+            },
+            BorderBrush = new SolidColorBrush(Color.Parse(border)),
         };
-        var cancel = MakeButton(cancelText, "#22FFFFFF");
-        var confirm = MakeButton(confirmText, "#CCC42B3A");
+        var cancel = MakeButton(cancelText, "#33FFFFFF", "#1AFFFFFF", "#40FFFFFF");
+        var confirm = MakeButton(confirmText, "#D64258", "#A62A3C", "#7E1F2D");
         cancel.Click += (_, _) => win.Close(false);
         confirm.Click += (_, _) => win.Close(true);
 

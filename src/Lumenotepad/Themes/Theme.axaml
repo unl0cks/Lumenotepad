@@ -25,6 +25,50 @@
     <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
     <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI</FontFamily>
 
+    <!-- Filled-button surfaces: top-lit vertical gradient + a deep same-hue border (nothing flat) -->
+    <LinearGradientBrush x:Key="AccentGradientBrush" StartPoint="50%,0%" EndPoint="50%,100%">
+        <GradientStop Offset="0" Color="#61B4FF"/>
+        <GradientStop Offset="1" Color="#3B8BE6"/>
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="AccentDeepBrush" Color="#2B6CB8"/>
+
+    <!-- Prominent filled button: gradient fill, 1px deep border, hover veil, pressed shrink.
+         (Fluent's Button theme swaps Background on hover, killing custom fills — hence own template.) -->
+    <ControlTheme x:Key="LumenButton" TargetType="Button">
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="Background" Value="{StaticResource AccentGradientBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource AccentDeepBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="14,8"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
+        <Setter Property="Transitions">
+            <Transitions><TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.1"/></Transitions>
+        </Setter>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}">
+                    <Panel>
+                        <Border x:Name="veil" Background="#17FFFFFF" CornerRadius="{TemplateBinding CornerRadius}"
+                                Opacity="0" IsHitTestVisible="False">
+                            <Border.Transitions><Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.12"/></Transitions></Border.Transitions>
+                        </Border>
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Padding="{TemplateBinding Padding}"
+                                          HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+                    </Panel>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#veil"><Setter Property="Opacity" Value="1"/></Style>
+        <Style Selector="^:pressed"><Setter Property="RenderTransform" Value="scale(0.965)"/></Style>
+        <Style Selector="^:disabled"><Setter Property="Opacity" Value="0.4"/></Style>
+    </ControlTheme>
+
     <!-- Round icon button (title-bar app mark, generic actions) -->
     <ControlTheme x:Key="IconButton" TargetType="Button">
         <Setter Property="Focusable" Value="False"/>

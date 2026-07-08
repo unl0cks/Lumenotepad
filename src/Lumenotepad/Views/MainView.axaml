@@ -115,9 +115,8 @@
                         <TextBlock Text="Pick up where you left off, or start something new."
                                    FontSize="12.5" Foreground="{StaticResource TextMutedBrush}"/>
                     </StackPanel>
-                    <Button x:Name="NewNotebookBtn" Grid.Column="1" VerticalAlignment="Center" Cursor="Hand"
-                            Command="{Binding AddNotebookCommand}" CornerRadius="10" Padding="14,8"
-                            Background="{StaticResource AccentSoftBrush}" Foreground="{StaticResource TextPrimaryBrush}">
+                    <Button x:Name="NewNotebookBtn" Grid.Column="1" VerticalAlignment="Center"
+                            Theme="{StaticResource LumenButton}" Command="{Binding AddNotebookCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock Text="&#xE710;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center"/>
                             <TextBlock Text="New notebook" FontSize="13"/>
@@ -131,13 +130,14 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="models:Notebook">
                             <Border Classes="nbcard" Width="196" Height="132" Margin="0,0,16,16"
-                                    CornerRadius="14" ClipToBounds="True" Cursor="Hand"
-                                    Background="{Binding Color, Converter={x:Static v:Converters.HexBrush}}">
+                                    CornerRadius="14" Cursor="Hand" BorderThickness="1"
+                                    Background="{Binding Color, Converter={x:Static v:Converters.CoverGradient}}"
+                                    BorderBrush="{Binding Color, Converter={x:Static v:Converters.CoverBorder}}">
                                 <Grid RowDefinitions="*,Auto">
                                     <TextBlock Text="{Binding Name, Converter={x:Static v:Converters.Initials}}"
                                                FontSize="30" FontWeight="Bold" Foreground="#59FFFFFF"
                                                Margin="16,12,0,0"/>
-                                    <Border Grid.Row="1" Background="#4D000000" Padding="14,9">
+                                    <Border Grid.Row="1" Background="#4D000000" Padding="14,9" CornerRadius="0,0,13,13">
                                         <StackPanel Spacing="2">
                                             <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
                                                        Foreground="White" TextTrimming="CharacterEllipsis"/>
@@ -171,8 +171,9 @@
                                  SelectedItem="{Binding SelectedNotebook, Mode=TwoWay}">
                             <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="models:Notebook">
-                                    <Border Width="40" Height="40" CornerRadius="12"
-                                            Background="{Binding Color, Converter={x:Static v:Converters.HexBrush}}"
+                                    <Border Width="40" Height="40" CornerRadius="12" BorderThickness="1"
+                                            Background="{Binding Color, Converter={x:Static v:Converters.CoverGradient}}"
+                                            BorderBrush="{Binding Color, Converter={x:Static v:Converters.CoverBorder}}"
                                             ToolTip.Tip="{Binding Name}">
                                         <TextBlock Text="{Binding Name, Converter={x:Static v:Converters.Initials}}"
                                                    Foreground="White" FontSize="13" FontWeight="SemiBold"
