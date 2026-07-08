@@ -10,6 +10,14 @@ using Lumenotepad.Services;
 
 namespace Lumenotepad.ViewModels;
 
+/// <summary>A homepage "Jump back in" entry: a recently edited page with its home notebook.</summary>
+public sealed record RecentPage(Notebook Notebook, Section Section, Page Page, string Ago)
+{
+    public string Title => string.IsNullOrWhiteSpace(Page.Title) ? "Untitled" : Page.Title;
+    public string Detail => $"{Notebook.Name} · {Ago}";
+    public string Color => Notebook.Color;
+}
+
 public partial class MainViewModel : ObservableObject
 {
     /// <summary>Default covers cycled onto new notebooks (the base shade of some palette families).</summary>
@@ -57,6 +65,60 @@ public partial class MainViewModel : ObservableObject
     /// <summary>The Light-paper toggle only means something on Lumen with Full theme off.</summary>
     public bool PaperToggleEnabled => Theme == "Lumen" && !FullTheme;
 
+    // ---- homepage life: greeting, stats, and the "Jump back in" strip ----
+
+    public string Greeting { get; } = BuildGreeting();
+    [ObservableProperty] private string _homeSubtitle = "Pick up where you left off, or start something new.";
+    [ObservableProperty] private bool _hasRecents;
+    public ObservableCollection<RecentPage> RecentPages { get; } = new();
+
+    private static string BuildGreeting()
+    {
+        var now = DateTime.Now;
+        var word = now.Hour < 5 ? "Up late" : now.Hour < 12 ? "Good morning"
+                 : now.Hour < 18 ? "Good afternoon" : "Good evening";
+        return $"{word} — it's {now:dddd, MMMM d}";
+    }
+
+    /// <summary>Rebuild the recents strip + stats line (called every time the homepage shows).</summary>
+    public void RefreshHome()
+    {
+        RecentPages.Clear();
+        var recents = Notebooks
+            .SelectMany(nb => nb.Sections.SelectMany(s => s.Pages.Select(p => (nb, s, p, t: _store.PageDocTime(nb, p.Id)))))
+            .Where(x => x.t is not null)
+            .OrderByDescending(x => x.t)
+            .Take(5);
+        var now = DateTime.UtcNow;
+        foreach (var (nb, s, p, t) in recents)
+            RecentPages.Add(new RecentPage(nb, s, p, AgoLabel(now - t!.Value)));
+        HasRecents = RecentPages.Count > 0;
+
+        int pages = Notebooks.Sum(n => n.Sections.Sum(sec => sec.Pages.Count));
+        HomeSubtitle = $"{Notebooks.Count} {(Notebooks.Count == 1 ? "notebook" : "notebooks")} · " +
+                       $"{pages} {(pages == 1 ? "page" : "pages")} — pick up where you left off.";
+    }
+
+    private static string AgoLabel(TimeSpan d) =>
+        d.TotalMinutes < 1 ? "just now" :
+        d.TotalMinutes < 60 ? $"{(int)d.TotalMinutes}m ago" :
+        d.TotalHours < 24 ? $"{(int)d.TotalHours}h ago" :
+        d.TotalDays < 2 ? "yesterday" : $"{(int)d.TotalDays}d ago";
+
+    [RelayCommand]
+    private void OpenRecent(RecentPage r)
+    {
+        SelectedNotebook = r.Notebook;
+        SelectedSection = r.Section;
+        SelectedPage = r.Page;
+        IsHomeVisible = false;
+    }
+
+    partial void OnIsHomeVisibleChanged(bool value)
+    {
+        if (value) RefreshHome();
+    }
+
     private readonly AppSettings? _settings;
     private readonly string? _settingsDir;
 
@@ -81,6 +143,7 @@ public partial class MainViewModel : ObservableObject
         }
         _workspace = store.LoadOrSeed();
         SelectedNotebook = Notebooks.FirstOrDefault();
+        RefreshHome();
     }
 
     partial void OnToolbarPositionChanged(string value)

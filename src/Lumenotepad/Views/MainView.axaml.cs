@@ -76,8 +76,28 @@ public partial class MainView : UserControl
         // Homepage gallery: click a card to open it, right-click for open/rename/color/delete.
         HomeCards.AddHandler(TappedEvent, OnHomeCardTapped);
         HomeCards.ContextRequested += OnHomeCardContextRequested;
+        RecentList.AddHandler(TappedEvent, (_, e) =>
+        {
+            if ((e.Source as StyledElement)?.DataContext is RecentPage r)
+                Vm?.OpenRecentCommand.Execute(r);
+        });
 
         PrefsBtn.Click += (_, _) => OpenPreferences();
+
+        // Keep the canvas plate's punched hole aligned with the page box (margin 14, radius 14).
+        CanvasPlate.SizeChanged += (_, _) => UpdateCanvasPlateClip();
+    }
+
+    private void UpdateCanvasPlateClip()
+    {
+        var b = CanvasPlate.Bounds;
+        if (b.Width <= 30 || b.Height <= 30) { CanvasPlate.Clip = null; return; }
+        var hole = new RectangleGeometry(new Rect(14, 14, b.Width - 28, b.Height - 28))
+        {
+            RadiusX = 14, RadiusY = 14,
+        };
+        CanvasPlate.Clip = new CombinedGeometry(GeometryCombineMode.Exclude,
+            new RectangleGeometry(new Rect(0, 0, b.Width, b.Height)), hole);
     }
 
     private PreferencesWindow? _prefs;

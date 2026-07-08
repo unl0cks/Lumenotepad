@@ -58,6 +58,16 @@
         <Style Selector="Border.nbcard:pointerover">
             <Setter Property="RenderTransform" Value="scale(1.035)"/>
         </Style>
+        <!-- "Jump back in" chips -->
+        <Style Selector="Border.recentchip">
+            <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
+            <Setter Property="Transitions">
+                <Transitions><TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" Easing="CubicEaseOut"/></Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.recentchip:pointerover">
+            <Setter Property="RenderTransform" Value="scale(1.03)"/>
+        </Style>
         <!-- "Flat covers" preference: the gloss overlays vanish, shadow + caption scrim stay -->
         <Style Selector="ItemsControl.flat Border.cardfx">
             <Setter Property="IsVisible" Value="False"/>
@@ -118,16 +128,19 @@
         </Grid>
 
         <!-- ============ Body: homepage gallery OR the editor (toolbar + rail | nav | canvas) ============ -->
-        <Panel Grid.Row="1" Background="{DynamicResource CanvasBackgroundBrush}">
+        <Panel Grid.Row="1">
 
         <!-- Homepage: the notebook gallery -->
-        <ScrollViewer x:Name="HomeHost" IsVisible="{Binding IsHomeVisible}" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer x:Name="HomeHost" IsVisible="{Binding IsHomeVisible}" VerticalScrollBarVisibility="Auto"
+                      Background="{DynamicResource CanvasBackgroundBrush}">
             <StackPanel Margin="36,26,36,32" Spacing="20" MaxWidth="1100">
                 <Grid ColumnDefinitions="*,Auto">
                     <StackPanel Spacing="3" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Greeting}" FontSize="12.5"
+                                   Foreground="{DynamicResource CanvasTextMutedBrush}"/>
                         <TextBlock Text="Notebooks" FontSize="24" FontWeight="SemiBold"
                                    Foreground="{DynamicResource CanvasTextBrush}"/>
-                        <TextBlock Text="Pick up where you left off, or start something new."
+                        <TextBlock Text="{Binding HomeSubtitle}"
                                    FontSize="12.5" Foreground="{DynamicResource CanvasTextMutedBrush}"/>
                     </StackPanel>
                     <Button x:Name="NewNotebookBtn" Grid.Column="1" VerticalAlignment="Center"
@@ -138,6 +151,39 @@
                         </StackPanel>
                     </Button>
                 </Grid>
+                <!-- recently edited pages, one click from anywhere -->
+                <StackPanel Spacing="8" IsVisible="{Binding HasRecents}">
+                    <TextBlock Text="JUMP BACK IN" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource CanvasTextMutedBrush}"/>
+                    <ItemsControl x:Name="RecentList" ItemsSource="{Binding RecentPages}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:RecentPage">
+                                <Border Classes="recentchip" Margin="0,0,10,10" CornerRadius="10" Padding="12,8"
+                                        Background="{DynamicResource PaperBackgroundBrush}"
+                                        BorderBrush="{DynamicResource PaperBorderBrush}" BorderThickness="1"
+                                        Cursor="Hand">
+                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                        <Border Width="10" Height="10" CornerRadius="5" VerticalAlignment="Center"
+                                                Background="{Binding Color, Converter={x:Static v:Converters.HexBrush}}"/>
+                                        <StackPanel Spacing="1">
+                                            <TextBlock Text="{Binding Title}" FontSize="12.5" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource CanvasTextBrush}"/>
+                                            <TextBlock Text="{Binding Detail}" FontSize="10.5"
+                                                       Foreground="{DynamicResource CanvasTextMutedBrush}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <TextBlock Text="NOTEBOOKS" FontSize="11" FontWeight="SemiBold" Margin="0,2,0,-8"
+                           Foreground="{DynamicResource CanvasTextMutedBrush}"
+                           IsVisible="{Binding HasRecents}"/>
                 <ItemsControl x:Name="HomeCards" ItemsSource="{Binding Notebooks}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
@@ -306,8 +352,13 @@
                 </DockPanel>
             </Border>
 
+            <!-- Page area: an OPAQUE canvas plate with a rounded HOLE punched under the page box
+                 (clip set in code), so the acrylic backdrop blurs through the page ONLY — solid
+                 themes get a real-glass page with solid surroundings. -->
+            <Panel Grid.Column="2">
+            <Border x:Name="CanvasPlate" Background="{DynamicResource CanvasBackgroundBrush}"/>
             <!-- Page: title + freeform canvas of note containers -->
-            <Border Grid.Column="2" Margin="14" CornerRadius="14"
+            <Border Margin="14" CornerRadius="14"
                     Background="{DynamicResource PaperBackgroundBrush}" BorderBrush="{DynamicResource PaperBorderBrush}" BorderThickness="1">
                 <DockPanel x:Name="PageDock">
                     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="26,22,26,0"
@@ -346,6 +397,7 @@
                     </Panel>
                 </DockPanel>
             </Border>
+            </Panel>
         </Grid>
         </DockPanel>
 

@@ -51,16 +51,16 @@ public class ThemePalettesTests
     [InlineData("Light", false)]
     [InlineData("Pink", false)]
     [InlineData("Light blue", false)]
-    public void SolidThemes_fullOff_solidCanvasWithFrostedPaperOnly(string theme, bool darkChrome)
+    public void SolidThemes_fullOff_solidCanvasWithRealGlassPageOnly(string theme, bool darkChrome)
     {
         var t = ThemePalettes.Resolve(theme, fullTheme: false, paperLight: false);
         Assert.True(IsOpaque(t.FrameBackground));
         Assert.True(IsOpaque(t.CanvasBackground));     // the body around the page is NOT glass
-        Assert.True(IsTranslucent(t.PaperBackground)); // only the page box reads frosted
-        Assert.Equal(t.TextPrimary, t.PaperText);      // one text family — frost sits on the canvas
-        Assert.Equal(t.TextPrimary, t.CanvasText);
+        Assert.True(IsGlassy(t.PaperBackground));      // the page box is REAL glass (acrylic hole)
+        Assert.Equal("#FFFFFFFF", t.PaperText);        // glass reads light on every theme
+        Assert.Equal(t.TextPrimary, t.CanvasText);     // solid surroundings keep theme text
         Assert.Equal(darkChrome, t.DarkChrome);
-        Assert.False(t.GlassWindow);                   // no acrylic backdrop outside Lumen
+        Assert.True(t.GlassWindow);                    // acrylic needed for the page hole
     }
 
     [Theory]

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -138,6 +139,15 @@ public sealed class WorkspaceStore
         if (!File.Exists(path)) return null;
         try { return Editor.CanvasDocJson.FromJson(File.ReadAllText(path)); }
         catch { return null; }
+    }
+
+    /// <summary>When the page's content file was last written (UTC), or null if it has none —
+    /// powers the homepage's "Jump back in" strip without storing any extra state.</summary>
+    public DateTime? PageDocTime(Notebook nb, string pageId)
+    {
+        if (string.IsNullOrEmpty(nb.Folder)) return null;
+        var path = PageDocPath(nb, pageId);
+        return File.Exists(path) ? File.GetLastWriteTimeUtc(path) : null;
     }
 
     public void DeletePageDoc(Notebook nb, string pageId)

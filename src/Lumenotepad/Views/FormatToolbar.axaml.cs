@@ -111,6 +111,11 @@ public partial class FormatToolbar : UserControl
 
         // Docked to the window, the strip is frame furniture: frame fill + a hairline toward the
         // content, so its icons sit on the frame color on every theme. Inside the page it stays bare.
+        // The resource bindings MUST be disposed on scope change — a live binding survives
+        // ClearValue and re-paints the old chrome on the next theme switch.
+        _chromeBgSub?.Dispose();
+        _chromeBorderSub?.Dispose();
+        _chromeBgSub = _chromeBorderSub = null;
         if (pageScope)
         {
             Chrome.ClearValue(Border.BackgroundProperty);
@@ -119,8 +124,8 @@ public partial class FormatToolbar : UserControl
         }
         else
         {
-            Chrome.Bind(Border.BackgroundProperty, this.GetResourceObservable("FrameBackgroundBrush"));
-            Chrome.Bind(Border.BorderBrushProperty, this.GetResourceObservable("FrameBorderBrush"));
+            _chromeBgSub = Chrome.Bind(Border.BackgroundProperty, this.GetResourceObservable("FrameBackgroundBrush"));
+            _chromeBorderSub = Chrome.Bind(Border.BorderBrushProperty, this.GetResourceObservable("FrameBorderBrush"));
             Chrome.BorderThickness = dock switch
             {
                 Dock.Left => new Thickness(0, 0, 1, 0),
@@ -131,6 +136,8 @@ public partial class FormatToolbar : UserControl
             Margin = new Thickness(0);   // flush with the window edge, like the panels
         }
     }
+
+    private System.IDisposable? _chromeBgSub, _chromeBorderSub;
 
     private void Do(Action<RichTextEditor> action)
     {

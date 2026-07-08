@@ -36,7 +36,8 @@ public sealed class NoteCanvas : Panel
         set
         {
             _canResize = value;
-            foreach (var child in Children) ((NoteBoxView)child).RefreshChrome();
+            foreach (var child in Children)
+                if (child is NoteBoxView v) v.RefreshChrome();
         }
     }
 
@@ -74,14 +75,30 @@ public sealed class NoteCanvas : Panel
         });
     }
 
+    // A quiet starter hint on empty pages, so a blank canvas never feels dead. A child element
+    // because Panel.Render is sealed (same lesson as the TextPresenter selection underlay).
+    private readonly TextBlock _hint = new()
+    {
+        Text = "Click anywhere and start typing",
+        FontSize = 13.5, IsHitTestVisible = false, IsVisible = false,
+    };
+
     private void Rebuild()
     {
         Children.Clear();
         SetActive(null);
+        Children.Add(_hint);
         if (_doc is not null)
             foreach (var box in _doc.Boxes)
                 Children.Add(new NoteBoxView(this, box));
+        UpdateHint();
         InvalidateMeasure();
+    }
+
+    private void UpdateHint()
+    {
+        _hint.Foreground = new SolidColorBrush(Color.Parse(Services.ThemeManager.Current.PaperTextMuted));
+        _hint.IsVisible = _doc is not null && _doc.Boxes.Count == 0;
     }
 
     protected override Size MeasureOverride(Size availableSize)
@@ -89,7 +106,7 @@ public sealed class NoteCanvas : Panel
         double w = 0, h = 0;
         foreach (var child in Children)
         {
-            var v = (NoteBoxView)child;
+            if (child is not NoteBoxView v) { child.Measure(Size.Infinity); continue; }
             v.Measure(new Size(v.Box.Width, double.PositiveInfinity));
             w = Math.Max(w, v.Box.X + v.Box.Width);
             h = Math.Max(h, v.Box.Y + Math.Max(v.DesiredSize.Height, v.Box.H));
@@ -101,7 +118,14 @@ public sealed class NoteCanvas : Panel
     {
         foreach (var child in Children)
         {
-            var v = (NoteBoxView)child;
+            if (child is not NoteBoxView v)
+            {
+                var d = child.DesiredSize;
+                child.Arrange(new Rect(
+                    Math.Max(0, (finalSize.Width - d.Width) / 2),
+                    Math.Min(170, finalSize.Height / 3), d.Width, d.Height));
+                continue;
+            }
             v.Arrange(new Rect(v.Box.X, v.Box.Y, v.Box.Width, Math.Max(v.DesiredSize.Height, v.Box.H)));
         }
         return finalSize;
@@ -123,6 +147,7 @@ public sealed class NoteCanvas : Panel
     {
         var view = new NoteBoxView(this, box);
         Children.Add(view);
+        UpdateHint();
         InvalidateMeasure();
         return view;
     }
@@ -171,6 +196,7 @@ public sealed class NoteCanvas : Panel
     {
         Children.Remove(view);
         if (ReferenceEquals(ActiveEditor, view.Editor)) SetActive(null);
+        UpdateHint();
         InvalidateMeasure();
     }
 

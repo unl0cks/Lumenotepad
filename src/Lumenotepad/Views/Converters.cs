@@ -57,13 +57,23 @@ public static class Converters
     public static readonly IValueConverter CoverBorder = new FuncValueConverter<string?, IBrush>(hex =>
         new SolidColorBrush(Shade(SafeParse(hex), -0.38)));
 
+    // Covers decoded at card size (full-resolution photos re-rasterizing every hover-animation
+    // frame is what made card hover lag) and cached per path+mtime.
+    private static readonly System.Collections.Generic.Dictionary<string, (DateTime Stamp, IBrush Brush)> CoverCache = new();
+
     /// <summary>Absolute cover-image path → a fill brush for the card (null = keep the color cover).</summary>
     public static readonly IValueConverter CoverImage = new FuncValueConverter<string?, IBrush?>(path =>
     {
         if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path)) return null;
         try
         {
-            return new ImageBrush(new Avalonia.Media.Imaging.Bitmap(path)) { Stretch = Stretch.UniformToFill };
+            var stamp = System.IO.File.GetLastWriteTimeUtc(path);
+            if (CoverCache.TryGetValue(path, out var hit) && hit.Stamp == stamp) return hit.Brush;
+            using var fs = System.IO.File.OpenRead(path);
+            var bmp = Avalonia.Media.Imaging.Bitmap.DecodeToWidth(fs, 420);
+            var brush = new ImageBrush(bmp) { Stretch = Stretch.UniformToFill };
+            CoverCache[path] = (stamp, brush);
+            return brush;
         }
         catch { return null; }
     });
