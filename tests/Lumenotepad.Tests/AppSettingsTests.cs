@@ -33,4 +33,23 @@ public class AppSettingsTests
         Assert.Equal("Lumen", loaded.Theme);
         Assert.False(loaded.FullTheme);
     }
+
+    [Fact]
+    public void StartVisible_DefaultsTrue_AndRoundTrips()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            Assert.True(new AppSettings().StartRailVisible);
+            Assert.True(new AppSettings().StartPagesVisible);
+
+            var s = new AppSettings { StartRailVisible = false, StartPagesVisible = false };
+            s.Save(dir);
+            var loaded = AppSettings.Load(dir);
+
+            Assert.False(loaded.StartRailVisible);
+            Assert.False(loaded.StartPagesVisible);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }

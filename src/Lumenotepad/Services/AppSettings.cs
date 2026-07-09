@@ -18,6 +18,8 @@ public sealed class AppSettings
     public string ToolbarScope { get; set; } = "Window";    // "Window" (window edge) | "Page" (inside the page box)
     public bool ResizablePages { get; set; } = true;        // note containers show resize handles
     public bool DeletedHistory { get; set; } = true;        // deleted containers kept per page, restorable
+    public bool StartRailVisible { get; set; } = true;      // notebooks rail shown at launch
+    public bool StartPagesVisible { get; set; } = true;     // pages panel shown at launch
 
     private const string FileName = "settings.json";
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };

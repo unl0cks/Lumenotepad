@@ -147,6 +147,21 @@
                             </StackPanel>
                             <ComboBox x:Name="ToolbarScopeBox" Grid.Column="1" Width="120" VerticalAlignment="Center"/>
                         </Grid>
+                        <TextBlock Classes="section" Text="PANELS"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Show notebooks rail"/>
+                                <TextBlock Classes="hint" Text="The rail starts visible; the title-bar toggle still hides it per session."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding StartRailVisible, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Show pages panel"/>
+                                <TextBlock Classes="hint" Text="The pages list starts visible; the title-bar toggle still hides it per session."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding StartPagesVisible, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
                     </StackPanel>
 
                     <StackPanel x:Name="CanvasPanel" Spacing="6" IsVisible="False">

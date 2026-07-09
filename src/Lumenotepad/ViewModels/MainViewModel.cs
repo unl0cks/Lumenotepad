@@ -63,6 +63,8 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _flatCovers;                  // prefs: solid covers, shadow kept
     [ObservableProperty] private bool _glossyAccents = true;        // prefs: gloss on chips + selected pills
     [ObservableProperty] private bool _extendedFonts;               // prefs: full font list vs curated
+    [ObservableProperty] private bool _startRailVisible = true;    // prefs: rail shown at launch
+    [ObservableProperty] private bool _startPagesVisible = true;   // prefs: pages panel shown at launch
 
     /// <summary>The Light-paper toggle only means something on Lumen with Full theme off.</summary>
     public bool PaperToggleEnabled => Theme == "Lumen" && !FullTheme;
@@ -144,6 +146,10 @@ public partial class MainViewModel : ObservableObject
             FlatCovers = _settings.FlatCovers;
             GlossyAccents = _settings.GlossyAccents;
             ExtendedFonts = _settings.ExtendedFonts;
+            StartRailVisible = _settings.StartRailVisible;
+            StartPagesVisible = _settings.StartPagesVisible;
+            IsRailVisible = _settings.StartRailVisible;
+            IsPagesVisible = _settings.StartPagesVisible;
         }
         _workspace = store.LoadOrSeed();
         SelectedNotebook = Notebooks.FirstOrDefault();
@@ -219,6 +225,22 @@ public partial class MainViewModel : ObservableObject
     {
         if (_settings is null || _settingsDir is null) return;
         _settings.ExtendedFonts = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnStartRailVisibleChanged(bool value)
+    {
+        IsRailVisible = value;
+        if (_settings is null || _settingsDir is null) return;
+        _settings.StartRailVisible = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnStartPagesVisibleChanged(bool value)
+    {
+        IsPagesVisible = value;
+        if (_settings is null || _settingsDir is null) return;
+        _settings.StartPagesVisible = value;
         _settings.Save(_settingsDir);
     }
 
