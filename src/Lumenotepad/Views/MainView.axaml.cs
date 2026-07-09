@@ -408,6 +408,7 @@ public partial class MainView : UserControl
             ApplyCanvasPrefs();
             ApplyGlossyAccents();
             ApplyPanels();
+            HookCollectionAnimations();
             Toolbar.SetExtendedFonts(_hookedVm.ExtendedFonts);
         }
     }
@@ -428,6 +429,58 @@ public partial class MainView : UserControl
         bool flat = Vm?.FlatCovers ?? false;
         HomeCards.Classes.Set("flat", flat);
         NotebooksList.Classes.Set("flat", flat);
+    }
+
+    // ---- add / delete animations (list mutations rise in / collapse out) --------------------------
+    private bool _notebooksHooked;
+    private System.Collections.Specialized.INotifyCollectionChanged? _sections, _pages;
+
+    private void HookCollectionAnimations()
+    {
+        if (!_notebooksHooked && Vm?.Notebooks is System.Collections.Specialized.INotifyCollectionChanged nc)
+        { nc.CollectionChanged += OnNotebooksChanged; _notebooksHooked = true; }
+        RehookSections();
+        RehookPages();
+    }
+
+    private void RehookSections()
+    {
+        if (_sections is not null) _sections.CollectionChanged -= OnSectionsChanged;
+        _sections = Vm?.SelectedNotebook?.Sections as System.Collections.Specialized.INotifyCollectionChanged;
+        if (_sections is not null) _sections.CollectionChanged += OnSectionsChanged;
+    }
+
+    private void RehookPages()
+    {
+        if (_pages is not null) _pages.CollectionChanged -= OnPagesChanged;
+        _pages = Vm?.SelectedSection?.Pages as System.Collections.Specialized.INotifyCollectionChanged;
+        if (_pages is not null) _pages.CollectionChanged += OnPagesChanged;
+    }
+
+    private void OnNotebooksChanged(object? s, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    { RiseAdded(e, HomeCards); RiseAdded(e, NotebooksList); }
+    private void OnSectionsChanged(object? s, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    { RiseAdded(e, SectionsList); }
+    private void OnPagesChanged(object? s, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    { RiseAdded(e, PagesList); }
+
+    /// <summary>Rise newly-added item containers in (ignores Move — that's the drag reflow).</summary>
+    private void RiseAdded(System.Collections.Specialized.NotifyCollectionChangedEventArgs e, ItemsControl list)
+    {
+        if (e.Action != System.Collections.Specialized.NotifyCollectionChangedAction.Add || e.NewItems is null) return;
+        var added = e.NewItems.Cast<object>().ToList();
+        Dispatcher.UIThread.Post(() =>
+        {
+            foreach (var it in added)
+                if (list.ContainerFromItem(it) is Control c) Motion.RiseIn(c, Motion.Base);
+        }, DispatcherPriority.Background);
+    }
+
+    /// <summary>Collapse an item's container out, then run the actual delete.</summary>
+    private void CollapseThenDelete(Control? container, System.Action delete)
+    {
+        if (container is null) { delete(); return; }
+        Motion.CollapseOut(container, Motion.Base, delete);
     }
 
     /// <summary>Initial rail/pages panel state (no animation); the toggles animate via Motion.Reveal.</summary>
@@ -490,6 +543,10 @@ public partial class MainView : UserControl
         if (e.PropertyName is nameof(MainViewModel.SelectedNotebook)
             or nameof(MainViewModel.SelectedSection) or nameof(MainViewModel.SelectedPage))
             ReassertListSelection();
+
+        // Re-point the add-animation hooks at the current section/page collections.
+        if (e.PropertyName == nameof(MainViewModel.SelectedNotebook)) RehookSections();
+        if (e.PropertyName == nameof(MainViewModel.SelectedSection)) RehookPages();
 
         // Section switch: the repopulated pages list rises in instead of popping.
         if (e.PropertyName == nameof(MainViewModel.SelectedSection))
@@ -632,6 +689,7 @@ public partial class MainView : UserControl
         Dispatcher.UIThread.Post(() =>
         {
             var box = SectionsList.ContainerFromItem(sec)?.GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
+            if (box is not null) Motion.FadeIn(box, Motion.Fast);
             box?.Focus();
             box?.SelectAll();
         }, DispatcherPriority.Background);
@@ -667,7 +725,7 @@ public partial class MainView : UserControl
         delete.Click += (_, _) => ConfirmThenDelete(
             "Delete this section?",
             $"“{Label(sec.Name)}” and all its pages will be permanently deleted. This can't be undone.",
-            () => Vm?.DeleteSectionCommand.Execute(sec));
+            () => CollapseThenDelete(SectionsList.ContainerFromItem(sec) as Control, () => Vm?.DeleteSectionCommand.Execute(sec)));
         OpenMenu(e, rename, delete);
     }
 
@@ -679,7 +737,7 @@ public partial class MainView : UserControl
         delete.Click += (_, _) => ConfirmThenDelete(
             "Delete this notebook?",
             $"“{Label(nb.Name)}” and all its sections and pages will be permanently deleted. This can't be undone.",
-            () => Vm?.DeleteNotebookCommand.Execute(nb));
+            () => CollapseThenDelete(NotebooksList.ContainerFromItem(nb) as Control, () => Vm?.DeleteNotebookCommand.Execute(nb)));
         OpenMenu(e, delete);
     }
 
@@ -690,7 +748,7 @@ public partial class MainView : UserControl
         delete.Click += (_, _) => ConfirmThenDelete(
             "Delete this notebook?",
             $"“{Label(nb.Name)}” and all its sections and pages will be permanently deleted. This can't be undone.",
-            () => Vm?.DeleteNotebookCommand.Execute(nb));
+            () => CollapseThenDelete(NotebooksList.ContainerFromItem(nb) as Control, () => Vm?.DeleteNotebookCommand.Execute(nb)));
         OpenMenu(e, delete);
     }
 
@@ -702,7 +760,7 @@ public partial class MainView : UserControl
         delete.Click += (_, _) => ConfirmThenDelete(
             "Delete this page?",
             $"“{Label(pg.Title)}” will be permanently deleted. This can't be undone.",
-            () => Vm?.DeletePageCommand.Execute(pg));
+            () => CollapseThenDelete(PagesList.ContainerFromItem(pg) as Control, () => Vm?.DeletePageCommand.Execute(pg)));
         OpenMenu(e, delete);
     }
 
@@ -758,7 +816,7 @@ public partial class MainView : UserControl
         delete.Click += (_, _) => ConfirmThenDelete(
             "Delete this notebook?",
             $"“{Label(nb.Name)}” and all its sections and pages will be permanently deleted. This can't be undone.",
-            () => Vm?.DeleteNotebookCommand.Execute(nb));
+            () => CollapseThenDelete(HomeCards.ContainerFromItem(nb) as Control, () => Vm?.DeleteNotebookCommand.Execute(nb)));
 
         if (nb.CoverPath is not null)
         {

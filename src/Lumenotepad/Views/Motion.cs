@@ -15,8 +15,8 @@ namespace Lumenotepad.Views;
 /// loop. One tween per element; a new tween on the same element cancels the old.</summary>
 public static class Motion
 {
-    public const int Fast = 160, Base = 260, Slow = 380;
-    public const double Rise = 10;
+    public const int Fast = 220, Base = 360, Slow = 520;
+    public const double Rise = 12;
 
     public static double EaseOut(double t) => 1 - Math.Pow(1 - t, 3);
     public static double EaseIn(double t) => t * t * t;
