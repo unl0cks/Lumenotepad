@@ -104,62 +104,8 @@ public partial class MainView : UserControl
         CanvasPlate.SizeChanged += (_, _) => UpdateCanvasPlateClip();
     }
 
-    // ---- manual RenderTransform animation ---------------------------------------------------------
-    // The Transitions engine does NOT move RenderTransform in this build (only keyframe Animations,
-    // like the wiggle, do). A LOCAL RenderTransform value DOES render (proven). So we ease it ourselves,
-    // frame by frame, as a local value. One tween per element; starting a new one cancels the old.
-
-    private readonly System.Collections.Generic.Dictionary<Visual, DispatcherTimer> _tweens = new();
-
-    private void StopTween(Visual b)
-    {
-        if (_tweens.TryGetValue(b, out var t)) { t.Stop(); _tweens.Remove(b); }
-    }
-
-    /// <summary>Ease (cubic-out) an element's translate+scale from a start to a target over ms. When it
-    /// comes to rest at identity the RenderTransform is cleared; onDone fires at the end either way.</summary>
-    private void Tween(Control b, double fx, double fy, double fs,
-                       double tx, double ty, double ts, int ms, System.Action? onDone = null)
-    {
-        StopTween(b);
-        b.Transitions = null;
-        int step = 0, steps = System.Math.Max(1, ms / 15);
-        void Frame(double e) =>
-            b.RenderTransform = Make(fx + (tx - fx) * e, fy + (ty - fy) * e, fs + (ts - fs) * e);
-        Frame(0);
-        var timer = new DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(15) };
-        timer.Tick += (_, _) =>
-        {
-            step++;
-            double p = System.Math.Min(1.0, step / (double)steps);
-            Frame(1 - System.Math.Pow(1 - p, 3));
-            if (step >= steps)
-            {
-                StopTween(b);
-                bool atRest = System.Math.Abs(ts - 1) < 1e-3 && System.Math.Abs(tx) < 1e-3 && System.Math.Abs(ty) < 1e-3;
-                if (atRest)
-                {
-                    b.ClearValue(Visual.RenderTransformProperty);
-                    b.ClearValue(Avalonia.Animation.Animatable.TransitionsProperty);  // restore any style transition (e.g. rail glow)
-                }
-                onDone?.Invoke();
-            }
-        };
-        _tweens[b] = timer;
-        timer.Start();
-    }
-
+    // ---- transform animation (delegates to the shared Motion engine) ------------------------------
     private static double ScaleNow(Visual b) => b.RenderTransform?.Value is { } m && m.M11 > 0 ? m.M11 : 1;
-
-    /// <summary>Build a translate+scale transform directly (no per-frame string parsing — that was
-    /// making the drag choppy).</summary>
-    private static ITransform Make(double tx, double ty, double s)
-    {
-        var b = TransformOperations.CreateBuilder(2);
-        b.AppendTranslate(tx, ty);
-        b.AppendScale(s, s);
-        return b.Build();
-    }
 
     // ---- hover scale (smooth, code-behind) --------------------------------------------------------
 
@@ -183,9 +129,9 @@ public partial class MainView : UserControl
         var old = _hoverCard;
         _hoverCard = card;
         if (old is not null && !ReferenceEquals(old, _dragCard) && !_settling.Contains(old))
-            Tween(old, 0, 0, ScaleNow(old), 0, 0, 1.0, 120);
+            Motion.Tween(old, 0, 0, ScaleNow(old), 0, 0, 1.0, 120);
         if (card is not null && !ReferenceEquals(card, _dragCard))
-            Tween(card, 0, 0, ScaleNow(card), 0, 0, 1.04, 150);
+            Motion.Tween(card, 0, 0, ScaleNow(card), 0, 0, 1.04, 150);
     }
 
     private void SetHoverChip(Border? chip)
@@ -193,8 +139,8 @@ public partial class MainView : UserControl
         if (ReferenceEquals(_hoverChip, chip)) return;
         var old = _hoverChip;
         _hoverChip = chip;
-        if (old is not null) Tween(old, 0, 0, ScaleNow(old), 0, 0, 1.0, 120);
-        if (chip is not null) Tween(chip, 0, 0, ScaleNow(chip), 0, 0, 1.035, 150);
+        if (old is not null) Motion.Tween(old, 0, 0, ScaleNow(old), 0, 0, 1.0, 120);
+        if (chip is not null) Motion.Tween(chip, 0, 0, ScaleNow(chip), 0, 0, 1.035, 150);
     }
 
     // ---- selected-item scale (rail chip, section tab, page row) -----------------------------------
@@ -204,9 +150,9 @@ public partial class MainView : UserControl
     private void ScaleSelect(ref Control? cur, Control? next, double scale)
     {
         if (ReferenceEquals(cur, next)) return;
-        if (cur is not null) Tween(cur, 0, 0, ScaleNow(cur), 0, 0, 1.0, 140);
+        if (cur is not null) Motion.Tween(cur, 0, 0, ScaleNow(cur), 0, 0, 1.0, 140);
         cur = next;
-        if (next is not null) Tween(next, 0, 0, ScaleNow(next), 0, 0, scale, 170);
+        if (next is not null) Motion.Tween(next, 0, 0, ScaleNow(next), 0, 0, scale, 170);
     }
 
     private void UpdateSelectionScale()
@@ -341,7 +287,7 @@ public partial class MainView : UserControl
                 double dx = op.X - np.X, dy = op.Y - np.Y;
                 if (System.Math.Abs(dx) < 0.5 && System.Math.Abs(dy) < 0.5) continue;
                 _settling.Add(nbc);
-                Tween(nbc, dx, dy, 1.0, 0, 0, 1.0, 170, onDone: () => _settling.Remove(nbc));
+                Motion.Tween(nbc, dx, dy, 1.0, 0, 0, 1.0, 170, onDone: () => _settling.Remove(nbc));
             }
         }, DispatcherPriority.Render);
     }
