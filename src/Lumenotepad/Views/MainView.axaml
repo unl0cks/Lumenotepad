@@ -215,7 +215,7 @@
         <Panel Grid.Row="1">
 
         <!-- Homepage: the notebook gallery -->
-        <ScrollViewer x:Name="HomeHost" IsVisible="{Binding IsHomeVisible}" VerticalScrollBarVisibility="Auto"
+        <ScrollViewer x:Name="HomeHost" VerticalScrollBarVisibility="Auto"
                       Background="{DynamicResource CanvasBackgroundBrush}">
             <StackPanel Margin="36,26,36,32" Spacing="20" MaxWidth="1100">
                 <Grid ColumnDefinitions="*,Auto">
@@ -371,7 +371,7 @@
             </StackPanel>
         </Button>
 
-        <DockPanel x:Name="BodyDock" IsVisible="{Binding !IsHomeVisible}">
+        <DockPanel x:Name="BodyDock" IsVisible="False">
         <v:FormatToolbar x:Name="Toolbar" DockPanel.Dock="Top"/>
         <Grid ColumnDefinitions="Auto,Auto,*">
 

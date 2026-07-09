@@ -22,6 +22,17 @@ public partial class PreferencesWindow : Window
         };
         CloseBtn.Click += (_, _) => Close();
         KeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); };
+
+        // Fade + scale out before actually closing (covers the X, Escape, and outside-close paths).
+        bool closing = false;
+        Closing += (_, e) =>
+        {
+            if (closing) return;
+            e.Cancel = true;
+            closing = true;
+            if (Content is Control root) Motion.CollapseOut(root, Motion.Fast, Close);
+            else Close();
+        };
         PrefsTitleBar.PointerPressed += (_, e) =>
         {
             if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) BeginMoveDrag(e);

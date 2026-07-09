@@ -408,6 +408,7 @@ public partial class MainView : UserControl
             ApplyCanvasPrefs();
             ApplyGlossyAccents();
             ApplyPanels();
+            ApplyHomeSurface();
             HookCollectionAnimations();
             Toolbar.SetExtendedFonts(_hookedVm.ExtendedFonts);
         }
@@ -491,6 +492,15 @@ public partial class MainView : UserControl
         PagesPanel.Width = vm.IsPagesVisible ? 224 : 0; PagesPanel.Opacity = vm.IsPagesVisible ? 1 : 0;
     }
 
+    /// <summary>Initial home/editor surface state (no animation); the switch cross-fades in code
+    /// (their IsVisible bindings were removed so we control the fade timing).</summary>
+    private void ApplyHomeSurface()
+    {
+        bool home = Vm?.IsHomeVisible ?? true;
+        HomeHost.IsVisible = home; HomeHost.Opacity = home ? 1 : 0; HomeHost.IsHitTestVisible = home;
+        BodyDock.IsVisible = !home; BodyDock.Opacity = home ? 0 : 1; BodyDock.IsHitTestVisible = !home;
+    }
+
     /// <summary>"Glossy accents": gloss on the recents chips + accent-gradient selected pills.</summary>
     private void ApplyGlossyAccents()
     {
@@ -552,7 +562,12 @@ public partial class MainView : UserControl
         if (e.PropertyName == nameof(MainViewModel.SelectedSection))
             Dispatcher.UIThread.Post(() => Motion.RiseIn(PagesList, Motion.Base), DispatcherPriority.Background);
 
-        if (e.PropertyName == nameof(MainViewModel.SelectedPage)) SyncEditorDocument();
+        if (e.PropertyName == nameof(MainViewModel.SelectedPage))
+        {
+            // Fade the current page out, THEN swap + rise the new one in (SyncEditorDocument does the swap).
+            if (PageCanvas.Document is not null) Motion.FadeOut(PageDock, Motion.Fast, SyncEditorDocument);
+            else SyncEditorDocument();
+        }
         else if (e.PropertyName is nameof(MainViewModel.ToolbarPosition) or nameof(MainViewModel.ToolbarScope))
             ApplyToolbarPlacement();
         else if (e.PropertyName is nameof(MainViewModel.ResizablePages) or nameof(MainViewModel.DeletedHistory))
@@ -577,9 +592,13 @@ public partial class MainView : UserControl
                 HomeCards.ItemsSource = null;
                 HomeCards.ItemsSource = vm.Notebooks;
             }
-            // The surface being shown rises + fades in (Slow) instead of popping.
-            var surface = home ? (Control)HomeHost : BodyDock;
-            Dispatcher.UIThread.Post(() => Motion.RiseIn(surface, Motion.Slow), DispatcherPriority.Background);
+            // Cross-fade: the outgoing surface fades out while the incoming one rises in.
+            var show = home ? (Control)HomeHost : BodyDock;
+            var hide = home ? (Control)BodyDock : HomeHost;
+            hide.IsHitTestVisible = false;
+            Motion.FadeOut(hide, Motion.Base, () => hide.IsVisible = false);
+            show.IsVisible = true; show.IsHitTestVisible = true;
+            Dispatcher.UIThread.Post(() => Motion.RiseIn(show, Motion.Slow), DispatcherPriority.Background);
         }
         else if (e.PropertyName is nameof(MainViewModel.Theme)
                  or nameof(MainViewModel.FullTheme) or nameof(MainViewModel.PaperLight))

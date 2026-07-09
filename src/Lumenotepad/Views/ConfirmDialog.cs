@@ -58,8 +58,6 @@ public static class ConfirmDialog
         };
         var cancel = MakeButton(cancelText, "#33FFFFFF", "#1AFFFFFF", "#40FFFFFF");
         var confirm = MakeButton(confirmText, "#D64258", "#A62A3C", "#7E1F2D");
-        cancel.Click += (_, _) => win.Close(false);
-        confirm.Click += (_, _) => win.Close(true);
 
         var buttons = new StackPanel
         {
@@ -89,10 +87,21 @@ public static class ConfirmDialog
 
         win.Content = card;
         win.Opened += (_, _) => Motion.ScaleIn(card, 0.96);   // fade + scale in on open
+
+        // Fade + shrink the card out, THEN close with the result (so the result survives).
+        bool closing = false;
+        void CloseWith(bool result)
+        {
+            if (closing) return;
+            closing = true;
+            Motion.CollapseOut(card, Motion.Fast, () => win.Close(result));
+        }
+        cancel.Click += (_, _) => CloseWith(false);
+        confirm.Click += (_, _) => CloseWith(true);
         win.KeyDown += (_, e) =>
         {
-            if (e.Key == Key.Escape) win.Close(false);
-            else if (e.Key == Key.Enter) win.Close(true);
+            if (e.Key == Key.Escape) CloseWith(false);
+            else if (e.Key == Key.Enter) CloseWith(true);
         };
 
         var result = await win.ShowDialog<bool?>(owner);
