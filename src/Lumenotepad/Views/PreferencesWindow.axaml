@@ -4,7 +4,7 @@
         x:Class="Lumenotepad.Views.PreferencesWindow"
         x:DataType="vm:MainViewModel"
         Title="Preferences"
-        Width="460" SizeToContent="Height" CanResize="False"
+        Width="640" Height="500" CanResize="False"
         WindowDecorations="None" ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         FontFamily="{StaticResource UiFont}"
@@ -39,6 +39,24 @@
             <Setter Property="Margin" Value="0,0,6,6"/>
             <Setter Property="CornerRadius" Value="9"/>
         </Style>
+        <!-- left category nav -->
+        <Style Selector="ListBox.prefnav ListBoxItem">
+            <Setter Property="CornerRadius" Value="9"/>
+            <Setter Property="Padding" Value="10,7"/>
+            <Setter Property="Margin" Value="0,1"/>
+        </Style>
+        <Style Selector="ListBox.prefnav ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="CornerRadius" Value="9"/>
+        </Style>
+        <Style Selector="ListBox.prefnav ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
+        </Style>
+        <Style Selector="ListBox.prefnav ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+        </Style>
+        <Style Selector="ListBox.prefnav ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+        </Style>
     </Window.Styles>
 
     <DockPanel>
@@ -50,91 +68,107 @@
             <Button x:Name="CloseBtn" Grid.Column="1" Theme="{StaticResource CloseCaptionButton}" Content="&#xE8BB;"/>
         </Grid>
 
-        <StackPanel Margin="20,4,20,18" Spacing="6">
+        <Grid ColumnDefinitions="158,*">
 
-            <TextBlock Classes="section" Text="APPEARANCE" Margin="0,0,0,2"/>
+            <!-- category nav -->
+            <Border Grid.Column="0" BorderBrush="{DynamicResource FrameBorderBrush}"
+                    BorderThickness="0,0,1,0" Padding="8,4">
+                <ListBox x:Name="NavList" Classes="prefnav" Background="Transparent"
+                         BorderThickness="0" Padding="0">
+                    <ListBoxItem Tag="appearance"><TextBlock Classes="label" Text="Appearance"/></ListBoxItem>
+                    <ListBoxItem Tag="layout"><TextBlock Classes="label" Text="Layout"/></ListBoxItem>
+                    <ListBoxItem Tag="canvas"><TextBlock Classes="label" Text="Canvas"/></ListBoxItem>
+                </ListBox>
+            </Border>
 
-            <TextBlock Classes="label" Text="Theme"/>
-            <ListBox x:Name="ThemeList" Classes="themepick" Background="Transparent" BorderThickness="0" Padding="0">
-                <ListBox.ItemsPanel>
-                    <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
-                </ListBox.ItemsPanel>
-            </ListBox>
+            <!-- category panels (one visible at a time; ShowPanel swaps + animates) -->
+            <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
+                <Panel Margin="20,4,20,18">
 
-            <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
-                <StackPanel Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="label" Text="Full theme"/>
-                    <TextBlock Classes="hint" Text="The page canvas matches the frame material instead of contrasting it."/>
-                </StackPanel>
-                <ToggleSwitch Grid.Column="1" IsChecked="{Binding FullTheme, Mode=TwoWay}" VerticalAlignment="Center"/>
-            </Grid>
+                    <StackPanel x:Name="AppearancePanel" Spacing="6">
+                        <TextBlock Classes="section" Text="THEME" Margin="0,4,0,2"/>
+                        <ListBox x:Name="ThemeList" Classes="themepick" Background="Transparent" BorderThickness="0" Padding="0">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                        </ListBox>
 
-            <Grid ColumnDefinitions="*,Auto" IsEnabled="{Binding PaperToggleEnabled}">
-                <StackPanel Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="label" Text="Light paper"/>
-                    <TextBlock Classes="hint" Text="Lumen with Full theme off: write on light paper instead of dark."/>
-                </StackPanel>
-                <ToggleSwitch Grid.Column="1" IsChecked="{Binding PaperLight, Mode=TwoWay}" VerticalAlignment="Center"/>
-            </Grid>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Full theme"/>
+                                <TextBlock Classes="hint" Text="The page canvas matches the frame material instead of contrasting it."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding FullTheme, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
 
-            <Grid ColumnDefinitions="*,Auto">
-                <StackPanel Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="label" Text="Flat covers"/>
-                    <TextBlock Classes="hint" Text="Notebook covers use their plain color — no gloss, shadows stay."/>
-                </StackPanel>
-                <ToggleSwitch Grid.Column="1" IsChecked="{Binding FlatCovers, Mode=TwoWay}" VerticalAlignment="Center"/>
-            </Grid>
+                        <Grid ColumnDefinitions="*,Auto" IsEnabled="{Binding PaperToggleEnabled}">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Light paper"/>
+                                <TextBlock Classes="hint" Text="Lumen with Full theme off: write on light paper instead of dark."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding PaperLight, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
 
-            <Grid ColumnDefinitions="*,Auto">
-                <StackPanel Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="label" Text="Glossy accents"/>
-                    <TextBlock Classes="hint" Text="Selected tabs, rows and homepage chips get the top-lit gloss."/>
-                </StackPanel>
-                <ToggleSwitch Grid.Column="1" IsChecked="{Binding GlossyAccents, Mode=TwoWay}" VerticalAlignment="Center"/>
-            </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Flat covers"/>
+                                <TextBlock Classes="hint" Text="Notebook covers use their plain color — no gloss, shadows stay."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding FlatCovers, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
 
-            <Grid ColumnDefinitions="*,Auto">
-                <StackPanel Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="label" Text="Extended font list"/>
-                    <TextBlock Classes="hint" Text="Offer every installed font in the toolbar's font menu instead of the essentials."/>
-                </StackPanel>
-                <ToggleSwitch Grid.Column="1" IsChecked="{Binding ExtendedFonts, Mode=TwoWay}" VerticalAlignment="Center"/>
-            </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Glossy accents"/>
+                                <TextBlock Classes="hint" Text="Selected tabs, rows and homepage chips get the top-lit gloss."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding GlossyAccents, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
 
-            <TextBlock Classes="section" Text="LAYOUT"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Extended font list"/>
+                                <TextBlock Classes="hint" Text="Offer every installed font in the toolbar's font menu instead of the essentials."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding ExtendedFonts, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
 
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Classes="label" Text="Toolbar position"/>
-                <ComboBox x:Name="ToolbarPosBox" Grid.Column="1" Width="120"/>
-            </Grid>
-            <Grid ColumnDefinitions="*,Auto">
-                <StackPanel Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="label" Text="Attach toolbar to"/>
-                    <TextBlock Classes="hint" Text="The window edge, or the page box itself."/>
-                </StackPanel>
-                <ComboBox x:Name="ToolbarScopeBox" Grid.Column="1" Width="120" VerticalAlignment="Center"/>
-            </Grid>
+                    <StackPanel x:Name="LayoutPanel" Spacing="6" IsVisible="False">
+                        <TextBlock Classes="section" Text="TOOLBAR" Margin="0,4,0,2"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="Toolbar position"/>
+                            <ComboBox x:Name="ToolbarPosBox" Grid.Column="1" Width="120"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Attach toolbar to"/>
+                                <TextBlock Classes="hint" Text="The window edge, or the page box itself."/>
+                            </StackPanel>
+                            <ComboBox x:Name="ToolbarScopeBox" Grid.Column="1" Width="120" VerticalAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
 
-            <TextBlock Classes="section" Text="CANVAS"/>
+                    <StackPanel x:Name="CanvasPanel" Spacing="6" IsVisible="False">
+                        <TextBlock Classes="section" Text="PAGES" Margin="0,4,0,2"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Resizable pages"/>
+                                <TextBlock Classes="hint" Text="Note containers show width, height and corner resize handles."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding ResizablePages, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Deleted pages history"/>
+                                <TextBlock Classes="hint" Text="Deleted containers are kept per page and can be dragged back."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding DeletedHistory, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
 
-            <Grid ColumnDefinitions="*,Auto">
-                <StackPanel Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="label" Text="Resizable pages"/>
-                    <TextBlock Classes="hint" Text="Note containers show width, height and corner resize handles."/>
-                </StackPanel>
-                <ToggleSwitch Grid.Column="1" IsChecked="{Binding ResizablePages, Mode=TwoWay}" VerticalAlignment="Center"/>
-            </Grid>
-
-            <Grid ColumnDefinitions="*,Auto">
-                <StackPanel Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="label" Text="Deleted pages history"/>
-                    <TextBlock Classes="hint" Text="Deleted containers are kept per page and can be dragged back."/>
-                </StackPanel>
-                <ToggleSwitch Grid.Column="1" IsChecked="{Binding DeletedHistory, Mode=TwoWay}" VerticalAlignment="Center"/>
-            </Grid>
-
-            <TextBlock Classes="hint" Margin="0,16,0,0"
-                       Text="Advanced settings (encodings, hashes, per-bullet colors…) arrive in a later update behind a confirmation."/>
-        </StackPanel>
+                </Panel>
+            </ScrollViewer>
+        </Grid>
     </DockPanel>
 </Window>
