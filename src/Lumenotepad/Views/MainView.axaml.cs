@@ -407,6 +407,7 @@ public partial class MainView : UserControl
             ApplyToolbarPlacement();
             ApplyCanvasPrefs();
             ApplyGlossyAccents();
+            ApplyPanels();
             Toolbar.SetExtendedFonts(_hookedVm.ExtendedFonts);
         }
     }
@@ -427,6 +428,14 @@ public partial class MainView : UserControl
         bool flat = Vm?.FlatCovers ?? false;
         HomeCards.Classes.Set("flat", flat);
         NotebooksList.Classes.Set("flat", flat);
+    }
+
+    /// <summary>Initial rail/pages panel state (no animation); the toggles animate via Motion.Reveal.</summary>
+    private void ApplyPanels()
+    {
+        if (Vm is not { } vm) return;
+        RailPanel.Width = vm.IsRailVisible ? 64 : 0; RailPanel.Opacity = vm.IsRailVisible ? 1 : 0;
+        PagesPanel.Width = vm.IsPagesVisible ? 224 : 0; PagesPanel.Opacity = vm.IsPagesVisible ? 1 : 0;
     }
 
     /// <summary>"Glossy accents": gloss on the recents chips + accent-gradient selected pills.</summary>
@@ -459,6 +468,7 @@ public partial class MainView : UserControl
         }
         DockPanel.SetDock(Toolbar, dock);
         Toolbar.SetPlacement(dock, vm.ToolbarScope == "Page");
+        Motion.FadeIn(Toolbar, Motion.Base);       // fade the toolbar in on (re)placement
     }
 
     // Debounced autosave: flush dirty page docs after ~0.9s of typing idle.
@@ -496,6 +506,10 @@ public partial class MainView : UserControl
             ApplyGlossyAccents();
         else if (e.PropertyName == nameof(MainViewModel.ExtendedFonts))
             Toolbar.SetExtendedFonts(Vm?.ExtendedFonts ?? false);
+        else if (e.PropertyName == nameof(MainViewModel.IsRailVisible))
+            Motion.Reveal(RailPanel, 64, Vm?.IsRailVisible ?? true);
+        else if (e.PropertyName == nameof(MainViewModel.IsPagesVisible))
+            Motion.Reveal(PagesPanel, 224, Vm?.IsPagesVisible ?? true);
         else if (e.PropertyName == nameof(MainViewModel.IsHomeVisible))
         {
             if (_rearranging) SetRearranging(false);          // leaving home exits rearrange mode

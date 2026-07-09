@@ -15,8 +15,8 @@ namespace Lumenotepad.Views;
 /// loop. One tween per element; a new tween on the same element cancels the old.</summary>
 public static class Motion
 {
-    public const int Fast = 120, Base = 190, Slow = 280;
-    public const double Rise = 8;
+    public const int Fast = 160, Base = 260, Slow = 380;
+    public const double Rise = 10;
 
     public static double EaseOut(double t) => 1 - Math.Pow(1 - t, 3);
     public static double EaseIn(double t) => t * t * t;
@@ -86,4 +86,26 @@ public static class Motion
 
     public static void CollapseOut(Control c, int ms = Base, Action? onDone = null)
     { c.RenderTransformOrigin = RelativePoint.Center; Tween(c, 0, 0, 1, 0, 0, 0.92, ms, EaseIn, c.Opacity, 0, onDone); }
+
+    /// <summary>Collapse/expand a side panel: animate its Width (to fullWidth or 0) and fade, for the
+    /// rail / pages toggle. Width is a layout property so this re-lays-out each frame — fine for a
+    /// narrow occasional panel.</summary>
+    public static void Reveal(Control c, double fullWidth, bool show, int ms = Base)
+    {
+        Stop(c);
+        double fromW = double.IsNaN(c.Width) ? c.Bounds.Width : c.Width;
+        double toW = show ? fullWidth : 0, fromO = c.Opacity, toO = show ? 1 : 0;
+        int step = 0, steps = Steps(ms);
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(15) };
+        timer.Tick += (_, _) =>
+        {
+            step++;
+            double e = EaseOut(Math.Min(1.0, step / (double)steps));
+            c.Width = Lerp(fromW, toW, e);
+            c.Opacity = Lerp(fromO, toO, e);
+            if (step >= steps) { Stop(c); c.Width = toW; c.Opacity = toO; }
+        };
+        Tweens[c] = timer;
+        timer.Start();
+    }
 }

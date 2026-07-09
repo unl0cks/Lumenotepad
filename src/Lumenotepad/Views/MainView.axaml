@@ -376,7 +376,7 @@
         <Grid ColumnDefinitions="Auto,Auto,*">
 
             <!-- Notebooks rail -->
-            <Border Grid.Column="0" Width="64" IsVisible="{Binding IsRailVisible}"
+            <Border x:Name="RailPanel" Grid.Column="0" Width="64" ClipToBounds="True"
                     Background="{DynamicResource FrameBackgroundBrush}"
                     BorderBrush="{DynamicResource FrameBorderBrush}" BorderThickness="0,0,1,0">
                 <DockPanel Margin="0,10">
@@ -423,7 +423,7 @@
             </Border>
 
             <!-- Sections + pages -->
-            <Border Grid.Column="1" Width="224" IsVisible="{Binding IsPagesVisible}"
+            <Border x:Name="PagesPanel" Grid.Column="1" Width="224" ClipToBounds="True"
                     Background="{DynamicResource FrameBackgroundBrush}"
                     BorderBrush="{DynamicResource FrameBorderBrush}" BorderThickness="0,0,1,0">
                 <DockPanel Margin="12,12,12,0">
