@@ -118,4 +118,22 @@ public class MainViewModelTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void StartVisiblePrefs_SeedLiveState_AndMirrorOnChange()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            new AppSettings { StartRailVisible = false, StartPagesVisible = false }.Save(dir);
+
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            Assert.False(vm.IsRailVisible);      // ctor seeds live state from the persisted pref
+            Assert.False(vm.IsPagesVisible);
+
+            vm.StartRailVisible = true;          // flipping the pref mirrors onto the live state
+            Assert.True(vm.IsRailVisible);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }
