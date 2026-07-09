@@ -46,11 +46,18 @@ public sealed class RichTextEditor : Control
 
     // ---- caret / selection ----
     private DocPos _caret, _anchor;
-    private bool _caretVisible = true;
-    private readonly DispatcherTimer _blink = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private double _desiredX = -1;           // sticky column for up/down
     private RunFormat _pending;              // format toggled at a collapsed caret → applies to next typed text
     private bool _hasPending;
+    // Smooth caret: a ~60fps animation loop (while focused) glides the caret's display rect toward its
+    // target and pulses its opacity as a soft-fade blink. Redraws are gated to transitions only, so an
+    // idle caret between blink fades doesn't keep repainting.
+    private readonly DispatcherTimer _anim = new() { Interval = TimeSpan.FromMilliseconds(16) };
+    private Rect _caretDisplay;
+    private bool _caretSeeded;
+    private double _caretOpacity = 1, _blinkMs;
+    // Checkbox pop: paragraph index -> (progress 0..1, target checked). Progress eases the toggle in.
+    private readonly Dictionary<int, (double P, bool On)> _checkAnim = new();
 
     /// <summary>Raised when the caret/selection moves or formatting changes — toolbars refresh from this.</summary>
     public event Action? SelectionChanged;
@@ -76,9 +83,9 @@ public sealed class RichTextEditor : Control
         Cursor = new Cursor(StandardCursorType.Ibeam);
         ClipToBounds = true;
         _doc.Changed += OnDocChanged;
-        _blink.Tick += (_, _) => { _caretVisible = !_caretVisible; InvalidateVisual(); };
-        GotFocus += (_, _) => { _caretVisible = true; _blink.Start(); InvalidateVisual(); };
-        LostFocus += (_, _) => { _blink.Stop(); _caretVisible = false; InvalidateVisual(); };
+        _anim.Tick += (_, _) => AnimTick();
+        GotFocus += (_, _) => { ResetBlink(); _caretSeeded = false; _anim.Start(); InvalidateVisual(); };
+        LostFocus += (_, _) => { _anim.Stop(); _checkAnim.Clear(); InvalidateVisual(); };
     }
 
     private void OnDocChanged()
@@ -286,10 +293,11 @@ public sealed class RichTextEditor : Control
         }
 
         // caret
-        if (_caretVisible && IsFocused)
+        if (IsFocused && _caretOpacity > 0.01)
         {
-            var rect = CaretRect();
-            ctx.FillRectangle(CaretBrush, new Rect(rect.X, rect.Y, 1.6, rect.Height), 0.8f);
+            var r = _caretSeeded ? _caretDisplay : CaretRect();
+            using (ctx.PushOpacity(_caretOpacity))
+                ctx.FillRectangle(CaretBrush, new Rect(r.X, r.Y, 1.6, r.Height), 0.8f);
         }
     }
 
@@ -349,19 +357,23 @@ public sealed class RichTextEditor : Control
 
         if (p.Bullet == "check")
         {
-            double half = 7.5 * s;
+            // a = checked-ness 0..1 (animates the toggle in/out); pop = a brief size bump mid-toggle.
+            bool anim = _checkAnim.TryGetValue(pi, out var ca);
+            double a = anim ? (ca.On ? ca.P : 1 - ca.P) : (p.Checked ? 1 : 0);
+            double pop = anim ? 1 + 0.18 * Math.Sin(Math.PI * ca.P) : 1;
+            double half = 7.5 * s * pop, r = 4 * s;
             var box = new Rect(cx - half, cy - half, half * 2, half * 2);
-            if (p.Checked)
+            if (a < 0.999)   // outline fades out as the accent fill comes in
+                ctx.DrawRectangle(null, new Pen(ForegroundAlpha(0.45 * (1 - a)), 1.5 * s), box, r, r);
+            if (a > 0.001)   // accent fill grows in + checkmark scales in from the box centre
             {
-                ctx.DrawRectangle(CaretBrush, null, box, 4 * s, 4 * s);   // accent per theme
-                var pen = new Pen(Brushes.White, 1.8 * s) { LineCap = PenLineCap.Round };
-                ctx.DrawLine(pen, new Point(cx - 4 * s, cy + 0.5 * s), new Point(cx - 1 * s, cy + 3.5 * s));
-                ctx.DrawLine(pen, new Point(cx - 1 * s, cy + 3.5 * s), new Point(cx + 4.5 * s, cy - 3 * s));
-            }
-            else
-            {
-                // Foreground-derived, not white — white boxes vanish on light paper.
-                ctx.DrawRectangle(null, new Pen(ForegroundAlpha(0.45), 1.5 * s), box, 4 * s, 4 * s);
+                var fill = CaretBrush is ISolidColorBrush cb ? new SolidColorBrush(cb.Color, a) : CaretBrush;
+                ctx.DrawRectangle(fill, null, box, r, r);
+                var pen = new Pen(new SolidColorBrush(Colors.White, a), 1.8 * s) { LineCap = PenLineCap.Round };
+                double m = a * pop;
+                Point P(double dx, double dy) => new(cx + dx * s * m, cy + dy * s * m);
+                ctx.DrawLine(pen, P(-4, 0.5), P(-1, 3.5));
+                ctx.DrawLine(pen, P(-1, 3.5), P(4.5, -3));
             }
             return;
         }
@@ -777,8 +789,55 @@ public sealed class RichTextEditor : Control
 
     private void ResetBlink()
     {
-        _caretVisible = true;
-        if (IsFocused) { _blink.Stop(); _blink.Start(); }
+        _blinkMs = 0;            // solid caret right after activity, then it starts pulsing again
+        _caretOpacity = 1;
+    }
+
+    /// <summary>One animation frame: glide the caret toward its target, pulse its opacity (soft blink),
+    /// and advance any checkbox pops. Only invalidates when something actually changed.</summary>
+    private void AnimTick()
+    {
+        bool dirty = false;
+        var target = CaretRect();
+        if (!_caretSeeded) { _caretDisplay = target; _caretSeeded = true; dirty = true; }
+        var d = _caretDisplay;
+        bool gliding = Math.Abs(d.X - target.X) + Math.Abs(d.Y - target.Y) + Math.Abs(d.Height - target.Height) > 0.4;
+        if (gliding)
+        {
+            const double k = 0.34;
+            _caretDisplay = new Rect(AnimLerp(d.X, target.X, k), AnimLerp(d.Y, target.Y, k),
+                                     AnimLerp(d.Width, target.Width, k), AnimLerp(d.Height, target.Height, k));
+            dirty = true;
+        }
+
+        _blinkMs += 16;
+        double op = gliding ? 1.0 : BlinkOpacity(_blinkMs);
+        if (Math.Abs(op - _caretOpacity) > 0.008) { _caretOpacity = op; dirty = true; }
+
+        if (_checkAnim.Count > 0)
+        {
+            foreach (var key in _checkAnim.Keys.ToList())
+            {
+                var (p, on) = _checkAnim[key];
+                p += 16.0 / 170;
+                if (p >= 1) _checkAnim.Remove(key); else _checkAnim[key] = (p, on);
+            }
+            dirty = true;
+        }
+
+        if (dirty) InvalidateVisual();
+    }
+
+    private static double AnimLerp(double a, double b, double t) => a + (b - a) * t;
+    private static double Smooth(double t) => t * t * (3 - 2 * t);
+    // hold on → fade out to a dim value → hold → fade back in.
+    private static double BlinkOpacity(double ms)
+    {
+        double t = (ms % 1150) / 1150;
+        if (t < 0.5) return 1;
+        if (t < 0.66) return 1 - Smooth((t - 0.5) / 0.16) * 0.9;
+        if (t < 0.82) return 0.1;
+        return 0.1 + Smooth((t - 0.82) / 0.18) * 0.9;
     }
 
     private void BringCaretIntoView()
@@ -868,6 +927,8 @@ public sealed class RichTextEditor : Control
         {
             PushUndo();
             _doc.ToggleChecked(checkPara);
+            _checkAnim[checkPara] = (0, _doc.Paragraphs[checkPara].Checked);   // pop the toggle in
+            if (!_anim.IsEnabled) _anim.Start();
             e.Handled = true;
             return;
         }
