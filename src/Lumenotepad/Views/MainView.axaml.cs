@@ -93,8 +93,130 @@ public partial class MainView : UserControl
         HomeCards.PointerMoved += OnRearrangeMoved;
         HomeCards.PointerReleased += OnRearrangeReleased;
 
+        // Hover scale — driven from code-behind as a local RenderTransform because the :pointerover
+        // STYLE path does not move RenderTransform in this build (SetHoverCard / SetHoverChip).
+        HomeCards.PointerMoved += (_, e) => { if (_dragNotebook is null) SetHoverCard(Ancestor(e.Source, "nbcard")); };
+        HomeCards.PointerExited += (_, _) => SetHoverCard(null);
+        RecentList.PointerMoved += (_, e) => SetHoverChip(Ancestor(e.Source, "recentchip"));
+        RecentList.PointerExited += (_, _) => SetHoverChip(null);
+
         // Keep the canvas plate's punched hole aligned with the page box (margin 14, radius 14).
         CanvasPlate.SizeChanged += (_, _) => UpdateCanvasPlateClip();
+    }
+
+    // ---- manual RenderTransform animation ---------------------------------------------------------
+    // The Transitions engine does NOT move RenderTransform in this build (only keyframe Animations,
+    // like the wiggle, do). A LOCAL RenderTransform value DOES render (proven). So we ease it ourselves,
+    // frame by frame, as a local value. One tween per element; starting a new one cancels the old.
+
+    private readonly System.Collections.Generic.Dictionary<Visual, DispatcherTimer> _tweens = new();
+
+    private void StopTween(Visual b)
+    {
+        if (_tweens.TryGetValue(b, out var t)) { t.Stop(); _tweens.Remove(b); }
+    }
+
+    /// <summary>Ease (cubic-out) an element's translate+scale from a start to a target over ms. When it
+    /// comes to rest at identity the RenderTransform is cleared; onDone fires at the end either way.</summary>
+    private void Tween(Control b, double fx, double fy, double fs,
+                       double tx, double ty, double ts, int ms, System.Action? onDone = null)
+    {
+        StopTween(b);
+        b.Transitions = null;
+        int step = 0, steps = System.Math.Max(1, ms / 15);
+        void Frame(double e) =>
+            b.RenderTransform = Make(fx + (tx - fx) * e, fy + (ty - fy) * e, fs + (ts - fs) * e);
+        Frame(0);
+        var timer = new DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(15) };
+        timer.Tick += (_, _) =>
+        {
+            step++;
+            double p = System.Math.Min(1.0, step / (double)steps);
+            Frame(1 - System.Math.Pow(1 - p, 3));
+            if (step >= steps)
+            {
+                StopTween(b);
+                bool atRest = System.Math.Abs(ts - 1) < 1e-3 && System.Math.Abs(tx) < 1e-3 && System.Math.Abs(ty) < 1e-3;
+                if (atRest)
+                {
+                    b.ClearValue(Visual.RenderTransformProperty);
+                    b.ClearValue(Avalonia.Animation.Animatable.TransitionsProperty);  // restore any style transition (e.g. rail glow)
+                }
+                onDone?.Invoke();
+            }
+        };
+        _tweens[b] = timer;
+        timer.Start();
+    }
+
+    private static double ScaleNow(Visual b) => b.RenderTransform?.Value is { } m && m.M11 > 0 ? m.M11 : 1;
+
+    /// <summary>Build a translate+scale transform directly (no per-frame string parsing — that was
+    /// making the drag choppy).</summary>
+    private static ITransform Make(double tx, double ty, double s)
+    {
+        var b = TransformOperations.CreateBuilder(2);
+        b.AppendTranslate(tx, ty);
+        b.AppendScale(s, s);
+        return b.Build();
+    }
+
+    // ---- hover scale (smooth, code-behind) --------------------------------------------------------
+
+    private Border? _hoverCard;
+    private Border? _hoverChip;
+    // Cards mid drop-glide: hover must NOT touch them, or its Tween cancels the glide (and its onDone,
+    // where the reorder happens) — which looked like "moving won't work" + the card popping.
+    private readonly System.Collections.Generic.HashSet<Visual> _settling = new();
+
+    private static Border? Ancestor(object? source, string cls)
+    {
+        if (source is not Visual v) return null;
+        return v.FindAncestorOfType<Border>(includeSelf: true) is { } b && b.Classes.Contains(cls)
+            ? b : v.GetVisualAncestors().OfType<Border>().FirstOrDefault(x => x.Classes.Contains(cls));
+    }
+
+    private void SetHoverCard(Border? card)
+    {
+        if (card is not null && _settling.Contains(card)) card = null;   // let the drop glide finish
+        if (ReferenceEquals(_hoverCard, card)) return;
+        var old = _hoverCard;
+        _hoverCard = card;
+        if (old is not null && !ReferenceEquals(old, _dragCard) && !_settling.Contains(old))
+            Tween(old, 0, 0, ScaleNow(old), 0, 0, 1.0, 120);
+        if (card is not null && !ReferenceEquals(card, _dragCard))
+            Tween(card, 0, 0, ScaleNow(card), 0, 0, 1.04, 150);
+    }
+
+    private void SetHoverChip(Border? chip)
+    {
+        if (ReferenceEquals(_hoverChip, chip)) return;
+        var old = _hoverChip;
+        _hoverChip = chip;
+        if (old is not null) Tween(old, 0, 0, ScaleNow(old), 0, 0, 1.0, 120);
+        if (chip is not null) Tween(chip, 0, 0, ScaleNow(chip), 0, 0, 1.035, 150);
+    }
+
+    // ---- selected-item scale (rail chip, section tab, page row) -----------------------------------
+    // The :selected STYLE can't move RenderTransform either, so the "lit" scale is driven here too.
+    private Control? _selRail, _selSection, _selPage;
+
+    private void ScaleSelect(ref Control? cur, Control? next, double scale)
+    {
+        if (ReferenceEquals(cur, next)) return;
+        if (cur is not null) Tween(cur, 0, 0, ScaleNow(cur), 0, 0, 1.0, 140);
+        cur = next;
+        if (next is not null) Tween(next, 0, 0, ScaleNow(next), 0, 0, scale, 170);
+    }
+
+    private void UpdateSelectionScale()
+    {
+        Control? rail = null;
+        if (Vm?.SelectedNotebook is { } nb && NotebooksList.ContainerFromItem(nb) is { } nc)
+            rail = nc.GetVisualDescendants().OfType<Border>().FirstOrDefault(b => b.Classes.Contains("railchip"));
+        ScaleSelect(ref _selRail, rail, 1.05);
+        ScaleSelect(ref _selSection, Vm?.SelectedSection is { } s ? SectionsList.ContainerFromItem(s) as Control : null, 1.03);
+        ScaleSelect(ref _selPage, Vm?.SelectedPage is { } pg ? PagesList.ContainerFromItem(pg) as Control : null, 1.02);
     }
 
     // ---- gallery rearrange mode ----
@@ -105,53 +227,177 @@ public partial class MainView : UserControl
     private void SetRearranging(bool on)
     {
         _rearranging = on;
-        _dragNotebook = null;
+        ResetDrag();                                    // never leave a card stranded mid-drag
         HomeCards.Classes.Set("rearrange", on);
         RearrangeBtn.Classes.Set("on", on);
     }
 
-    private Border? _grabbedCard;
+    // The dragged card is rendered as a SNAPSHOT floating in DragLayer (a Canvas), so it can move
+    // freely without being clipped to its grid cell. The real card is hidden while it floats; the
+    // live reorder still runs on the real cards underneath so the grid reflows.
+    private Border? _ghost;        // floating snapshot
+    private Border? _dragCard;     // the real card, hidden during the drag
+    private Size _ghostSize;
+    private Point _grabOffset;     // cursor position relative to the ghost's top-left
+    private DispatcherTimer? _ghostTween;
+
+    private void ResetDrag()
+    {
+        _dragNotebook = null;
+        _ghostTween?.Stop(); _ghostTween = null;
+        if (_ghost is not null) { DragLayer.Children.Remove(_ghost); _ghost = null; }
+        if (_dragCard is not null) { _dragCard.Opacity = 1; _dragCard = null; }
+    }
 
     private void OnRearrangePressed(object? sender, PointerPressedEventArgs e)
     {
         if (!_rearranging) return;
         if ((e.Source as StyledElement)?.DataContext is not Notebook nb) return;
+        var card = HomeCards.ContainerFromItem(nb)?.GetVisualDescendants()
+            .OfType<Border>().FirstOrDefault(x => x.Classes.Contains("nbcard"));
+        if (card is null || card.Bounds.Width < 1 || card.Bounds.Height < 1) return;
+
         _dragNotebook = nb;
-        // "Snap up" like grabbing it (Apple-style): the card pops bigger while held.
-        _grabbedCard = (e.Source as Visual)?.FindAncestorOfType<Border>(includeSelf: true) is { } b
-            && b.Classes.Contains("nbcard") ? b
-            : (e.Source as Visual)?.GetVisualAncestors().OfType<Border>().FirstOrDefault(x => x.Classes.Contains("nbcard"));
-        if (_grabbedCard is not null)
-            _grabbedCard.RenderTransform = TransformOperations.Parse("scale(1.09)");
+        _dragCard = card;
+        card.ClearValue(Visual.RenderTransformProperty);   // snapshot the card clean (no leftover hover scale)
+
+        var size = card.Bounds.Size;
+        double scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1.0;
+        var rtb = new Avalonia.Media.Imaging.RenderTargetBitmap(
+            new PixelSize(System.Math.Max(1, (int)(size.Width * scaling)), System.Math.Max(1, (int)(size.Height * scaling))),
+            new Vector(96 * scaling, 96 * scaling));
+        rtb.Render(card);
+
+        const double lift = 1.06;
+        _ghostSize = new Size(size.Width * lift, size.Height * lift);
+        _ghost = new Border
+        {
+            Width = _ghostSize.Width, Height = _ghostSize.Height,
+            CornerRadius = new CornerRadius(14),
+            BoxShadow = BoxShadows.Parse("0 10 26 0 #70000000"),
+            Child = new Image { Source = rtb, Stretch = Stretch.Fill },
+            IsHitTestVisible = false,
+        };
+        DragLayer.Children.Add(_ghost);
+        card.Opacity = 0;                                  // the ghost stands in for it
+        if (ReferenceEquals(_hoverCard, card)) _hoverCard = null;
+
+        // Lift the ghost IN PLACE (centred on the card) so it doesn't jump to the cursor; then keep
+        // the grab point under the cursor as it moves.
+        var centre = card.TranslatePoint(new Point(size.Width / 2, size.Height / 2), DragLayer) ?? default;
+        Canvas.SetLeft(_ghost, centre.X - _ghostSize.Width / 2);
+        Canvas.SetTop(_ghost, centre.Y - _ghostSize.Height / 2);
+        var cur = e.GetPosition(DragLayer);
+        _grabOffset = new Point(cur.X - Canvas.GetLeft(_ghost), cur.Y - Canvas.GetTop(_ghost));
+
         e.Pointer.Capture(HomeCards);
         e.Handled = true;
     }
 
+    private void PositionGhost(Point pInLayer)
+    {
+        if (_ghost is null) return;
+        Canvas.SetLeft(_ghost, pInLayer.X - _grabOffset.X);
+        Canvas.SetTop(_ghost, pInLayer.Y - _grabOffset.Y);
+    }
+
     private void OnRearrangeMoved(object? sender, PointerEventArgs e)
     {
-        if (_dragNotebook is null || Vm is null) return;
-        foreach (var container in HomeCards.GetRealizedContainers())
+        if (_dragNotebook is null || _ghost is null) return;
+        PositionGhost(e.GetPosition(DragLayer));
+
+        // Live reorder: slide the OTHER cards out of the way as the cursor enters their slot. The
+        // dragged card's own (hidden) container moves too; the floating ghost shows where it is.
+        var dragged = _dragNotebook;
+        var container = HomeCards.ContainerFromItem(dragged);
+        int curIdx = container is null ? -1 : HomeCards.IndexFromContainer(container);
+        int target = -1;
+        foreach (var c in HomeCards.GetRealizedContainers())
         {
-            var p = e.GetPosition(container);
-            if (p.X < 0 || p.Y < 0 || p.X > container.Bounds.Width || p.Y > container.Bounds.Height) continue;
-            int target = HomeCards.IndexFromContainer(container);
-            if (target >= 0) Vm.MoveNotebookTo(_dragNotebook, target, save: false);
+            if (ReferenceEquals(c, container)) continue;
+            var p = e.GetPosition(c);
+            if (p.X < 0 || p.Y < 0 || p.X > c.Bounds.Width || p.Y > c.Bounds.Height) continue;
+            target = HomeCards.IndexFromContainer(c);
             break;
         }
+        if (target < 0 || target == curIdx) return;
+
+        var old = new System.Collections.Generic.Dictionary<object, Point>();
+        foreach (var c in HomeCards.GetRealizedContainers())
+            if (HomeCards.ItemFromContainer(c) is { } it && !ReferenceEquals(it, dragged))
+                old[it] = Center(c);
+        Vm?.MoveNotebookTo(dragged, target, save: false);
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_dragNotebook is null) return;
+            foreach (var c in HomeCards.GetRealizedContainers())
+            {
+                if (HomeCards.ItemFromContainer(c) is not { } it) continue;
+                var nbc = c.GetVisualDescendants().OfType<Border>().FirstOrDefault(x => x.Classes.Contains("nbcard"));
+                if (nbc is null) continue;
+                if (ReferenceEquals(it, dragged)) { nbc.Opacity = 0; _dragCard = nbc; continue; }  // keep it hidden after regen
+                if (!old.TryGetValue(it, out var op)) continue;
+                var np = Center(c);
+                double dx = op.X - np.X, dy = op.Y - np.Y;
+                if (System.Math.Abs(dx) < 0.5 && System.Math.Abs(dy) < 0.5) continue;
+                _settling.Add(nbc);
+                Tween(nbc, dx, dy, 1.0, 0, 0, 1.0, 170, onDone: () => _settling.Remove(nbc));
+            }
+        }, DispatcherPriority.Render);
     }
 
     private void OnRearrangeReleased(object? sender, PointerReleasedEventArgs e)
     {
         if (_dragNotebook is null) return;
-        _dragNotebook = null;
-        if (_grabbedCard is not null)
-        {
-            _grabbedCard.RenderTransform = TransformOperations.Parse("scale(1)");
-            _grabbedCard = null;
-        }
+        var dragged = _dragNotebook;
+        var ghost = _ghost;
+        _dragNotebook = null; _ghost = null;
         e.Pointer.Capture(null);
         Vm?.Save();
+        if (ghost is null) { ResetDrag(); return; }
+
+        // Glide the ghost into the dragged card's (already-reordered) slot, then reveal the real card.
+        var card = HomeCards.ContainerFromItem(dragged)?.GetVisualDescendants()
+            .OfType<Border>().FirstOrDefault(x => x.Classes.Contains("nbcard"));
+        Point targetTL;
+        if (card is not null)
+        {
+            var cc = card.TranslatePoint(new Point(card.Bounds.Width / 2, card.Bounds.Height / 2), DragLayer) ?? default;
+            targetTL = new Point(cc.X - _ghostSize.Width / 2, cc.Y - _ghostSize.Height / 2);
+        }
+        else targetTL = new Point(Canvas.GetLeft(ghost), Canvas.GetTop(ghost));
+
+        var reveal = card ?? _dragCard;
+        _dragCard = null;
+        TweenGhost(ghost, targetTL, 190, () =>
+        {
+            DragLayer.Children.Remove(ghost);
+            if (reveal is not null) reveal.Opacity = 1;
+        });
     }
+
+    private void TweenGhost(Border ghost, Point target, int ms, System.Action onDone)
+    {
+        _ghostTween?.Stop();
+        double fx = Canvas.GetLeft(ghost), fy = Canvas.GetTop(ghost);
+        if (double.IsNaN(fx)) fx = target.X;
+        if (double.IsNaN(fy)) fy = target.Y;
+        int step = 0, steps = System.Math.Max(1, ms / 15);
+        var timer = new DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(15) };
+        timer.Tick += (_, _) =>
+        {
+            step++;
+            double p = System.Math.Min(1.0, step / (double)steps);
+            double ep = 1 - System.Math.Pow(1 - p, 3);
+            Canvas.SetLeft(ghost, fx + (target.X - fx) * ep);
+            Canvas.SetTop(ghost, fy + (target.Y - fy) * ep);
+            if (step >= steps) { timer.Stop(); _ghostTween = null; onDone(); }
+        };
+        _ghostTween = timer;
+        timer.Start();
+    }
+
+    private Point Center(Visual c) => c.TranslatePoint(new Point(c.Bounds.Width / 2, c.Bounds.Height / 2), HomeCards) ?? default;
 
     private void OpenSortMenu()
     {
@@ -244,7 +490,8 @@ public partial class MainView : UserControl
         RecentList.Classes.Set("glossy", glossy);
         SectionsList.Classes.Set("glossy", glossy);
         PagesList.Classes.Set("glossy", glossy);
-        NotebooksList.Classes.Set("glossy", glossy);
+        // NOT the rail: its item now stretches full-width, so the glossy accent-gradient selection
+        // fill would show as an ugly full-width blue bar. The rail chip shows its own colour + glow.
     }
 
     /// <summary>Place the toolbar per the VM: docked to a side of either the WINDOW body or the PAGE box.</summary>
@@ -282,6 +529,12 @@ public partial class MainView : UserControl
 
     private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        // Selection changed (or the notebook/section swapped the list's ItemsSource) — re-assert the
+        // section/page ListBox selection so the :selected styling (scale + glow) shows by default.
+        if (e.PropertyName is nameof(MainViewModel.SelectedNotebook)
+            or nameof(MainViewModel.SelectedSection) or nameof(MainViewModel.SelectedPage))
+            ReassertListSelection();
+
         if (e.PropertyName == nameof(MainViewModel.SelectedPage)) SyncEditorDocument();
         else if (e.PropertyName is nameof(MainViewModel.ToolbarPosition) or nameof(MainViewModel.ToolbarScope))
             ApplyToolbarPlacement();
@@ -309,6 +562,25 @@ public partial class MainView : UserControl
             HomeCards.ItemsSource = null;
             HomeCards.ItemsSource = vm.Notebooks;
         }
+    }
+
+    /// <summary>
+    /// Avalonia's ListBox drops its bound selection when its nested ItemsSource swaps
+    /// (SelectedNotebook.Sections / SelectedSection.Pages): it coerces SelectedIndex to -1 and the
+    /// unchanged bound value never re-pushes, so the item never reads as :selected. Re-assert it once
+    /// the new containers have materialized so the default section/page light up without a click.
+    /// </summary>
+    private void ReassertListSelection()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (Vm is not { } vm) return;
+            if (vm.SelectedSection is { } sec && !ReferenceEquals(SectionsList.SelectedItem, sec))
+                SectionsList.SelectedItem = sec;
+            if (vm.SelectedPage is { } pg && !ReferenceEquals(PagesList.SelectedItem, pg))
+                PagesList.SelectedItem = pg;
+            UpdateSelectionScale();     // drive the "lit" scale (the style path can't move RenderTransform)
+        }, DispatcherPriority.Background);
     }
 
     private void SyncEditorDocument()

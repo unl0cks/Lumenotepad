@@ -65,7 +65,7 @@ public static class ThemeManager
 
         // A very faint accent glow (BoxShadows can't take a DynamicResource color, so bake it here
         // and refresh on every theme change) for selected section/page rows.
-        r["AccentGlowShadow"] = BoxShadows.Parse($"0 0 7 0 {ThemePalettes.Alpha(t.Accent, 0x66)}");
+        r["AccentGlowShadow"] = BoxShadows.Parse($"0 0 5 0 {ThemePalettes.Alpha(t.Accent, 0x4D)}");
 
         // Fluent's own controls (menus, flyouts, list selection) follow the accent + variant.
         var accent = Color.Parse(t.Accent);

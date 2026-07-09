@@ -293,18 +293,41 @@ public sealed class RichTextEditor : Control
         }
     }
 
-    // ---- bullet glyphs: style key → (glyph, size, color). "num" and "check" are drawn specially. ----
-    private static readonly Dictionary<string, (string Glyph, double Size, string Color)> BulletGlyphs = new()
+    // ---- bullet glyphs: style key → (glyph, color). "num" and "check" are drawn specially. ----
+    // No fixed size: every glyph has a different intrinsic design size (a ★ at 12pt is visually
+    // bigger than a ♥ at 12pt, and some fall back to a different symbol font), so sizes are
+    // auto-calibrated at draw time to a common INK height — the "same size" the owner asked for.
+    private static readonly Dictionary<string, (string Glyph, string Color)> BulletGlyphs = new()
     {
-        ["dot"] = ("●", 9, "#4DA6FF"),
-        ["arrow"] = ("➤", 11, "#4DA6FF"),
-        ["star"] = ("★", 12, "#E9B865"),
-        ["heart"] = ("♥", 12, "#E27BA6"),
-        ["flower"] = ("✿", 12, "#7FD1A6"),
-        ["spark"] = ("✦", 12, "#FFD966"),
+        ["dot"] = ("●", "#4DA6FF"),
+        ["arrow"] = ("➤", "#4DA6FF"),
+        ["star"] = ("★", "#E9B865"),
+        ["heart"] = ("♥", "#E27BA6"),
+        ["flower"] = ("✿", "#7FD1A6"),
+        ["spark"] = ("✦", "#FFD966"),
     };
 
     private static readonly FontFamily GlyphFont = new("Segoe UI Symbol, Segoe UI Emoji, Segoe UI");
+
+    /// <summary>Per-glyph calibration, measured once: the nominal font size that yields 1px of ink
+    /// height, plus the ink centre as a fraction of the font size (scale-invariant). Lets every
+    /// bullet render at an identical ink height and be centred on its actual ink, not its layout
+    /// box — glyphs like ♥ otherwise render smaller and sit low.</summary>
+    private readonly record struct GlyphCal(double UnitSize, double CenterXFrac, double CenterYFrac);
+    private static readonly Dictionary<string, GlyphCal> _glyphCal = new();
+
+    private static GlyphCal Calibrate(string glyph)
+    {
+        if (_glyphCal.TryGetValue(glyph, out var c)) return c;
+        const double probe = 24.0;
+        var ft = new FormattedText(glyph, System.Globalization.CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight, new Typeface(GlyphFont), probe, Brushes.Black);
+        var b = ft.BuildGeometry(new Point(0, 0))?.Bounds ?? new Rect(0, 0, ft.Width, ft.Height);
+        double h = b.Height > 0.1 ? b.Height : probe;
+        c = new GlyphCal(probe / h, b.Center.X / probe, b.Center.Y / probe);
+        _glyphCal[glyph] = c;
+        return c;
+    }
 
     /// <summary>The editor foreground with adjusted opacity — bullet furniture (numbers, empty
     /// checkboxes) must follow the paper's text color to stay visible on light paper.</summary>
@@ -373,9 +396,13 @@ public sealed class RichTextEditor : Control
 
         if (BulletGlyphs.TryGetValue(p.Bullet, out var g))
         {
-            var ft = new FormattedText(g.Glyph, System.Globalization.CultureInfo.CurrentCulture,
-                FlowDirection.LeftToRight, new Typeface(GlyphFont), g.Size * s, BrushFor(g.Color));
-            ctx.DrawText(ft, new Point(cx - ft.Width / 2, cy - ft.Height / 2));
+            double targetInk = 7.6 * s;                       // one ink height for every bullet style
+            var cal = Calibrate(g.Glyph);
+            double size = cal.UnitSize * targetInk;
+            var ft = new FormattedText(g.Glyph, System.Globalization.CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight, new Typeface(GlyphFont), size, BrushFor(g.Color));
+            // centre the actual INK on (cx, cy), not the layout box
+            ctx.DrawText(ft, new Point(cx - cal.CenterXFrac * size, cy - cal.CenterYFrac * size));
         }
     }
 

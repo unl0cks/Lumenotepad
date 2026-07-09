@@ -24,16 +24,37 @@
         <Style Selector="TextBox.rename:focus /template/ Border#PART_BorderElement">
             <Setter Property="Background" Value="#18FFFFFF"/>
         </Style>
-        <!-- rail chips -->
+        <!-- rail chips. The item STRETCHES to the full rail width (not just the 36px chip) and centres
+             the chip inside — the GPU compositor clips a scaled element to its layout SLOT, so the chip
+             needs a slot bigger than itself or the selected scale + glow get clipped off. -->
         <Style Selector="ListBox.rail ListBoxItem">
             <Setter Property="Padding" Value="0"/>
-            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="Margin" Value="0,2"/>
             <Setter Property="CornerRadius" Value="12"/>
-            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <!-- Taller than the 36px chip + centred, so the selected scale + glow have VERTICAL slack
+                 too (the item is the chip's layout slot; without this the scale clips top/bottom). -->
+            <Setter Property="MinHeight" Value="48"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <!-- The full-width rail item must show NO selection/hover fill — only the chip. -->
+        <Style Selector="ListBox.rail ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="ListBox.rail ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="ListBox.rail ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
         </Style>
         <!-- selected notebook: gentle scale + a very faint glow in the notebook's OWN color -->
         <Style Selector="ListBox.rail ListBoxItem Border.railchip">
             <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
+            <!-- Identity baseline: a TransformOperationsTransition won't fire the FIRST time the
+                 :selected scale is applied unless the element already holds a TransformOperations
+                 value. Without this the selected chip only scales after it's been re-touched. -->
+            <Setter Property="RenderTransform" Value="scale(1)"/>
             <Setter Property="Transitions">
                 <Transitions>
                     <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.16" Easing="CubicEaseOut"/>
@@ -41,33 +62,30 @@
                 </Transitions>
             </Setter>
         </Style>
+        <!-- scale is driven from code-behind (UpdateSelectionScale); the glow works via the style path -->
         <Style Selector="ListBox.rail ListBoxItem:selected Border.railchip">
-            <Setter Property="RenderTransform" Value="scale(1.09)"/>
             <Setter Property="BoxShadow" Value="{ReflectionBinding Color, Converter={x:Static v:Converters.GlowShadow}}"/>
         </Style>
-        <!-- page rows -->
+        <!-- page rows. Horizontal margin gives the selected scale + glow room so they don't clip
+             against the panel edges (the item is clipped to its layout slot). -->
         <Style Selector="ListBox.pages ListBoxItem">
             <Setter Property="Padding" Value="9,6"/>
-            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="Margin" Value="7,3"/>
             <Setter Property="CornerRadius" Value="8"/>
             <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
         </Style>
-        <Style Selector="ListBox.pages ListBoxItem:selected">
-            <Setter Property="RenderTransform" Value="scale(1.03)"/>
-        </Style>
+        <!-- scale driven from code-behind (UpdateSelectionScale); glow via the style path -->
         <Style Selector="ListBox.pages ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="BoxShadow" Value="{DynamicResource AccentGlowShadow}"/>
         </Style>
-        <!-- section tabs -->
+        <!-- section tabs. Symmetric margin so the selected scale + glow have room top & bottom too. -->
         <Style Selector="ListBox.sections ListBoxItem">
             <Setter Property="Padding" Value="10,4"/>
-            <Setter Property="Margin" Value="3,0,5,3"/>
+            <Setter Property="Margin" Value="3,4,5,4"/>
             <Setter Property="CornerRadius" Value="8"/>
             <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
         </Style>
-        <Style Selector="ListBox.sections ListBoxItem:selected">
-            <Setter Property="RenderTransform" Value="scale(1.04)"/>
-        </Style>
+        <!-- scale driven from code-behind (UpdateSelectionScale); glow via the style path -->
         <Style Selector="ListBox.sections ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="BoxShadow" Value="{DynamicResource AccentGlowShadow}"/>
         </Style>
@@ -78,15 +96,20 @@
              layers clip to the layout SLOT, so the shadow (static underlay) + growth fit the cell. -->
         <Style Selector="Border.nbcard">
             <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
+            <!-- Identity baseline: without an initial TransformOperations value the
+                 TransformOperationsTransition swallows the FIRST :pointerover scale (hover appears
+                 dead until a local transform has primed the property, e.g. after a grab). -->
+            <Setter Property="RenderTransform" Value="scale(1)"/>
             <Setter Property="Transitions">
                 <Transitions>
                     <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.14" Easing="CubicEaseOut"/>
                 </Transitions>
             </Setter>
         </Style>
-        <Style Selector="ItemsControl:not(.rearrange) Border.nbcard:pointerover">
-            <Setter Property="RenderTransform" Value="scale(1.04)"/>
-        </Style>
+        <!-- Hover SCALE is applied from code-behind (SetHoverCard) as a LOCAL RenderTransform: the
+             :pointerover STYLE path does not drive RenderTransform in this build (other properties
+             like Opacity apply fine, RenderTransform stays pinned at identity), whereas a local
+             value — the same mechanism the grab-pop uses — works. The transition below animates it. -->
         <!-- "Glossy accents" preference: top-lit gloss on chips + selected pills -->
         <Style Selector="Border.chipfx">
             <Setter Property="IsVisible" Value="False"/>
@@ -101,6 +124,7 @@
              stays inside the layout slot (no compositor clip). -->
         <Style Selector="Border.recentchip">
             <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
+            <Setter Property="RenderTransform" Value="scale(1)"/>   <!-- identity baseline; see nbcard -->
             <Setter Property="Transitions">
                 <Transitions>
                     <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" Easing="CubicEaseOut"/>
@@ -108,8 +132,9 @@
                 </Transitions>
             </Setter>
         </Style>
+        <!-- BorderBrush accent via :pointerover works (non-transform property); the SCALE is applied
+             from code-behind (SetHoverChip) as a local RenderTransform, see the nbcard note above. -->
         <Style Selector="Border.recentchip:pointerover">
-            <Setter Property="RenderTransform" Value="scale(1.04)"/>
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
         </Style>
         <!-- Rearrange mode: Apple-style wiggle (on the wrapper) + grab hand cursor (on the card) -->
@@ -229,7 +254,9 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:RecentPage">
-                                <Border Classes="recentchip" Margin="4,4,14,14" CornerRadius="10"
+                                <!-- symmetric margin gives the hover-scale slack on ALL sides (with 0 top/left
+                                     the scale overflowed off the top-left and clipped) -->
+                                <Border Classes="recentchip" Margin="5,5,13,13" CornerRadius="10"
                                         Background="{DynamicResource CanvasChipBrush}"
                                         BorderBrush="{DynamicResource CanvasChipBorderBrush}" BorderThickness="1"
                                         Cursor="Hand">
@@ -273,10 +300,14 @@
                                         CornerRadius="14" Background="#01000000" IsHitTestVisible="False"
                                         BoxShadow="0 2 10 0 #59000000"/>
                                 <!-- wiggle wrapper: rotates in rearrange mode, leaving the card's own
-                                     RenderTransform free for hover / grab scale -->
-                                <Border Classes="wigglewrap" Width="196" Height="132"
+                                     RenderTransform free for hover / grab scale. It fills the WHOLE cell
+                                     (224x162) so the nbcard, centred inside it at 196x132, keeps 14px of
+                                     slack on every side — a transitioned element is clipped to its layout
+                                     SLOT, so without that slack the hover growth is clipped away (invisible). -->
+                                <Border Classes="wigglewrap" Width="224" Height="162"
                                         HorizontalAlignment="Center" VerticalAlignment="Center" Background="Transparent">
                                 <Border Classes="nbcard" Width="196" Height="132"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"
                                         CornerRadius="14" Cursor="Hand" BorderThickness="1"
                                         Background="{Binding Color, Converter={x:Static v:Converters.HexBrush}}"
                                         BorderBrush="{Binding Color, Converter={x:Static v:Converters.CoverBorder}}">
@@ -326,6 +357,10 @@
             </StackPanel>
         </ScrollViewer>
 
+        <!-- Floating drag layer: the card being dragged is rendered here (as a snapshot) so it can
+             move freely without being clipped to its grid cell. Sits above the gallery, ignores input. -->
+        <Canvas x:Name="DragLayer" IsHitTestVisible="False" IsVisible="{Binding IsHomeVisible}" ClipToBounds="False"/>
+
         <!-- Preferences, homepage style: a proper filled button floating bottom-right -->
         <Button x:Name="HomePrefsBtn" Theme="{StaticResource LumenButton}"
                 IsVisible="{Binding IsHomeVisible}"
@@ -348,19 +383,26 @@
                     <Button DockPanel.Dock="Bottom" Theme="{StaticResource IconButton}" Width="40" Height="40"
                             HorizontalAlignment="Center" Margin="0,8,0,0" FontFamily="{StaticResource IconFont}"
                             Content="&#xE710;" Command="{Binding AddNotebookCommand}" ToolTip.Tip="New notebook"/>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <ListBox x:Name="NotebooksList" Classes="rail" Background="Transparent" BorderThickness="0"
-                                 HorizontalAlignment="Center" Padding="0"
-                                 ItemsSource="{Binding Notebooks}"
-                                 SelectedItem="{Binding SelectedNotebook, Mode=TwoWay}">
+                    <!-- No outer ScrollViewer: it reserved scrollbar width, which shrank + shifted the
+                         chips and clipped their left edge. The ListBox scrolls itself with an OVERLAY
+                         scrollbar that doesn't reserve space, so the 40px chips stay centred in the 64px
+                         rail with room for the selected scale + glow. -->
+                    <ListBox x:Name="NotebooksList" Classes="rail" Background="Transparent" BorderThickness="0"
+                             Padding="0,8" ClipToBounds="False"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.AllowAutoHide="True"
+                             ItemsSource="{Binding Notebooks}"
+                             SelectedItem="{Binding SelectedNotebook, Mode=TwoWay}">
                             <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="models:Notebook">
-                                    <Border Classes="railchip" Width="40" Height="40" CornerRadius="12" BorderThickness="1"
+                                    <!-- 36px (was 40) so the selected scale + glow keep margin from the
+                                         rail's right scrollbar zone whether it overlays or reserves width. -->
+                                    <Border Classes="railchip" Width="36" Height="36" CornerRadius="11" BorderThickness="1"
                                             Background="{Binding Color, Converter={x:Static v:Converters.HexBrush}}"
                                             BorderBrush="{Binding Color, Converter={x:Static v:Converters.CoverBorder}}"
                                             ToolTip.Tip="{Binding Name}">
                                         <Panel>
-                                            <Border Classes="cardfx" CornerRadius="11">
+                                            <Border Classes="cardfx" CornerRadius="10">
                                                 <Border.Background>
                                                     <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
                                                         <GradientStop Offset="0" Color="#2EFFFFFF"/>
@@ -377,7 +419,6 @@
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
-                    </ScrollViewer>
                 </DockPanel>
             </Border>
 

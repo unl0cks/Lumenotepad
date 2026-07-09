@@ -57,11 +57,12 @@ public static class Converters
     public static readonly IValueConverter CoverBorder = new FuncValueConverter<string?, IBrush>(hex =>
         new SolidColorBrush(Shade(SafeParse(hex), -0.38)));
 
-    /// <summary>Notebook color → a very faint glow (for the selected rail chip).</summary>
+    /// <summary>Notebook color → a very faint glow (for the selected rail chip). Blur kept small so
+    /// the halo fits inside the rail's ~12px side slack instead of clipping at the edges.</summary>
     public static readonly IValueConverter GlowShadow = new FuncValueConverter<string?, BoxShadows>(hex =>
     {
         var c = SafeParse(hex);
-        return BoxShadows.Parse($"0 0 9 0 #80{c.R:X2}{c.G:X2}{c.B:X2}");
+        return BoxShadows.Parse($"0 0 4 0 #5A{c.R:X2}{c.G:X2}{c.B:X2}");
     });
 
     // Covers decoded at card size (full-resolution photos re-rasterizing every hover-animation

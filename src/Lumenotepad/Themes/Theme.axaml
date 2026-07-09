@@ -41,7 +41,7 @@
     <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#52FFFFFF"/>
     <SolidColorBrush x:Key="ScrollThumbPressedBrush" Color="#70FFFFFF"/>
     <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#FF14161C"/>
-    <BoxShadows x:Key="AccentGlowShadow">0 0 7 0 #664DA6FF</BoxShadows>
+    <BoxShadows x:Key="AccentGlowShadow">0 0 5 0 #4D4DA6FF</BoxShadows>
 
     <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
     <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI</FontFamily>
