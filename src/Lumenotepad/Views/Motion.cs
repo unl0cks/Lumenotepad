@@ -19,6 +19,7 @@ public static class Motion
     public const double Rise = 12;
 
     public static double EaseOut(double t) => 1 - Math.Pow(1 - t, 3);
+    public static double EaseOutSoft(double t) => 1 - Math.Pow(1 - t, 5);   // stronger deceleration — no hard stop
     public static double EaseIn(double t) => t * t * t;
     public static double Lerp(double a, double b, double t) => a + (b - a) * t;
     public static int Steps(int ms) => Math.Max(1, ms / 15);

@@ -601,9 +601,9 @@ public partial class MainView : UserControl
             const int ms = 170;
             show.RenderTransformOrigin = hide.RenderTransformOrigin = Avalonia.RelativePoint.Center;
             hide.IsHitTestVisible = false;
-            Motion.Tween(hide, 0, 0, 1, 0, 0, small, ms, Motion.EaseIn, 1, 0, onDone: () => hide.IsVisible = false);
+            Motion.Tween(hide, 0, 0, 1, 0, 0, small, ms, Motion.EaseOutSoft, 1, 0, onDone: () => hide.IsVisible = false);
             show.IsVisible = true; show.IsHitTestVisible = true;
-            Motion.Tween(show, 0, 0, small, 0, 0, 1, ms, Motion.EaseOut, 0, 1);
+            Motion.Tween(show, 0, 0, small, 0, 0, 1, ms + 40, Motion.EaseOutSoft, 0, 1);   // +40ms tail = soft landing
         }
         else if (e.PropertyName is nameof(MainViewModel.Theme)
                  or nameof(MainViewModel.FullTheme) or nameof(MainViewModel.PaperLight))
