@@ -598,7 +598,7 @@ public partial class MainView : UserControl
             var show = home ? (Control)HomeHost : BodyDock;
             var hide = home ? (Control)BodyDock : HomeHost;
             const double small = 0.95;
-            const int ms = 240;
+            const int ms = 170;
             show.RenderTransformOrigin = hide.RenderTransformOrigin = Avalonia.RelativePoint.Center;
             hide.IsHitTestVisible = false;
             Motion.Tween(hide, 0, 0, 1, 0, 0, small, ms, Motion.EaseIn, 1, 0, onDone: () => hide.IsVisible = false);
