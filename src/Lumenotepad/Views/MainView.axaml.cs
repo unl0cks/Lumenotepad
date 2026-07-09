@@ -492,13 +492,15 @@ public partial class MainView : UserControl
         PagesPanel.Width = vm.IsPagesVisible ? 224 : 0; PagesPanel.Opacity = vm.IsPagesVisible ? 1 : 0;
     }
 
-    /// <summary>Initial home/editor surface state (no animation); the switch cross-fades in code
-    /// (their IsVisible bindings were removed so we control the fade timing).</summary>
+    /// <summary>Initial home/editor surface state (no animation); the switch zooms in code (their
+    /// IsVisible bindings were removed so we control the fade timing). BOTH stay laid out — the hidden
+    /// one just sits at opacity 0 — so opening a notebook doesn't pay a first-time editor layout that
+    /// stalls the click.</summary>
     private void ApplyHomeSurface()
     {
         bool home = Vm?.IsHomeVisible ?? true;
-        HomeHost.IsVisible = home; HomeHost.Opacity = home ? 1 : 0; HomeHost.IsHitTestVisible = home;
-        BodyDock.IsVisible = !home; BodyDock.Opacity = home ? 0 : 1; BodyDock.IsHitTestVisible = !home;
+        HomeHost.IsVisible = true; HomeHost.Opacity = home ? 1 : 0; HomeHost.IsHitTestVisible = home;
+        BodyDock.IsVisible = true; BodyDock.Opacity = home ? 0 : 1; BodyDock.IsHitTestVisible = !home;
     }
 
     /// <summary>"Glossy accents": gloss on the recents chips + accent-gradient selected pills.</summary>
@@ -600,9 +602,9 @@ public partial class MainView : UserControl
             const double small = 0.95;
             const int ms = 170;
             show.RenderTransformOrigin = hide.RenderTransformOrigin = Avalonia.RelativePoint.Center;
-            hide.IsHitTestVisible = false;
-            Motion.Tween(hide, 0, 0, 1, 0, 0, small, ms, Motion.EaseOutSoft, 1, 0, onDone: () => hide.IsVisible = false);
-            show.IsVisible = true; show.IsHitTestVisible = true;
+            hide.IsHitTestVisible = false;                                 // both stay laid out (opacity only)
+            Motion.Tween(hide, 0, 0, 1, 0, 0, small, ms, Motion.EaseOutSoft, 1, 0);
+            show.IsHitTestVisible = true;
             Motion.Tween(show, 0, 0, small, 0, 0, 1, ms + 40, Motion.EaseOutSoft, 0, 1);   // +40ms tail = soft landing
         }
         else if (e.PropertyName is nameof(MainViewModel.Theme)
