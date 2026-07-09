@@ -14,5 +14,15 @@
         <!-- Scrollbar look lives in Themes/Theme.axaml as a full ControlTheme replacement:
              Fluent's scrollbar keeps its chunky expanded state (track plate + arrow buttons)
              regardless of what plain styles here say. -->
+        <!-- App-wide button press feedback: a quick opacity dip. Opacity animates in this build
+             (RenderTransform does not — see the motion spec), so this is declarative and global. -->
+        <Style Selector="Button">
+            <Setter Property="Transitions">
+                <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.11"/></Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button:pressed">
+            <Setter Property="Opacity" Value="0.7"/>
+        </Style>
     </Application.Styles>
 </Application>

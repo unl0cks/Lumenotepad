@@ -587,6 +587,7 @@ public partial class MainView : UserControl
             // Note containers read their paper-region brushes at construction — rebuild them.
             PageCanvas.Document = PageCanvas.Document;
             if (TrashPanel.IsVisible) RefreshTrashPanel();
+            if (Content is Control root) Motion.FadeIn(root, Motion.Fast);   // soft cross to the new theme
         }
     }
 

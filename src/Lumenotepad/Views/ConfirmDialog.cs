@@ -88,6 +88,7 @@ public static class ConfirmDialog
         };
 
         win.Content = card;
+        win.Opened += (_, _) => Motion.ScaleIn(card, 0.96);   // fade + scale in on open
         win.KeyDown += (_, e) =>
         {
             if (e.Key == Key.Escape) win.Close(false);

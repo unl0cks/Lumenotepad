@@ -15,7 +15,11 @@ public partial class PreferencesWindow : Window
     {
         InitializeComponent();
 
-        Opened += (_, _) => WinChrome.RoundCorners(this, true);
+        Opened += (_, _) =>
+        {
+            WinChrome.RoundCorners(this, true);
+            if (Content is Control root) Motion.ScaleIn(root, 0.97);   // fade + scale in on open
+        };
         CloseBtn.Click += (_, _) => Close();
         KeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); };
         PrefsTitleBar.PointerPressed += (_, e) =>
