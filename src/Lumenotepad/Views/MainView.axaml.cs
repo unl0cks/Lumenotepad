@@ -592,13 +592,18 @@ public partial class MainView : UserControl
                 HomeCards.ItemsSource = null;
                 HomeCards.ItemsSource = vm.Notebooks;
             }
-            // Cross-fade: the outgoing surface fades out while the incoming one rises in.
+            // Zoom: the incoming surface grows in from 0.95 while the outgoing one shrinks to 0.95 and
+            // fades — reads as "zoom into the notebook" / "shrink back to the gallery". Scales kept <=1
+            // so a full-screen surface never overflows + clips at the window edges. Quick (240ms).
             var show = home ? (Control)HomeHost : BodyDock;
             var hide = home ? (Control)BodyDock : HomeHost;
+            const double small = 0.95;
+            const int ms = 240;
+            show.RenderTransformOrigin = hide.RenderTransformOrigin = Avalonia.RelativePoint.Center;
             hide.IsHitTestVisible = false;
-            Motion.FadeOut(hide, Motion.Base, () => hide.IsVisible = false);
+            Motion.Tween(hide, 0, 0, 1, 0, 0, small, ms, Motion.EaseIn, 1, 0, onDone: () => hide.IsVisible = false);
             show.IsVisible = true; show.IsHitTestVisible = true;
-            Dispatcher.UIThread.Post(() => Motion.RiseIn(show, Motion.Slow), DispatcherPriority.Background);
+            Motion.Tween(show, 0, 0, small, 0, 0, 1, ms, Motion.EaseOut, 0, 1);
         }
         else if (e.PropertyName is nameof(MainViewModel.Theme)
                  or nameof(MainViewModel.FullTheme) or nameof(MainViewModel.PaperLight))
