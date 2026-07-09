@@ -1,77 +1,98 @@
+using System;
+using System.Linq;
 using Avalonia;
+using Avalonia.Animation;
+using Avalonia.VisualTree;
+using Avalonia.Animation.Easings;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Media;
-using Avalonia.VisualTree;
-using Lumenotepad.Services;
-using Lumenotepad.ViewModels;
-using Lumenotepad.Views;
+using Avalonia.Media.Transformation;
+using Avalonia.Styling;
 
 namespace CardRepro;
 
+// SPIKE: which animation primitives actually animate (produce intermediate values) in this build?
+// Advance the headless render/animation clock and read the property mid-flight.
 internal static class Program
 {
     [STAThread]
     private static void Main()
     {
         AppBuilder.Configure<Lumenotepad.App>()
-            .ConfigureFonts(fonts => fonts.AddFontCollection(new Avalonia.Media.Fonts.EmbeddedFontCollection(
-                new System.Uri(AppFonts.CollectionUri),
-                new System.Uri("avares://Lumenotepad/Assets/Fonts"))))
             .UseSkia()
             .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false })
             .SetupWithoutStarting();
 
-        var dir = Path.Combine(Path.GetTempPath(), "lnp-repro-" + Guid.NewGuid().ToString("N"));
-        var vm = new MainViewModel(new WorkspaceStore(dir));
-        vm.AddNotebookCommand.Execute(null);
-        vm.GoHomeCommand.Execute(null);
-
-        var window = new Window { Width = 1180, Height = 720, Content = new MainView { DataContext = vm } };
+        var target = new Border { Width = 100, Height = 100, Background = Brushes.Red, Opacity = 1 };
+        var window = new Window { Width = 220, Height = 220, Content = target };
         window.Show();
-        window.SetRenderScaling(1.0);
-        Dispatch();
+        Pump();
 
-        // Hover the first card → confirm scale applies now.
-        var card = window.GetVisualDescendants().OfType<Border>().FirstOrDefault(b => b.Classes.Contains("nbcard"));
-        if (card is not null)
+        Console.WriteLine("=== 1) Transition on Opacity (declarative) ===");
+        target.Transitions = new Transitions
         {
-            card.Transitions = null;   // headless clock doesn't tick transitions — read the target directly
-            window.MouseMove(new Point(-5, -5));
-            Dispatch();
-            var mid = card.TranslatePoint(new Point(card.Bounds.Width / 2, card.Bounds.Height / 2), window) ?? default;
-            window.MouseMove(mid);
-            Dispatch();
-            Console.WriteLine($"[card] pointerover={card.IsPointerOver} transform={card.RenderTransform?.Value}");
-        }
-        Save(window, "home-hover");
+            new DoubleTransition { Property = Visual.OpacityProperty, Duration = TimeSpan.FromMilliseconds(300) },
+        };
+        Pump();
+        target.Opacity = 0.0;
+        Tick(9);   // ~150ms at 60fps
+        Console.WriteLine($"   Opacity after ~150ms (expect ~0.5 if animating): {target.Opacity:0.###}");
+        target.Opacity = 1; target.Transitions = null; Pump();
 
-        // Editor: the selected section/page/notebook should look selected by default.
-        window.MouseMove(new Point(-5, -5));
-        vm.OpenNotebookCommand.Execute(vm.Notebooks[0]);
-        vm.SelectedSection ??= vm.Notebooks[0].Sections[0];
-        vm.SelectedPage ??= vm.SelectedSection?.Pages[0];
-        Dispatch();
-        Save(window, "editor-selection");
+        Console.WriteLine("=== 2) Animation.RunAsync on Opacity (keyframe) ===");
+        var opAnim = new Animation
+        {
+            Duration = TimeSpan.FromMilliseconds(300), Easing = new LinearEasing(), FillMode = FillMode.Forward,
+            Children =
+            {
+                new KeyFrame { Cue = new Cue(0d), Setters = { new Setter(Visual.OpacityProperty, 1.0) } },
+                new KeyFrame { Cue = new Cue(1d), Setters = { new Setter(Visual.OpacityProperty, 0.0) } },
+            },
+        };
+        _ = opAnim.RunAsync(target);
+        Tick(9);
+        Console.WriteLine($"   Opacity after ~150ms (expect ~0.5 if animating): {target.Opacity:0.###}");
+        target.Opacity = 1; Pump();
 
-        // Same under the Light theme (glow color follows accent).
-        vm.Theme = "Light";
-        ThemeManager.Apply(Application.Current!, ThemePalettes.Resolve("Light", false, false));
-        Dispatch();
-        Save(window, "editor-selection-light");
+        Console.WriteLine("=== 3) Animation.RunAsync on RenderTransform (keyframe TransformOperations) ===");
+        target.RenderTransformOrigin = RelativePoint.Center;
+        var trAnim = new Animation
+        {
+            Duration = TimeSpan.FromMilliseconds(300), Easing = new LinearEasing(), FillMode = FillMode.Forward,
+            Children =
+            {
+                new KeyFrame { Cue = new Cue(0d), Setters = { new Setter(Visual.RenderTransformProperty, TransformOperations.Parse("scale(1)")) } },
+                new KeyFrame { Cue = new Cue(1d), Setters = { new Setter(Visual.RenderTransformProperty, TransformOperations.Parse("scale(2)")) } },
+            },
+        };
+        try { _ = trAnim.RunAsync(target); Tick(9); Console.WriteLine($"   scale after ~150ms: {target.RenderTransform?.Value.M11:0.###}"); }
+        catch (Exception ex) { Console.WriteLine("   THROWS: " + ex.Message.Split('.')[0]); }
+
+        Console.WriteLine("=== 4) TransitioningContentControl cross-fade ===");
+        var tcc = new TransitioningContentControl
+        {
+            Width = 120, Height = 120,
+            PageTransition = new CrossFade(TimeSpan.FromMilliseconds(300)),
+            Content = new Border { Background = Brushes.Blue },
+        };
+        window.Content = tcc; Pump();
+        tcc.Content = new Border { Background = Brushes.Green };
+        Tick(9);
+        // during a cross-fade the presenters animate opacity; sample any child opacity != 1
+        var opacities = tcc.GetVisualDescendants().OfType<Control>()
+            .Select(c => c.Opacity).Where(o => o < 0.999).ToList();
+        Console.WriteLine($"   mid-fade child opacities <1 (expect some ~0.5 if animating): [{string.Join(", ", opacities.Select(o => o.ToString("0.##")))}]");
+
         Console.WriteLine("done");
     }
 
-    private static void Dispatch()
+    private static void Tick(int frames)
     {
-        for (int i = 0; i < 6; i++) Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        try { AvaloniaHeadlessPlatform.ForceRenderTimerTick(frames); }
+        catch (Exception ex) { Console.WriteLine("   [ForceRenderTimerTick failed: " + ex.Message + "]"); }
+        Pump();
     }
 
-    private static void Save(Window window, string name)
-    {
-        var frame = window.CaptureRenderedFrame();
-        var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", name + ".png"));
-        frame!.Save(path);
-        Console.WriteLine("saved: " + path);
-    }
+    private static void Pump() { for (int i = 0; i < 6; i++) Avalonia.Threading.Dispatcher.UIThread.RunJobs(); }
 }
