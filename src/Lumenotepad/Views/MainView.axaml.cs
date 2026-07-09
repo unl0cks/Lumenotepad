@@ -481,6 +481,10 @@ public partial class MainView : UserControl
             or nameof(MainViewModel.SelectedSection) or nameof(MainViewModel.SelectedPage))
             ReassertListSelection();
 
+        // Section switch: the repopulated pages list rises in instead of popping.
+        if (e.PropertyName == nameof(MainViewModel.SelectedSection))
+            Dispatcher.UIThread.Post(() => Motion.RiseIn(PagesList, Motion.Base), DispatcherPriority.Background);
+
         if (e.PropertyName == nameof(MainViewModel.SelectedPage)) SyncEditorDocument();
         else if (e.PropertyName is nameof(MainViewModel.ToolbarPosition) or nameof(MainViewModel.ToolbarScope))
             ApplyToolbarPlacement();
@@ -492,21 +496,26 @@ public partial class MainView : UserControl
             ApplyGlossyAccents();
         else if (e.PropertyName == nameof(MainViewModel.ExtendedFonts))
             Toolbar.SetExtendedFonts(Vm?.ExtendedFonts ?? false);
-        else if (e.PropertyName == nameof(MainViewModel.IsHomeVisible) && _rearranging)
-            SetRearranging(false);                 // leaving home always exits rearrange mode
+        else if (e.PropertyName == nameof(MainViewModel.IsHomeVisible))
+        {
+            if (_rearranging) SetRearranging(false);          // leaving home exits rearrange mode
+            bool home = Vm?.IsHomeVisible ?? true;
+            if (home && Vm is { } vm)
+            {
+                // Card subtitles (counts) are converter-computed — re-realize on return home.
+                HomeCards.ItemsSource = null;
+                HomeCards.ItemsSource = vm.Notebooks;
+            }
+            // The surface being shown rises + fades in (Slow) instead of popping.
+            var surface = home ? (Control)HomeHost : BodyDock;
+            Dispatcher.UIThread.Post(() => Motion.RiseIn(surface, Motion.Slow), DispatcherPriority.Background);
+        }
         else if (e.PropertyName is nameof(MainViewModel.Theme)
                  or nameof(MainViewModel.FullTheme) or nameof(MainViewModel.PaperLight))
         {
             // Note containers read their paper-region brushes at construction — rebuild them.
             PageCanvas.Document = PageCanvas.Document;
             if (TrashPanel.IsVisible) RefreshTrashPanel();
-        }
-        else if (e.PropertyName == nameof(MainViewModel.IsHomeVisible) && Vm is { IsHomeVisible: true } vm)
-        {
-            // Card subtitles (section/page counts) are computed by a converter, so re-realize the
-            // cards when coming home — counts changed while editing.
-            HomeCards.ItemsSource = null;
-            HomeCards.ItemsSource = vm.Notebooks;
         }
     }
 
@@ -533,8 +542,10 @@ public partial class MainView : UserControl
     {
         Vm?.FlushDirtyDocs();                      // the page being left saves immediately
         PageCanvas.Document = Vm?.SelectedPage is { } page ? Vm.DocumentFor(page) : null;
-        if (PageCanvas.Document is null) TrashPanel.IsVisible = false;
-        else if (TrashPanel.IsVisible) RefreshTrashPanel();
+        if (PageCanvas.Document is null) { TrashPanel.IsVisible = false; return; }
+        if (TrashPanel.IsVisible) RefreshTrashPanel();
+        // Page switch: title + canvas rise in instead of the content popping.
+        Dispatcher.UIThread.Post(() => Motion.RiseIn(PageDock, Motion.Base), DispatcherPriority.Background);
     }
 
     // ---- deleted-containers history panel ----
