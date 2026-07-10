@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Media;
 using Lumenotepad.Platform;
 using Lumenotepad.Services;
 using Lumenotepad.ViewModels;
@@ -129,10 +131,80 @@ public partial class PreferencesWindow : Window
             _lastNav = NavList.SelectedItem;
             ShowPanel("appearance");
         };
+
+        AccentHexBox.KeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Enter || Vm is not { } vm) return;
+            if (string.IsNullOrWhiteSpace(AccentHexBox.Text)) vm.CustomAccent = null;
+            else if (ThemePalettes.NormalizeHex(AccentHexBox.Text) is { } norm) vm.CustomAccent = norm;
+            AccentHexBox.Text = vm.CustomAccent ?? "";
+        };
+        DataContextChanged += (_, _) => HookVmChanges();
+        HookVmChanges();
+        // The window subscribes to the long-lived VM; unhook on close or the VM pins the dead
+        // window (and keeps invoking its handler) until the next prefs open re-hooks.
+        Closed += (_, _) =>
+        {
+            if (_hookedVm is not null) _hookedVm.PropertyChanged -= OnVmChanged;
+            _hookedVm = null;
+        };
     }
 
     private bool _navGuard;
     private object? _lastNav;
+    private MainViewModel? _hookedVm;
+
+    /// <summary>Track VM changes that redraw prefs-local visuals (swatch ring, gate padlock).</summary>
+    private void HookVmChanges()
+    {
+        if (_hookedVm is not null) _hookedVm.PropertyChanged -= OnVmChanged;
+        _hookedVm = Vm;
+        if (_hookedVm is not null) _hookedVm.PropertyChanged += OnVmChanged;
+    }
+
+    private void OnVmChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainViewModel.CustomAccent)) BuildAccentSwatches();
+        else if (e.PropertyName == nameof(MainViewModel.AdvancedUnlocked)) UpdateGateVisuals();
+    }
+
+    /// <summary>The accent row: an "auto" chip (theme's own accent) + the six notebook colors.
+    /// Rebuilt on every change — the active swatch carries the ring.</summary>
+    private void BuildAccentSwatches()
+    {
+        AccentSwatches.Children.Clear();
+        AccentSwatches.Children.Add(MakeSwatch(null, "Theme default"));
+        foreach (var (hex, name) in MainViewModel.NotebookColors)
+            AccentSwatches.Children.Add(MakeSwatch(hex, name));
+    }
+
+    private Control MakeSwatch(string? hex, string tip)
+    {
+        string? current = ThemePalettes.NormalizeHex(Vm?.CustomAccent);
+        bool active = hex is null ? current is null
+                                  : string.Equals(current, hex, StringComparison.OrdinalIgnoreCase);
+        var ring = active
+            ? this.FindResource("TextPrimaryBrush") as IBrush ?? Brushes.White
+            : new SolidColorBrush(Color.Parse("#66808080"));
+        var b = new Border
+        {
+            Width = 24, Height = 24, CornerRadius = new CornerRadius(12),
+            Margin = new Thickness(0, 2, 8, 4),
+            Background = hex is null ? Brushes.Transparent : new SolidColorBrush(Color.Parse(hex)),
+            BorderBrush = ring, BorderThickness = new Thickness(active ? 2 : 1),
+            Child = hex is null
+                ? new TextBlock
+                {
+                    Text = "A", FontSize = 11,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                }
+                : null,
+        };
+        ToolTip.SetTip(b, tip);
+        b.PointerPressed += (_, _) => { if (Vm is { } vm) vm.CustomAccent = hex; };
+        return b;
+    }
 
     /// <summary>Categories behind the Advanced confirmation ("bullets"/"fonts" arrive in later parts).</summary>
     private static bool IsGated(string key) => key is "data" or "bullets" or "fonts";
@@ -179,6 +251,8 @@ public partial class PreferencesWindow : Window
         ThemeList.SelectedItem = vm.Theme;
         ToolbarPosBox.SelectedItem = vm.ToolbarPosition;
         ToolbarScopeBox.SelectedItem = vm.ToolbarScope;
+        AccentHexBox.Text = vm.CustomAccent ?? "";
+        BuildAccentSwatches();
         UpdateGateVisuals();
     }
 }

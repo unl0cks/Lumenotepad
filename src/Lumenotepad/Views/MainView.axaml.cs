@@ -608,7 +608,8 @@ public partial class MainView : UserControl
             Motion.Tween(show, 0, 0, small, 0, 0, 1, ms + 40, Motion.EaseOutSoft, 0, 1);   // +40ms tail = soft landing
         }
         else if (e.PropertyName is nameof(MainViewModel.Theme)
-                 or nameof(MainViewModel.FullTheme) or nameof(MainViewModel.PaperLight))
+                 or nameof(MainViewModel.FullTheme) or nameof(MainViewModel.PaperLight)
+                 or nameof(MainViewModel.CustomAccent))
         {
             // Note containers read their paper-region brushes at construction — rebuild them.
             PageCanvas.Document = PageCanvas.Document;

@@ -12,7 +12,7 @@ public sealed class AppSettings
     public bool FlatCovers { get; set; }                    // solid notebook covers (no gradient), shadow kept
     public bool GlossyAccents { get; set; } = true;         // top-lit gloss on chips + selected pills
     public bool ExtendedFonts { get; set; }                 // full installed-font list vs curated shortlist
-    public string AccentColor { get; set; } = "#4DA6FF";
+    public string? CustomAccent { get; set; }               // accent override; null = theme's own
     public double BlurStrength { get; set; } = 0.6;         // 0..1
     public string ToolbarPosition { get; set; } = "Top";    // "Top" | "Left" | "Right" | "Bottom"
     public string ToolbarScope { get; set; } = "Window";    // "Window" (window edge) | "Page" (inside the page box)

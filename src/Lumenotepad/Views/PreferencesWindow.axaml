@@ -142,6 +142,15 @@
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding ExtendedFonts, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
+
+                        <TextBlock Classes="section" Text="ACCENT"/>
+                        <WrapPanel x:Name="AccentSwatches"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="hint" VerticalAlignment="Center" Margin="0,0,10,0"
+                                       Text="Custom hex — Enter applies; blank returns to the theme's own accent."/>
+                            <TextBox x:Name="AccentHexBox" Grid.Column="1" Width="110" FontSize="12.5"
+                                     PlaceholderText="#RRGGBB" VerticalAlignment="Center"/>
+                        </Grid>
                     </StackPanel>
 
                     <StackPanel x:Name="LayoutPanel" Spacing="6" IsVisible="False">

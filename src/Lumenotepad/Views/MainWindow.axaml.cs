@@ -31,14 +31,18 @@ public partial class MainWindow : Window
     {
         if (e.PropertyName is nameof(ViewModels.MainViewModel.Theme)
             or nameof(ViewModels.MainViewModel.FullTheme)
-            or nameof(ViewModels.MainViewModel.PaperLight))
+            or nameof(ViewModels.MainViewModel.PaperLight)
+            or nameof(ViewModels.MainViewModel.CustomAccent))
             ApplyTheme();
     }
 
     private void ApplyTheme()
     {
         if (_themeVm is not { } vm || Application.Current is not { } app) return;
-        Services.ThemeManager.Apply(app, Services.ThemePalettes.Resolve(vm.Theme, vm.FullTheme, vm.PaperLight));
+        var tokens = Services.ThemePalettes.Resolve(vm.Theme, vm.FullTheme, vm.PaperLight);
+        if (Services.ThemePalettes.NormalizeHex(vm.CustomAccent) is { } accent)
+            tokens = Services.ThemePalettes.WithAccent(tokens, accent);
+        Services.ThemeManager.Apply(app, tokens);
         Services.ThemeManager.ApplyChrome(this);
     }
 
