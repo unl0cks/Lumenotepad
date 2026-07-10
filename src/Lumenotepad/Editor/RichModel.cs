@@ -343,6 +343,38 @@ public sealed class RichDocument
         OnChanged();
     }
 
+    /// <summary>The contiguous run of "num" paragraphs containing <paramref name="paraIndex"/>
+    /// (start..end inclusive), or null when that paragraph isn't numbered.</summary>
+    public (int Start, int End)? NumRunAt(int paraIndex)
+    {
+        if (paraIndex < 0 || paraIndex >= Paragraphs.Count || Paragraphs[paraIndex].Bullet != "num")
+            return null;
+        int s = paraIndex, e = paraIndex;
+        while (s > 0 && Paragraphs[s - 1].Bullet == "num") s--;
+        while (e + 1 < Paragraphs.Count && Paragraphs[e + 1].Bullet == "num") e++;
+        return (s, e);
+    }
+
+    /// <summary>Set one number-style override ('b','i','u','s'; null = inherit) across the whole
+    /// numbered list containing <paramref name="paraIndex"/>. No-op outside a numbered list.</summary>
+    public void SetNumFlag(int paraIndex, char flag, bool? value)
+    {
+        if (NumRunAt(paraIndex) is not { } run) return;
+        for (int i = run.Start; i <= run.End; i++)
+        {
+            var p = Paragraphs[i];
+            switch (flag)
+            {
+                case 'b': p.NumBold = value; break;
+                case 'i': p.NumItalic = value; break;
+                case 'u': p.NumUnderline = value; break;
+                case 's': p.NumStrike = value; break;
+            }
+            p.Version++;
+        }
+        OnChanged();
+    }
+
     // ---- snapshots (undo/redo) ----
     public DocSnapshot TakeSnapshot() => new() { Paragraphs = Paragraphs.Select(p => p.Clone()).ToList() };
 

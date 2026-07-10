@@ -136,6 +136,47 @@ public class RichModelTests
     }
 
     [Fact]
+    public void NumRunAt_FindsContiguousRun_AndRejectsNonNum()
+    {
+        var doc = new RichDocument();
+        doc.InsertText(new DocPos(0, 0), "a\nb\nc\nd\ne");
+        doc.SetBullet(new DocPos(1, 0), new DocPos(3, 0), "num");   // paras 1..3 numbered
+
+        Assert.Equal((1, 3), doc.NumRunAt(2));
+        Assert.Equal((1, 3), doc.NumRunAt(1));
+        Assert.Equal((1, 3), doc.NumRunAt(3));
+        Assert.Null(doc.NumRunAt(0));
+        Assert.Null(doc.NumRunAt(4));
+        Assert.Null(doc.NumRunAt(-1));
+        Assert.Null(doc.NumRunAt(99));
+    }
+
+    [Fact]
+    public void SetNumFlag_SetsWholeRun_NotNeighbors_AndRaisesChanged()
+    {
+        var doc = new RichDocument();
+        doc.InsertText(new DocPos(0, 0), "a\nb\nc\nd");
+        doc.SetBullet(new DocPos(0, 0), new DocPos(2, 0), "num");   // paras 0..2 numbered
+
+        bool changed = false;
+        doc.Changed += () => changed = true;
+        doc.SetNumFlag(1, 'b', true);
+
+        Assert.True(changed);
+        Assert.True(doc.Paragraphs[0].NumBold);
+        Assert.True(doc.Paragraphs[1].NumBold);
+        Assert.True(doc.Paragraphs[2].NumBold);
+        Assert.Null(doc.Paragraphs[3].NumBold);      // outside the run
+
+        doc.SetNumFlag(1, 'b', null);                // clearing restores inherit
+        Assert.Null(doc.Paragraphs[0].NumBold);
+
+        changed = false;
+        doc.SetNumFlag(3, 'b', true);                // not a numbered paragraph → no-op
+        Assert.False(changed);
+    }
+
+    [Fact]
     public void Move_crossesParagraphBoundaries()
     {
         var d = Doc("ab\ncd");
