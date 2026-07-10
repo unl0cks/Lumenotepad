@@ -164,7 +164,15 @@ public partial class PreferencesWindow : Window
 
     private void OnVmChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(MainViewModel.CustomAccent)) BuildAccentSwatches();
+        if (e.PropertyName == nameof(MainViewModel.CustomAccent))
+        {
+            AccentHexBox.Text = Vm?.CustomAccent ?? "";   // swatch picks echo into the hex field
+            BuildAccentSwatches();
+        }
+        // Theme switches swap the token brush INSTANCES — rebuild so the active ring re-resolves.
+        else if (e.PropertyName is nameof(MainViewModel.Theme)
+                 or nameof(MainViewModel.FullTheme) or nameof(MainViewModel.PaperLight))
+            BuildAccentSwatches();
         else if (e.PropertyName == nameof(MainViewModel.AdvancedUnlocked)) UpdateGateVisuals();
     }
 
