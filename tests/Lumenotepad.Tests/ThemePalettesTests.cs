@@ -101,4 +101,41 @@ public class ThemePalettesTests
         Assert.Equal("#FFFFFFFF", ThemePalettes.Shade("#FF808080", 1));
         Assert.Equal("#554DA6FF", ThemePalettes.Alpha("#4DA6FF", 0x55));
     }
+
+    [Fact]
+    public void WithAccent_RecomputesEveryAccentDerivedToken()
+    {
+        var t = ThemePalettes.Resolve("Lumen", false, false);
+        var seeded = ThemePalettes.WithAccent(t, "#E27BA6");
+
+        Assert.Equal("#E27BA6", seeded.Accent);
+        Assert.Equal(ThemePalettes.Shade("#E27BA6", 0.15), seeded.AccentHover);
+        Assert.Equal(ThemePalettes.Alpha("#E27BA6", 0x38), seeded.AccentSoft);
+        Assert.Equal(ThemePalettes.Shade("#E27BA6", -0.28), seeded.AccentDeep);
+        Assert.Equal(ThemePalettes.Shade("#E27BA6", 0.12), seeded.AccentGradTop);
+        Assert.Equal(ThemePalettes.Shade("#E27BA6", -0.10), seeded.AccentGradBottom);
+        Assert.Equal(ThemePalettes.Alpha("#E27BA6", 0x55), seeded.FieldSelection);
+        Assert.Equal(ThemePalettes.Alpha("#E27BA6", 0x4D), seeded.NoteChromeFocus);
+        // non-accent tokens untouched
+        Assert.Equal(t.FrameBackground, seeded.FrameBackground);
+        Assert.Equal(t.PaperBackground, seeded.PaperBackground);
+        Assert.Equal(t.TextPrimary, seeded.TextPrimary);
+    }
+
+    [Theory]
+    [InlineData("4da6ff", "#4DA6FF")]
+    [InlineData("#4DA6FF", "#4DA6FF")]
+    [InlineData("  #e27ba6 ", "#E27BA6")]
+    public void NormalizeHex_AcceptsSixHexDigits(string input, string expected) =>
+        Assert.Equal(expected, ThemePalettes.NormalizeHex(input));
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("xyzxyz")]
+    [InlineData("#4DA6FF00")]
+    [InlineData("#4DA")]
+    public void NormalizeHex_RejectsInvalid(string? input) =>
+        Assert.Null(ThemePalettes.NormalizeHex(input));
 }

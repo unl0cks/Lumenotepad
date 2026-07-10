@@ -155,6 +155,31 @@ public static class ThemePalettes
         ControlHover = "#12000000", ControlPressed = "#22000000",
     };
 
+    /// <summary>Recompute every accent-derived token from a new seed color — the custom-accent
+    /// preference. Pure: same Shade/Alpha math the palettes use, everything else untouched.</summary>
+    public static ThemeTokens WithAccent(ThemeTokens t, string seed) => t with
+    {
+        Accent = seed,
+        AccentHover = Shade(seed, 0.15),
+        AccentSoft = Alpha(seed, 0x38),
+        AccentDeep = Shade(seed, -0.28),
+        AccentGradTop = Shade(seed, 0.12),
+        AccentGradBottom = Shade(seed, -0.10),
+        FieldSelection = Alpha(seed, 0x55),
+        NoteChromeFocus = Alpha(seed, 0x4D),
+    };
+
+    /// <summary>Normalize user hex input ("4da6ff", " #4DA6FF ") to "#RRGGBB"; null when invalid.</summary>
+    public static string? NormalizeHex(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return null;
+        var t = s.Trim().TrimStart('#');
+        if (t.Length != 6) return null;
+        foreach (char ch in t)
+            if (!Uri.IsHexDigit(ch)) return null;
+        return "#" + t.ToUpperInvariant();
+    }
+
     // ---- tiny color math on hex strings (pure, testable) ----
 
     /// <summary>Blend toward white (f &gt; 0) or black (f &lt; 0); f in -1..1.</summary>
