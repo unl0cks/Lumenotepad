@@ -72,6 +72,7 @@ public partial class FormatToolbar : UserControl
         BuildSwatches(HighlightSwatches, Highlights, hex => Do(e => e.ApplyHighlight(hex)), HighlightBtn);
         BuildSwatches(ColorSwatches, TextColors, hex => Do(e => e.ApplyColor(hex)), ColorBtn);
         BuildBulletChoices();
+        BuildNumStyleRow();
         BuildFontList();
         BuildDockMenu();
     }
@@ -217,6 +218,53 @@ public partial class FormatToolbar : UserControl
         }
     }
 
+    private Button? _numB, _numI, _numU, _numS;
+
+    /// <summary>The per-list number-style row: label + B/I/U/S toggles + "match text" reset. Lives in
+    /// the bullet flyout, visible only when the caret sits in a numbered list; the flyout stays open
+    /// so several flags can be flipped in a row.</summary>
+    private void BuildNumStyleRow()
+    {
+        var label = new TextBlock
+        {
+            Text = "Numbers:", FontSize = 11.5, Opacity = 0.7,
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 2, 0),
+        };
+        NumStylePanel.Children.Add(label);
+
+        Button Make(string text, char flag, string tip, FontWeight weight = FontWeight.Normal,
+                    FontStyle style = FontStyle.Normal, TextDecorationCollection? deco = null)
+        {
+            var b = new Button
+            {
+                Width = 30, Height = 30, FontSize = 13, Theme = BoldBtn.Theme,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Content = new TextBlock
+                {
+                    Text = text, FontWeight = weight, FontStyle = style, TextDecorations = deco,
+                },
+            };
+            ToolTip.SetTip(b, tip);
+            b.Click += (_, _) => Do(e => e.ToggleNumStyle(flag));
+            NumStylePanel.Children.Add(b);
+            return b;
+        }
+        _numB = Make("B", 'b', "Bold numbers", weight: FontWeight.Bold);
+        _numI = Make("I", 'i', "Italic numbers", style: FontStyle.Italic);
+        _numU = Make("U", 'u', "Underlined numbers", deco: TextDecorations.Underline);
+        _numS = Make("S", 's', "Struck-through numbers", deco: TextDecorations.Strikethrough);
+
+        var reset = new Button
+        {
+            Height = 30, FontSize = 11.5, Theme = BoldBtn.Theme, Padding = new Thickness(8, 0),
+            Content = "Match text", VerticalContentAlignment = VerticalAlignment.Center,
+        };
+        ToolTip.SetTip(reset, "Numbers follow their line's own formatting again");
+        reset.Click += (_, _) => Do(e => e.ClearNumStyle());
+        NumStylePanel.Children.Add(reset);
+    }
+
     private bool _extendedFonts;
 
     /// <summary>"Extended font list" preference: every installed family vs the curated shortlist.</summary>
@@ -288,6 +336,14 @@ public partial class FormatToolbar : UserControl
             HighlightBtn.Classes.Set("on", f.Highlight is not null);
             ColorBtn.Classes.Set("on", f.Color is not null);
             BulletBtn.Classes.Set("on", _target.CurrentBullet is not null);
+            NumStylePanel.IsVisible = _target.CurrentBullet == "num";
+            if (_target.CurrentNumStyle is { } ns)
+            {
+                _numB?.Classes.Set("on", ns.Bold);
+                _numI?.Classes.Set("on", ns.Italic);
+                _numU?.Classes.Set("on", ns.Underline);
+                _numS?.Classes.Set("on", ns.Strike);
+            }
             if (!SizeBox.IsFocused)                       // don't clobber a number mid-typing
                 SizeBox.Text = (f.Size ?? _target.FontSize).ToString("0");
             FontList.SelectedItem = f.Font ?? "(Default)";

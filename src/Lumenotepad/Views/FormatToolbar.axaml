@@ -58,7 +58,11 @@
                     FontFamily="{StaticResource IconFont}" Content="&#xE8FD;" ToolTip.Tip="Bullets &amp; lists (Ctrl+Shift+8)">
                 <Button.Flyout>
                     <Flyout Placement="Bottom">
-                        <StackPanel Orientation="Horizontal" Spacing="4" x:Name="BulletChoices"/>
+                        <StackPanel Spacing="6">
+                            <StackPanel Orientation="Horizontal" Spacing="4" x:Name="BulletChoices"/>
+                            <!-- number-style override for the list under the caret (shown on "num") -->
+                            <StackPanel Orientation="Horizontal" Spacing="4" x:Name="NumStylePanel" IsVisible="False"/>
+                        </StackPanel>
                     </Flyout>
                 </Button.Flyout>
             </Button>
