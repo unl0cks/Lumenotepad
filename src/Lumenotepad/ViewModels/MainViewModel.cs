@@ -70,6 +70,12 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double _glassTint;                 // prefs: -1..1 glass veil; 0 = off
     [ObservableProperty] private bool _reduceMotion;                // prefs: skip animations
     [ObservableProperty] private string _motionSpeed = "Normal";    // prefs: Calm | Normal | Snappy
+    [ObservableProperty] private bool? _numBoldDefault;             // prefs: number-style defaults;
+    [ObservableProperty] private bool? _numItalicDefault;           // null = match the line's text
+    [ObservableProperty] private bool? _numUnderlineDefault;
+    [ObservableProperty] private bool? _numStrikeDefault;
+    /// <summary>Bumped whenever a bullet color override changes — consumers re-read BulletColorFor.</summary>
+    [ObservableProperty] private int _bulletPrefsVersion;
 
     /// <summary>The Light-paper toggle only means something on Lumen with Full theme off.</summary>
     public bool PaperToggleEnabled => Theme == "Lumen" && !FullTheme;
@@ -158,6 +164,10 @@ public partial class MainViewModel : ObservableObject
             GlassTint = _settings.GlassTint;
             ReduceMotion = _settings.ReduceMotion;
             MotionSpeed = _settings.MotionSpeed;
+            NumBoldDefault = _settings.NumBoldDefault;
+            NumItalicDefault = _settings.NumItalicDefault;
+            NumUnderlineDefault = _settings.NumUnderlineDefault;
+            NumStrikeDefault = _settings.NumStrikeDefault;
             IsRailVisible = _settings.StartRailVisible;
             IsPagesVisible = _settings.StartPagesVisible;
         }
@@ -289,6 +299,34 @@ public partial class MainViewModel : ObservableObject
         _settings.Save(_settingsDir);
     }
 
+    partial void OnNumBoldDefaultChanged(bool? value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.NumBoldDefault = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnNumItalicDefaultChanged(bool? value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.NumItalicDefault = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnNumUnderlineDefaultChanged(bool? value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.NumUnderlineDefault = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnNumStrikeDefaultChanged(bool? value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.NumStrikeDefault = value;
+        _settings.Save(_settingsDir);
+    }
+
     // ---- gallery ordering (the order persists via order.json) ----
 
     public void SortNotebooksByName() =>
@@ -338,6 +376,20 @@ public partial class MainViewModel : ObservableObject
     /// <summary>The portable userdata folder backing this workspace (null in the designer).</summary>
     public string? SettingsDir => _settingsDir;
 
+    /// <summary>The effective hex override for a bullet style (null = the built-in default color).</summary>
+    public string? BulletColorFor(string style) =>
+        _settings is not null && _settings.BulletColors.TryGetValue(style, out var hex) ? hex : null;
+
+    /// <summary>Set (hex) or clear (null) one bullet style's color override; bumps BulletPrefsVersion.</summary>
+    public void SetBulletColor(string style, string? hex)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        if (hex is null) _settings.BulletColors.Remove(style);
+        else _settings.BulletColors[style] = hex;
+        _settings.Save(_settingsDir);
+        BulletPrefsVersion++;
+    }
+
     /// <summary>Reset every preference to its default (notebooks and notes untouched). Each setter
     /// persists and re-applies through its own OnChanged hook.</summary>
     public void ResetSettingsToDefaults()
@@ -352,6 +404,14 @@ public partial class MainViewModel : ObservableObject
         CustomAccent = d.CustomAccent;
         GlassTint = d.GlassTint;
         ReduceMotion = d.ReduceMotion; MotionSpeed = d.MotionSpeed;
+        NumBoldDefault = d.NumBoldDefault; NumItalicDefault = d.NumItalicDefault;
+        NumUnderlineDefault = d.NumUnderlineDefault; NumStrikeDefault = d.NumStrikeDefault;
+        if (_settings is not null && _settingsDir is not null && _settings.BulletColors.Count > 0)
+        {
+            _settings.BulletColors.Clear();
+            _settings.Save(_settingsDir);
+            BulletPrefsVersion++;
+        }
     }
 
     // Per-page canvas documents: loaded from disk on first access, dirty-tracked on edit, saved by

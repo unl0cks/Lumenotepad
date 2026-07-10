@@ -158,4 +158,30 @@ public class MainViewModelTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void BulletColor_SetPersistClearAndReset()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            Assert.Null(vm.BulletColorFor("star"));
+
+            vm.SetBulletColor("star", "#FF0000");
+            Assert.Equal("#FF0000", vm.BulletColorFor("star"));
+            Assert.Equal("#FF0000", AppSettings.Load(dir).BulletColors["star"]);   // persisted
+
+            vm.SetBulletColor("star", null);
+            Assert.Null(vm.BulletColorFor("star"));
+
+            vm.SetBulletColor("heart", "#00FF00");
+            vm.NumBoldDefault = true;
+            vm.ResetSettingsToDefaults();
+            Assert.Null(vm.BulletColorFor("heart"));
+            Assert.Null(vm.NumBoldDefault);
+            Assert.Empty(AppSettings.Load(dir).BulletColors);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }

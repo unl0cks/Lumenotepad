@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 
@@ -16,6 +17,11 @@ public sealed class AppSettings
     public double GlassTint { get; set; }                   // -1..1: darken / lighten the glass; 0 = off
     public bool ReduceMotion { get; set; }                  // skip animations entirely
     public string MotionSpeed { get; set; } = "Normal";     // "Calm" | "Normal" | "Snappy"
+    public Dictionary<string, string> BulletColors { get; set; } = new();  // bullet style → hex override
+    public bool? NumBoldDefault { get; set; }               // numbered-list number style defaults;
+    public bool? NumItalicDefault { get; set; }             // null = the number matches its line's text
+    public bool? NumUnderlineDefault { get; set; }
+    public bool? NumStrikeDefault { get; set; }
     public string ToolbarPosition { get; set; } = "Top";    // "Top" | "Left" | "Right" | "Bottom"
     public string ToolbarScope { get; set; } = "Window";    // "Window" (window edge) | "Page" (inside the page box)
     public bool ResizablePages { get; set; } = true;        // note containers show resize handles
