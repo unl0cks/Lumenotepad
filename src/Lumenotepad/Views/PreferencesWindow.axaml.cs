@@ -81,13 +81,17 @@ public partial class PreferencesWindow : Window
             if (IsGated(key) && Vm is { AdvancedUnlocked: false } vm)
             {
                 _navGuard = true;
-                bool ok = await ConfirmDialog.Show(this, "Unlock advanced settings?",
-                    "Advanced settings change how notes are stored, exported, and rendered. " +
-                    "They're meant for power users — the defaults are right for most people.",
-                    "Unlock", danger: false);
-                if (!ok) { NavList.SelectedItem = _lastNav; _navGuard = false; return; }
+                bool ok;
+                try
+                {
+                    ok = await ConfirmDialog.Show(this, "Unlock advanced settings?",
+                        "Advanced settings change how notes are stored, exported, and rendered. " +
+                        "They're meant for power users — the defaults are right for most people.",
+                        "Unlock", danger: false);
+                }
+                finally { _navGuard = false; }
+                if (!ok) { NavList.SelectedItem = _lastNav; return; }
                 vm.AdvancedUnlocked = true;
-                _navGuard = false;
                 UpdateGateVisuals();
             }
             _lastNav = NavList.SelectedItem;
@@ -136,21 +140,27 @@ public partial class PreferencesWindow : Window
     /// <summary>Locked = the small padlock shows on the ADVANCED group header.</summary>
     private void UpdateGateVisuals() => GateLock.IsVisible = Vm is not { AdvancedUnlocked: true };
 
-    /// <summary>Fill the Data &amp; tools facts (folder path + size) when the panel shows.</summary>
+    /// <summary>Fill the Data &amp; tools facts (folder path + size) when the panel shows. The size
+    /// walk runs off-thread — a workspace with embedded images can be thousands of files.</summary>
     private void RefreshDataPanel()
     {
         var dir = Vm?.SettingsDir;
         DataFolderText.Text = dir ?? "—";
-        WorkspaceSizeText.Text = dir is null ? "—" : FolderSize(dir);
+        if (dir is null) { WorkspaceSizeText.Text = "—"; return; }
+        WorkspaceSizeText.Text = "…";
+        System.Threading.Tasks.Task.Run(() => FolderSize(dir)).ContinueWith(
+            t => WorkspaceSizeText.Text = t.IsCompletedSuccessfully ? t.Result : "—",
+            System.Threading.Tasks.TaskScheduler.FromCurrentSynchronizationContext());
     }
 
     private static string FolderSize(string dir)
     {
+        const long MB = 1 << 20;
         try
         {
-            long b = Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories)
-                .Sum(f => new FileInfo(f).Length);
-            return b < 1 << 20 ? $"{b / 1024.0:0.#} KB" : $"{b / 1048576.0:0.#} MB";
+            long b = new DirectoryInfo(dir).EnumerateFiles("*", SearchOption.AllDirectories)
+                .Sum(f => f.Length);   // FileInfo from the enumeration — no re-stat per file
+            return b < MB ? $"{b / 1024.0:0.#} KB" : $"{(double)b / MB:0.#} MB";
         }
         catch { return "—"; }
     }
