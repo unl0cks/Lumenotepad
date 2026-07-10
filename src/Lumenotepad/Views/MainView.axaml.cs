@@ -325,10 +325,20 @@ public partial class MainView : UserControl
     private void TweenGhost(Border ghost, Point target, int ms, System.Action onDone)
     {
         _ghostTween?.Stop();
+        // The ghost runs its own timer (Canvas position, not a transform) — honor the reduce-motion
+        // pref here too so the drop snap matches the rest of the app.
+        if (!Motion.Enabled)
+        {
+            Canvas.SetLeft(ghost, target.X);
+            Canvas.SetTop(ghost, target.Y);
+            _ghostTween = null;
+            onDone();
+            return;
+        }
         double fx = Canvas.GetLeft(ghost), fy = Canvas.GetTop(ghost);
         if (double.IsNaN(fx)) fx = target.X;
         if (double.IsNaN(fy)) fy = target.Y;
-        int step = 0, steps = System.Math.Max(1, ms / 15);
+        int step = 0, steps = System.Math.Max(1, Motion.Ms(ms) / 15);
         var timer = new DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(15) };
         timer.Tick += (_, _) =>
         {
