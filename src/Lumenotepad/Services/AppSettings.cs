@@ -13,7 +13,7 @@ public sealed class AppSettings
     public bool GlossyAccents { get; set; } = true;         // top-lit gloss on chips + selected pills
     public bool ExtendedFonts { get; set; }                 // full installed-font list vs curated shortlist
     public string? CustomAccent { get; set; }               // accent override; null = theme's own
-    public double BlurStrength { get; set; } = 0.6;         // 0..1
+    public double GlassTint { get; set; }                   // -1..1: darken / lighten the glass; 0 = off
     public string ToolbarPosition { get; set; } = "Top";    // "Top" | "Left" | "Right" | "Bottom"
     public string ToolbarScope { get; set; } = "Window";    // "Window" (window edge) | "Page" (inside the page box)
     public bool ResizablePages { get; set; } = true;        // note containers show resize handles

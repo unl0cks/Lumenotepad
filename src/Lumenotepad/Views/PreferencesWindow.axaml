@@ -151,6 +151,16 @@
                             <TextBox x:Name="AccentHexBox" Grid.Column="1" Width="110" FontSize="12.5"
                                      PlaceholderText="#RRGGBB" VerticalAlignment="Center"/>
                         </Grid>
+
+                        <TextBlock Classes="section" Text="GLASS"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="Glass tint"/>
+                            <TextBlock x:Name="GlassTintValue" Grid.Column="1" Classes="hint" Text="0%"/>
+                        </Grid>
+                        <Slider x:Name="GlassTintSlider" Minimum="-1" Maximum="1"
+                                TickFrequency="0.05" IsSnapToTickEnabled="True"/>
+                        <TextBlock Classes="hint"
+                                   Text="Darken or lighten what shows through the glass. Zero is untinted; solid themes ignore it."/>
                     </StackPanel>
 
                     <StackPanel x:Name="LayoutPanel" Spacing="6" IsVisible="False">

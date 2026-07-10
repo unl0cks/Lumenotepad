@@ -408,6 +408,7 @@ public partial class MainView : UserControl
             ApplyCanvasPrefs();
             ApplyGlossyAccents();
             ApplyPanels();
+            ApplyGlassTint();
             ApplyHomeSurface();
             HookCollectionAnimations();
             Toolbar.SetExtendedFonts(_hookedVm.ExtendedFonts);
@@ -514,6 +515,18 @@ public partial class MainView : UserControl
         // fill would show as an ugly full-width blue bar. The rail chip shows its own colour + glow.
     }
 
+    /// <summary>"Glass tint": white/black veil under all content, tinting whatever the acrylic
+    /// backdrop shows through. Hidden entirely on solid (non-glass) themes and at zero.</summary>
+    private void ApplyGlassTint()
+    {
+        if (Vm is not { } vm) return;
+        double t = System.Math.Clamp(vm.GlassTint, -1, 1);
+        bool on = Services.ThemeManager.Current.GlassWindow && System.Math.Abs(t) > 0.01;
+        GlassTintVeil.IsVisible = on;
+        if (on) GlassTintVeil.Background =
+            new SolidColorBrush(t >= 0 ? Colors.White : Colors.Black, System.Math.Abs(t) * 0.35);
+    }
+
     /// <summary>Place the toolbar per the VM: docked to a side of either the WINDOW body or the PAGE box.</summary>
     private void ApplyToolbarPlacement()
     {
@@ -578,6 +591,8 @@ public partial class MainView : UserControl
             ApplyFlatCovers();
         else if (e.PropertyName == nameof(MainViewModel.GlossyAccents))
             ApplyGlossyAccents();
+        else if (e.PropertyName == nameof(MainViewModel.GlassTint))
+            ApplyGlassTint();
         else if (e.PropertyName == nameof(MainViewModel.ExtendedFonts))
             Toolbar.SetExtendedFonts(Vm?.ExtendedFonts ?? false);
         else if (e.PropertyName == nameof(MainViewModel.IsRailVisible))
@@ -615,6 +630,10 @@ public partial class MainView : UserControl
             PageCanvas.Document = PageCanvas.Document;
             if (TrashPanel.IsVisible) RefreshTrashPanel();
             if (Content is Control root) Motion.FadeIn(root, Motion.Fast);   // soft cross to the new theme
+            // Posted: MainWindow's own PropertyChanged handler updates ThemeManager.Current on this
+            // same VM event, and subscription order between the two views isn't guaranteed — read
+            // GlassWindow only after that handler has had a chance to run.
+            Dispatcher.UIThread.Post(ApplyGlassTint, DispatcherPriority.Background);
         }
     }
 

@@ -67,6 +67,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _startPagesVisible = true;   // prefs: pages panel shown at launch
     [ObservableProperty] private bool _advancedUnlocked;            // prefs: advanced gate accepted
     [ObservableProperty] private string? _customAccent;             // prefs: accent override; null = theme's own
+    [ObservableProperty] private double _glassTint;                 // prefs: -1..1 glass veil; 0 = off
 
     /// <summary>The Light-paper toggle only means something on Lumen with Full theme off.</summary>
     public bool PaperToggleEnabled => Theme == "Lumen" && !FullTheme;
@@ -152,6 +153,7 @@ public partial class MainViewModel : ObservableObject
             StartPagesVisible = _settings.StartPagesVisible;
             AdvancedUnlocked = _settings.AdvancedUnlocked;
             CustomAccent = _settings.CustomAccent;
+            GlassTint = _settings.GlassTint;
             IsRailVisible = _settings.StartRailVisible;
             IsPagesVisible = _settings.StartPagesVisible;
         }
@@ -262,6 +264,13 @@ public partial class MainViewModel : ObservableObject
         _settings.Save(_settingsDir);
     }
 
+    partial void OnGlassTintChanged(double value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.GlassTint = value;
+        _settings.Save(_settingsDir);
+    }
+
     // ---- gallery ordering (the order persists via order.json) ----
 
     public void SortNotebooksByName() =>
@@ -323,6 +332,7 @@ public partial class MainViewModel : ObservableObject
         StartRailVisible = d.StartRailVisible; StartPagesVisible = d.StartPagesVisible;
         AdvancedUnlocked = d.AdvancedUnlocked;
         CustomAccent = d.CustomAccent;
+        GlassTint = d.GlassTint;
     }
 
     // Per-page canvas documents: loaded from disk on first access, dirty-tracked on edit, saved by

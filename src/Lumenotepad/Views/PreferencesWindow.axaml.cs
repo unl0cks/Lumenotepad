@@ -139,6 +139,11 @@ public partial class PreferencesWindow : Window
             else if (ThemePalettes.NormalizeHex(AccentHexBox.Text) is { } norm) vm.CustomAccent = norm;
             AccentHexBox.Text = vm.CustomAccent ?? "";
         };
+        GlassTintSlider.ValueChanged += (_, e) =>
+        {
+            if (Vm is { } vm && Math.Abs(vm.GlassTint - e.NewValue) > 1e-6) vm.GlassTint = e.NewValue;
+            GlassTintValue.Text = $"{(int)Math.Round(e.NewValue * 100)}%";
+        };
         DataContextChanged += (_, _) => HookVmChanges();
         HookVmChanges();
         // The window subscribes to the long-lived VM; unhook on close or the VM pins the dead
@@ -261,6 +266,8 @@ public partial class PreferencesWindow : Window
         ToolbarScopeBox.SelectedItem = vm.ToolbarScope;
         AccentHexBox.Text = vm.CustomAccent ?? "";
         BuildAccentSwatches();
+        GlassTintSlider.Value = vm.GlassTint;
+        GlassTintValue.Text = $"{(int)Math.Round(vm.GlassTint * 100)}%";
         UpdateGateVisuals();
     }
 }
