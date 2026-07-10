@@ -5,8 +5,10 @@ using System.IO;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Media;
+using Lumenotepad.Editor;
 using Lumenotepad.Platform;
 using Lumenotepad.Services;
 using Lumenotepad.ViewModels;
@@ -31,6 +33,7 @@ public partial class PreferencesWindow : Window
             ["appearance"] = AppearancePanel,
             ["layout"] = LayoutPanel,
             ["canvas"] = CanvasPanel,
+            ["bullets"] = BulletsPanel,
             ["data"] = DataPanel,
         };
 
@@ -149,6 +152,25 @@ public partial class PreferencesWindow : Window
         {
             if (Vm is { } vm && MotionSpeedBox.SelectedItem is string speed) vm.MotionSpeed = speed;
         };
+
+        foreach (var (box, get, set) in new (ComboBox, Func<MainViewModel, bool?>, Action<MainViewModel, bool?>)[]
+        {
+            (NumBoldBox, vm => vm.NumBoldDefault, (vm, v) => vm.NumBoldDefault = v),
+            (NumItalicBox, vm => vm.NumItalicDefault, (vm, v) => vm.NumItalicDefault = v),
+            (NumUnderlineBox, vm => vm.NumUnderlineDefault, (vm, v) => vm.NumUnderlineDefault = v),
+            (NumStrikeBox, vm => vm.NumStrikeDefault, (vm, v) => vm.NumStrikeDefault = v),
+        })
+        {
+            box.ItemsSource = new[] { "Match text", "Always on", "Always off" };
+            box.SelectionChanged += (_, _) =>
+            {
+                if (Vm is { } vm && box.SelectedItem is string s)
+                {
+                    bool? v = s switch { "Always on" => true, "Always off" => false, _ => null };
+                    if (get(vm) != v) set(vm, v);
+                }
+            };
+        }
         DataContextChanged += (_, _) => HookVmChanges();
         HookVmChanges();
         // The window subscribes to the long-lived VM; unhook on close or the VM pins the dead
@@ -184,6 +206,7 @@ public partial class PreferencesWindow : Window
                  or nameof(MainViewModel.FullTheme) or nameof(MainViewModel.PaperLight))
             BuildAccentSwatches();
         else if (e.PropertyName == nameof(MainViewModel.AdvancedUnlocked)) UpdateGateVisuals();
+        else if (e.PropertyName == nameof(MainViewModel.BulletPrefsVersion)) BuildBulletRows();
     }
 
     /// <summary>The accent row: an "auto" chip (theme's own accent) + the six notebook colors.
@@ -223,6 +246,79 @@ public partial class PreferencesWindow : Window
         b.PointerPressed += (_, _) => { if (Vm is { } vm) vm.CustomAccent = hex; };
         return b;
     }
+
+    private static readonly (string Key, string Name)[] BulletStyles =
+    {
+        ("dot", "Bullet"), ("arrow", "Arrow"), ("star", "Star"),
+        ("heart", "Heart"), ("flower", "Flower"), ("spark", "Spark"),
+    };
+
+    private static readonly FontFamily BulletGlyphFont = new("Segoe UI Symbol, Segoe UI Emoji, Segoe UI");
+
+    /// <summary>One row per bullet style: glyph (in its effective color), name, color button whose
+    /// flyout offers the notebook palette + a reset to the built-in default.</summary>
+    private void BuildBulletRows()
+    {
+        BulletColorRows.Children.Clear();
+        foreach (var (key, name) in BulletStyles)
+        {
+            if (RichTextEditor.BulletGlyphInfo(key) is not { } info) continue;
+            string effective = Vm?.BulletColorFor(key) ?? info.Color;
+
+            var row = new Grid { ColumnDefinitions = new ColumnDefinitions("28,*,Auto") };
+            var glyph = new TextBlock
+            {
+                Text = info.Glyph, FontFamily = BulletGlyphFont, FontSize = 15,
+                Foreground = new SolidColorBrush(Color.Parse(effective)),
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            };
+            var label = new TextBlock { Text = name, FontSize = 13,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
+            Grid.SetColumn(label, 1);
+
+            var swatch = new Button
+            {
+                Width = 34, Height = 22, CornerRadius = new CornerRadius(6), Padding = new Thickness(0),
+                Background = new SolidColorBrush(Color.Parse(effective)),
+                BorderBrush = new SolidColorBrush(Color.Parse("#66808080")), BorderThickness = new Thickness(1),
+            };
+            ToolTip.SetTip(swatch, Vm?.BulletColorFor(key) is null ? "Default color" : "Custom color");
+            swatch.Flyout = BuildBulletColorFlyout(key);
+            Grid.SetColumn(swatch, 2);
+
+            row.Children.Add(glyph);
+            row.Children.Add(label);
+            row.Children.Add(swatch);
+            BulletColorRows.Children.Add(row);
+        }
+    }
+
+    /// <summary>The palette flyout for one bullet style: 9 hue families × 5 shades + default reset.</summary>
+    private Flyout BuildBulletColorFlyout(string styleKey)
+    {
+        var shades = new WrapPanel { MaxWidth = 190 };
+        foreach (var (_, familyShades) in MainViewModel.NotebookPalette)
+            foreach (var (shadeName, hex) in familyShades)
+            {
+                var chip = new Border
+                {
+                    Width = 16, Height = 16, CornerRadius = new CornerRadius(8),
+                    Margin = new Thickness(0, 0, 3, 3),
+                    Background = new SolidColorBrush(Color.Parse(hex)),
+                };
+                ToolTip.SetTip(chip, shadeName);
+                chip.PointerPressed += (_, _) => Vm?.SetBulletColor(styleKey, hex);
+                shades.Children.Add(chip);
+            }
+        var reset = new Button { Content = "Reset to default", FontSize = 12, Margin = new Thickness(0, 6, 0, 0) };
+        reset.Click += (_, _) => Vm?.SetBulletColor(styleKey, null);
+        var panel = new StackPanel();
+        panel.Children.Add(shades);
+        panel.Children.Add(reset);
+        return new Flyout { Content = panel, Placement = PlacementMode.Bottom };
+    }
+
+    private static string NumOpt(bool? v) => v switch { true => "Always on", false => "Always off", _ => "Match text" };
 
     /// <summary>Categories behind the Advanced confirmation ("bullets"/"fonts" arrive in later parts).</summary>
     private static bool IsGated(string key) => key is "data" or "bullets" or "fonts";
@@ -274,6 +370,11 @@ public partial class PreferencesWindow : Window
         GlassTintSlider.Value = vm.GlassTint;
         GlassTintValue.Text = $"{(int)Math.Round(vm.GlassTint * 100)}%";
         MotionSpeedBox.SelectedItem = vm.MotionSpeed;
+        NumBoldBox.SelectedItem = NumOpt(vm.NumBoldDefault);
+        NumItalicBox.SelectedItem = NumOpt(vm.NumItalicDefault);
+        NumUnderlineBox.SelectedItem = NumOpt(vm.NumUnderlineDefault);
+        NumStrikeBox.SelectedItem = NumOpt(vm.NumStrikeDefault);
+        BuildBulletRows();
         UpdateGateVisuals();
     }
 }

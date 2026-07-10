@@ -89,6 +89,7 @@
                                        Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
+                    <ListBoxItem Tag="bullets"><TextBlock Classes="label" Text="Bullets &amp; numbers"/></ListBoxItem>
                     <ListBoxItem Tag="data"><TextBlock Classes="label" Text="Data &amp; tools"/></ListBoxItem>
                 </ListBox>
             </Border>
@@ -226,6 +227,33 @@
                                 <TextBlock Classes="hint" Text="Deleted containers are kept per page and can be dragged back."/>
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding DeletedHistory, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
+
+                    <StackPanel x:Name="BulletsPanel" Spacing="6" IsVisible="False">
+                        <TextBlock Classes="section" Text="BULLET COLORS" Margin="0,4,0,2"/>
+                        <TextBlock Classes="hint"
+                                   Text="Each bullet style carries its own color. Numbered lists and checklists follow the text and accent instead."/>
+                        <StackPanel x:Name="BulletColorRows" Spacing="4" Margin="0,4,0,0"/>
+
+                        <TextBlock Classes="section" Text="NUMBERED LISTS"/>
+                        <TextBlock Classes="hint"
+                                   Text="How numbers render by default. A single list can still be overridden from the toolbar's bullet menu."/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="Bold numbers"/>
+                            <ComboBox x:Name="NumBoldBox" Grid.Column="1" Width="130"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="Italic numbers"/>
+                            <ComboBox x:Name="NumItalicBox" Grid.Column="1" Width="130"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="Underlined numbers"/>
+                            <ComboBox x:Name="NumUnderlineBox" Grid.Column="1" Width="130"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="Struck-through numbers"/>
+                            <ComboBox x:Name="NumStrikeBox" Grid.Column="1" Width="130"/>
                         </Grid>
                     </StackPanel>
 
