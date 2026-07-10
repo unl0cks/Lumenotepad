@@ -20,6 +20,7 @@ public sealed class AppSettings
     public bool DeletedHistory { get; set; } = true;        // deleted containers kept per page, restorable
     public bool StartRailVisible { get; set; } = true;      // notebooks rail shown at launch
     public bool StartPagesVisible { get; set; } = true;     // pages panel shown at launch
+    public bool AdvancedUnlocked { get; set; }              // advanced prefs gate accepted
 
     private const string FileName = "settings.json";
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };

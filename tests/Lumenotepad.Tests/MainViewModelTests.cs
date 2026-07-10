@@ -136,4 +136,26 @@ public class MainViewModelTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void ResetSettingsToDefaults_RestoresDefaults()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            vm.Theme = "Pink";
+            vm.FlatCovers = true;
+            vm.AdvancedUnlocked = true;
+            vm.StartRailVisible = false;
+
+            vm.ResetSettingsToDefaults();
+
+            Assert.Equal("Lumen", vm.Theme);
+            Assert.False(vm.FlatCovers);
+            Assert.False(vm.AdvancedUnlocked);
+            Assert.True(vm.StartRailVisible);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }

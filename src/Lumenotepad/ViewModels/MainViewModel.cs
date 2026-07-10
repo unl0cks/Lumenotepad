@@ -65,6 +65,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _extendedFonts;               // prefs: full font list vs curated
     [ObservableProperty] private bool _startRailVisible = true;    // prefs: rail shown at launch
     [ObservableProperty] private bool _startPagesVisible = true;   // prefs: pages panel shown at launch
+    [ObservableProperty] private bool _advancedUnlocked;            // prefs: advanced gate accepted
 
     /// <summary>The Light-paper toggle only means something on Lumen with Full theme off.</summary>
     public bool PaperToggleEnabled => Theme == "Lumen" && !FullTheme;
@@ -148,6 +149,7 @@ public partial class MainViewModel : ObservableObject
             ExtendedFonts = _settings.ExtendedFonts;
             StartRailVisible = _settings.StartRailVisible;
             StartPagesVisible = _settings.StartPagesVisible;
+            AdvancedUnlocked = _settings.AdvancedUnlocked;
             IsRailVisible = _settings.StartRailVisible;
             IsPagesVisible = _settings.StartPagesVisible;
         }
@@ -244,6 +246,13 @@ public partial class MainViewModel : ObservableObject
         _settings.Save(_settingsDir);
     }
 
+    partial void OnAdvancedUnlockedChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.AdvancedUnlocked = value;
+        _settings.Save(_settingsDir);
+    }
+
     // ---- gallery ordering (the order persists via order.json) ----
 
     public void SortNotebooksByName() =>
@@ -289,6 +298,22 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>Persist the whole tree (called after every structural change / rename).</summary>
     public void Save() => _store.Save(_workspace);
+
+    /// <summary>The portable userdata folder backing this workspace (null in the designer).</summary>
+    public string? SettingsDir => _settingsDir;
+
+    /// <summary>Reset every preference to its default (notebooks and notes untouched). Each setter
+    /// persists and re-applies through its own OnChanged hook.</summary>
+    public void ResetSettingsToDefaults()
+    {
+        var d = new AppSettings();
+        Theme = d.Theme; FullTheme = d.FullTheme; PaperLight = d.PaperLight;
+        FlatCovers = d.FlatCovers; GlossyAccents = d.GlossyAccents; ExtendedFonts = d.ExtendedFonts;
+        ToolbarPosition = d.ToolbarPosition; ToolbarScope = d.ToolbarScope;
+        ResizablePages = d.ResizablePages; DeletedHistory = d.DeletedHistory;
+        StartRailVisible = d.StartRailVisible; StartPagesVisible = d.StartPagesVisible;
+        AdvancedUnlocked = d.AdvancedUnlocked;
+    }
 
     // Per-page canvas documents: loaded from disk on first access, dirty-tracked on edit, saved by
     // FlushDirtyDocs (the view debounces it while typing; page switch and window close flush too).

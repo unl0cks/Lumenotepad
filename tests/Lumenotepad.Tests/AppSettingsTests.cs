@@ -52,4 +52,18 @@ public class AppSettingsTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void AdvancedUnlocked_DefaultsFalse_AndRoundTrips()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            Assert.False(new AppSettings().AdvancedUnlocked);
+            var s = new AppSettings { AdvancedUnlocked = true };
+            s.Save(dir);
+            Assert.True(AppSettings.Load(dir).AdvancedUnlocked);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }

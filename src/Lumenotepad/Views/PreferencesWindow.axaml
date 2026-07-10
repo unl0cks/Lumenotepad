@@ -78,6 +78,16 @@
                     <ListBoxItem Tag="appearance"><TextBlock Classes="label" Text="Appearance"/></ListBoxItem>
                     <ListBoxItem Tag="layout"><TextBlock Classes="label" Text="Layout"/></ListBoxItem>
                     <ListBoxItem Tag="canvas"><TextBlock Classes="label" Text="Canvas"/></ListBoxItem>
+                    <ListBoxItem IsEnabled="False" Margin="0,10,0,0" Padding="10,2">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock x:Name="GateLock" Text="&#xE72E;" FontFamily="{StaticResource IconFont}"
+                                       FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="ADVANCED" FontSize="10.5" FontWeight="SemiBold" LetterSpacing="1"
+                                       Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="data"><TextBlock Classes="label" Text="Data &amp; tools"/></ListBoxItem>
                 </ListBox>
             </Border>
 
@@ -179,6 +189,37 @@
                                 <TextBlock Classes="hint" Text="Deleted containers are kept per page and can be dragged back."/>
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding DeletedHistory, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
+
+                    <StackPanel x:Name="DataPanel" Spacing="6" IsVisible="False">
+                        <TextBlock Classes="section" Text="STORAGE" Margin="0,4,0,2"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,10,0">
+                                <TextBlock Classes="label" Text="Data folder"/>
+                                <TextBlock x:Name="DataFolderText" Classes="hint" Text="—"/>
+                            </StackPanel>
+                            <Button x:Name="OpenDataBtn" Grid.Column="1" Content="Open" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="Workspace size"/>
+                            <TextBlock x:Name="WorkspaceSizeText" Grid.Column="1" Classes="label" Text="—"/>
+                        </Grid>
+
+                        <TextBlock Classes="section" Text="MAINTENANCE"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,10,0">
+                                <TextBlock Classes="label" Text="Reset settings"/>
+                                <TextBlock Classes="hint" Text="Every preference returns to its default. Notebooks and notes stay."/>
+                            </StackPanel>
+                            <Button x:Name="ResetBtn" Grid.Column="1" Content="Reset…" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,10,0,0">
+                            <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,10,0">
+                                <TextBlock Classes="label" Text="Lock advanced settings"/>
+                                <TextBlock Classes="hint" Text="Hide the advanced categories behind the confirmation again."/>
+                            </StackPanel>
+                            <Button x:Name="RelockBtn" Grid.Column="1" Content="Lock" VerticalAlignment="Center"/>
                         </Grid>
                     </StackPanel>
 

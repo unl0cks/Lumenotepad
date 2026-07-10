@@ -14,7 +14,8 @@ namespace Lumenotepad.Views;
 public static class ConfirmDialog
 {
     public static async Task<bool> Show(Window owner, string title, string message,
-                                        string confirmText = "Delete", string cancelText = "Cancel")
+                                        string confirmText = "Delete", string cancelText = "Cancel",
+                                        bool danger = true)
     {
         var win = new Window
         {
@@ -57,7 +58,10 @@ public static class ConfirmDialog
             BorderBrush = new SolidColorBrush(Color.Parse(border)),
         };
         var cancel = MakeButton(cancelText, "#33FFFFFF", "#1AFFFFFF", "#40FFFFFF");
-        var confirm = MakeButton(confirmText, "#D64258", "#A62A3C", "#7E1F2D");
+        var t = Services.ThemeManager.Current;
+        var confirm = danger
+            ? MakeButton(confirmText, "#D64258", "#A62A3C", "#7E1F2D")                  // destructive red
+            : MakeButton(confirmText, t.AccentGradTop, t.AccentGradBottom, t.AccentDeep); // affirmative accent
 
         var buttons = new StackPanel
         {

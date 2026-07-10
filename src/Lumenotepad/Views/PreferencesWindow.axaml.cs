@@ -1,4 +1,8 @@
+using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.IO;
+using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Lumenotepad.Platform;
@@ -25,6 +29,7 @@ public partial class PreferencesWindow : Window
             ["appearance"] = AppearancePanel,
             ["layout"] = LayoutPanel,
             ["canvas"] = CanvasPanel,
+            ["data"] = DataPanel,
         };
 
         Opened += (_, _) =>
@@ -69,11 +74,85 @@ public partial class PreferencesWindow : Window
             if (Vm is { } vm && ToolbarScopeBox.SelectedItem is string scope) vm.ToolbarScope = scope;
         };
 
-        NavList.SelectionChanged += (_, _) =>
+        NavList.SelectionChanged += async (_, _) =>
         {
-            if (NavList.SelectedItem is ListBoxItem { Tag: string key }) ShowPanel(key);
+            if (_navGuard) return;
+            if (NavList.SelectedItem is not ListBoxItem { Tag: string key }) return;
+            if (IsGated(key) && Vm is { AdvancedUnlocked: false } vm)
+            {
+                _navGuard = true;
+                bool ok = await ConfirmDialog.Show(this, "Unlock advanced settings?",
+                    "Advanced settings change how notes are stored, exported, and rendered. " +
+                    "They're meant for power users — the defaults are right for most people.",
+                    "Unlock", danger: false);
+                if (!ok) { NavList.SelectedItem = _lastNav; _navGuard = false; return; }
+                vm.AdvancedUnlocked = true;
+                _navGuard = false;
+                UpdateGateVisuals();
+            }
+            _lastNav = NavList.SelectedItem;
+            if (key == "data") RefreshDataPanel();
+            ShowPanel(key);
         };
         NavList.SelectedIndex = 0;
+        _lastNav = NavList.SelectedItem;
+
+        OpenDataBtn.Click += (_, _) =>
+        {
+            if (Vm?.SettingsDir is { } d)
+                System.Diagnostics.Process.Start(
+                    new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{d}\"") { UseShellExecute = true });
+        };
+        ResetBtn.Click += async (_, _) =>
+        {
+            if (Vm is not { } vm) return;
+            if (!await ConfirmDialog.Show(this, "Reset settings?",
+                "Every preference returns to its default. Your notebooks and notes are not touched.",
+                "Reset")) return;
+            vm.ResetSettingsToDefaults();
+            SyncFromVm();
+            UpdateGateVisuals();
+            _navGuard = true; NavList.SelectedIndex = 0; _navGuard = false;
+            _lastNav = NavList.SelectedItem;
+            ShowPanel("appearance");
+        };
+        RelockBtn.Click += (_, _) =>
+        {
+            if (Vm is not { } vm) return;
+            vm.AdvancedUnlocked = false;
+            UpdateGateVisuals();
+            _navGuard = true; NavList.SelectedIndex = 0; _navGuard = false;
+            _lastNav = NavList.SelectedItem;
+            ShowPanel("appearance");
+        };
+    }
+
+    private bool _navGuard;
+    private object? _lastNav;
+
+    /// <summary>Categories behind the Advanced confirmation ("bullets"/"fonts" arrive in later parts).</summary>
+    private static bool IsGated(string key) => key is "data" or "bullets" or "fonts";
+
+    /// <summary>Locked = the small padlock shows on the ADVANCED group header.</summary>
+    private void UpdateGateVisuals() => GateLock.IsVisible = Vm is not { AdvancedUnlocked: true };
+
+    /// <summary>Fill the Data &amp; tools facts (folder path + size) when the panel shows.</summary>
+    private void RefreshDataPanel()
+    {
+        var dir = Vm?.SettingsDir;
+        DataFolderText.Text = dir ?? "—";
+        WorkspaceSizeText.Text = dir is null ? "—" : FolderSize(dir);
+    }
+
+    private static string FolderSize(string dir)
+    {
+        try
+        {
+            long b = Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories)
+                .Sum(f => new FileInfo(f).Length);
+            return b < 1 << 20 ? $"{b / 1024.0:0.#} KB" : $"{b / 1048576.0:0.#} MB";
+        }
+        catch { return "—"; }
     }
 
     /// <summary>Show one category panel and rise it in (the others hide).</summary>
@@ -90,5 +169,6 @@ public partial class PreferencesWindow : Window
         ThemeList.SelectedItem = vm.Theme;
         ToolbarPosBox.SelectedItem = vm.ToolbarPosition;
         ToolbarScopeBox.SelectedItem = vm.ToolbarScope;
+        UpdateGateVisuals();
     }
 }
