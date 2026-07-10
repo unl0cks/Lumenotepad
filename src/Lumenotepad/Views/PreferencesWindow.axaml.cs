@@ -144,6 +144,11 @@ public partial class PreferencesWindow : Window
             if (Vm is { } vm && Math.Abs(vm.GlassTint - e.NewValue) > 1e-6) vm.GlassTint = e.NewValue;
             GlassTintValue.Text = $"{(int)Math.Round(e.NewValue * 100)}%";
         };
+        MotionSpeedBox.ItemsSource = new[] { "Calm", "Normal", "Snappy" };
+        MotionSpeedBox.SelectionChanged += (_, _) =>
+        {
+            if (Vm is { } vm && MotionSpeedBox.SelectedItem is string speed) vm.MotionSpeed = speed;
+        };
         DataContextChanged += (_, _) => HookVmChanges();
         HookVmChanges();
         // The window subscribes to the long-lived VM; unhook on close or the VM pins the dead
@@ -268,6 +273,7 @@ public partial class PreferencesWindow : Window
         BuildAccentSwatches();
         GlassTintSlider.Value = vm.GlassTint;
         GlassTintValue.Text = $"{(int)Math.Round(vm.GlassTint * 100)}%";
+        MotionSpeedBox.SelectedItem = vm.MotionSpeed;
         UpdateGateVisuals();
     }
 }

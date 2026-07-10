@@ -409,6 +409,7 @@ public partial class MainView : UserControl
             ApplyGlossyAccents();
             ApplyPanels();
             ApplyGlassTint();
+            ApplyMotionPrefs();
             ApplyHomeSurface();
             HookCollectionAnimations();
             Toolbar.SetExtendedFonts(_hookedVm.ExtendedFonts);
@@ -529,6 +530,14 @@ public partial class MainView : UserControl
             new SolidColorBrush(t >= 0 ? Colors.White : Colors.Black, System.Math.Abs(t) * 0.35);
     }
 
+    /// <summary>Push the motion prefs onto the shared engine (statics — affect every window).</summary>
+    private void ApplyMotionPrefs()
+    {
+        if (Vm is not { } vm) return;
+        Motion.Enabled = !vm.ReduceMotion;
+        Motion.SpeedScale = vm.MotionSpeed switch { "Calm" => 1.4, "Snappy" => 0.6, _ => 1.0 };
+    }
+
     /// <summary>Place the toolbar per the VM: docked to a side of either the WINDOW body or the PAGE box.</summary>
     private void ApplyToolbarPlacement()
     {
@@ -595,6 +604,8 @@ public partial class MainView : UserControl
             ApplyGlossyAccents();
         else if (e.PropertyName == nameof(MainViewModel.GlassTint))
             ApplyGlassTint();
+        else if (e.PropertyName is nameof(MainViewModel.ReduceMotion) or nameof(MainViewModel.MotionSpeed))
+            ApplyMotionPrefs();
         else if (e.PropertyName == nameof(MainViewModel.ExtendedFonts))
             Toolbar.SetExtendedFonts(Vm?.ExtendedFonts ?? false);
         else if (e.PropertyName == nameof(MainViewModel.IsRailVisible))

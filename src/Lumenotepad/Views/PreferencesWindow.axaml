@@ -161,6 +161,22 @@
                                 TickFrequency="0.05" IsSnapToTickEnabled="True"/>
                         <TextBlock Classes="hint"
                                    Text="Darken or lighten what shows through the glass. Zero is untinted; themes with no glass anywhere ignore it."/>
+
+                        <TextBlock Classes="section" Text="MOTION"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Reduce motion"/>
+                                <TextBlock Classes="hint" Text="Skip animations — everything lands instantly."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding ReduceMotion, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Animation speed"/>
+                                <TextBlock Classes="hint" Text="How quickly the whole app moves."/>
+                            </StackPanel>
+                            <ComboBox x:Name="MotionSpeedBox" Grid.Column="1" Width="120" VerticalAlignment="Center"/>
+                        </Grid>
                     </StackPanel>
 
                     <StackPanel x:Name="LayoutPanel" Spacing="6" IsVisible="False">

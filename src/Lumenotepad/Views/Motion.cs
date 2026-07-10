@@ -18,6 +18,12 @@ public static class Motion
     public const int Fast = 220, Base = 360, Slow = 520;
     public const double Rise = 12;
 
+    /// <summary>Prefs: master motion switch + global speed. When disabled every tween snaps
+    /// straight to its final frame (and still fires onDone) so callers never special-case it.</summary>
+    public static bool Enabled { get; set; } = true;
+    public static double SpeedScale { get; set; } = 1.0;    // Calm 1.4 / Normal 1.0 / Snappy 0.6
+    public static int Ms(int ms) => Math.Max(1, (int)Math.Round(ms * SpeedScale));
+
     public static double EaseOut(double t) => 1 - Math.Pow(1 - t, 3);
     public static double EaseOutSoft(double t) => 1 - Math.Pow(1 - t, 5);   // stronger deceleration — no hard stop
     public static double EaseIn(double t) => t * t * t;
@@ -48,7 +54,16 @@ public static class Motion
         Stop(c);
         c.Transitions = null;
         ease ??= EaseOut;
-        int step = 0, steps = Steps(ms);
+        if (!Enabled)
+        {
+            c.RenderTransform = Make(tx, ty, ts);
+            bool restNow = Math.Abs(ts - 1) < 1e-3 && Math.Abs(tx) < 1e-3 && Math.Abs(ty) < 1e-3;
+            if (restNow) { c.ClearValue(Visual.RenderTransformProperty); c.ClearValue(Animatable.TransitionsProperty); }
+            if (toOpacity is double o) c.Opacity = o;
+            onDone?.Invoke();
+            return;
+        }
+        int step = 0, steps = Steps(Ms(ms));
         void Frame(double e)
         {
             c.RenderTransform = Make(Lerp(fx, tx, e), Lerp(fy, ty, e), Lerp(fs, ts, e));
@@ -96,7 +111,8 @@ public static class Motion
         Stop(c);
         double fromW = double.IsNaN(c.Width) ? c.Bounds.Width : c.Width;
         double toW = show ? fullWidth : 0, fromO = c.Opacity, toO = show ? 1 : 0;
-        int step = 0, steps = Steps(ms);
+        if (!Enabled) { c.Width = toW; c.Opacity = toO; return; }
+        int step = 0, steps = Steps(Ms(ms));
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(15) };
         timer.Tick += (_, _) =>
         {

@@ -23,4 +23,20 @@ public class MotionTests
     [Fact]
     public void Steps_never_zero()   // a 1ms animation still runs at least one frame
         => Assert.True(Motion.Steps(1) >= 1);
+
+    [Fact]
+    public void Ms_ScalesWithSpeedScale()
+    {
+        var old = Motion.SpeedScale;
+        try
+        {
+            Motion.SpeedScale = 1.4;
+            Assert.Equal(308, Motion.Ms(220));
+            Motion.SpeedScale = 0.6;
+            Assert.Equal(132, Motion.Ms(220));
+            Motion.SpeedScale = 1.0;
+            Assert.Equal(220, Motion.Ms(220));
+        }
+        finally { Motion.SpeedScale = old; }
+    }
 }

@@ -66,4 +66,21 @@ public class AppSettingsTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void MotionPrefs_DefaultAndRoundTrip()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            Assert.False(new AppSettings().ReduceMotion);
+            Assert.Equal("Normal", new AppSettings().MotionSpeed);
+            var s = new AppSettings { ReduceMotion = true, MotionSpeed = "Snappy" };
+            s.Save(dir);
+            var loaded = AppSettings.Load(dir);
+            Assert.True(loaded.ReduceMotion);
+            Assert.Equal("Snappy", loaded.MotionSpeed);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }

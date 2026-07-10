@@ -14,6 +14,8 @@ public sealed class AppSettings
     public bool ExtendedFonts { get; set; }                 // full installed-font list vs curated shortlist
     public string? CustomAccent { get; set; }               // accent override; null = theme's own
     public double GlassTint { get; set; }                   // -1..1: darken / lighten the glass; 0 = off
+    public bool ReduceMotion { get; set; }                  // skip animations entirely
+    public string MotionSpeed { get; set; } = "Normal";     // "Calm" | "Normal" | "Snappy"
     public string ToolbarPosition { get; set; } = "Top";    // "Top" | "Left" | "Right" | "Bottom"
     public string ToolbarScope { get; set; } = "Window";    // "Window" (window edge) | "Page" (inside the page box)
     public bool ResizablePages { get; set; } = true;        // note containers show resize handles
