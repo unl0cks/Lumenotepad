@@ -301,6 +301,20 @@ public sealed class RichTextEditor : Control
         }
     }
 
+    // ---- prefs: bullet colors + number-style defaults (pushed by MainView.ApplyBulletPrefs) ----
+    /// <summary>Per-style bullet color overrides (style → hex); missing = the built-in default.</summary>
+    public static readonly Dictionary<string, string> BulletColorOverrides = new();
+    /// <summary>Global number-style defaults; null = the number matches its line's text.</summary>
+    public static bool? NumBoldDefault, NumItalicDefault, NumUnderlineDefault, NumStrikeDefault;
+
+    /// <summary>Number-style resolution: paragraph override, then the global default, then the run.</summary>
+    public static bool NumFlag(bool? para, bool? global, bool run) => para ?? global ?? run;
+
+    /// <summary>Glyph + built-in color for a bullet style — the prefs UI reads this so the defaults
+    /// live in exactly one place.</summary>
+    public static (string Glyph, string Color)? BulletGlyphInfo(string style) =>
+        BulletGlyphs.TryGetValue(style, out var g) ? g : null;
+
     // ---- bullet glyphs: style key → (glyph, color). "num" and "check" are drawn specially. ----
     // No fixed size: every glyph has a different intrinsic design size (a ★ at 12pt is visually
     // bigger than a ♥ at 12pt, and some fall back to a different symbol font), so sizes are
@@ -384,10 +398,10 @@ public sealed class RichTextEditor : Control
             for (int j = pi - 1; j >= 0 && _doc.Paragraphs[j].Bullet == "num"; j--) n++;
             // The number inherits its text's bold/italic/underline/strike unless overridden per flag.
             var fr = p.Runs.Count > 0 ? p.Runs[0] : null;
-            bool bold = p.NumBold ?? fr?.Bold ?? false;
-            bool italic = p.NumItalic ?? fr?.Italic ?? false;
-            bool under = p.NumUnderline ?? fr?.Underline ?? false;
-            bool strike = p.NumStrike ?? fr?.Strike ?? false;
+            bool bold = NumFlag(p.NumBold, NumBoldDefault, fr?.Bold ?? false);
+            bool italic = NumFlag(p.NumItalic, NumItalicDefault, fr?.Italic ?? false);
+            bool under = NumFlag(p.NumUnderline, NumUnderlineDefault, fr?.Underline ?? false);
+            bool strike = NumFlag(p.NumStrike, NumStrikeDefault, fr?.Strike ?? false);
             var brush = ForegroundAlpha(0.8);   // follows the paper text color, not hardcoded white
             var ft = new FormattedText($"{n}.", System.Globalization.CultureInfo.CurrentCulture,
                 FlowDirection.LeftToRight,
@@ -412,7 +426,8 @@ public sealed class RichTextEditor : Control
             var cal = Calibrate(g.Glyph);
             double size = cal.UnitSize * targetInk;
             var ft = new FormattedText(g.Glyph, System.Globalization.CultureInfo.InvariantCulture,
-                FlowDirection.LeftToRight, new Typeface(GlyphFont), size, BrushFor(g.Color));
+                FlowDirection.LeftToRight, new Typeface(GlyphFont), size,
+                BrushFor(BulletColorOverrides.TryGetValue(p.Bullet, out var oc) ? oc : g.Color));
             // centre the actual INK on (cx, cy), not the layout box
             ctx.DrawText(ft, new Point(cx - cal.CenterXFrac * size, cy - cal.CenterYFrac * size));
         }
@@ -662,6 +677,50 @@ public sealed class RichTextEditor : Control
         var (a, b) = SelOrdered();
         bool clear = style is null || _doc.BulletAll(a, b, style);
         _doc.SetBullet(a, b, clear ? null : style);
+        _typingBurst = false;
+        RaiseSelectionChanged();
+    }
+
+    /// <summary>Effective number-style flags at the selection start when it sits in a numbered list
+    /// (override ?? global default ?? first text run), else null — drives the toolbar's number row.</summary>
+    public (bool Bold, bool Italic, bool Underline, bool Strike)? CurrentNumStyle
+    {
+        get
+        {
+            var (a, _) = SelOrdered();
+            _doc.Clamp(ref a);
+            var p = _doc.Paragraphs[a.Para];
+            if (p.Bullet != "num") return null;
+            var fr = p.Runs.Count > 0 ? p.Runs[0] : null;
+            return (NumFlag(p.NumBold, NumBoldDefault, fr?.Bold ?? false),
+                    NumFlag(p.NumItalic, NumItalicDefault, fr?.Italic ?? false),
+                    NumFlag(p.NumUnderline, NumUnderlineDefault, fr?.Underline ?? false),
+                    NumFlag(p.NumStrike, NumStrikeDefault, fr?.Strike ?? false));
+        }
+    }
+
+    /// <summary>Toggle one number-style flag ('b','i','u','s') for the whole numbered list at the
+    /// selection start — the override becomes the opposite of the current effective state.</summary>
+    public void ToggleNumStyle(char flag)
+    {
+        if (CurrentNumStyle is not { } cur) return;
+        var (a, _) = SelOrdered();
+        _doc.Clamp(ref a);
+        bool eff = flag switch { 'b' => cur.Bold, 'i' => cur.Italic, 'u' => cur.Underline, _ => cur.Strike };
+        PushUndo();
+        _doc.SetNumFlag(a.Para, flag, !eff);
+        _typingBurst = false;
+        RaiseSelectionChanged();
+    }
+
+    /// <summary>Clear the list's overrides — numbers return to the global default / their text.</summary>
+    public void ClearNumStyle()
+    {
+        if (CurrentBullet != "num") return;
+        var (a, _) = SelOrdered();
+        _doc.Clamp(ref a);
+        PushUndo();
+        foreach (char f in "bius") _doc.SetNumFlag(a.Para, f, null);
         _typingBurst = false;
         RaiseSelectionChanged();
     }

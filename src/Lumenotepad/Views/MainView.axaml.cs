@@ -413,6 +413,7 @@ public partial class MainView : UserControl
         {
             _hookedVm.PropertyChanged += OnVmPropertyChanged;
             _hookedVm.DocsDirtied += OnDocsDirtied;
+            ApplyBulletPrefs(rebuild: false);
             SyncEditorDocument();
             ApplyToolbarPlacement();
             ApplyCanvasPrefs();
@@ -540,6 +541,21 @@ public partial class MainView : UserControl
             new SolidColorBrush(t >= 0 ? Colors.White : Colors.Black, System.Math.Abs(t) * 0.35);
     }
 
+    /// <summary>Push the bullet/number prefs onto the editor statics; optionally rebuild the open
+    /// page so existing note boxes re-render with the new furniture.</summary>
+    private void ApplyBulletPrefs(bool rebuild)
+    {
+        if (Vm is not { } vm) return;
+        RichTextEditor.BulletColorOverrides.Clear();
+        foreach (var style in new[] { "dot", "arrow", "star", "heart", "flower", "spark" })
+            if (vm.BulletColorFor(style) is { } hex) RichTextEditor.BulletColorOverrides[style] = hex;
+        RichTextEditor.NumBoldDefault = vm.NumBoldDefault;
+        RichTextEditor.NumItalicDefault = vm.NumItalicDefault;
+        RichTextEditor.NumUnderlineDefault = vm.NumUnderlineDefault;
+        RichTextEditor.NumStrikeDefault = vm.NumStrikeDefault;
+        if (rebuild) PageCanvas.Document = PageCanvas.Document;
+    }
+
     /// <summary>Push the motion prefs onto the shared engine (statics — affect every window).</summary>
     private void ApplyMotionPrefs()
     {
@@ -616,6 +632,10 @@ public partial class MainView : UserControl
             ApplyGlassTint();
         else if (e.PropertyName is nameof(MainViewModel.ReduceMotion) or nameof(MainViewModel.MotionSpeed))
             ApplyMotionPrefs();
+        else if (e.PropertyName is nameof(MainViewModel.BulletPrefsVersion)
+                 or nameof(MainViewModel.NumBoldDefault) or nameof(MainViewModel.NumItalicDefault)
+                 or nameof(MainViewModel.NumUnderlineDefault) or nameof(MainViewModel.NumStrikeDefault))
+            ApplyBulletPrefs(rebuild: true);
         else if (e.PropertyName == nameof(MainViewModel.ExtendedFonts))
             Toolbar.SetExtendedFonts(Vm?.ExtendedFonts ?? false);
         else if (e.PropertyName == nameof(MainViewModel.IsRailVisible))

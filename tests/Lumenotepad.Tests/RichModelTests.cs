@@ -184,4 +184,15 @@ public class RichModelTests
         Assert.Equal(new DocPos(0, 2), d.Move(new DocPos(1, 0), -1));
         Assert.Equal(new DocPos(0, 0), d.Move(new DocPos(0, 0), -1));   // clamped at start
     }
+
+    [Fact]
+    public void NumFlag_ResolvesParaThenDefaultThenRun()
+    {
+        Assert.True(RichTextEditor.NumFlag(true, false, false));    // paragraph override wins
+        Assert.False(RichTextEditor.NumFlag(false, true, true));
+        Assert.True(RichTextEditor.NumFlag(null, true, false));     // then the global default
+        Assert.False(RichTextEditor.NumFlag(null, false, true));
+        Assert.True(RichTextEditor.NumFlag(null, null, true));      // then the text run
+        Assert.False(RichTextEditor.NumFlag(null, null, false));
+    }
 }
