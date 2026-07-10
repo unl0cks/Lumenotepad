@@ -1,10 +1,11 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Lumenotepad.ViewModels"
+        xmlns:controls="using:Lumenotepad.Controls"
         x:Class="Lumenotepad.Views.PreferencesWindow"
         x:DataType="vm:MainViewModel"
         Title="Preferences"
-        Width="640" Height="500" CanResize="False"
+        Width="760" Height="560" MinWidth="620" MinHeight="440"
         WindowDecorations="None" ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         FontFamily="{StaticResource UiFont}"
@@ -59,6 +60,7 @@
         </Style>
     </Window.Styles>
 
+    <Grid>
     <DockPanel>
         <!-- mini title bar -->
         <Grid DockPanel.Dock="Top" Height="36" ColumnDefinitions="*,Auto" x:Name="PrefsTitleBar"
@@ -262,4 +264,7 @@
             </ScrollViewer>
         </Grid>
     </DockPanel>
+    <!-- top-most: thin edge/corner grips that make the chromeless window resizable -->
+    <controls:WindowResizeBorder/>
+    </Grid>
 </Window>
