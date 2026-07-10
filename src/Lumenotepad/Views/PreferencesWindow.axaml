@@ -160,7 +160,7 @@
                         <Slider x:Name="GlassTintSlider" Minimum="-1" Maximum="1"
                                 TickFrequency="0.05" IsSnapToTickEnabled="True"/>
                         <TextBlock Classes="hint"
-                                   Text="Darken or lighten what shows through the glass. Zero is untinted; solid themes ignore it."/>
+                                   Text="Darken or lighten what shows through the glass. Zero is untinted; themes with no glass anywhere ignore it."/>
                     </StackPanel>
 
                     <StackPanel x:Name="LayoutPanel" Spacing="6" IsVisible="False">

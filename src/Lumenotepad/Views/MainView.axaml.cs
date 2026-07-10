@@ -516,7 +516,9 @@ public partial class MainView : UserControl
     }
 
     /// <summary>"Glass tint": white/black veil under all content, tinting whatever the acrylic
-    /// backdrop shows through. Hidden entirely on solid (non-glass) themes and at zero.</summary>
+    /// backdrop shows through. Hidden only when the theme shows no acrylic anywhere (GlassWindow
+    /// false, i.e. solid frame + Full theme) or at ~zero — solid+FullOff themes still show it
+    /// through the glass page box.</summary>
     private void ApplyGlassTint()
     {
         if (Vm is not { } vm) return;

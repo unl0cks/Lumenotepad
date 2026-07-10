@@ -177,7 +177,9 @@
     <Grid RowDefinitions="38,*">
 
         <!-- Glass tint: a veil UNDER all content that lightens/darkens what the acrylic shows
-             through (prefs slider). First child = bottom of z-order; hidden on solid themes. -->
+             through (prefs slider). First child = bottom of z-order; hidden only when the theme
+             shows no acrylic at all (GlassWindow false) — solid frames with Full theme OFF still
+             show it through the glass page box. -->
         <Border x:Name="GlassTintVeil" Grid.RowSpan="2" IsVisible="False" IsHitTestVisible="False"/>
 
         <!-- ============ Title bar ============ -->
