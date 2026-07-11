@@ -423,7 +423,7 @@ public partial class MainView : UserControl
             ApplyMotionPrefs();
             ApplyHomeSurface();
             HookCollectionAnimations();
-            Toolbar.SetExtendedFonts(_hookedVm.ExtendedFonts);
+            Toolbar.SetFontPrefs(_hookedVm.ExtendedFonts, _hookedVm.DisabledFontsList);
         }
     }
 
@@ -636,8 +636,10 @@ public partial class MainView : UserControl
                  or nameof(MainViewModel.NumBoldDefault) or nameof(MainViewModel.NumItalicDefault)
                  or nameof(MainViewModel.NumUnderlineDefault) or nameof(MainViewModel.NumStrikeDefault))
             ApplyBulletPrefs(rebuild: true);
-        else if (e.PropertyName == nameof(MainViewModel.ExtendedFonts))
-            Toolbar.SetExtendedFonts(Vm?.ExtendedFonts ?? false);
+        else if (e.PropertyName is nameof(MainViewModel.ExtendedFonts) or nameof(MainViewModel.FontPrefsVersion))
+        {
+            if (Vm is { } fvm) Toolbar.SetFontPrefs(fvm.ExtendedFonts, fvm.DisabledFontsList);
+        }
         else if (e.PropertyName == nameof(MainViewModel.IsRailVisible))
             Motion.Reveal(RailPanel, 64, Vm?.IsRailVisible ?? true);
         else if (e.PropertyName == nameof(MainViewModel.IsPagesVisible))

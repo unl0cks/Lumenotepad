@@ -266,12 +266,18 @@ public partial class FormatToolbar : UserControl
     }
 
     private bool _extendedFonts;
+    private System.Collections.Generic.IReadOnlyCollection<string>? _disabledFonts;
 
-    /// <summary>"Extended font list" preference: every installed family vs the curated shortlist.</summary>
-    public void SetExtendedFonts(bool extended)
+    /// <summary>Fonts prefs: the full installed list vs the curated shortlist, minus the
+    /// curation blocklist. Rebuilds the menu only when something actually changed.</summary>
+    public void SetFontPrefs(bool extended, System.Collections.Generic.IReadOnlyCollection<string> disabled)
     {
-        if (_extendedFonts == extended && FontList.ItemsSource is not null) return;
+        bool same = _extendedFonts == extended && _disabledFonts is not null
+            && _disabledFonts.Count == disabled.Count
+            && _disabledFonts.SequenceEqual(disabled);
+        if (same && FontList.ItemsSource is not null) return;
         _extendedFonts = extended;
+        _disabledFonts = disabled.ToList();               // snapshot — the VM list mutates in place
         RefreshFontList();
     }
 
@@ -298,7 +304,7 @@ public partial class FormatToolbar : UserControl
     private void RefreshFontList()
     {
         var names = new System.Collections.Generic.List<string> { "(Default)" };
-        names.AddRange(Services.AppFonts.ListNames(_extendedFonts));
+        names.AddRange(Services.AppFonts.ListNames(_extendedFonts, _disabledFonts));
         FontList.ItemsSource = names;
     }
 
