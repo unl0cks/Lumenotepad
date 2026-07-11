@@ -406,6 +406,10 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnRecentCountChanged(int value)
     {
+        // The ctor's settings-load fires this BEFORE the workspace is built — RefreshHome would
+        // NRE on a persisted non-default count. The ctor calls RefreshHome itself at the end,
+        // so skipping here is correct, not just safe.
+        if (_workspace is null) return;
         RefreshHome();                                   // the strip resizes live
         if (_settings is null || _settingsDir is null) return;
         _settings.RecentCount = value;

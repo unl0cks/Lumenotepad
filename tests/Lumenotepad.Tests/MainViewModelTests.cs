@@ -252,4 +252,17 @@ public class MainViewModelTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void PersistedNonDefaultRecentCount_DoesNotCrashConstruction()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            new AppSettings { RecentCount = 8 }.Save(dir);
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);   // must not throw
+            Assert.Equal(8, vm.RecentCount);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }
