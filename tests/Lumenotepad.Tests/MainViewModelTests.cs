@@ -209,4 +209,47 @@ public class MainViewModelTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void LaunchTarget_LastPage_LandsInEditorOnMatch()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            var seed = new MainViewModel(new WorkspaceStore(dir), dir);
+            var page = seed.SelectedPage!;
+            new AppSettings { LaunchTarget = "LastPage", LastPageId = page.Id }.Save(dir);
+
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            Assert.False(vm.IsHomeVisible);
+            Assert.Equal(page.Id, vm.SelectedPage?.Id);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void LaunchTarget_LastPage_FallsBackToHomeWhenGone()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            new AppSettings { LaunchTarget = "LastPage", LastPageId = "no-such-page" }.Save(dir);
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            Assert.True(vm.IsHomeVisible);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void SelectingAPage_TracksLastPageId()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            var id = vm.SelectedPage!.Id;
+            Assert.Equal(id, AppSettings.Load(dir).LastPageId);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }

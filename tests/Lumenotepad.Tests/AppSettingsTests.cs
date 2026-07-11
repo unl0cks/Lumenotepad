@@ -120,4 +120,39 @@ public class AppSettingsTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void BehaviorPrefs_DefaultsAndRoundTrip()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            var d = new AppSettings();
+            Assert.Equal("Home", d.LaunchTarget);
+            Assert.Null(d.LastPageId);
+            Assert.Equal(900, d.AutosaveMs);
+            Assert.True(d.ConfirmDeleteNotebook);
+            Assert.True(d.ConfirmDeleteSection);
+            Assert.True(d.ConfirmDeletePage);
+            Assert.True(d.ConfirmDeleteContainer);
+            Assert.Equal(5, d.RecentCount);
+            Assert.False(d.AlwaysOnTop);
+
+            var s = new AppSettings
+            {
+                LaunchTarget = "LastPage", LastPageId = "p1", AutosaveMs = 2000,
+                ConfirmDeletePage = false, RecentCount = 8, AlwaysOnTop = true,
+            };
+            s.Save(dir);
+            var loaded = AppSettings.Load(dir);
+            Assert.Equal("LastPage", loaded.LaunchTarget);
+            Assert.Equal("p1", loaded.LastPageId);
+            Assert.Equal(2000, loaded.AutosaveMs);
+            Assert.False(loaded.ConfirmDeletePage);
+            Assert.True(loaded.ConfirmDeleteNotebook);
+            Assert.Equal(8, loaded.RecentCount);
+            Assert.True(loaded.AlwaysOnTop);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }

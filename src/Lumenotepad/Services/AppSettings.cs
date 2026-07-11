@@ -23,6 +23,15 @@ public sealed class AppSettings
     public bool? NumUnderlineDefault { get; set; }
     public bool? NumStrikeDefault { get; set; }
     public List<string> DisabledFonts { get; set; } = new();  // fonts hidden from the toolbar menu
+    public string LaunchTarget { get; set; } = "Home";      // "Home" | "LastPage"
+    public string? LastPageId { get; set; }                 // auto-tracked; not a pref, not reset
+    public int AutosaveMs { get; set; } = 900;              // typing → save debounce (100..5000)
+    public bool ConfirmDeleteNotebook { get; set; } = true; // per-kind "are you sure" prompts
+    public bool ConfirmDeleteSection { get; set; } = true;
+    public bool ConfirmDeletePage { get; set; } = true;
+    public bool ConfirmDeleteContainer { get; set; } = true;
+    public int RecentCount { get; set; } = 5;               // homepage "Jump back in" entries (0..10)
+    public bool AlwaysOnTop { get; set; }
     public string ToolbarPosition { get; set; } = "Top";    // "Top" | "Left" | "Right" | "Bottom"
     public string ToolbarScope { get; set; } = "Window";    // "Window" (window edge) | "Page" (inside the page box)
     public bool ResizablePages { get; set; } = true;        // note containers show resize handles

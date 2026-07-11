@@ -195,15 +195,20 @@ Guard-save hooks (after `OnNumStrikeDefaultChanged`, one per property — all id
 
 - [ ] **Step 5: Launch-target resolution + last-page tracking + recents count.**
 
-In the ctor, REPLACE the tail `SelectedNotebook = Notebooks.FirstOrDefault(); RefreshHome();` with:
+In the ctor, REPLACE the tail `SelectedNotebook = Notebooks.FirstOrDefault(); RefreshHome();` with
+(AMENDED after implementation caught an ordering bug: the default-selection cascade fires
+`OnSelectedPageChanged`, which OVERWRITES `_settings.LastPageId` before the resolution block would
+read it — so the target id must be captured into a local FIRST):
 
 ```csharp
+        // Capture BEFORE the default selection below — its cascade re-tracks LastPageId.
+        var lastPageId = _settings is { LaunchTarget: "LastPage" } ? _settings.LastPageId : null;
         SelectedNotebook = Notebooks.FirstOrDefault();
-        if (_settings is { LaunchTarget: "LastPage", LastPageId.Length: > 0 })
+        if (!string.IsNullOrEmpty(lastPageId))
         {
             var hit = Notebooks
                 .SelectMany(nb => nb.Sections.SelectMany(s => s.Pages.Select(p => (nb, s, p))))
-                .FirstOrDefault(x => x.p.Id == _settings.LastPageId);
+                .FirstOrDefault(x => x.p.Id == lastPageId);
             if (hit.p is not null)
             {
                 SelectedNotebook = hit.nb;

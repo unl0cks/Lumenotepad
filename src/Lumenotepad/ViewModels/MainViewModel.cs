@@ -80,6 +80,15 @@ public partial class MainViewModel : ObservableObject
     /// <summary>Bumped whenever the fonts-curation list changes — the toolbar menu refreshes.</summary>
     [ObservableProperty] private int _fontPrefsVersion;
 
+    [ObservableProperty] private string _launchTarget = "Home";     // prefs: "Home" | "LastPage"
+    [ObservableProperty] private int _autosaveMs = 900;             // prefs: save debounce
+    [ObservableProperty] private bool _confirmDeleteNotebook = true;
+    [ObservableProperty] private bool _confirmDeleteSection = true;
+    [ObservableProperty] private bool _confirmDeletePage = true;
+    [ObservableProperty] private bool _confirmDeleteContainer = true;
+    [ObservableProperty] private int _recentCount = 5;              // prefs: Jump back in entries
+    [ObservableProperty] private bool _alwaysOnTop;
+
     /// <summary>The Light-paper toggle only means something on Lumen with Full theme off.</summary>
     public bool PaperToggleEnabled => Theme == "Lumen" && !FullTheme;
 
@@ -106,7 +115,7 @@ public partial class MainViewModel : ObservableObject
             .SelectMany(nb => nb.Sections.SelectMany(s => s.Pages.Select(p => (nb, s, p, t: _store.PageDocTime(nb, p.Id)))))
             .Where(x => x.t is not null)
             .OrderByDescending(x => x.t)
-            .Take(5);
+            .Take(Math.Clamp(RecentCount, 0, 10));
         var now = DateTime.UtcNow;
         foreach (var (nb, s, p, t) in recents)
             RecentPages.Add(new RecentPage(nb, s, p, AgoLabel(now - t!.Value)));
@@ -173,9 +182,32 @@ public partial class MainViewModel : ObservableObject
             NumStrikeDefault = _settings.NumStrikeDefault;
             IsRailVisible = _settings.StartRailVisible;
             IsPagesVisible = _settings.StartPagesVisible;
+            LaunchTarget = _settings.LaunchTarget;
+            AutosaveMs = _settings.AutosaveMs;
+            ConfirmDeleteNotebook = _settings.ConfirmDeleteNotebook;
+            ConfirmDeleteSection = _settings.ConfirmDeleteSection;
+            ConfirmDeletePage = _settings.ConfirmDeletePage;
+            ConfirmDeleteContainer = _settings.ConfirmDeleteContainer;
+            RecentCount = _settings.RecentCount;
+            AlwaysOnTop = _settings.AlwaysOnTop;
         }
         _workspace = store.LoadOrSeed();
+        // Capture BEFORE the default selection below — its cascade re-tracks LastPageId.
+        var lastPageId = _settings is { LaunchTarget: "LastPage" } ? _settings.LastPageId : null;
         SelectedNotebook = Notebooks.FirstOrDefault();
+        if (!string.IsNullOrEmpty(lastPageId))
+        {
+            var hit = Notebooks
+                .SelectMany(nb => nb.Sections.SelectMany(s => s.Pages.Select(p => (nb, s, p))))
+                .FirstOrDefault(x => x.p.Id == lastPageId);
+            if (hit.p is not null)
+            {
+                SelectedNotebook = hit.nb;
+                SelectedSection = hit.s;
+                SelectedPage = hit.p;
+                IsHomeVisible = false;              // land straight in the editor
+            }
+        }
         RefreshHome();
     }
 
@@ -330,6 +362,63 @@ public partial class MainViewModel : ObservableObject
         _settings.Save(_settingsDir);
     }
 
+    partial void OnLaunchTargetChanged(string value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.LaunchTarget = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnAutosaveMsChanged(int value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.AutosaveMs = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnConfirmDeleteNotebookChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.ConfirmDeleteNotebook = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnConfirmDeleteSectionChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.ConfirmDeleteSection = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnConfirmDeletePageChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.ConfirmDeletePage = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnConfirmDeleteContainerChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.ConfirmDeleteContainer = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnRecentCountChanged(int value)
+    {
+        RefreshHome();                                   // the strip resizes live
+        if (_settings is null || _settingsDir is null) return;
+        _settings.RecentCount = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnAlwaysOnTopChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.AlwaysOnTop = value;
+        _settings.Save(_settingsDir);
+    }
+
     // ---- gallery ordering (the order persists via order.json) ----
 
     public void SortNotebooksByName() =>
@@ -428,6 +517,10 @@ public partial class MainViewModel : ObservableObject
         ReduceMotion = d.ReduceMotion; MotionSpeed = d.MotionSpeed;
         NumBoldDefault = d.NumBoldDefault; NumItalicDefault = d.NumItalicDefault;
         NumUnderlineDefault = d.NumUnderlineDefault; NumStrikeDefault = d.NumStrikeDefault;
+        LaunchTarget = d.LaunchTarget; AutosaveMs = d.AutosaveMs;
+        ConfirmDeleteNotebook = d.ConfirmDeleteNotebook; ConfirmDeleteSection = d.ConfirmDeleteSection;
+        ConfirmDeletePage = d.ConfirmDeletePage; ConfirmDeleteContainer = d.ConfirmDeleteContainer;
+        RecentCount = d.RecentCount; AlwaysOnTop = d.AlwaysOnTop;
         if (_settings is not null && _settingsDir is not null && _settings.BulletColors.Count > 0)
         {
             _settings.BulletColors.Clear();
@@ -506,6 +599,12 @@ public partial class MainViewModel : ObservableObject
     {
         if (value is null && SelectedSection is { Pages.Count: > 0 } sec)
             SelectedPage = sec.Pages[0];
+
+        if (value is not null && _settings is not null && _settingsDir is not null)
+        {
+            _settings.LastPageId = value.Id;        // bookkeeping for "open last page" launches
+            _settings.Save(_settingsDir);
+        }
     }
 
     [RelayCommand]
