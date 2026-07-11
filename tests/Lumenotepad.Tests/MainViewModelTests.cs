@@ -265,4 +265,24 @@ public class MainViewModelTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void Greeting_PersonalizesAndRefreshes()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            new AppSettings { UserName = "Sam", ShowHomeStats = false }.Save(dir);
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);   // must not crash (ctor gotcha)
+            Assert.Contains(", Sam —", vm.Greeting);
+            Assert.DoesNotContain("notebook", vm.HomeSubtitle);
+
+            vm.UserName = "";
+            Assert.DoesNotContain(",", vm.Greeting.Split('—')[0]);      // plain greeting again
+
+            vm.ShowHomeStats = true;
+            Assert.Contains("notebook", vm.HomeSubtitle);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }

@@ -155,4 +155,45 @@ public class AppSettingsTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void PersonalTouchPrefs_DefaultsAndRoundTrip()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            var d = new AppSettings();
+            Assert.Null(d.CaretColor);
+            Assert.Equal(1.6, d.CaretWidth, 3);
+            Assert.True(d.CaretBlink);
+            Assert.Equal("#66FFD666", d.DefaultHighlight);
+            Assert.Equal("yyyy-MM-dd", d.DateFormat);
+            Assert.Equal(360, d.NewNoteWidth, 3);
+            Assert.False(d.AccentFollowsNotebook);
+            Assert.Equal("", d.UserName);
+            Assert.True(d.ShowHomeStats);
+            Assert.Equal("Medium", d.CardSize);
+
+            var s = new AppSettings
+            {
+                CaretColor = "#FF0000", CaretWidth = 2.5, CaretBlink = false,
+                DefaultHighlight = "#6699E28A", DateFormat = "HH:mm", NewNoteWidth = 480,
+                AccentFollowsNotebook = true, UserName = "Sam", ShowHomeStats = false,
+                CardSize = "Large",
+            };
+            s.Save(dir);
+            var loaded = AppSettings.Load(dir);
+            Assert.Equal("#FF0000", loaded.CaretColor);
+            Assert.Equal(2.5, loaded.CaretWidth, 3);
+            Assert.False(loaded.CaretBlink);
+            Assert.Equal("#6699E28A", loaded.DefaultHighlight);
+            Assert.Equal("HH:mm", loaded.DateFormat);
+            Assert.Equal(480, loaded.NewNoteWidth, 3);
+            Assert.True(loaded.AccentFollowsNotebook);
+            Assert.Equal("Sam", loaded.UserName);
+            Assert.False(loaded.ShowHomeStats);
+            Assert.Equal("Large", loaded.CardSize);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }

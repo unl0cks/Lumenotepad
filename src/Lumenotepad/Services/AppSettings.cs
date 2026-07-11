@@ -32,6 +32,16 @@ public sealed class AppSettings
     public bool ConfirmDeleteContainer { get; set; } = true;
     public int RecentCount { get; set; } = 5;               // homepage "Jump back in" entries (0..10)
     public bool AlwaysOnTop { get; set; }
+    public string? CaretColor { get; set; }                 // null = the theme accent
+    public double CaretWidth { get; set; } = 1.6;           // 1..3 px
+    public bool CaretBlink { get; set; } = true;
+    public string DefaultHighlight { get; set; } = "#66FFD666";  // Ctrl+Shift+H color
+    public string DateFormat { get; set; } = "yyyy-MM-dd";  // Ctrl+Shift+T insert format
+    public double NewNoteWidth { get; set; } = 360;         // new container width (height is auto)
+    public bool AccentFollowsNotebook { get; set; }         // inside a notebook, its color tints the UI
+    public string UserName { get; set; } = "";              // greeting name; "" = plain greeting
+    public bool ShowHomeStats { get; set; } = true;         // notebook/page counts under the greeting
+    public string CardSize { get; set; } = "Medium";        // gallery covers: Small | Medium | Large
     public string ToolbarPosition { get; set; } = "Top";    // "Top" | "Left" | "Right" | "Bottom"
     public string ToolbarScope { get; set; } = "Window";    // "Window" (window edge) | "Page" (inside the page box)
     public bool ResizablePages { get; set; } = true;        // note containers show resize handles

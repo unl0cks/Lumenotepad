@@ -88,28 +88,40 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _confirmDeleteContainer = true;
     [ObservableProperty] private int _recentCount = 5;              // prefs: Jump back in entries
     [ObservableProperty] private bool _alwaysOnTop;
+    [ObservableProperty] private string? _caretColor;               // prefs: null = accent
+    [ObservableProperty] private double _caretWidth = 1.6;
+    [ObservableProperty] private bool _caretBlink = true;
+    [ObservableProperty] private string _defaultHighlight = "#66FFD666";
+    [ObservableProperty] private string _dateFormat = "yyyy-MM-dd";
+    [ObservableProperty] private double _newNoteWidth = 360;
+    [ObservableProperty] private bool _accentFollowsNotebook;
+    [ObservableProperty] private string _userName = "";
+    [ObservableProperty] private bool _showHomeStats = true;
+    [ObservableProperty] private string _cardSize = "Medium";       // Small | Medium | Large
 
     /// <summary>The Light-paper toggle only means something on Lumen with Full theme off.</summary>
     public bool PaperToggleEnabled => Theme == "Lumen" && !FullTheme;
 
     // ---- homepage life: greeting, stats, and the "Jump back in" strip ----
 
-    public string Greeting { get; } = BuildGreeting();
+    [ObservableProperty] private string _greeting = BuildGreeting("");
     [ObservableProperty] private string _homeSubtitle = "Pick up where you left off, or start something new.";
     [ObservableProperty] private bool _hasRecents;
     public ObservableCollection<RecentPage> RecentPages { get; } = new();
 
-    private static string BuildGreeting()
+    private static string BuildGreeting(string name)
     {
         var now = DateTime.Now;
         var word = now.Hour < 5 ? "Up late" : now.Hour < 12 ? "Good morning"
                  : now.Hour < 18 ? "Good afternoon" : "Good evening";
-        return $"{word} — it's {now:dddd, MMMM d}";
+        var who = string.IsNullOrWhiteSpace(name) ? "" : $", {name.Trim()}";
+        return $"{word}{who} — it's {now:dddd, MMMM d}";
     }
 
     /// <summary>Rebuild the recents strip + stats line (called every time the homepage shows).</summary>
     public void RefreshHome()
     {
+        Greeting = BuildGreeting(UserName);
         RecentPages.Clear();
         var recents = Notebooks
             .SelectMany(nb => nb.Sections.SelectMany(s => s.Pages.Select(p => (nb, s, p, t: _store.PageDocTime(nb, p.Id)))))
@@ -122,8 +134,10 @@ public partial class MainViewModel : ObservableObject
         HasRecents = RecentPages.Count > 0;
 
         int pages = Notebooks.Sum(n => n.Sections.Sum(sec => sec.Pages.Count));
-        HomeSubtitle = $"{Notebooks.Count} {(Notebooks.Count == 1 ? "notebook" : "notebooks")} · " +
-                       $"{pages} {(pages == 1 ? "page" : "pages")} — pick up where you left off.";
+        HomeSubtitle = ShowHomeStats
+            ? $"{Notebooks.Count} {(Notebooks.Count == 1 ? "notebook" : "notebooks")} · " +
+              $"{pages} {(pages == 1 ? "page" : "pages")} — pick up where you left off."
+            : "Pick up where you left off, or start something new.";
     }
 
     private static string AgoLabel(TimeSpan d) =>
@@ -190,6 +204,16 @@ public partial class MainViewModel : ObservableObject
             ConfirmDeleteContainer = _settings.ConfirmDeleteContainer;
             RecentCount = _settings.RecentCount;
             AlwaysOnTop = _settings.AlwaysOnTop;
+            CaretColor = _settings.CaretColor;
+            CaretWidth = _settings.CaretWidth;
+            CaretBlink = _settings.CaretBlink;
+            DefaultHighlight = _settings.DefaultHighlight;
+            DateFormat = _settings.DateFormat;
+            NewNoteWidth = _settings.NewNoteWidth;
+            AccentFollowsNotebook = _settings.AccentFollowsNotebook;
+            UserName = _settings.UserName;
+            ShowHomeStats = _settings.ShowHomeStats;
+            CardSize = _settings.CardSize;
         }
         _workspace = store.LoadOrSeed();
         // Capture BEFORE the default selection below — its cascade re-tracks LastPageId.
@@ -423,6 +447,78 @@ public partial class MainViewModel : ObservableObject
         _settings.Save(_settingsDir);
     }
 
+    partial void OnCaretColorChanged(string? value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.CaretColor = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnCaretWidthChanged(double value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.CaretWidth = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnCaretBlinkChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.CaretBlink = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnDefaultHighlightChanged(string value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.DefaultHighlight = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnDateFormatChanged(string value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.DateFormat = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnNewNoteWidthChanged(double value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.NewNoteWidth = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnAccentFollowsNotebookChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.AccentFollowsNotebook = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnUserNameChanged(string value)
+    {
+        if (_workspace is not null) Greeting = BuildGreeting(value);   // live greeting refresh
+        if (_settings is null || _settingsDir is null) return;
+        _settings.UserName = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnShowHomeStatsChanged(bool value)
+    {
+        if (_workspace is not null) RefreshHome();                     // subtitle swaps live
+        if (_settings is null || _settingsDir is null) return;
+        _settings.ShowHomeStats = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnCardSizeChanged(string value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.CardSize = value;
+        _settings.Save(_settingsDir);
+    }
+
     // ---- gallery ordering (the order persists via order.json) ----
 
     public void SortNotebooksByName() =>
@@ -525,6 +621,10 @@ public partial class MainViewModel : ObservableObject
         ConfirmDeleteNotebook = d.ConfirmDeleteNotebook; ConfirmDeleteSection = d.ConfirmDeleteSection;
         ConfirmDeletePage = d.ConfirmDeletePage; ConfirmDeleteContainer = d.ConfirmDeleteContainer;
         RecentCount = d.RecentCount; AlwaysOnTop = d.AlwaysOnTop;
+        CaretColor = d.CaretColor; CaretWidth = d.CaretWidth; CaretBlink = d.CaretBlink;
+        DefaultHighlight = d.DefaultHighlight; DateFormat = d.DateFormat;
+        NewNoteWidth = d.NewNoteWidth; AccentFollowsNotebook = d.AccentFollowsNotebook;
+        UserName = d.UserName; ShowHomeStats = d.ShowHomeStats; CardSize = d.CardSize;
         if (_settings is not null && _settingsDir is not null && _settings.BulletColors.Count > 0)
         {
             _settings.BulletColors.Clear();
