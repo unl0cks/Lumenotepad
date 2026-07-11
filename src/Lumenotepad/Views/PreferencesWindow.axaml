@@ -91,6 +91,8 @@
                     <ListBoxItem Tag="appearance"><TextBlock Classes="label" Text="Appearance"/></ListBoxItem>
                     <ListBoxItem Tag="layout"><TextBlock Classes="label" Text="Layout"/></ListBoxItem>
                     <ListBoxItem Tag="canvas"><TextBlock Classes="label" Text="Canvas"/></ListBoxItem>
+                    <ListBoxItem Tag="editor"><TextBlock Classes="label" Text="Editor"/></ListBoxItem>
+                    <ListBoxItem Tag="shortcuts"><TextBlock Classes="label" Text="Shortcuts"/></ListBoxItem>
                     <ListBoxItem IsEnabled="False" Margin="0,10,0,0" Padding="10,2">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <TextBlock x:Name="GateLock" Text="&#xE72E;" FontFamily="{StaticResource IconFont}"
@@ -152,6 +154,18 @@
                         </Grid>
                         <Slider x:Name="RecentCountSlider" Minimum="0" Maximum="10"
                                 TickFrequency="1" IsSnapToTickEnabled="True"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Greet me as"/>
+                                <TextBlock Classes="hint" Text="Blank keeps the plain greeting."/>
+                            </StackPanel>
+                            <TextBox x:Name="UserNameBox" Grid.Column="1" Width="150" FontSize="12.5"
+                                     VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="Show notebook &amp; page counts"/>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowHomeStats, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
 
                         <TextBlock Classes="section" Text="ASK BEFORE DELETING"/>
                         <Grid ColumnDefinitions="*,Auto">
@@ -249,6 +263,19 @@
                             </StackPanel>
                             <ComboBox x:Name="MotionSpeedBox" Grid.Column="1" Width="120" VerticalAlignment="Center"/>
                         </Grid>
+
+                        <TextBlock Classes="section" Text="GALLERY"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Accent follows notebook"/>
+                                <TextBlock Classes="hint" Text="Inside a notebook, its cover color tints the whole app."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding AccentFollowsNotebook, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="Cover size"/>
+                            <ComboBox x:Name="CardSizeBox" Grid.Column="1" Width="120" VerticalAlignment="Center"/>
+                        </Grid>
                     </StackPanel>
 
                     <StackPanel x:Name="LayoutPanel" Spacing="6" IsVisible="False">
@@ -297,6 +324,60 @@
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding DeletedHistory, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="New container width"/>
+                            <TextBlock x:Name="NewNoteWidthValue" Grid.Column="1" Classes="label" Text="360"/>
+                        </Grid>
+                        <Slider x:Name="NewNoteWidthSlider" Minimum="240" Maximum="640"
+                                TickFrequency="20" IsSnapToTickEnabled="True"/>
+                    </StackPanel>
+
+                    <StackPanel x:Name="EditorPanel" Spacing="6" IsVisible="False">
+                        <TextBlock Classes="section" Text="CARET" Margin="0,4,0,2"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Caret color"/>
+                                <TextBlock Classes="hint" Text="Blank hex returns to the accent color."/>
+                            </StackPanel>
+                            <TextBox x:Name="CaretColorBox" Grid.Column="1" Width="110" FontSize="12.5"
+                                     PlaceholderText="#RRGGBB" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="Caret width"/>
+                            <TextBlock x:Name="CaretWidthValue" Grid.Column="1" Classes="hint" Text="1.6"/>
+                        </Grid>
+                        <Slider x:Name="CaretWidthSlider" Minimum="1" Maximum="3"
+                                TickFrequency="0.1" IsSnapToTickEnabled="True"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Caret blinks"/>
+                                <TextBlock Classes="hint" Text="Off keeps a steady caret (it still glides)."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding CaretBlink, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <TextBlock Classes="section" Text="WRITING"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Quick highlight color"/>
+                                <TextBlock Classes="hint" Text="What Ctrl+Shift+H applies."/>
+                            </StackPanel>
+                            <StackPanel x:Name="HighlightChoices" Grid.Column="1" Orientation="Horizontal"
+                                        Spacing="6" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Date &amp; time format"/>
+                                <TextBlock Classes="hint" Text="What Ctrl+Shift+T inserts at the caret."/>
+                            </StackPanel>
+                            <ComboBox x:Name="DateFormatBox" Grid.Column="1" Width="170" VerticalAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
+
+                    <StackPanel x:Name="ShortcutsPanel" Spacing="6" IsVisible="False">
+                        <TextBlock Classes="section" Text="KEYBOARD SHORTCUTS" Margin="0,4,0,2"/>
+                        <TextBlock Classes="hint" Text="Everything the keyboard can do today. Custom bindings come later."/>
+                        <StackPanel x:Name="ShortcutRows" Spacing="2" Margin="0,4,0,0"/>
                     </StackPanel>
 
                     <StackPanel x:Name="FontsPanel" Spacing="6" IsVisible="False">

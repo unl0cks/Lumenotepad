@@ -34,6 +34,8 @@ public partial class PreferencesWindow : Window
             ["appearance"] = AppearancePanel,
             ["layout"] = LayoutPanel,
             ["canvas"] = CanvasPanel,
+            ["editor"] = EditorPanel,
+            ["shortcuts"] = ShortcutsPanel,
             ["fonts"] = FontsPanel,
             ["bullets"] = BulletsPanel,
             ["data"] = DataPanel,
@@ -129,6 +131,7 @@ public partial class PreferencesWindow : Window
             _lastNav = NavList.SelectedItem;
             if (key == "data") RefreshDataPanel();
             if (key == "fonts") RefreshFontChoices();
+            if (key == "shortcuts") BuildShortcutRows();
             ShowPanel(key);
         };
         NavList.SelectedIndex = 0;
@@ -199,6 +202,41 @@ public partial class PreferencesWindow : Window
                 }
             };
         }
+        CaretColorBox.KeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Enter || Vm is not { } vm) return;
+            if (string.IsNullOrWhiteSpace(CaretColorBox.Text)) vm.CaretColor = null;
+            else if (ThemePalettes.NormalizeHex(CaretColorBox.Text) is { } norm) vm.CaretColor = norm;
+            CaretColorBox.Text = vm.CaretColor ?? "";
+        };
+        CaretWidthSlider.ValueChanged += (_, e) =>
+        {
+            if (Vm is { } vm && Math.Abs(vm.CaretWidth - e.NewValue) > 1e-6) vm.CaretWidth = e.NewValue;
+            CaretWidthValue.Text = $"{e.NewValue:0.0}";
+        };
+        BuildHighlightChoices();
+        DateFormatBox.ItemsSource = DateFormats.Select(f => DateTime.Now.ToString(f)).ToArray();
+        DateFormatBox.SelectionChanged += (_, _) =>
+        {
+            if (Vm is { } vm && DateFormatBox.SelectedIndex is >= 0 and var i && i < DateFormats.Length
+                && vm.DateFormat != DateFormats[i]) vm.DateFormat = DateFormats[i];
+        };
+        UserNameBox.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter && Vm is { } vm) vm.UserName = UserNameBox.Text ?? "";
+        };
+        UserNameBox.LostFocus += (_, _) => { if (Vm is { } vm) vm.UserName = UserNameBox.Text ?? ""; };
+        CardSizeBox.ItemsSource = new[] { "Small", "Medium", "Large" };
+        CardSizeBox.SelectionChanged += (_, _) =>
+        {
+            if (Vm is { } vm && CardSizeBox.SelectedItem is string cs && vm.CardSize != cs) vm.CardSize = cs;
+        };
+        NewNoteWidthSlider.ValueChanged += (_, e) =>
+        {
+            if (Vm is { } vm && Math.Abs(vm.NewNoteWidth - e.NewValue) > 0.5) vm.NewNoteWidth = e.NewValue;
+            NewNoteWidthValue.Text = ((int)e.NewValue).ToString();
+        };
+
         DataContextChanged += (_, _) => HookVmChanges();
         HookVmChanges();
         // The window subscribes to the long-lived VM; unhook on close or the VM pins the dead
@@ -351,6 +389,68 @@ public partial class PreferencesWindow : Window
         return new Flyout { Content = panel, Placement = PlacementMode.Bottom };
     }
 
+    /// <summary>The Ctrl+Shift+T format presets (shown rendered with today's date).</summary>
+    private static readonly string[] DateFormats =
+        { "yyyy-MM-dd", "MMMM d, yyyy", "dd/MM/yyyy", "yyyy-MM-dd HH:mm", "HH:mm" };
+
+    /// <summary>The quick-highlight choices — the toolbar's own highlight palette
+    /// (FormatToolbar.Highlights' non-null hexes, verbatim).</summary>
+    private void BuildHighlightChoices()
+    {
+        foreach (var hex in new[] { "#66FFD666", "#6699E28A", "#66FF8FAB", "#664DA6FF", "#66C9A0FF" })
+        {
+            var chip = new Border
+            {
+                Width = 22, Height = 22, CornerRadius = new CornerRadius(6),
+                Background = new SolidColorBrush(Color.Parse(hex)),
+                BorderBrush = new SolidColorBrush(Color.Parse("#66808080")), BorderThickness = new Thickness(1),
+                Tag = hex,
+            };
+            chip.PointerPressed += (_, _) => { if (Vm is { } vm) vm.DefaultHighlight = hex; UpdateHighlightRings(); };
+            HighlightChoices.Children.Add(chip);
+        }
+        UpdateHighlightRings();
+    }
+
+    /// <summary>Ring the chip whose Tag matches the current pref — tag-based, no color reconstruction.</summary>
+    private void UpdateHighlightRings()
+    {
+        foreach (var child in HighlightChoices.Children)
+            if (child is Border { Tag: string hex } b)
+                b.BorderThickness = new Thickness(
+                    string.Equals(Vm?.DefaultHighlight, hex, StringComparison.OrdinalIgnoreCase) ? 2 : 1);
+    }
+
+    /// <summary>The keyboard reference table: build once on first nav to "shortcuts" (static content).</summary>
+    private void BuildShortcutRows()
+    {
+        if (ShortcutRows.Children.Count > 0) return;
+        foreach (var (keys, what) in new[]
+        {
+            ("Ctrl+B / Ctrl+I / Ctrl+U", "Bold / italic / underline"),
+            ("Ctrl+Shift+S", "Strikethrough"),
+            ("Ctrl+Shift+H", "Quick highlight (color set above)"),
+            ("Ctrl+Shift+8", "Bullet list"),
+            ("Ctrl+Shift+7", "Numbered list"),
+            ("Ctrl+Shift+T", "Insert date & time"),
+            ("Ctrl+A", "Select all"),
+            ("Ctrl+Z / Ctrl+Y", "Undo / redo"),
+            ("Ctrl+C / Ctrl+X / Ctrl+V", "Copy / cut / paste"),
+            ("Ctrl+Left / Ctrl+Right", "Jump by word"),
+            ("Ctrl+Backspace / Ctrl+Delete", "Delete previous / next word"),
+            ("Escape", "Close dialogs and the preferences window"),
+        })
+        {
+            var row = new Grid { ColumnDefinitions = new ColumnDefinitions("200,*") };
+            var k = new TextBlock { Text = keys, FontSize = 12.5, FontWeight = FontWeight.SemiBold };
+            var w = new TextBlock { Text = what, FontSize = 12.5, Opacity = 0.8 };
+            Grid.SetColumn(w, 1);
+            row.Children.Add(k);
+            row.Children.Add(w);
+            ShortcutRows.Children.Add(row);
+        }
+    }
+
     private static string NumOpt(bool? v) => v switch { true => "Always on", false => "Always off", _ => "Match text" };
 
     /// <summary>Categories behind the Advanced confirmation ("bullets"/"fonts" arrive in later parts).</summary>
@@ -473,6 +573,15 @@ public partial class PreferencesWindow : Window
         _syncingStartup = true;
         StartupToggle.IsChecked = Platform.StartupRegistry.IsEnabled();
         _syncingStartup = false;
+        CaretColorBox.Text = vm.CaretColor ?? "";
+        CaretWidthSlider.Value = vm.CaretWidth;
+        CaretWidthValue.Text = $"{vm.CaretWidth:0.0}";
+        DateFormatBox.SelectedIndex = Math.Max(0, Array.IndexOf(DateFormats, vm.DateFormat));
+        UserNameBox.Text = vm.UserName;
+        CardSizeBox.SelectedItem = vm.CardSize;
+        NewNoteWidthSlider.Value = vm.NewNoteWidth;
+        NewNoteWidthValue.Text = ((int)vm.NewNoteWidth).ToString();
+        UpdateHighlightRings();
         UpdateGateVisuals();
     }
 }
