@@ -58,6 +58,16 @@
         <Style Selector="ListBox.prefnav ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
         </Style>
+        <!-- fonts checklist rows: plain checkbox rows, no selection fill -->
+        <Style Selector="ListBox.fontcheck ListBoxItem">
+            <Setter Property="Padding" Value="4,2"/>
+        </Style>
+        <Style Selector="ListBox.fontcheck ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="ListBox.fontcheck ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
     </Window.Styles>
 
     <Grid>
@@ -89,6 +99,7 @@
                                        Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
+                    <ListBoxItem Tag="fonts"><TextBlock Classes="label" Text="Fonts"/></ListBoxItem>
                     <ListBoxItem Tag="bullets"><TextBlock Classes="label" Text="Bullets &amp; numbers"/></ListBoxItem>
                     <ListBoxItem Tag="data"><TextBlock Classes="label" Text="Data &amp; tools"/></ListBoxItem>
                 </ListBox>
@@ -136,14 +147,6 @@
                                 <TextBlock Classes="hint" Text="Selected tabs, rows and homepage chips get the top-lit gloss."/>
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding GlossyAccents, Mode=TwoWay}" VerticalAlignment="Center"/>
-                        </Grid>
-
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Spacing="2" VerticalAlignment="Center">
-                                <TextBlock Classes="label" Text="Extended font list"/>
-                                <TextBlock Classes="hint" Text="Offer every installed font in the toolbar's font menu instead of the essentials."/>
-                            </StackPanel>
-                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding ExtendedFonts, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
 
                         <TextBlock Classes="section" Text="ACCENT"/>
@@ -228,6 +231,23 @@
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding DeletedHistory, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
+                    </StackPanel>
+
+                    <StackPanel x:Name="FontsPanel" Spacing="6" IsVisible="False">
+                        <TextBlock Classes="section" Text="FONT MENU" Margin="0,4,0,2"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Show all installed fonts"/>
+                                <TextBlock Classes="hint" Text="Offer every installed font instead of the essentials shortlist."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding ExtendedFonts, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <TextBlock Classes="section" Text="OFFERED FONTS"/>
+                        <TextBlock Classes="hint"
+                                   Text="Untick a font to hide it from the toolbar's menu. The bundled faces are always available."/>
+                        <ListBox x:Name="FontsList" Classes="fontcheck" Height="300" Margin="0,4,0,0"
+                                 Background="Transparent" BorderThickness="0" Padding="0"/>
                     </StackPanel>
 
                     <StackPanel x:Name="BulletsPanel" Spacing="6" IsVisible="False">

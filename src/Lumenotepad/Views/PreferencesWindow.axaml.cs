@@ -33,6 +33,7 @@ public partial class PreferencesWindow : Window
             ["appearance"] = AppearancePanel,
             ["layout"] = LayoutPanel,
             ["canvas"] = CanvasPanel,
+            ["fonts"] = FontsPanel,
             ["bullets"] = BulletsPanel,
             ["data"] = DataPanel,
         };
@@ -101,6 +102,7 @@ public partial class PreferencesWindow : Window
             }
             _lastNav = NavList.SelectedItem;
             if (key == "data") RefreshDataPanel();
+            if (key == "fonts") RefreshFontChoices();
             ShowPanel(key);
         };
         NavList.SelectedIndex = 0;
@@ -207,6 +209,10 @@ public partial class PreferencesWindow : Window
             BuildAccentSwatches();
         else if (e.PropertyName == nameof(MainViewModel.AdvancedUnlocked)) UpdateGateVisuals();
         else if (e.PropertyName == nameof(MainViewModel.BulletPrefsVersion)) BuildBulletRows();
+        else if (e.PropertyName == nameof(MainViewModel.ExtendedFonts))
+        {
+            if (FontsPanel.IsVisible) RefreshFontChoices();
+        }
     }
 
     /// <summary>The accent row: an "auto" chip (theme's own accent) + the six notebook colors.
@@ -351,6 +357,62 @@ public partial class PreferencesWindow : Window
         catch { return "—"; }
     }
 
+    /// <summary>One checklist row's state (mutable — the checkbox writes back through the VM).</summary>
+    private sealed class FontChoice
+    {
+        public string Name = "";
+        public bool Enabled = true;
+        public bool Bundled;
+    }
+
+    private bool _fontTemplateSet;
+
+    /// <summary>(Re)build the fonts checklist: every candidate the menu COULD offer (current
+    /// master-switch mode), bundled faces locked on. Lazy — runs when the panel shows, and again
+    /// when the master switch flips while it's visible.</summary>
+    private void RefreshFontChoices()
+    {
+        if (Vm is not { } vm) return;
+        if (!_fontTemplateSet)
+        {
+            _fontTemplateSet = true;
+            // Virtualized recycling briefly rebuilds rows with a NULL datum, and FontFamily
+            // helpers throw on null — the null-guard is load-bearing (known gotcha).
+            FontsList.ItemTemplate = new Avalonia.Controls.Templates.FuncDataTemplate<FontChoice?>((item, _) =>
+            {
+                var cb = new CheckBox { FontSize = 13, MinHeight = 0 };
+                if (item is null) return cb;
+                cb.Content = new TextBlock
+                {
+                    Text = item.Name,
+                    FontFamily = AppFonts.Family(item.Name),
+                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                };
+                cb.IsChecked = item.Enabled;             // set BEFORE subscribing — no spurious write
+                cb.IsEnabled = !item.Bundled;
+                if (item.Bundled) ToolTip.SetTip(cb, "Bundled fonts are always available");
+                cb.IsCheckedChanged += (_, _) =>
+                {
+                    if (cb.IsChecked is { } v && v != item.Enabled)
+                    {
+                        item.Enabled = v;
+                        Vm?.SetFontEnabled(item.Name, v);
+                    }
+                };
+                return cb;
+            });
+        }
+        var choices = AppFonts.ListNames(vm.ExtendedFonts)   // unfiltered candidates
+            .Select(n => new FontChoice
+            {
+                Name = n,
+                Bundled = AppFonts.Bundled.Contains(n, StringComparer.OrdinalIgnoreCase),
+                Enabled = vm.IsFontEnabled(n),
+            })
+            .ToList();
+        FontsList.ItemsSource = choices;
+    }
+
     /// <summary>Show one category panel and rise it in (the others hide).</summary>
     private void ShowPanel(string key)
     {
@@ -375,6 +437,7 @@ public partial class PreferencesWindow : Window
         NumUnderlineBox.SelectedItem = NumOpt(vm.NumUnderlineDefault);
         NumStrikeBox.SelectedItem = NumOpt(vm.NumStrikeDefault);
         BuildBulletRows();
+        if (FontsPanel.IsVisible) RefreshFontChoices();
         UpdateGateVisuals();
     }
 }
