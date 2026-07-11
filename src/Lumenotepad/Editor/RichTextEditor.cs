@@ -297,7 +297,7 @@ public sealed class RichTextEditor : Control
         {
             var r = _caretSeeded ? _caretDisplay : CaretRect();
             using (ctx.PushOpacity(_caretOpacity))
-                ctx.FillRectangle(CaretBrush, new Rect(r.X, r.Y, 1.6, r.Height), 0.8f);
+                ctx.FillRectangle(CaretBrush, new Rect(r.X, r.Y, CaretWidthPref, r.Height), 0.8f);
         }
     }
 
@@ -309,6 +309,18 @@ public sealed class RichTextEditor : Control
 
     /// <summary>Number-style resolution: paragraph override, then the global default, then the run.</summary>
     public static bool NumFlag(bool? para, bool? global, bool run) => para ?? global ?? run;
+
+    // ---- prefs: caret + highlight + date insert (pushed by MainView.ApplyEditorPrefs) ----
+    /// <summary>Caret color override (null = the theme accent picked up at construction).</summary>
+    public static string? CaretColorOverride;
+    public static double CaretWidthPref = 1.6;
+    public static bool CaretBlinkPref = true;
+    /// <summary>The Ctrl+Shift+H highlight color.</summary>
+    public static string DefaultHighlightPref = "#66FFD666";
+    /// <summary>The Ctrl+Shift+T timestamp format.</summary>
+    public static string DateFormatPref = "yyyy-MM-dd";
+    /// <summary>Width for freshly created note containers (height stays content-auto).</summary>
+    public static double NewNoteWidthPref = 360;
 
     /// <summary>Glyph + built-in color for a bullet style — the prefs UI reads this so the defaults
     /// live in exactly one place.</summary>
@@ -437,7 +449,7 @@ public sealed class RichTextEditor : Control
     {
         var p = _caret;
         _doc.Clamp(ref p);
-        if (p.Para >= _layouts.Count) return new Rect(0, 0, 1.6, FontSize * 1.35);
+        if (p.Para >= _layouts.Count) return new Rect(0, 0, CaretWidthPref, FontSize * 1.35);
         var r = _layouts[p.Para].HitTestTextPosition(p.Off);
         return new Rect(r.X + IndentOf(p.Para), r.Y + ParagraphTop(p.Para), r.Width, r.Height <= 0 ? FontSize * 1.35 : r.Height);
     }
@@ -610,6 +622,9 @@ public sealed class RichTextEditor : Control
             case Key.H when ctrl && shift:
                 ToggleDefaultHighlight();
                 break;
+            case Key.T when ctrl && shift:
+                InsertDateTime();
+                break;
             case Key.D8 when ctrl && shift:              // Ctrl+Shift+8 — dot bullets
                 ApplyBullet("dot");
                 break;
@@ -742,17 +757,37 @@ public sealed class RichTextEditor : Control
     /// <summary>Ctrl+Shift+H: toggle the default yellow highlight.</summary>
     public void ToggleDefaultHighlight()
     {
-        const string yellow = "#66FFD666";
         if (HasSelection)
         {
             var (a, b) = SelOrdered();
-            ApplyHighlight(_doc.RangeAll(a, b, r => r.Highlight is not null) ? null : yellow);
+            ApplyHighlight(_doc.RangeAll(a, b, r => r.Highlight is not null) ? null : DefaultHighlightPref);
         }
         else
         {
             var cur = _hasPending ? _pending : _doc.FormatAt(_caret);
-            ApplyHighlight(cur.Highlight is null ? yellow : null);
+            ApplyHighlight(cur.Highlight is null ? DefaultHighlightPref : null);
         }
+    }
+
+    /// <summary>Ctrl+Shift+T: insert the current date/time at the caret using the format pref.</summary>
+    public void InsertDateTime()
+    {
+        string stamp;
+        try { stamp = System.DateTime.Now.ToString(DateFormatPref); }
+        catch (FormatException) { stamp = System.DateTime.Now.ToString("yyyy-MM-dd"); }
+        InsertPlainText(stamp);
+    }
+
+    /// <summary>Insert plain text at the caret, replacing any selection — the same flow the paste
+    /// path uses (PushUndo, delete selection, insert with the caret's current format, land the
+    /// caret after it, invalidate). Shared so paste and other programmatic inserts stay identical.</summary>
+    private void InsertPlainText(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        PushUndo();
+        if (HasSelection) DeleteSelection();
+        _caret = _anchor = _doc.InsertText(_caret, text, _doc.FormatAt(_caret));
+        AfterEdit();
     }
 
     private void ToggleFlag(Func<RichRun, bool> get, Action<RichRun, bool> set, Func<RunFormat, RunFormat> flipPending)
@@ -870,7 +905,7 @@ public sealed class RichTextEditor : Control
         }
 
         _blinkMs += 16;
-        double op = gliding ? 1.0 : BlinkOpacity(_blinkMs);
+        double op = gliding || !CaretBlinkPref ? 1.0 : BlinkOpacity(_blinkMs);
         if (Math.Abs(op - _caretOpacity) > 0.008) { _caretOpacity = op; dirty = true; }
 
         if (_checkAnim.Count > 0)
@@ -961,10 +996,7 @@ public sealed class RichTextEditor : Control
             if (clipboard is null) return;
             var text = await clipboard.TryGetTextAsync();
             if (string.IsNullOrEmpty(text)) return;
-            PushUndo();
-            if (HasSelection) DeleteSelection();
-            _caret = _anchor = _doc.InsertText(_caret, text, _doc.FormatAt(_caret));
-            AfterEdit();
+            InsertPlainText(text);
         }
         catch { }
     }

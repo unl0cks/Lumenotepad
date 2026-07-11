@@ -138,7 +138,7 @@ public sealed class NoteCanvas : Panel
         if (_doc is null || !ReferenceEquals(e.Source, this)) return;
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         var p = e.GetPosition(this);
-        var view = AddBoxView(_doc.AddBox(p.X - 11, p.Y - 16));
+        var view = AddBoxView(_doc.AddBox(p.X - 11, p.Y - 16, Math.Clamp(RichTextEditor.NewNoteWidthPref, 240, 640)));
         Dispatcher.UIThread.Post(view.FocusEditor, DispatcherPriority.Background);
         e.Handled = true;
     }
@@ -259,7 +259,7 @@ internal sealed class NoteBoxView : Panel
         {
             Document = box.Doc, Margin = new Thickness(10, 3, 10, 9),
             Foreground = B(t.PaperText),
-            CaretBrush = B(t.Accent),
+            CaretBrush = B(RichTextEditor.CaretColorOverride ?? t.Accent),
             SelectionBrush = B(t.FieldSelection),
         };
 

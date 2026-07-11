@@ -417,6 +417,7 @@ public partial class MainView : UserControl
             _hookedVm.PropertyChanged += OnVmPropertyChanged;
             _hookedVm.DocsDirtied += OnDocsDirtied;
             ApplyBulletPrefs(rebuild: false);
+            ApplyEditorPrefs(rebuild: false);
             SyncEditorDocument();
             ApplyToolbarPlacement();
             ApplyCanvasPrefs();
@@ -559,6 +560,20 @@ public partial class MainView : UserControl
         if (rebuild) PageCanvas.Document = PageCanvas.Document;
     }
 
+    /// <summary>Push the editor prefs onto the shared statics; optionally rebuild so open note
+    /// boxes pick up caret color/width changes immediately.</summary>
+    private void ApplyEditorPrefs(bool rebuild)
+    {
+        if (Vm is not { } vm) return;
+        RichTextEditor.CaretColorOverride = Services.ThemePalettes.NormalizeHex(vm.CaretColor);
+        RichTextEditor.CaretWidthPref = System.Math.Clamp(vm.CaretWidth, 1, 3);
+        RichTextEditor.CaretBlinkPref = vm.CaretBlink;
+        RichTextEditor.DefaultHighlightPref = vm.DefaultHighlight;
+        RichTextEditor.DateFormatPref = vm.DateFormat;
+        RichTextEditor.NewNoteWidthPref = vm.NewNoteWidth;
+        if (rebuild) PageCanvas.Document = PageCanvas.Document;
+    }
+
     /// <summary>Push the motion prefs onto the shared engine (statics — affect every window).</summary>
     private void ApplyMotionPrefs()
     {
@@ -641,6 +656,10 @@ public partial class MainView : UserControl
                  or nameof(MainViewModel.NumBoldDefault) or nameof(MainViewModel.NumItalicDefault)
                  or nameof(MainViewModel.NumUnderlineDefault) or nameof(MainViewModel.NumStrikeDefault))
             ApplyBulletPrefs(rebuild: true);
+        else if (e.PropertyName is nameof(MainViewModel.CaretColor) or nameof(MainViewModel.CaretWidth)
+                 or nameof(MainViewModel.CaretBlink) or nameof(MainViewModel.DefaultHighlight)
+                 or nameof(MainViewModel.DateFormat) or nameof(MainViewModel.NewNoteWidth))
+            ApplyEditorPrefs(rebuild: true);
         else if (e.PropertyName is nameof(MainViewModel.ExtendedFonts) or nameof(MainViewModel.FontPrefsVersion))
         {
             if (Vm is { } fvm) Toolbar.SetFontPrefs(fvm.ExtendedFonts, fvm.DisabledFontsList);
