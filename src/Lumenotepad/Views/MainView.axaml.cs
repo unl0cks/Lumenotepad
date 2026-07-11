@@ -589,6 +589,12 @@ public partial class MainView : UserControl
         RichTextEditor.DefaultHighlightPref = vm.DefaultHighlight;
         RichTextEditor.DateFormatPref = vm.DateFormat;
         RichTextEditor.NewNoteWidthPref = vm.NewNoteWidth;
+        RichTextEditor.EditorFontPref = vm.EditorFont;
+        RichTextEditor.EditorFontSizePref = vm.EditorFontSize;
+        RichTextEditor.LineSpacingScalePref = vm.LineSpacingScale;
+        RichTextEditor.ParagraphSpacingScalePref = vm.ParagraphSpacingScale;
+        RichTextEditor.IndentScalePref = vm.IndentScale;
+        RichTextEditor.SmartListsPref = vm.SmartLists;
         if (rebuild) PageCanvas.Document = PageCanvas.Document;
     }
 
@@ -678,7 +684,10 @@ public partial class MainView : UserControl
             ApplyBulletPrefs(rebuild: true);
         else if (e.PropertyName is nameof(MainViewModel.CaretColor) or nameof(MainViewModel.CaretWidth)
                  or nameof(MainViewModel.CaretBlink) or nameof(MainViewModel.DefaultHighlight)
-                 or nameof(MainViewModel.DateFormat) or nameof(MainViewModel.NewNoteWidth))
+                 or nameof(MainViewModel.DateFormat) or nameof(MainViewModel.NewNoteWidth)
+                 or nameof(MainViewModel.EditorFont) or nameof(MainViewModel.EditorFontSize)
+                 or nameof(MainViewModel.LineSpacingScale) or nameof(MainViewModel.ParagraphSpacingScale)
+                 or nameof(MainViewModel.IndentScale) or nameof(MainViewModel.SmartLists))
             ApplyEditorPrefs(rebuild: true);
         else if (e.PropertyName is nameof(MainViewModel.ExtendedFonts) or nameof(MainViewModel.FontPrefsVersion))
         {

@@ -195,4 +195,16 @@ public class RichModelTests
         Assert.True(RichTextEditor.NumFlag(null, null, true));      // then the text run
         Assert.False(RichTextEditor.NumFlag(null, null, false));
     }
+
+    [Fact]
+    public void SmartListKind_DetectsPrefixes()
+    {
+        Assert.Equal("num", RichTextEditor.SmartListKind("1."));
+        Assert.Equal("dot", RichTextEditor.SmartListKind("-"));
+        Assert.Equal("dot", RichTextEditor.SmartListKind("*"));
+        Assert.Null(RichTextEditor.SmartListKind("2."));      // only "1." starts a list
+        Assert.Null(RichTextEditor.SmartListKind("a."));
+        Assert.Null(RichTextEditor.SmartListKind(""));
+        Assert.Null(RichTextEditor.SmartListKind("hello -"));
+    }
 }

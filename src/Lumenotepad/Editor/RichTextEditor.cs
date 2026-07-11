@@ -159,7 +159,7 @@ public sealed class RichTextEditor : Control
         return Math.Clamp(eff / FontSize, 0.75, 2.5);
     }
 
-    private double IndentOf(Paragraph p) => p.Bullet is null ? 0 : BulletIndent * Math.Max(1, ScaleOf(p));
+    private double IndentOf(Paragraph p) => p.Bullet is null ? 0 : BulletIndent * IndentScalePref * Math.Max(1, ScaleOf(p));
 
     private double IndentOf(int pi) =>
         pi >= 0 && pi < _doc.Paragraphs.Count ? IndentOf(_doc.Paragraphs[pi]) : 0;
@@ -173,9 +173,12 @@ public sealed class RichTextEditor : Control
                                   textWrapping: TextWrapping.Wrap, maxWidth: maxWidth);
 
         var defaultProps = new GenericTextRunProperties(new Typeface(FontFamily), FontSize, foregroundBrush: Foreground);
+        double lineHeight = double.NaN;
+        if (LineSpacingScalePref > 1.005 && p.Runs.Count > 0)
+            lineHeight = p.Runs.Max(r => r.Size ?? FontSize) * 1.35 * LineSpacingScalePref;
         var paraProps = new GenericTextParagraphProperties(
             FlowDirection.LeftToRight, TextAlignment.Left, true, false,
-            defaultProps, TextWrapping.Wrap, double.NaN, 0, 0);
+            defaultProps, TextWrapping.Wrap, lineHeight, 0, 0);
         return new TextLayout(new RunsTextSource(p, this), paraProps, maxWidth: maxWidth);
     }
 
@@ -321,6 +324,25 @@ public sealed class RichTextEditor : Control
     public static string DateFormatPref = "yyyy-MM-dd";
     /// <summary>Width for freshly created note containers (height stays content-auto).</summary>
     public static double NewNoteWidthPref = 360;
+
+    /// <summary>Base font/size for note text (runs without their own font/size render in these).</summary>
+    public static string? EditorFontPref;
+    public static double EditorFontSizePref = 15;
+    /// <summary>Layout scales (read at construction; canvas rebuild applies changes).</summary>
+    public static double LineSpacingScalePref = 1.0;
+    public static double ParagraphSpacingScalePref = 1.0;
+    public static double IndentScalePref = 1.0;
+    /// <summary>"1. "/"- "/"* " at a line start auto-starts a list.</summary>
+    public static bool SmartListsPref = true;
+
+    /// <summary>Pure prefix→list-kind detection for smart lists: the text BEFORE the just-typed
+    /// space. Only exact "1." starts numbering (matching how lists renumber from 1).</summary>
+    public static string? SmartListKind(string beforeCaret) => beforeCaret switch
+    {
+        "1." => "num",
+        "-" or "*" => "dot",
+        _ => null,
+    };
 
     /// <summary>Glyph + built-in color for a bullet style — the prefs UI reads this so the defaults
     /// live in exactly one place.</summary>
@@ -537,6 +559,21 @@ public sealed class RichTextEditor : Control
         var fmt = _hasPending ? _pending : _doc.FormatAt(_caret);
         _caret = _anchor = _doc.InsertText(_caret, text, fmt);
         _hasPending = false;
+
+        // Smart lists: a space completing "1."/"-"/"*" at the start of a plain paragraph turns
+        // it into a real list (its own undo step — Ctrl+Z restores the typed prefix).
+        if (SmartListsPref && text == " " && _caret.Off >= 2)
+        {
+            var para = _doc.Paragraphs[_caret.Para];
+            if (para.Bullet is null && SmartListKind(para.Text[..(_caret.Off - 1)]) is { } kind)
+            {
+                PushUndo();
+                _doc.DeleteRange(new DocPos(_caret.Para, 0), _caret);
+                _caret = _anchor = new DocPos(_caret.Para, 0);
+                _doc.SetBullet(_caret, _caret, kind);
+            }
+        }
+
         AfterEdit();
         e.Handled = true;
     }

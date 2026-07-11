@@ -261,6 +261,9 @@ internal sealed class NoteBoxView : Panel
             Foreground = B(t.PaperText),
             CaretBrush = B(RichTextEditor.CaretColorOverride ?? t.Accent),
             SelectionBrush = B(t.FieldSelection),
+            FontFamily = Services.AppFonts.Family(RichTextEditor.EditorFontPref),
+            FontSize = Math.Clamp(RichTextEditor.EditorFontSizePref, 11, 24),
+            ParagraphSpacing = 4 * Math.Clamp(RichTextEditor.ParagraphSpacingScalePref, 0.5, 3),
         };
 
         _gripBar = new Border
