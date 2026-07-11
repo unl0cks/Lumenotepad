@@ -46,10 +46,16 @@ public partial class MainWindow : Window
         Services.ThemeManager.ApplyChrome(this);
     }
 
+    private bool _closingAnimated;
+
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         base.OnClosing(e);
         (DataContext as ViewModels.MainViewModel)?.FlushDirtyDocs();   // never lose the last keystrokes
+        if (_closingAnimated) return;                                  // second pass: let the close through
+        e.Cancel = true;
+        _closingAnimated = true;
+        Motion.CollapseOut(Host, 150, Close);                          // quick fade + shrink, then close
     }
 
     protected override void OnOpened(EventArgs e)
@@ -61,8 +67,7 @@ public partial class MainWindow : Window
         // Some events (display-mode flips, DWM resets) silently drop the corner preference WITHOUT a
         // WindowState change; re-assert it whenever the floating window regains focus — self-heals square corners.
         Activated += (_, _) => { if (WindowState == WindowState.Normal) WinChrome.RoundCorners(this, true); };
-        Host.Opacity = 1;
-        Host.RenderTransform = null;
+        Motion.ScaleIn(Host, 0.97, 220);                               // launch: fade + scale in
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)

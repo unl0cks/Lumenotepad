@@ -90,7 +90,7 @@ public static class ConfirmDialog
         };
 
         win.Content = card;
-        win.Opened += (_, _) => Motion.ScaleIn(card, 0.96);   // fade + scale in on open
+        win.Opened += (_, _) => Motion.ScaleIn(card, 0.96, 160);   // quick fade + scale in
 
         // Fade + shrink the card out, THEN close with the result (so the result survives).
         bool closing = false;
@@ -98,7 +98,7 @@ public static class ConfirmDialog
         {
             if (closing) return;
             closing = true;
-            Motion.CollapseOut(card, Motion.Fast, () => win.Close(result));
+            Motion.CollapseOut(card, 130, () => win.Close(result));
         }
         cancel.Click += (_, _) => CloseWith(false);
         confirm.Click += (_, _) => CloseWith(true);

@@ -41,7 +41,7 @@ public partial class PreferencesWindow : Window
         Opened += (_, _) =>
         {
             WinChrome.RoundCorners(this, true);
-            if (Content is Control root) Motion.ScaleIn(root, 0.97);   // fade + scale in on open
+            if (Content is Control root) Motion.ScaleIn(root, 0.96, 180);   // quick fade + scale in
         };
         CloseBtn.Click += (_, _) => Close();
         KeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); };
@@ -53,7 +53,7 @@ public partial class PreferencesWindow : Window
             if (closing) return;
             e.Cancel = true;
             closing = true;
-            if (Content is Control root) Motion.CollapseOut(root, Motion.Fast, Close);
+            if (Content is Control root) Motion.CollapseOut(root, 140, Close);
             else Close();
         };
         PrefsTitleBar.PointerPressed += (_, e) =>
