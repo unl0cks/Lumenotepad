@@ -11,6 +11,9 @@
     <UserControl.Resources>
         <x:Double x:Key="NbCardWidth">196</x:Double>
         <x:Double x:Key="NbCardHeight">132</x:Double>
+        <!-- cell = card + hover/shadow slack (28/30); ApplyCardSize keeps all four in step -->
+        <x:Double x:Key="NbCardCellWidth">224</x:Double>
+        <x:Double x:Key="NbCardCellHeight">162</x:Double>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -305,17 +308,21 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="models:Notebook">
                             <!-- Fixed cell sized so EVERYTHING (static shadow halo + hover growth) fits fully
-                                 inside it — nothing ever draws past the item boundary, so nothing can clip. -->
-                            <Panel Width="224" Height="162" Margin="0,0,2,2">
-                                <Border Width="196" Height="132" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                 inside it — nothing ever draws past the item boundary, so nothing can clip.
+                                 ALL FOUR dimensions follow the Cover-size pref (cell = card + slack), or the
+                                 halo detaches and Large cards overlap their neighbours. -->
+                            <Panel Width="{DynamicResource NbCardCellWidth}" Height="{DynamicResource NbCardCellHeight}" Margin="0,0,2,2">
+                                <Border Width="{DynamicResource NbCardWidth}" Height="{DynamicResource NbCardHeight}"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"
                                         CornerRadius="14" Background="#01000000" IsHitTestVisible="False"
                                         BoxShadow="0 2 10 0 #59000000"/>
                                 <!-- wiggle wrapper: rotates in rearrange mode, leaving the card's own
                                      RenderTransform free for hover / grab scale. It fills the WHOLE cell
-                                     (224x162) so the nbcard, centred inside it at 196x132, keeps 14px of
-                                     slack on every side — a transitioned element is clipped to its layout
-                                     SLOT, so without that slack the hover growth is clipped away (invisible). -->
-                                <Border Classes="wigglewrap" Width="224" Height="162"
+                                     so the nbcard, centred inside it, keeps ~14px of slack on every side —
+                                     a transitioned element is clipped to its layout SLOT, so without that
+                                     slack the hover growth is clipped away (invisible). -->
+                                <Border Classes="wigglewrap"
+                                        Width="{DynamicResource NbCardCellWidth}" Height="{DynamicResource NbCardCellHeight}"
                                         HorizontalAlignment="Center" VerticalAlignment="Center" Background="Transparent">
                                 <Border Classes="nbcard"
                                         Width="{DynamicResource NbCardWidth}" Height="{DynamicResource NbCardHeight}"

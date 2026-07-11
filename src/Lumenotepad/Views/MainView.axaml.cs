@@ -532,7 +532,9 @@ public partial class MainView : UserControl
         // fill would show as an ugly full-width blue bar. The rail chip shows its own colour + glow.
     }
 
-    /// <summary>Gallery card size pref → the DynamicResource doubles the card template consumes.</summary>
+    /// <summary>Gallery card size pref → the DynamicResource doubles the card template consumes.
+    /// The CELL (and the shadow halo bound to the card size) must scale WITH the card — the cell
+    /// carries the hover-growth/shadow slack, and a fixed cell makes Large cards overlap.</summary>
     private void ApplyCardSize()
     {
         var (w, h) = (Vm?.CardSize) switch
@@ -543,6 +545,8 @@ public partial class MainView : UserControl
         };
         Resources["NbCardWidth"] = w;
         Resources["NbCardHeight"] = h;
+        Resources["NbCardCellWidth"] = w + 28;    // same 28/30 slack the Medium layout always had
+        Resources["NbCardCellHeight"] = h + 30;
     }
 
     /// <summary>"Glass tint": white/black veil under all content, tinting whatever the acrylic
