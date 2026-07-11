@@ -422,6 +422,7 @@ public partial class MainView : UserControl
             ApplyToolbarPlacement();
             ApplyCanvasPrefs();
             ApplyGlossyAccents();
+            ApplyCardSize();
             ApplyPanels();
             ApplyGlassTint();
             ApplyMotionPrefs();
@@ -529,6 +530,19 @@ public partial class MainView : UserControl
         PagesList.Classes.Set("glossy", glossy);
         // NOT the rail: its item now stretches full-width, so the glossy accent-gradient selection
         // fill would show as an ugly full-width blue bar. The rail chip shows its own colour + glow.
+    }
+
+    /// <summary>Gallery card size pref → the DynamicResource doubles the card template consumes.</summary>
+    private void ApplyCardSize()
+    {
+        var (w, h) = (Vm?.CardSize) switch
+        {
+            "Small" => (156.0, 104.0),
+            "Large" => (236.0, 160.0),
+            _ => (196.0, 132.0),
+        };
+        Resources["NbCardWidth"] = w;
+        Resources["NbCardHeight"] = h;
     }
 
     /// <summary>"Glass tint": white/black veil under all content, tinting whatever the acrylic
@@ -648,6 +662,8 @@ public partial class MainView : UserControl
             ApplyFlatCovers();
         else if (e.PropertyName == nameof(MainViewModel.GlossyAccents))
             ApplyGlossyAccents();
+        else if (e.PropertyName == nameof(MainViewModel.CardSize))
+            ApplyCardSize();
         else if (e.PropertyName == nameof(MainViewModel.GlassTint))
             ApplyGlassTint();
         else if (e.PropertyName is nameof(MainViewModel.ReduceMotion) or nameof(MainViewModel.MotionSpeed))
@@ -693,7 +709,7 @@ public partial class MainView : UserControl
         }
         else if (e.PropertyName is nameof(MainViewModel.Theme)
                  or nameof(MainViewModel.FullTheme) or nameof(MainViewModel.PaperLight)
-                 or nameof(MainViewModel.CustomAccent))
+                 or nameof(MainViewModel.CustomAccent) or nameof(MainViewModel.AccentFollowsNotebook))
         {
             // Note containers read their paper-region brushes at construction — rebuild them.
             PageCanvas.Document = PageCanvas.Document;

@@ -33,7 +33,12 @@ public partial class MainWindow : Window
         if (e.PropertyName is nameof(ViewModels.MainViewModel.Theme)
             or nameof(ViewModels.MainViewModel.FullTheme)
             or nameof(ViewModels.MainViewModel.PaperLight)
-            or nameof(ViewModels.MainViewModel.CustomAccent))
+            or nameof(ViewModels.MainViewModel.CustomAccent)
+            or nameof(ViewModels.MainViewModel.AccentFollowsNotebook))
+            ApplyTheme();
+        else if ((e.PropertyName is nameof(ViewModels.MainViewModel.SelectedNotebook)
+                  or nameof(ViewModels.MainViewModel.IsHomeVisible))
+                 && _themeVm is { AccentFollowsNotebook: true })
             ApplyTheme();
 
         if (e.PropertyName == nameof(ViewModels.MainViewModel.AlwaysOnTop) && _themeVm is { } topVm)
@@ -44,8 +49,12 @@ public partial class MainWindow : Window
     {
         if (_themeVm is not { } vm || Application.Current is not { } app) return;
         var tokens = Services.ThemePalettes.Resolve(vm.Theme, vm.FullTheme, vm.PaperLight);
-        if (Services.ThemePalettes.NormalizeHex(vm.CustomAccent) is { } accent)
-            tokens = Services.ThemePalettes.WithAccent(tokens, accent);
+        // Inside a notebook, its cover color can drive the whole accent (pref); otherwise the
+        // user's custom accent; otherwise the theme's own.
+        string? seed = vm.AccentFollowsNotebook && !vm.IsHomeVisible && vm.SelectedNotebook is { } nb
+            ? Services.ThemePalettes.NormalizeHex(nb.Color)
+            : Services.ThemePalettes.NormalizeHex(vm.CustomAccent);
+        if (seed is { } accent) tokens = Services.ThemePalettes.WithAccent(tokens, accent);
         Services.ThemeManager.Apply(app, tokens);
         Services.ThemeManager.ApplyChrome(this);
     }

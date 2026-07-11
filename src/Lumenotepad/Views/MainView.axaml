@@ -8,6 +8,11 @@
              xmlns:conv="using:Avalonia.Data.Converters"
              x:DataType="vm:MainViewModel">
 
+    <UserControl.Resources>
+        <x:Double x:Key="NbCardWidth">196</x:Double>
+        <x:Double x:Key="NbCardHeight">132</x:Double>
+    </UserControl.Resources>
+
     <UserControl.Styles>
         <!-- flat, borderless rename fields -->
         <Style Selector="TextBox.rename">
@@ -312,7 +317,8 @@
                                      SLOT, so without that slack the hover growth is clipped away (invisible). -->
                                 <Border Classes="wigglewrap" Width="224" Height="162"
                                         HorizontalAlignment="Center" VerticalAlignment="Center" Background="Transparent">
-                                <Border Classes="nbcard" Width="196" Height="132"
+                                <Border Classes="nbcard"
+                                        Width="{DynamicResource NbCardWidth}" Height="{DynamicResource NbCardHeight}"
                                         HorizontalAlignment="Center" VerticalAlignment="Center"
                                         CornerRadius="14" Cursor="Hand" BorderThickness="1"
                                         Background="{Binding Color, Converter={x:Static v:Converters.HexBrush}}"
