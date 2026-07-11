@@ -33,9 +33,21 @@ public static class AppFonts
         : Bundled.Contains(name, StringComparer.OrdinalIgnoreCase) ? new FontFamily($"{CollectionUri}#{name}")
         : new FontFamily(name);
 
+    /// <summary>Pure filter for the fonts-curation pref: drop disabled names (case-insensitive)
+    /// but NEVER the bundled faces — they must stay reachable on every machine.</summary>
+    public static IEnumerable<string> WithoutDisabled(IEnumerable<string> names,
+                                                      IReadOnlyCollection<string>? disabled)
+    {
+        if (disabled is not { Count: > 0 }) return names;
+        var hidden = new HashSet<string>(disabled, StringComparer.OrdinalIgnoreCase);
+        foreach (var b in Bundled) hidden.Remove(b);
+        return names.Where(n => !hidden.Contains(n));
+    }
+
     /// <summary>The names offered by the toolbar's font menu: bundled first, then the curated
-    /// shortlist (or every installed family when <paramref name="extended"/>).</summary>
-    public static IReadOnlyList<string> ListNames(bool extended)
+    /// shortlist (or every installed family when <paramref name="extended"/>), minus any the
+    /// fonts-curation pref disabled (bundled faces are never hidden).</summary>
+    public static IReadOnlyList<string> ListNames(bool extended, IReadOnlyCollection<string>? disabled = null)
     {
         var installed = FontManager.Current.SystemFonts.Select(f => f.Name)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -43,7 +55,7 @@ public static class AppFonts
             ? installed.OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase)
             : Curated.Where(installed.Contains);
         return Bundled.OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase)
-            .Concat(rest.Where(n => !Bundled.Contains(n, StringComparer.OrdinalIgnoreCase)))
+            .Concat(WithoutDisabled(rest.Where(n => !Bundled.Contains(n, StringComparer.OrdinalIgnoreCase)), disabled))
             .ToList();
     }
 }
