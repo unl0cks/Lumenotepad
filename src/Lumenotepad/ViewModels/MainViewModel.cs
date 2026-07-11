@@ -77,6 +77,9 @@ public partial class MainViewModel : ObservableObject
     /// <summary>Bumped whenever a bullet color override changes — consumers re-read BulletColorFor.</summary>
     [ObservableProperty] private int _bulletPrefsVersion;
 
+    /// <summary>Bumped whenever the fonts-curation list changes — the toolbar menu refreshes.</summary>
+    [ObservableProperty] private int _fontPrefsVersion;
+
     /// <summary>The Light-paper toggle only means something on Lumen with Full theme off.</summary>
     public bool PaperToggleEnabled => Theme == "Lumen" && !FullTheme;
 
@@ -390,6 +393,25 @@ public partial class MainViewModel : ObservableObject
         BulletPrefsVersion++;
     }
 
+    /// <summary>The fonts-curation blocklist (empty in the designer).</summary>
+    public IReadOnlyCollection<string> DisabledFontsList =>
+        (IReadOnlyCollection<string>?)_settings?.DisabledFonts ?? System.Array.Empty<string>();
+
+    /// <summary>A font is offered unless the curation pref disabled it (case-insensitive).</summary>
+    public bool IsFontEnabled(string name) =>
+        _settings is null ||
+        !_settings.DisabledFonts.Contains(name, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Enable/disable one font in the toolbar menu; bumps FontPrefsVersion.</summary>
+    public void SetFontEnabled(string name, bool enabled)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        if (enabled) _settings.DisabledFonts.RemoveAll(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase));
+        else if (IsFontEnabled(name)) _settings.DisabledFonts.Add(name);
+        _settings.Save(_settingsDir);
+        FontPrefsVersion++;
+    }
+
     /// <summary>Reset every preference to its default (notebooks and notes untouched). Each setter
     /// persists and re-applies through its own OnChanged hook.</summary>
     public void ResetSettingsToDefaults()
@@ -411,6 +433,12 @@ public partial class MainViewModel : ObservableObject
             _settings.BulletColors.Clear();
             _settings.Save(_settingsDir);
             BulletPrefsVersion++;
+        }
+        if (_settings is not null && _settingsDir is not null && _settings.DisabledFonts.Count > 0)
+        {
+            _settings.DisabledFonts.Clear();
+            _settings.Save(_settingsDir);
+            FontPrefsVersion++;
         }
     }
 

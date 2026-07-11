@@ -105,4 +105,19 @@ public class AppSettingsTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void DisabledFonts_DefaultEmpty_AndRoundTrips()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            Assert.Empty(new AppSettings().DisabledFonts);
+            var s = new AppSettings();
+            s.DisabledFonts.Add("Impact");
+            s.Save(dir);
+            Assert.Equal(new[] { "Impact" }, AppSettings.Load(dir).DisabledFonts);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }

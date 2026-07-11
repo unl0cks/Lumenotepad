@@ -184,4 +184,29 @@ public class MainViewModelTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void FontEnablement_PersistsAndResets()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            Assert.True(vm.IsFontEnabled("Impact"));
+
+            vm.SetFontEnabled("Impact", false);
+            Assert.False(vm.IsFontEnabled("impact"));                        // case-insensitive
+            Assert.Contains("Impact", AppSettings.Load(dir).DisabledFonts);  // persisted
+
+            vm.SetFontEnabled("IMPACT", true);
+            Assert.True(vm.IsFontEnabled("Impact"));
+            Assert.Empty(AppSettings.Load(dir).DisabledFonts);
+
+            vm.SetFontEnabled("Georgia", false);
+            vm.ResetSettingsToDefaults();
+            Assert.True(vm.IsFontEnabled("Georgia"));
+            Assert.Empty(AppSettings.Load(dir).DisabledFonts);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }
