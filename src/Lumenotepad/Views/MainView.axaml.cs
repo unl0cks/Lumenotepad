@@ -429,6 +429,9 @@ public partial class MainView : UserControl
             ApplyHomeSurface();
             HookCollectionAnimations();
             Toolbar.SetFontPrefs(_hookedVm.ExtendedFonts, _hookedVm.DisabledFontsList);
+            Toolbar.SetPalettes(
+                _hookedVm.PaletteFor(highlight: true, FormatToolbar.BuiltInHighlights),
+                _hookedVm.PaletteFor(highlight: false, FormatToolbar.BuiltInTextColors));
         }
     }
 
@@ -692,6 +695,12 @@ public partial class MainView : UserControl
         else if (e.PropertyName is nameof(MainViewModel.ExtendedFonts) or nameof(MainViewModel.FontPrefsVersion))
         {
             if (Vm is { } fvm) Toolbar.SetFontPrefs(fvm.ExtendedFonts, fvm.DisabledFontsList);
+        }
+        else if (e.PropertyName == nameof(MainViewModel.PalettePrefsVersion))
+        {
+            if (Vm is { } pvm) Toolbar.SetPalettes(
+                pvm.PaletteFor(true, FormatToolbar.BuiltInHighlights),
+                pvm.PaletteFor(false, FormatToolbar.BuiltInTextColors));
         }
         else if (e.PropertyName == nameof(MainViewModel.IsRailVisible))
             Motion.Reveal(RailPanel, 64, Vm?.IsRailVisible ?? true);

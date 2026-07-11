@@ -237,6 +237,26 @@ public partial class PreferencesWindow : Window
             NewNoteWidthValue.Text = ((int)e.NewValue).ToString();
         };
 
+        EditorFontBox.ItemsSource = new[] { "(Default)" }.Concat(AppFonts.ListNames(Vm?.ExtendedFonts ?? false)).ToArray();
+        EditorFontBox.SelectionChanged += (_, _) =>
+        {
+            if (Vm is { } vm && EditorFontBox.SelectedItem is string f)
+            {
+                var v = f == "(Default)" ? null : f;
+                if (vm.EditorFont != v) vm.EditorFont = v;
+            }
+        };
+        WireScaleSlider(EditorFontSizeSlider, EditorFontSizeValue, v => v.ToString("0"),
+            vm => vm.EditorFontSize, (vm, v) => vm.EditorFontSize = v);
+        WireScaleSlider(LineSpacingSlider, LineSpacingValue, v => $"{v:0.0}×",
+            vm => vm.LineSpacingScale, (vm, v) => vm.LineSpacingScale = v);
+        WireScaleSlider(ParaSpacingSlider, ParaSpacingValue, v => $"{v:0.0}×",
+            vm => vm.ParagraphSpacingScale, (vm, v) => vm.ParagraphSpacingScale = v);
+        WireScaleSlider(IndentScaleSlider, IndentScaleValue, v => $"{v:0.0}×",
+            vm => vm.IndentScale, (vm, v) => vm.IndentScale = v);
+        WirePaletteEditor(TextPaletteChips, TextPaletteHexBox, TextPaletteReset, highlight: false);
+        WirePaletteEditor(HighlightPaletteChips, HighlightPaletteHexBox, HighlightPaletteReset, highlight: true);
+
         DataContextChanged += (_, _) => HookVmChanges();
         HookVmChanges();
         // The window subscribes to the long-lived VM; unhook on close or the VM pins the dead
@@ -277,6 +297,11 @@ public partial class PreferencesWindow : Window
         else if (e.PropertyName == nameof(MainViewModel.ExtendedFonts))
         {
             if (FontsPanel.IsVisible) RefreshFontChoices();
+        }
+        else if (e.PropertyName == nameof(MainViewModel.PalettePrefsVersion))
+        {
+            BuildPaletteChips(TextPaletteChips, false);
+            BuildPaletteChips(HighlightPaletteChips, true);
         }
     }
 
@@ -419,6 +444,62 @@ public partial class PreferencesWindow : Window
             if (child is Border { Tag: string hex } b)
                 b.BorderThickness = new Thickness(
                     string.Equals(Vm?.DefaultHighlight, hex, StringComparison.OrdinalIgnoreCase) ? 2 : 1);
+    }
+
+    /// <summary>One slider + live value label bound to a double VM pref (epsilon write-guard).</summary>
+    private void WireScaleSlider(Slider slider, TextBlock label, Func<double, string> fmt,
+                                 Func<MainViewModel, double> get, Action<MainViewModel, double> set)
+    {
+        slider.ValueChanged += (_, e) =>
+        {
+            if (Vm is { } vm && Math.Abs(get(vm) - e.NewValue) > 1e-6) set(vm, e.NewValue);
+            label.Text = fmt(e.NewValue);
+        };
+    }
+
+    private void WirePaletteEditor(WrapPanel chips, TextBox hexBox, Button reset, bool highlight)
+    {
+        hexBox.KeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Enter || Vm is not { } vm) return;
+            // highlights carry alpha — accept #AARRGGBB too (8 hex digits), else normalize 6
+            var raw = (hexBox.Text ?? "").Trim().TrimStart('#');
+            string? hex = raw.Length == 8 && raw.All(Uri.IsHexDigit) ? "#" + raw.ToUpperInvariant()
+                        : ThemePalettes.NormalizeHex(hexBox.Text);
+            if (hex is null) return;
+            if (highlight && hex.Length == 7) hex = "#66" + hex[1..];   // default highlight alpha
+            vm.AddPaletteColor(highlight, hex,
+                highlight ? FormatToolbar.BuiltInHighlights : FormatToolbar.BuiltInTextColors);
+            hexBox.Text = "";
+        };
+        reset.Click += (_, _) => Vm?.ResetPalette(highlight);
+        BuildPaletteChips(chips, highlight);
+    }
+
+    private void BuildPaletteChips(WrapPanel chips, bool highlight)
+    {
+        chips.Children.Clear();
+        if (Vm is not { } vm) return;
+        foreach (var hex in vm.PaletteFor(highlight,
+                     highlight ? FormatToolbar.BuiltInHighlights : FormatToolbar.BuiltInTextColors))
+        {
+            var chip = new Border
+            {
+                Width = 20, Height = 20, CornerRadius = new CornerRadius(6),
+                Margin = new Thickness(0, 0, 4, 4),
+                Background = new SolidColorBrush(Color.Parse(hex)),
+                BorderBrush = new SolidColorBrush(Color.Parse("#66808080")), BorderThickness = new Thickness(1),
+            };
+            ToolTip.SetTip(chip, $"{hex} — right-click to remove");
+            var captured = hex;
+            chip.PointerPressed += (_, e) =>
+            {
+                if (e.GetCurrentPoint(chip).Properties.IsRightButtonPressed && Vm is { } v)
+                    v.RemovePaletteColor(highlight, captured,
+                        highlight ? FormatToolbar.BuiltInHighlights : FormatToolbar.BuiltInTextColors);
+            };
+            chips.Children.Add(chip);
+        }
     }
 
     /// <summary>The keyboard reference table: build once on first nav to "shortcuts" (static content).</summary>
@@ -582,6 +663,17 @@ public partial class PreferencesWindow : Window
         NewNoteWidthSlider.Value = vm.NewNoteWidth;
         NewNoteWidthValue.Text = ((int)vm.NewNoteWidth).ToString();
         UpdateHighlightRings();
+        EditorFontBox.SelectedItem = vm.EditorFont ?? "(Default)";
+        EditorFontSizeSlider.Value = vm.EditorFontSize;
+        EditorFontSizeValue.Text = vm.EditorFontSize.ToString("0");
+        LineSpacingSlider.Value = vm.LineSpacingScale;
+        LineSpacingValue.Text = $"{vm.LineSpacingScale:0.0}×";
+        ParaSpacingSlider.Value = vm.ParagraphSpacingScale;
+        ParaSpacingValue.Text = $"{vm.ParagraphSpacingScale:0.0}×";
+        IndentScaleSlider.Value = vm.IndentScale;
+        IndentScaleValue.Text = $"{vm.IndentScale:0.0}×";
+        BuildPaletteChips(TextPaletteChips, false);
+        BuildPaletteChips(HighlightPaletteChips, true);
         UpdateGateVisuals();
     }
 }

@@ -28,6 +28,16 @@ public partial class FormatToolbar : UserControl
         ("#4DA6FF", "Blue"), ("#C9A0FF", "Purple"), ("#FF6B6B", "Red"),
     };
 
+    /// <summary>The built-in palettes (the "(none)" entry excluded) — prefs seeds edits from these.
+    /// MUST be declared after <see cref="Highlights"/>/<see cref="TextColors"/> — static field
+    /// initializers run in declaration order, so an earlier declaration would read null arrays.</summary>
+    public static readonly string[] BuiltInHighlights =
+        Highlights.Where(h => h.Hex is not null).Select(h => h.Hex!).ToArray();
+    public static readonly string[] BuiltInTextColors =
+        TextColors.Where(c => c.Hex is not null).Select(c => c.Hex!).ToArray();
+
+    private System.Collections.Generic.IReadOnlyList<string>? _customHighlights, _customTextColors;
+
     private RichTextEditor? _target;
     private bool _syncing;
 
@@ -190,6 +200,27 @@ public partial class FormatToolbar : UserControl
             b.Click += (_, _) => { apply(hex); owner.Flyout?.Hide(); };
             host.Children.Add(b);
         }
+    }
+
+    /// <summary>Palette prefs: rebuild the highlight/text-color swatch rows from custom lists (names
+    /// become the hex strings for custom colors — tooltips only). Empty lists never reach here — the
+    /// VM's PaletteFor seeds from the built-ins — but the "same" guard still skips redundant rebuilds.</summary>
+    public void SetPalettes(System.Collections.Generic.IReadOnlyList<string> highlights,
+                            System.Collections.Generic.IReadOnlyList<string> textColors)
+    {
+        bool same = _customHighlights is not null && _customHighlights.SequenceEqual(highlights)
+                 && _customTextColors is not null && _customTextColors.SequenceEqual(textColors);
+        if (same) return;
+        _customHighlights = highlights.ToList();
+        _customTextColors = textColors.ToList();
+        HighlightSwatches.Children.Clear();
+        ColorSwatches.Children.Clear();
+        BuildSwatches(HighlightSwatches,
+            new[] { ((string?)null, "None") }.Concat(highlights.Select(h => ((string?)h, h))).ToArray(),
+            hex => Do(e => e.ApplyHighlight(hex)), HighlightBtn);
+        BuildSwatches(ColorSwatches,
+            new[] { ((string?)null, "Default") }.Concat(textColors.Select(c => ((string?)c, c))).ToArray(),
+            hex => Do(e => e.ApplyColor(hex)), ColorBtn);
     }
 
     private static readonly (string? Key, string Glyph, string Name)[] Bullets =

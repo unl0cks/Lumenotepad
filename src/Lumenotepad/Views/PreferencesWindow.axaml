@@ -372,6 +372,69 @@
                             </StackPanel>
                             <ComboBox x:Name="DateFormatBox" Grid.Column="1" Width="170" VerticalAlignment="Center"/>
                         </Grid>
+
+                        <TextBlock Classes="section" Text="TEXT DEFAULTS"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Note font"/>
+                                <TextBlock Classes="hint" Text="What unstyled note text renders in."/>
+                            </StackPanel>
+                            <ComboBox x:Name="EditorFontBox" Grid.Column="1" Width="170" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="Note text size"/>
+                            <TextBlock x:Name="EditorFontSizeValue" Grid.Column="1" Classes="label" Text="15"/>
+                        </Grid>
+                        <Slider x:Name="EditorFontSizeSlider" Minimum="11" Maximum="24"
+                                TickFrequency="1" IsSnapToTickEnabled="True"/>
+
+                        <TextBlock Classes="section" Text="SPACING"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="Line spacing"/>
+                            <TextBlock x:Name="LineSpacingValue" Grid.Column="1" Classes="hint" Text="1.0×"/>
+                        </Grid>
+                        <Slider x:Name="LineSpacingSlider" Minimum="1" Maximum="1.8"
+                                TickFrequency="0.1" IsSnapToTickEnabled="True"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="Paragraph spacing"/>
+                            <TextBlock x:Name="ParaSpacingValue" Grid.Column="1" Classes="hint" Text="1.0×"/>
+                        </Grid>
+                        <Slider x:Name="ParaSpacingSlider" Minimum="0.5" Maximum="3"
+                                TickFrequency="0.25" IsSnapToTickEnabled="True"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="List indent"/>
+                            <TextBlock x:Name="IndentScaleValue" Grid.Column="1" Classes="hint" Text="1.0×"/>
+                        </Grid>
+                        <Slider x:Name="IndentScaleSlider" Minimum="0.7" Maximum="2"
+                                TickFrequency="0.1" IsSnapToTickEnabled="True"/>
+
+                        <TextBlock Classes="section" Text="SMART INPUT"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Smart lists"/>
+                                <TextBlock Classes="hint" Text="Typing '1. ', '- ' or '* ' at a line start begins a real list."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding SmartLists, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <TextBlock Classes="section" Text="TOOLBAR PALETTES"/>
+                        <TextBlock Classes="hint" Text="The color rows the toolbar offers. Right-click a chip to remove it."/>
+                        <Grid ColumnDefinitions="90,*,Auto">
+                            <TextBlock Classes="label" Text="Text colors"/>
+                            <WrapPanel x:Name="TextPaletteChips" Grid.Column="1" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                <TextBox x:Name="TextPaletteHexBox" Width="92" FontSize="12" PlaceholderText="#RRGGBB"/>
+                                <Button x:Name="TextPaletteReset" Content="Reset" FontSize="11.5"/>
+                            </StackPanel>
+                        </Grid>
+                        <Grid ColumnDefinitions="90,*,Auto">
+                            <TextBlock Classes="label" Text="Highlights"/>
+                            <WrapPanel x:Name="HighlightPaletteChips" Grid.Column="1" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                <TextBox x:Name="HighlightPaletteHexBox" Width="92" FontSize="12" PlaceholderText="#RRGGBB"/>
+                                <Button x:Name="HighlightPaletteReset" Content="Reset" FontSize="11.5"/>
+                            </StackPanel>
+                        </Grid>
                     </StackPanel>
 
                     <StackPanel x:Name="ShortcutsPanel" Spacing="6" IsVisible="False">
