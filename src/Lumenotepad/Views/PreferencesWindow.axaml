@@ -87,6 +87,7 @@
                     BorderThickness="0,0,1,0" Padding="8,4">
                 <ListBox x:Name="NavList" Classes="prefnav" Background="Transparent"
                          BorderThickness="0" Padding="0">
+                    <ListBoxItem Tag="general"><TextBlock Classes="label" Text="General"/></ListBoxItem>
                     <ListBoxItem Tag="appearance"><TextBlock Classes="label" Text="Appearance"/></ListBoxItem>
                     <ListBoxItem Tag="layout"><TextBlock Classes="label" Text="Layout"/></ListBoxItem>
                     <ListBoxItem Tag="canvas"><TextBlock Classes="label" Text="Canvas"/></ListBoxItem>
@@ -109,7 +110,72 @@
             <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
                 <Panel Margin="20,4,20,18">
 
-                    <StackPanel x:Name="AppearancePanel" Spacing="6">
+                    <StackPanel x:Name="GeneralPanel" Spacing="6">
+                        <TextBlock Classes="section" Text="STARTUP" Margin="0,4,0,2"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="When Lumenotepad opens"/>
+                                <TextBlock Classes="hint" Text="Land on the notebook gallery, or jump straight back into the last page."/>
+                            </StackPanel>
+                            <ComboBox x:Name="LaunchTargetBox" Grid.Column="1" Width="150" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Start with Windows"/>
+                                <TextBlock Classes="hint" Text="Launch Lumenotepad when you sign in."/>
+                            </StackPanel>
+                            <ToggleSwitch x:Name="StartupToggle" Grid.Column="1" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Always on top"/>
+                                <TextBlock Classes="hint" Text="Keep the window above other apps."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding AlwaysOnTop, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <TextBlock Classes="section" Text="SAVING"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="Autosave after typing stops"/>
+                            <TextBlock x:Name="AutosaveValue" Grid.Column="1" Classes="hint" Text="0.9s"/>
+                        </Grid>
+                        <Slider x:Name="AutosaveSlider" Minimum="100" Maximum="5000"
+                                TickFrequency="100" IsSnapToTickEnabled="True"/>
+
+                        <TextBlock Classes="section" Text="HOMEPAGE"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Jump back in entries"/>
+                                <TextBlock Classes="hint" Text="How many recent pages the homepage offers. Zero hides the strip."/>
+                            </StackPanel>
+                            <TextBlock x:Name="RecentCountValue" Grid.Column="1" Classes="label" Text="5"/>
+                        </Grid>
+                        <Slider x:Name="RecentCountSlider" Minimum="0" Maximum="10"
+                                TickFrequency="1" IsSnapToTickEnabled="True"/>
+
+                        <TextBlock Classes="section" Text="ASK BEFORE DELETING"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="Notebooks"/>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding ConfirmDeleteNotebook, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="Sections"/>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding ConfirmDeleteSection, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="Pages"/>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding ConfirmDeletePage, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Note containers"/>
+                                <TextBlock Classes="hint" Text="Container deletes can restore from the page's deleted history anyway."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding ConfirmDeleteContainer, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
+
+                    <StackPanel x:Name="AppearancePanel" Spacing="6" IsVisible="False">
                         <TextBlock Classes="section" Text="THEME" Margin="0,4,0,2"/>
                         <ListBox x:Name="ThemeList" Classes="themepick" Background="Transparent" BorderThickness="0" Padding="0">
                             <ListBox.ItemsPanel>

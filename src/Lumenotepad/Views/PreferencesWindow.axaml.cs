@@ -30,6 +30,7 @@ public partial class PreferencesWindow : Window
         InitializeComponent();
         _panels = new()
         {
+            ["general"] = GeneralPanel,
             ["appearance"] = AppearancePanel,
             ["layout"] = LayoutPanel,
             ["canvas"] = CanvasPanel,
@@ -80,6 +81,31 @@ public partial class PreferencesWindow : Window
             if (Vm is { } vm && ToolbarScopeBox.SelectedItem is string scope) vm.ToolbarScope = scope;
         };
 
+        LaunchTargetBox.ItemsSource = new[] { "Home page", "Last page" };
+        LaunchTargetBox.SelectionChanged += (_, _) =>
+        {
+            if (Vm is { } vm && LaunchTargetBox.SelectedItem is string s)
+            {
+                var v = s == "Last page" ? "LastPage" : "Home";
+                if (vm.LaunchTarget != v) vm.LaunchTarget = v;
+            }
+        };
+        StartupToggle.IsCheckedChanged += (_, _) =>
+        {
+            if (_syncingStartup) return;
+            Platform.StartupRegistry.SetEnabled(StartupToggle.IsChecked == true);
+        };
+        AutosaveSlider.ValueChanged += (_, e) =>
+        {
+            if (Vm is { } vm && vm.AutosaveMs != (int)e.NewValue) vm.AutosaveMs = (int)e.NewValue;
+            AutosaveValue.Text = $"{e.NewValue / 1000.0:0.#}s";
+        };
+        RecentCountSlider.ValueChanged += (_, e) =>
+        {
+            if (Vm is { } vm && vm.RecentCount != (int)e.NewValue) vm.RecentCount = (int)e.NewValue;
+            RecentCountValue.Text = ((int)e.NewValue).ToString();
+        };
+
         NavList.SelectionChanged += async (_, _) =>
         {
             if (_navGuard) return;
@@ -125,7 +151,7 @@ public partial class PreferencesWindow : Window
             UpdateGateVisuals();
             _navGuard = true; NavList.SelectedIndex = 0; _navGuard = false;
             _lastNav = NavList.SelectedItem;
-            ShowPanel("appearance");
+            ShowPanel("general");
         };
         RelockBtn.Click += (_, _) =>
         {
@@ -134,7 +160,7 @@ public partial class PreferencesWindow : Window
             UpdateGateVisuals();
             _navGuard = true; NavList.SelectedIndex = 0; _navGuard = false;
             _lastNav = NavList.SelectedItem;
-            ShowPanel("appearance");
+            ShowPanel("general");
         };
 
         AccentHexBox.KeyDown += (_, e) =>
@@ -187,6 +213,7 @@ public partial class PreferencesWindow : Window
     private bool _navGuard;
     private object? _lastNav;
     private MainViewModel? _hookedVm;
+    private bool _syncingStartup;
 
     /// <summary>Track VM changes that redraw prefs-local visuals (swatch ring, gate padlock).</summary>
     private void HookVmChanges()
@@ -438,6 +465,14 @@ public partial class PreferencesWindow : Window
         NumStrikeBox.SelectedItem = NumOpt(vm.NumStrikeDefault);
         BuildBulletRows();
         if (FontsPanel.IsVisible) RefreshFontChoices();
+        LaunchTargetBox.SelectedItem = vm.LaunchTarget == "LastPage" ? "Last page" : "Home page";
+        AutosaveSlider.Value = vm.AutosaveMs;
+        AutosaveValue.Text = $"{vm.AutosaveMs / 1000.0:0.#}s";
+        RecentCountSlider.Value = vm.RecentCount;
+        RecentCountValue.Text = vm.RecentCount.ToString();
+        _syncingStartup = true;
+        StartupToggle.IsChecked = Platform.StartupRegistry.IsEnabled();
+        _syncingStartup = false;
         UpdateGateVisuals();
     }
 }
