@@ -75,6 +75,12 @@ last before ADVANCED), **Backup** (gated, under Data & tools or its own row — 
 - **UI corner roundness** (radius tokenization — the M7-spec phase 8).
 - **Custom keybindings** (keymap layer + editor prefs UI).
 
+### Part 7 — Preferences UX pass (owner-requested 2026-07-11, runs LAST)
+The window has grown "cluttered and confusing, a little unorganized" (owner). After all feature
+parts land: reorganize with fresh eyes — regroup rows into clearer sections, consistent
+section/hint hierarchy, possibly sub-grouping cards or separators, panel order review, maybe
+search/filter. Design proposed to the owner BEFORE implementing (mockup-first).
+
 ## Testing
 Same regime as M7: settings round-trips, VM logic (launch-target resolution, recents count,
 markdown assembly, backup pruning) unit-tested; pointer/visual behavior verified in the real app
