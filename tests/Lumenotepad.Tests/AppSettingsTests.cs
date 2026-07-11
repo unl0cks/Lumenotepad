@@ -196,4 +196,41 @@ public class AppSettingsTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void EditorDefaultPrefs_DefaultsAndRoundTrip()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            var d = new AppSettings();
+            Assert.Null(d.EditorFont);
+            Assert.Equal(15, d.EditorFontSize, 3);
+            Assert.Equal(1.0, d.LineSpacingScale, 3);
+            Assert.Equal(1.0, d.ParagraphSpacingScale, 3);
+            Assert.Equal(1.0, d.IndentScale, 3);
+            Assert.True(d.SmartLists);
+            Assert.Empty(d.HighlightPalette);
+            Assert.Empty(d.TextPalette);
+
+            var s = new AppSettings
+            {
+                EditorFont = "Caveat", EditorFontSize = 18, LineSpacingScale = 1.4,
+                ParagraphSpacingScale = 2.0, IndentScale = 1.5, SmartLists = false,
+            };
+            s.HighlightPalette.Add("#66FF0000");
+            s.TextPalette.Add("#00FF00");
+            s.Save(dir);
+            var loaded = AppSettings.Load(dir);
+            Assert.Equal("Caveat", loaded.EditorFont);
+            Assert.Equal(18, loaded.EditorFontSize, 3);
+            Assert.Equal(1.4, loaded.LineSpacingScale, 3);
+            Assert.Equal(2.0, loaded.ParagraphSpacingScale, 3);
+            Assert.Equal(1.5, loaded.IndentScale, 3);
+            Assert.False(loaded.SmartLists);
+            Assert.Equal(new[] { "#66FF0000" }, loaded.HighlightPalette);
+            Assert.Equal(new[] { "#00FF00" }, loaded.TextPalette);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }

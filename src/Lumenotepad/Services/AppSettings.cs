@@ -42,6 +42,14 @@ public sealed class AppSettings
     public string UserName { get; set; } = "";              // greeting name; "" = plain greeting
     public bool ShowHomeStats { get; set; } = true;         // notebook/page counts under the greeting
     public string CardSize { get; set; } = "Medium";        // gallery covers: Small | Medium | Large
+    public string? EditorFont { get; set; }                 // base note font; null = app default
+    public double EditorFontSize { get; set; } = 15;        // base note size (11..24)
+    public double LineSpacingScale { get; set; } = 1.0;     // 1..1.8 — lines within a paragraph
+    public double ParagraphSpacingScale { get; set; } = 1.0;// 0.5..3 — the gap between paragraphs
+    public double IndentScale { get; set; } = 1.0;          // 0.7..2 — bullet indent width
+    public bool SmartLists { get; set; } = true;            // "1. "/"- "/"* " auto-start lists
+    public List<string> HighlightPalette { get; set; } = new();  // empty = the built-in palette
+    public List<string> TextPalette { get; set; } = new();       // empty = the built-in palette
     public string ToolbarPosition { get; set; } = "Top";    // "Top" | "Left" | "Right" | "Bottom"
     public string ToolbarScope { get; set; } = "Window";    // "Window" (window edge) | "Page" (inside the page box)
     public bool ResizablePages { get; set; } = true;        // note containers show resize handles

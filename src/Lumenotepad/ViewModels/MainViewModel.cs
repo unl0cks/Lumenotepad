@@ -98,6 +98,14 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _userName = "";
     [ObservableProperty] private bool _showHomeStats = true;
     [ObservableProperty] private string _cardSize = "Medium";       // Small | Medium | Large
+    [ObservableProperty] private string? _editorFont;               // prefs: null = app default
+    [ObservableProperty] private double _editorFontSize = 15;
+    [ObservableProperty] private double _lineSpacingScale = 1.0;
+    [ObservableProperty] private double _paragraphSpacingScale = 1.0;
+    [ObservableProperty] private double _indentScale = 1.0;
+    [ObservableProperty] private bool _smartLists = true;
+    /// <summary>Bumped whenever a toolbar palette changes — the toolbar rebuilds its swatches.</summary>
+    [ObservableProperty] private int _palettePrefsVersion;
 
     /// <summary>The Light-paper toggle only means something on Lumen with Full theme off.</summary>
     public bool PaperToggleEnabled => Theme == "Lumen" && !FullTheme;
@@ -214,6 +222,12 @@ public partial class MainViewModel : ObservableObject
             UserName = _settings.UserName;
             ShowHomeStats = _settings.ShowHomeStats;
             CardSize = _settings.CardSize;
+            EditorFont = _settings.EditorFont;
+            EditorFontSize = _settings.EditorFontSize;
+            LineSpacingScale = _settings.LineSpacingScale;
+            ParagraphSpacingScale = _settings.ParagraphSpacingScale;
+            IndentScale = _settings.IndentScale;
+            SmartLists = _settings.SmartLists;
         }
         _workspace = store.LoadOrSeed();
         // Capture BEFORE the default selection below — its cascade re-tracks LastPageId.
@@ -519,6 +533,48 @@ public partial class MainViewModel : ObservableObject
         _settings.Save(_settingsDir);
     }
 
+    partial void OnEditorFontChanged(string? value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.EditorFont = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnEditorFontSizeChanged(double value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.EditorFontSize = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnLineSpacingScaleChanged(double value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.LineSpacingScale = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnParagraphSpacingScaleChanged(double value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.ParagraphSpacingScale = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnIndentScaleChanged(double value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.IndentScale = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnSmartListsChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.SmartLists = value;
+        _settings.Save(_settingsDir);
+    }
+
     // ---- gallery ordering (the order persists via order.json) ----
 
     public void SortNotebooksByName() =>
@@ -582,6 +638,43 @@ public partial class MainViewModel : ObservableObject
         BulletPrefsVersion++;
     }
 
+    /// <summary>The effective palette (empty stored list = the built-in defaults).</summary>
+    public IReadOnlyList<string> PaletteFor(bool highlight, IReadOnlyList<string> builtIns) =>
+        _settings is { } s && (highlight ? s.HighlightPalette : s.TextPalette) is { Count: > 0 } list
+            ? list : builtIns;
+
+    /// <summary>Add a color; seeds the stored list from the built-ins on first edit.</summary>
+    public void AddPaletteColor(bool highlight, string hex, IReadOnlyList<string> builtIns)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        var list = highlight ? _settings.HighlightPalette : _settings.TextPalette;
+        if (list.Count == 0) list.AddRange(builtIns);
+        if (!list.Contains(hex, StringComparer.OrdinalIgnoreCase)) list.Add(hex);
+        _settings.Save(_settingsDir);
+        PalettePrefsVersion++;
+    }
+
+    /// <summary>Remove a color; seeds first like Add. The last chip cannot be removed.</summary>
+    public void RemovePaletteColor(bool highlight, string hex, IReadOnlyList<string> builtIns)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        var list = highlight ? _settings.HighlightPalette : _settings.TextPalette;
+        if (list.Count == 0) list.AddRange(builtIns);
+        if (list.Count <= 1) return;
+        list.RemoveAll(h => string.Equals(h, hex, StringComparison.OrdinalIgnoreCase));
+        _settings.Save(_settingsDir);
+        PalettePrefsVersion++;
+    }
+
+    /// <summary>Back to the built-ins (clears the stored list).</summary>
+    public void ResetPalette(bool highlight)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        (highlight ? _settings.HighlightPalette : _settings.TextPalette).Clear();
+        _settings.Save(_settingsDir);
+        PalettePrefsVersion++;
+    }
+
     /// <summary>The fonts-curation blocklist (empty in the designer).</summary>
     public IReadOnlyCollection<string> DisabledFontsList =>
         (IReadOnlyCollection<string>?)_settings?.DisabledFonts ?? System.Array.Empty<string>();
@@ -625,6 +718,9 @@ public partial class MainViewModel : ObservableObject
         DefaultHighlight = d.DefaultHighlight; DateFormat = d.DateFormat;
         NewNoteWidth = d.NewNoteWidth; AccentFollowsNotebook = d.AccentFollowsNotebook;
         UserName = d.UserName; ShowHomeStats = d.ShowHomeStats; CardSize = d.CardSize;
+        EditorFont = d.EditorFont; EditorFontSize = d.EditorFontSize;
+        LineSpacingScale = d.LineSpacingScale; ParagraphSpacingScale = d.ParagraphSpacingScale;
+        IndentScale = d.IndentScale; SmartLists = d.SmartLists;
         if (_settings is not null && _settingsDir is not null && _settings.BulletColors.Count > 0)
         {
             _settings.BulletColors.Clear();
@@ -636,6 +732,14 @@ public partial class MainViewModel : ObservableObject
             _settings.DisabledFonts.Clear();
             _settings.Save(_settingsDir);
             FontPrefsVersion++;
+        }
+        if (_settings is not null && _settingsDir is not null
+            && (_settings.HighlightPalette.Count > 0 || _settings.TextPalette.Count > 0))
+        {
+            _settings.HighlightPalette.Clear();
+            _settings.TextPalette.Clear();
+            _settings.Save(_settingsDir);
+            PalettePrefsVersion++;
         }
     }
 

@@ -285,4 +285,32 @@ public class MainViewModelTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void Palettes_SeedEditResetRoundTrip()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            var builtIns = new[] { "#AAA111", "#BBB222" };
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            Assert.Equal(builtIns, vm.PaletteFor(highlight: false, builtIns));
+
+            vm.AddPaletteColor(false, "#CCC333", builtIns);
+            Assert.Equal(new[] { "#AAA111", "#BBB222", "#CCC333" }, vm.PaletteFor(false, builtIns));
+            Assert.Equal(3, AppSettings.Load(dir).TextPalette.Count);      // seeded + persisted
+
+            vm.RemovePaletteColor(false, "#aaa111", builtIns);             // case-insensitive
+            Assert.Equal(new[] { "#BBB222", "#CCC333" }, vm.PaletteFor(false, builtIns));
+
+            vm.RemovePaletteColor(false, "#BBB222", builtIns);
+            vm.RemovePaletteColor(false, "#CCC333", builtIns);             // last chip survives
+            Assert.Single(vm.PaletteFor(false, builtIns));
+
+            vm.ResetPalette(false);
+            Assert.Equal(builtIns, vm.PaletteFor(false, builtIns));
+            Assert.Empty(AppSettings.Load(dir).TextPalette);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }
