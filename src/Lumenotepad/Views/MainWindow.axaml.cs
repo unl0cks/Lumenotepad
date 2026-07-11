@@ -24,6 +24,7 @@ public partial class MainWindow : Window
         {
             _themeVm.PropertyChanged += OnThemePropertyChanged;
             ApplyTheme();
+            Topmost = _themeVm.AlwaysOnTop;
         }
     }
 
@@ -34,6 +35,9 @@ public partial class MainWindow : Window
             or nameof(ViewModels.MainViewModel.PaperLight)
             or nameof(ViewModels.MainViewModel.CustomAccent))
             ApplyTheme();
+
+        if (e.PropertyName == nameof(ViewModels.MainViewModel.AlwaysOnTop) && _themeVm is { } topVm)
+            Topmost = topVm.AlwaysOnTop;
     }
 
     private void ApplyTheme()

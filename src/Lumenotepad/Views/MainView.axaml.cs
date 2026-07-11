@@ -48,11 +48,14 @@ public partial class MainView : UserControl
         PageCanvas.ActiveEditorChanged += ed => { if (ed is not null) Toolbar.Target = ed; };
 
         // Deleting a container asks first; the deleted history panel lists what can come back.
-        PageCanvas.ConfirmDelete = () => ConfirmDialog.Show(Window!,
-            "Delete this container?",
-            PageCanvas.HistoryEnabled
-                ? "It will move to this page's deleted history — you can drag it back onto the page anytime."
-                : "The deleted history is turned off, so this can't be undone.");
+        PageCanvas.ConfirmDelete = () =>
+            Vm is { ConfirmDeleteContainer: false }
+                ? System.Threading.Tasks.Task.FromResult(true)
+                : ConfirmDialog.Show(Window!,
+                    "Delete this container?",
+                    PageCanvas.HistoryEnabled
+                        ? "It will move to this page's deleted history — you can drag it back onto the page anytime."
+                        : "The deleted history is turned off, so this can't be undone.");
         PageCanvas.TrashChanged += () => { if (TrashPanel.IsVisible) RefreshTrashPanel(); };
         HistoryBtn.Click += (_, _) =>
         {
@@ -591,10 +594,12 @@ public partial class MainView : UserControl
     {
         if (_autosave is null)
         {
-            _autosave = new Avalonia.Threading.DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(900) };
+            _autosave = new Avalonia.Threading.DispatcherTimer();
             _autosave.Tick += (_, _) => { _autosave!.Stop(); Vm?.FlushDirtyDocs(); };
         }
         _autosave.Stop();
+        _autosave.Interval = System.TimeSpan.FromMilliseconds(
+            System.Math.Clamp(Vm?.AutosaveMs ?? 900, 100, 5000));
         _autosave.Start();
     }
 
@@ -817,6 +822,7 @@ public partial class MainView : UserControl
         delete.Click += (_, _) => ConfirmThenDelete(
             "Delete this section?",
             $"“{Label(sec.Name)}” and all its pages will be permanently deleted. This can't be undone.",
+            Vm?.ConfirmDeleteSection ?? true,
             () => CollapseThenDelete(SectionsList.ContainerFromItem(sec) as Control, () => Vm?.DeleteSectionCommand.Execute(sec)));
         OpenMenu(e, rename, delete);
     }
@@ -829,6 +835,7 @@ public partial class MainView : UserControl
         delete.Click += (_, _) => ConfirmThenDelete(
             "Delete this notebook?",
             $"“{Label(nb.Name)}” and all its sections and pages will be permanently deleted. This can't be undone.",
+            Vm?.ConfirmDeleteNotebook ?? true,
             () => CollapseThenDelete(NotebooksList.ContainerFromItem(nb) as Control, () => Vm?.DeleteNotebookCommand.Execute(nb)));
         OpenMenu(e, delete);
     }
@@ -840,6 +847,7 @@ public partial class MainView : UserControl
         delete.Click += (_, _) => ConfirmThenDelete(
             "Delete this notebook?",
             $"“{Label(nb.Name)}” and all its sections and pages will be permanently deleted. This can't be undone.",
+            Vm?.ConfirmDeleteNotebook ?? true,
             () => CollapseThenDelete(NotebooksList.ContainerFromItem(nb) as Control, () => Vm?.DeleteNotebookCommand.Execute(nb)));
         OpenMenu(e, delete);
     }
@@ -852,6 +860,7 @@ public partial class MainView : UserControl
         delete.Click += (_, _) => ConfirmThenDelete(
             "Delete this page?",
             $"“{Label(pg.Title)}” will be permanently deleted. This can't be undone.",
+            Vm?.ConfirmDeletePage ?? true,
             () => CollapseThenDelete(PagesList.ContainerFromItem(pg) as Control, () => Vm?.DeletePageCommand.Execute(pg)));
         OpenMenu(e, delete);
     }
@@ -908,6 +917,7 @@ public partial class MainView : UserControl
         delete.Click += (_, _) => ConfirmThenDelete(
             "Delete this notebook?",
             $"“{Label(nb.Name)}” and all its sections and pages will be permanently deleted. This can't be undone.",
+            Vm?.ConfirmDeleteNotebook ?? true,
             () => CollapseThenDelete(HomeCards.ContainerFromItem(nb) as Control, () => Vm?.DeleteNotebookCommand.Execute(nb)));
 
         if (nb.CoverPath is not null)
@@ -968,8 +978,9 @@ public partial class MainView : UserControl
         if (e.Source is Control c) { menu.Open(c); e.Handled = true; }
     }
 
-    private async void ConfirmThenDelete(string title, string message, System.Action delete)
+    private async void ConfirmThenDelete(string title, string message, bool ask, System.Action delete)
     {
+        if (!ask) { delete(); return; }
         if (Window is not { } w) return;
         if (await ConfirmDialog.Show(w, title, message)) delete();
     }
