@@ -237,7 +237,8 @@ public partial class PreferencesWindow : Window
             NewNoteWidthValue.Text = ((int)e.NewValue).ToString();
         };
 
-        EditorFontBox.ItemsSource = new[] { "(Default)" }.Concat(AppFonts.ListNames(Vm?.ExtendedFonts ?? false)).ToArray();
+        // ItemsSource is (re)built in RefreshEditorFontList — the ctor runs before the DataContext
+        // lands, so building it here would permanently miss the Extended-fonts master switch.
         EditorFontBox.SelectionChanged += (_, _) =>
         {
             if (Vm is { } vm && EditorFontBox.SelectedItem is string f)
@@ -297,6 +298,7 @@ public partial class PreferencesWindow : Window
         else if (e.PropertyName == nameof(MainViewModel.ExtendedFonts))
         {
             if (FontsPanel.IsVisible) RefreshFontChoices();
+            RefreshEditorFontList();               // the Note-font combo offers the same candidates
         }
         else if (e.PropertyName == nameof(MainViewModel.PalettePrefsVersion))
         {
@@ -663,7 +665,7 @@ public partial class PreferencesWindow : Window
         NewNoteWidthSlider.Value = vm.NewNoteWidth;
         NewNoteWidthValue.Text = ((int)vm.NewNoteWidth).ToString();
         UpdateHighlightRings();
-        EditorFontBox.SelectedItem = vm.EditorFont ?? "(Default)";
+        RefreshEditorFontList();
         EditorFontSizeSlider.Value = vm.EditorFontSize;
         EditorFontSizeValue.Text = vm.EditorFontSize.ToString("0");
         LineSpacingSlider.Value = vm.LineSpacingScale;
@@ -675,5 +677,15 @@ public partial class PreferencesWindow : Window
         BuildPaletteChips(TextPaletteChips, false);
         BuildPaletteChips(HighlightPaletteChips, true);
         UpdateGateVisuals();
+    }
+
+    /// <summary>(Re)build the Note-font combo. The ctor runs before the DataContext lands (so a
+    /// ctor-built list would always read ExtendedFonts=false), and the Extended-fonts master switch
+    /// changes the candidate list — rebuild on sync and on the switch.</summary>
+    private void RefreshEditorFontList()
+    {
+        EditorFontBox.ItemsSource =
+            new[] { "(Default)" }.Concat(AppFonts.ListNames(Vm?.ExtendedFonts ?? false)).ToArray();
+        EditorFontBox.SelectedItem = Vm?.EditorFont ?? "(Default)";
     }
 }
