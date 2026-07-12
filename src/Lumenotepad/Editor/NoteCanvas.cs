@@ -47,6 +47,63 @@ public sealed class NoteCanvas : Panel
     /// <summary>Asked before a container is deleted via its ✕ button / menu; null = no prompt.</summary>
     public Func<Task<bool>>? ConfirmDelete { get; set; }
 
+    /// <summary>The paper grid ("Paper grid" preference): "None" | "Dots" | "Lines". The dots and
+    /// lines sit on the same 20px lattice the snap uses, so snapped containers land exactly on them.</summary>
+    public string GridStyle
+    {
+        get => _gridStyle;
+        set { if (_gridStyle == value) return; _gridStyle = value; RefreshGrid(); }
+    }
+    private string _gridStyle = "None";
+
+    /// <summary>"Snap to grid" preference: drag/resize/placement land on the 20px cell.</summary>
+    public bool SnapToGrid { get; set; }
+
+    // The grid underlay: a Border filled with a TILED DrawingBrush — one 20px cell drawn once and
+    // repeated by the compositor. Per-dot geometry would put tens of thousands of nodes in the
+    // scene. A child element because Panel.Render is sealed (same lesson as the starter hint).
+    private readonly Border _gridLayer = new() { IsHitTestVisible = false };
+
+    private void RefreshGrid() => _gridLayer.Background = BuildGridBrush(_gridStyle);
+
+    private static IBrush? BuildGridBrush(string style)
+    {
+        var t = Services.ThemeManager.Current;
+        if (style == "Dots")
+        {
+            // Full dots at all four tile corners: each is clipped to its quarter inside the cell
+            // and the neighbouring tiles complete it — the assembled sheet shows whole dots
+            // exactly on the 20px lattice.
+            var g = new GeometryGroup();
+            foreach (var (x, y) in new[] { (0.0, 0.0), (GridMath.Cell, 0.0), (0.0, GridMath.Cell), (GridMath.Cell, GridMath.Cell) })
+                g.Children.Add(new EllipseGeometry(new Rect(x - 1.1, y - 1.1, 2.2, 2.2)));
+            return Tile(new GeometryDrawing
+            {
+                Geometry = g,
+                Brush = new SolidColorBrush(Color.Parse(Services.ThemePalettes.Alpha(t.PaperText, 0x30))),
+            });
+        }
+        if (style == "Lines")
+        {
+            var g = new GeometryGroup();
+            g.Children.Add(new LineGeometry(new Point(0, 0), new Point(GridMath.Cell, 0)));
+            g.Children.Add(new LineGeometry(new Point(0, 0), new Point(0, GridMath.Cell)));
+            return Tile(new GeometryDrawing
+            {
+                Geometry = g,
+                Pen = new Pen(new SolidColorBrush(Color.Parse(Services.ThemePalettes.Alpha(t.PaperText, 0x1E)))),
+            });
+        }
+        return null;
+    }
+
+    private static DrawingBrush Tile(Drawing cell) => new()
+    {
+        Drawing = cell, TileMode = TileMode.Tile, Stretch = Stretch.None,
+        SourceRect = new RelativeRect(0, 0, GridMath.Cell, GridMath.Cell, RelativeUnit.Absolute),
+        DestinationRect = new RelativeRect(0, 0, GridMath.Cell, GridMath.Cell, RelativeUnit.Absolute),
+    };
+
     /// <summary>The editor of the most recently focused container (what the toolbar targets).</summary>
     public RichTextEditor? ActiveEditor { get; private set; }
     public event Action<RichTextEditor?>? ActiveEditorChanged;
@@ -87,6 +144,8 @@ public sealed class NoteCanvas : Panel
     {
         Children.Clear();
         SetActive(null);
+        Children.Add(_gridLayer);      // first child = bottom of z-order: under every container
+        RefreshGrid();                 // theme changes arrive as a Document reset — re-tint here
         Children.Add(_hint);
         if (_doc is not null)
             foreach (var box in _doc.Boxes)
@@ -118,6 +177,11 @@ public sealed class NoteCanvas : Panel
     {
         foreach (var child in Children)
         {
+            if (ReferenceEquals(child, _gridLayer))
+            {
+                child.Arrange(new Rect(finalSize));     // the grid covers the whole scrollable page
+                continue;
+            }
             if (child is not NoteBoxView v)
             {
                 var d = child.DesiredSize;
@@ -138,7 +202,9 @@ public sealed class NoteCanvas : Panel
         if (_doc is null || !ReferenceEquals(e.Source, this)) return;
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         var p = e.GetPosition(this);
-        var view = AddBoxView(_doc.AddBox(p.X - 11, p.Y - 16, Math.Clamp(RichTextEditor.NewNoteWidthPref, 240, 640)));
+        double bx = p.X - 11, by = p.Y - 16;
+        if (SnapToGrid) { bx = Math.Max(0, GridMath.Snap(bx)); by = Math.Max(0, GridMath.Snap(by)); }
+        var view = AddBoxView(_doc.AddBox(bx, by, Math.Clamp(RichTextEditor.NewNoteWidthPref, 240, 640)));
         Dispatcher.UIThread.Post(view.FocusEditor, DispatcherPriority.Background);
         e.Handled = true;
     }
@@ -395,13 +461,23 @@ internal sealed class NoteBoxView : Panel
             double dx = p.X - _dragStart.X, dy = p.Y - _dragStart.Y;
             if (mode == DragMode.Move)
             {
-                Box.X = Math.Max(0, _dragOrigin.X + dx);
-                Box.Y = Math.Max(0, _dragOrigin.Y + dy);
+                double nx = _dragOrigin.X + dx, ny = _dragOrigin.Y + dy;
+                if (_canvas.SnapToGrid) { nx = GridMath.Snap(nx); ny = GridMath.Snap(ny); }
+                Box.X = Math.Max(0, nx);
+                Box.Y = Math.Max(0, ny);
             }
             if (mode is DragMode.Width or DragMode.Both)
-                Box.Width = Math.Clamp(_dragOrigin.W + dx, NoteBox.MinWidth, 1600);
+            {
+                double nw = _dragOrigin.W + dx;
+                if (_canvas.SnapToGrid) nw = GridMath.Snap(nw);
+                Box.Width = Math.Clamp(nw, NoteBox.MinWidth, 1600);
+            }
             if (mode is DragMode.Height or DragMode.Both)
-                Box.H = Math.Clamp(_dragOrigin.H + dy, NoteBox.MinHeight, 4000);
+            {
+                double nh = _dragOrigin.H + dy;
+                if (_canvas.SnapToGrid) nh = GridMath.Snap(nh);
+                Box.H = Math.Clamp(nh, NoteBox.MinHeight, 4000);
+            }
             _canvas.InvalidateMeasure();
             e.Handled = true;
         };

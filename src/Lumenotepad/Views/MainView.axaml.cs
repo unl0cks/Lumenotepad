@@ -441,6 +441,8 @@ public partial class MainView : UserControl
         if (Vm is not { } vm) return;
         PageCanvas.CanResize = vm.ResizablePages;
         PageCanvas.HistoryEnabled = vm.DeletedHistory;
+        PageCanvas.GridStyle = vm.PageGrid;
+        PageCanvas.SnapToGrid = vm.GridSnap;
         if (!vm.DeletedHistory) TrashPanel.IsVisible = false;
         ApplyFlatCovers();
     }
@@ -669,7 +671,8 @@ public partial class MainView : UserControl
         }
         else if (e.PropertyName is nameof(MainViewModel.ToolbarPosition) or nameof(MainViewModel.ToolbarScope))
             ApplyToolbarPlacement();
-        else if (e.PropertyName is nameof(MainViewModel.ResizablePages) or nameof(MainViewModel.DeletedHistory))
+        else if (e.PropertyName is nameof(MainViewModel.ResizablePages) or nameof(MainViewModel.DeletedHistory)
+                 or nameof(MainViewModel.PageGrid) or nameof(MainViewModel.GridSnap))
             ApplyCanvasPrefs();
         else if (e.PropertyName == nameof(MainViewModel.FlatCovers))
             ApplyFlatCovers();
