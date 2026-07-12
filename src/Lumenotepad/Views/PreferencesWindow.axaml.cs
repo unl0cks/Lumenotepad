@@ -236,6 +236,11 @@ public partial class PreferencesWindow : Window
             if (Vm is { } vm && Math.Abs(vm.NewNoteWidth - e.NewValue) > 0.5) vm.NewNoteWidth = e.NewValue;
             NewNoteWidthValue.Text = ((int)e.NewValue).ToString();
         };
+        PageGridBox.ItemsSource = new[] { "None", "Dots", "Lines" };
+        PageGridBox.SelectionChanged += (_, _) =>
+        {
+            if (Vm is { } vm && PageGridBox.SelectedItem is string g && vm.PageGrid != g) vm.PageGrid = g;
+        };
 
         // ItemsSource is (re)built in RefreshEditorFontList — the ctor runs before the DataContext
         // lands, so building it here would permanently miss the Extended-fonts master switch.
@@ -664,6 +669,7 @@ public partial class PreferencesWindow : Window
         CardSizeBox.SelectedItem = vm.CardSize;
         NewNoteWidthSlider.Value = vm.NewNoteWidth;
         NewNoteWidthValue.Text = ((int)vm.NewNoteWidth).ToString();
+        PageGridBox.SelectedItem = vm.PageGrid;
         UpdateHighlightRings();
         RefreshEditorFontList();
         EditorFontSizeSlider.Value = vm.EditorFontSize;

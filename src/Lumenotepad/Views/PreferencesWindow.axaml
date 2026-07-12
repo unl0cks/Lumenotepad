@@ -330,6 +330,24 @@
                         </Grid>
                         <Slider x:Name="NewNoteWidthSlider" Minimum="240" Maximum="640"
                                 TickFrequency="20" IsSnapToTickEnabled="True"/>
+
+                        <TextBlock Classes="section" Text="PAPER"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Paper grid"/>
+                                <TextBlock Classes="hint" Text="Faint dots or lines on the page, under your notes."/>
+                            </StackPanel>
+                            <ComboBox x:Name="PageGridBox" Grid.Column="1" Width="120" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Snap to grid"/>
+                                <TextBlock Classes="hint" Text="Moving or resizing containers lands on the 20px grid."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding GridSnap, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <TextBlock Classes="hint" Margin="0,4,0,0"
+                                   Text="Paper color is per notebook — right-click a notebook cover on the homepage or its chip in the rail."/>
                     </StackPanel>
 
                     <StackPanel x:Name="EditorPanel" Spacing="6" IsVisible="False">
