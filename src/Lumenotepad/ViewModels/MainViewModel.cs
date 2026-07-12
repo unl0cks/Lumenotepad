@@ -104,6 +104,8 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double _paragraphSpacingScale = 1.0;
     [ObservableProperty] private double _indentScale = 1.0;
     [ObservableProperty] private bool _smartLists = true;
+    [ObservableProperty] private string _pageGrid = "None";   // prefs: canvas paper grid
+    [ObservableProperty] private bool _gridSnap;              // prefs: snap to the 20px cell
     /// <summary>Bumped whenever a toolbar palette changes — the toolbar rebuilds its swatches.</summary>
     [ObservableProperty] private int _palettePrefsVersion;
 
@@ -228,6 +230,8 @@ public partial class MainViewModel : ObservableObject
             ParagraphSpacingScale = _settings.ParagraphSpacingScale;
             IndentScale = _settings.IndentScale;
             SmartLists = _settings.SmartLists;
+            PageGrid = _settings.PageGrid;
+            GridSnap = _settings.GridSnap;
         }
         _workspace = store.LoadOrSeed();
         // Capture BEFORE the default selection below — its cascade re-tracks LastPageId.
@@ -575,6 +579,20 @@ public partial class MainViewModel : ObservableObject
         _settings.Save(_settingsDir);
     }
 
+    partial void OnPageGridChanged(string value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.PageGrid = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnGridSnapChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.GridSnap = value;
+        _settings.Save(_settingsDir);
+    }
+
     // ---- gallery ordering (the order persists via order.json) ----
 
     public void SortNotebooksByName() =>
@@ -721,6 +739,7 @@ public partial class MainViewModel : ObservableObject
         EditorFont = d.EditorFont; EditorFontSize = d.EditorFontSize;
         LineSpacingScale = d.LineSpacingScale; ParagraphSpacingScale = d.ParagraphSpacingScale;
         IndentScale = d.IndentScale; SmartLists = d.SmartLists;
+        PageGrid = d.PageGrid; GridSnap = d.GridSnap;
         if (_settings is not null && _settingsDir is not null && _settings.BulletColors.Count > 0)
         {
             _settings.BulletColors.Clear();
@@ -862,6 +881,13 @@ public partial class MainViewModel : ObservableObject
         _store.DeleteCover(nb);
         nb.Cover = "";
         nb.CoverPath = null;
+        Save();
+    }
+
+    /// <summary>Set (hex) or clear (null) a notebook's paper tint; persists the tree.</summary>
+    public void SetNotebookPaperTint(Notebook nb, string? hex)
+    {
+        nb.PaperTint = hex;
         Save();
     }
 

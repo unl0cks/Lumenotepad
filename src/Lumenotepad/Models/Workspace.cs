@@ -24,6 +24,9 @@ public sealed partial class Notebook : ObservableObject
     [ObservableProperty]
     [property: System.Text.Json.Serialization.JsonIgnore]
     private string? _coverPath;
+    /// <summary>Paper tint hex for this notebook's pages (null = untinted). Per-notebook data,
+    /// not a preference — set from the notebook context menu, untouched by Reset settings.</summary>
+    [ObservableProperty] private string? _paperTint;
     public ObservableCollection<Section> Sections { get; set; } = new();
 }
 

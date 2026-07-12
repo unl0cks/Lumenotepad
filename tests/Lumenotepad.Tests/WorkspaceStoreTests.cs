@@ -83,4 +83,24 @@ public class WorkspaceStoreTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void PaperTint_roundTrips()
+    {
+        var dir = TempDir();
+        try
+        {
+            var store = new WorkspaceStore(dir);
+            var ws = new Workspace();
+            ws.Notebooks.Add(new Notebook { Name = "Tinted", PaperTint = "#E8D9A8" });
+            ws.Notebooks.Add(new Notebook { Name = "Plain" });
+
+            store.Save(ws);
+            var loaded = new WorkspaceStore(dir).Load();
+
+            Assert.Equal("#E8D9A8", loaded.Notebooks[0].PaperTint);
+            Assert.Null(loaded.Notebooks[1].PaperTint);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }

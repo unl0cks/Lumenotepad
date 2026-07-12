@@ -233,4 +233,23 @@ public class AppSettingsTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void PaperGridPrefs_DefaultAndRoundTrip()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            Assert.Equal("None", new AppSettings().PageGrid);
+            Assert.False(new AppSettings().GridSnap);
+
+            var s = new AppSettings { PageGrid = "Dots", GridSnap = true };
+            s.Save(dir);
+            var loaded = AppSettings.Load(dir);
+
+            Assert.Equal("Dots", loaded.PageGrid);
+            Assert.True(loaded.GridSnap);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }

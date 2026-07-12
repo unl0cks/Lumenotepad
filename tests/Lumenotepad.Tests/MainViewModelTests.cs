@@ -313,4 +313,46 @@ public class MainViewModelTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void ResetSettingsToDefaults_restoresPaperGridPrefs()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            vm.PageGrid = "Lines";
+            vm.GridSnap = true;
+
+            vm.ResetSettingsToDefaults();
+
+            Assert.Equal("None", vm.PageGrid);
+            Assert.False(vm.GridSnap);
+            var persisted = AppSettings.Load(dir);
+            Assert.Equal("None", persisted.PageGrid);
+            Assert.False(persisted.GridSnap);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void SetNotebookPaperTint_setsAndPersists()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            var nb = vm.Notebooks[0];
+
+            vm.SetNotebookPaperTint(nb, "#8FC2EC");
+
+            Assert.Equal("#8FC2EC", nb.PaperTint);
+            var reloaded = new MainViewModel(new WorkspaceStore(dir), dir);
+            Assert.Equal("#8FC2EC", reloaded.Notebooks[0].PaperTint);   // Save() ran
+
+            vm.SetNotebookPaperTint(nb, null);
+            Assert.Null(nb.PaperTint);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }

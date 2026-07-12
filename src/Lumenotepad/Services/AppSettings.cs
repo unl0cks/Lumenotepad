@@ -50,6 +50,8 @@ public sealed class AppSettings
     public bool SmartLists { get; set; } = true;            // "1. "/"- "/"* " auto-start lists
     public List<string> HighlightPalette { get; set; } = new();  // empty = the built-in palette
     public List<string> TextPalette { get; set; } = new();       // empty = the built-in palette
+    public string PageGrid { get; set; } = "None";          // canvas paper grid: None | Dots | Lines
+    public bool GridSnap { get; set; }                      // move/resize lands on the 20px cell
     public string ToolbarPosition { get; set; } = "Top";    // "Top" | "Left" | "Right" | "Bottom"
     public string ToolbarScope { get; set; } = "Window";    // "Window" (window edge) | "Page" (inside the page box)
     public bool ResizablePages { get; set; } = true;        // note containers show resize handles
