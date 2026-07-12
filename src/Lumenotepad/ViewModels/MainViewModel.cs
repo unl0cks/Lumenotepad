@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
+using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Lumenotepad.Editor;
@@ -257,6 +259,9 @@ public partial class MainViewModel : ObservableObject
             }
         }
         RefreshHome();
+
+        if (BackupDue())
+            System.Threading.Tasks.Task.Run(RunBackupNow);   // off the UI thread; no-op when no folder/not due
     }
 
     partial void OnToolbarPositionChanged(string value)
@@ -940,6 +945,67 @@ public partial class MainViewModel : ObservableObject
         s.LastBackupUtc = now;
         s.Save(_settingsDir);
         return zip;
+    }
+
+    /// <summary>Import plain text as a new page in the current section: one note box holding the text,
+    /// one paragraph per line. Returns the new page (null if no section is selected).</summary>
+    public Page? ImportTextAsPage(string title, string text)
+    {
+        if (SelectedSection is not { } sec) return null;
+        var page = new Page { Title = string.IsNullOrWhiteSpace(title) ? "Imported" : title.Trim() };
+        sec.Pages.Add(page);
+        var doc = DocumentFor(page);                       // new empty doc, Changed wired for autosave
+        doc.AddBox(40, 40, NoteBox.DefaultWidth, PlainTextDoc(text));   // fires Changed → dirty
+        SelectedPage = page;
+        Save();                                            // the tree
+        FlushDirtyDocs();                                  // the page content
+        return page;
+    }
+
+    private static Editor.RichDocument PlainTextDoc(string text)
+    {
+        var d = new Editor.RichDocument();
+        d.Paragraphs.Clear();
+        foreach (var line in (text ?? "").Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
+            d.Paragraphs.Add(new Editor.Paragraph { Runs = { new Editor.RichRun { Text = line } } });
+        if (d.Paragraphs.Count == 0) d.Paragraphs.Add(new Editor.Paragraph());
+        return d;
+    }
+
+    /// <summary>Export every notebook to <paramref name="destFolder"/> as
+    /// &lt;notebook&gt;/&lt;section&gt;/&lt;page&gt;.md (UTF-8, no BOM). Flushes dirty docs first so
+    /// the export sees the latest edits, then reads each page from disk. Returns the page count written.</summary>
+    public int ExportAllNotebooks(string destFolder)
+    {
+        FlushDirtyDocs();
+        int count = 0;
+        var utf8 = new UTF8Encoding(false);
+        foreach (var nb in Notebooks)
+        {
+            var nbDir = Path.Combine(destFolder, MarkdownExport.SafeName(nb.Name));
+            foreach (var sec in nb.Sections)
+            {
+                var secDir = Path.Combine(nbDir, MarkdownExport.SafeName(sec.Name));
+                Directory.CreateDirectory(secDir);
+                var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var page in sec.Pages)
+                {
+                    var doc = _store.LoadPageDoc(nb, page.Id) ?? new Editor.CanvasDocument();
+                    var file = UniqueFile(used, MarkdownExport.SafeName(page.Title));
+                    File.WriteAllText(Path.Combine(secDir, file + ".md"),
+                        MarkdownExport.PageToMarkdown(page.Title, doc), utf8);
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private static string UniqueFile(HashSet<string> used, string name)
+    {
+        var candidate = name;
+        for (int i = 2; !used.Add(candidate); i++) candidate = $"{name} ({i})";
+        return candidate;
     }
 
     [RelayCommand]

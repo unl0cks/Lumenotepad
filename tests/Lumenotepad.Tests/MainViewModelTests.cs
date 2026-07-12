@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using Lumenotepad.Services;
 using Lumenotepad.ViewModels;
 using Xunit;
@@ -378,5 +379,52 @@ public class MainViewModelTests
             Assert.Equal(5, persisted.BackupKeep);
         }
         finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void ImportTextAsPage_addsPageWithTextBox()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            int before = vm.SelectedSection!.Pages.Count;
+
+            var page = vm.ImportTextAsPage("Notes", "line one\nline two");
+
+            Assert.NotNull(page);
+            Assert.Equal(before + 1, vm.SelectedSection!.Pages.Count);
+            Assert.Same(page, vm.SelectedPage);
+            var doc = vm.DocumentFor(page!);
+            Assert.Single(doc.Boxes);
+            Assert.Equal("line one\nline two", doc.Boxes[0].Doc.GetText());
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void ExportAllNotebooks_writesMarkdownTree()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        var dest = Path.Combine(Path.GetTempPath(), "lnp-exp-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            vm.ImportTextAsPage("Hello", "world");    // gives a page with real content, saved to disk
+
+            int pages = vm.ExportAllNotebooks(dest);
+
+            Assert.True(pages >= 1);
+            var files = Directory.GetFiles(dest, "*.md", SearchOption.AllDirectories);
+            Assert.Contains(files, f => Path.GetFileName(f) == "Hello.md");
+            var body = File.ReadAllText(files.First(f => Path.GetFileName(f) == "Hello.md"));
+            Assert.Contains("# Hello", body);
+            Assert.Contains("world", body);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            if (Directory.Exists(dest)) Directory.Delete(dest, true);
+        }
     }
 }
