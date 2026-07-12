@@ -421,6 +421,7 @@ public partial class MainView : UserControl
             SyncEditorDocument();
             ApplyToolbarPlacement();
             ApplyCanvasPrefs();
+            ApplyPaperTint();
             ApplyGlossyAccents();
             ApplyCardSize();
             ApplyPanels();
@@ -445,6 +446,15 @@ public partial class MainView : UserControl
         PageCanvas.SnapToGrid = vm.GridSnap;
         if (!vm.DeletedHistory) TrashPanel.IsVisible = false;
         ApplyFlatCovers();
+    }
+
+    /// <summary>Per-notebook paper tint: the selected notebook's PaperTint hex as a translucent
+    /// veil (fixed alpha keeps text readable on both light and dark paper).</summary>
+    private void ApplyPaperTint()
+    {
+        var hex = Services.ThemePalettes.NormalizeHex(Vm?.SelectedNotebook?.PaperTint);
+        PaperTintVeil.IsVisible = hex is not null;
+        if (hex is not null) PaperTintVeil.Background = new SolidColorBrush(Color.Parse(hex), 0.22);
     }
 
     /// <summary>"Flat covers": a class on the hosts hides every Border.cardfx gloss overlay.</summary>
@@ -656,7 +666,7 @@ public partial class MainView : UserControl
             ReassertListSelection();
 
         // Re-point the add-animation hooks at the current section/page collections.
-        if (e.PropertyName == nameof(MainViewModel.SelectedNotebook)) RehookSections();
+        if (e.PropertyName == nameof(MainViewModel.SelectedNotebook)) { RehookSections(); ApplyPaperTint(); }
         if (e.PropertyName == nameof(MainViewModel.SelectedSection)) RehookPages();
 
         // Section switch: the repopulated pages list rises in instead of popping.
@@ -897,7 +907,7 @@ public partial class MainView : UserControl
             $"“{Label(nb.Name)}” and all its sections and pages will be permanently deleted. This can't be undone.",
             Vm?.ConfirmDeleteNotebook ?? true,
             () => CollapseThenDelete(NotebooksList.ContainerFromItem(nb) as Control, () => Vm?.DeleteNotebookCommand.Execute(nb)));
-        OpenMenu(e, delete);
+        OpenMenu(e, PaperTintMenu(nb), delete);
     }
 
     private void OnNotebookNameContextRequested(object? sender, ContextRequestedEventArgs e)
@@ -964,6 +974,7 @@ public partial class MainView : UserControl
             }
             color.Items.Add(fam);
         }
+        var paper = PaperTintMenu(nb);
 
         var moveLeft = new MenuItem { Header = "Move left" };
         moveLeft.Click += (_, _) => Vm?.MoveNotebook(nb, -1);
@@ -984,11 +995,11 @@ public partial class MainView : UserControl
         {
             var removeCover = new MenuItem { Header = "Remove cover image" };
             removeCover.Click += (_, _) => Vm?.ClearNotebookCover(nb);
-            OpenMenu(e, open, rename, moveLeft, moveRight, color, cover, removeCover, delete);
+            OpenMenu(e, open, rename, moveLeft, moveRight, color, paper, cover, removeCover, delete);
         }
         else
         {
-            OpenMenu(e, open, rename, moveLeft, moveRight, color, cover, delete);
+            OpenMenu(e, open, rename, moveLeft, moveRight, color, paper, cover, delete);
         }
     }
 
@@ -1015,6 +1026,35 @@ public partial class MainView : UserControl
         if (cropped is null) return;
         try { Vm.SetNotebookCover(nb, cropped); }
         finally { try { System.IO.File.Delete(cropped); } catch { } }
+    }
+
+    /// <summary>Soft tints that stay readable at the veil's fixed alpha on light AND dark paper.</summary>
+    private static readonly (string Name, string? Hex)[] PaperTints =
+    {
+        ("None", null),
+        ("Ivory", "#E8D9A8"), ("Peach", "#EFB98E"), ("Rose", "#EC9EB6"),
+        ("Mint", "#9BD3A6"), ("Sky", "#8FC2EC"), ("Lavender", "#B4A2E6"),
+        ("Sand", "#CBB98F"), ("Graphite", "#8C939E"),
+    };
+
+    /// <summary>The per-notebook "Paper color" submenu (current choice shown bold).</summary>
+    private MenuItem PaperTintMenu(Notebook nb)
+    {
+        var root = new MenuItem { Header = "Paper color" };
+        foreach (var (name, hex) in PaperTints)
+        {
+            var item = new MenuItem
+            {
+                Header = name,
+                Icon = hex is null ? null : Swatch(hex),
+                FontWeight = string.Equals(nb.PaperTint, hex, System.StringComparison.OrdinalIgnoreCase)
+                    ? FontWeight.SemiBold : FontWeight.Normal,
+            };
+            var chosen = hex;
+            item.Click += (_, _) => { Vm?.SetNotebookPaperTint(nb, chosen); ApplyPaperTint(); };
+            root.Items.Add(item);
+        }
+        return root;
     }
 
     private static Border Swatch(string hex)
