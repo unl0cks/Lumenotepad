@@ -106,6 +106,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _smartLists = true;
     [ObservableProperty] private string _pageGrid = "None";   // prefs: canvas paper grid
     [ObservableProperty] private bool _gridSnap;              // prefs: snap to the 20px cell
+    [ObservableProperty] private string? _backupFolder;    // prefs: auto-backup destination (null = off)
+    [ObservableProperty] private int _backupEveryDays;     // prefs: 0 = off
+    [ObservableProperty] private int _backupKeep = 5;      // prefs: retained zip count
     /// <summary>Bumped whenever a toolbar palette changes — the toolbar rebuilds its swatches.</summary>
     [ObservableProperty] private int _palettePrefsVersion;
 
@@ -232,6 +235,9 @@ public partial class MainViewModel : ObservableObject
             SmartLists = _settings.SmartLists;
             PageGrid = _settings.PageGrid;
             GridSnap = _settings.GridSnap;
+            BackupFolder = _settings.BackupFolder;
+            BackupEveryDays = _settings.BackupEveryDays;
+            BackupKeep = _settings.BackupKeep;
         }
         _workspace = store.LoadOrSeed();
         // Capture BEFORE the default selection below — its cascade re-tracks LastPageId.
@@ -593,6 +599,27 @@ public partial class MainViewModel : ObservableObject
         _settings.Save(_settingsDir);
     }
 
+    partial void OnBackupFolderChanged(string? value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.BackupFolder = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnBackupEveryDaysChanged(int value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.BackupEveryDays = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnBackupKeepChanged(int value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.BackupKeep = value;
+        _settings.Save(_settingsDir);
+    }
+
     // ---- gallery ordering (the order persists via order.json) ----
 
     public void SortNotebooksByName() =>
@@ -740,6 +767,7 @@ public partial class MainViewModel : ObservableObject
         LineSpacingScale = d.LineSpacingScale; ParagraphSpacingScale = d.ParagraphSpacingScale;
         IndentScale = d.IndentScale; SmartLists = d.SmartLists;
         PageGrid = d.PageGrid; GridSnap = d.GridSnap;
+        BackupFolder = d.BackupFolder; BackupEveryDays = d.BackupEveryDays; BackupKeep = d.BackupKeep;
         if (_settings is not null && _settingsDir is not null && _settings.BulletColors.Count > 0)
         {
             _settings.BulletColors.Clear();
@@ -889,6 +917,29 @@ public partial class MainViewModel : ObservableObject
     {
         nb.PaperTint = hex;
         Save();
+    }
+
+    /// <summary>When the last successful auto/manual backup ran (UTC), or null.</summary>
+    public System.DateTime? LastBackupUtc => _settings?.LastBackupUtc;
+
+    /// <summary>True when a backup folder is set and the interval has elapsed (startup checks this).</summary>
+    public bool BackupDue() =>
+        _settings is { BackupFolder: { Length: > 0 } folder } s &&
+        BackupService.IsDue(s.LastBackupUtc, s.BackupEveryDays, System.DateTime.UtcNow);
+
+    /// <summary>Zip userdata to the backup folder, prune to BackupKeep, stamp LastBackupUtc. Returns the
+    /// zip path, or null if no folder is set. I/O — call from a background task. Flushes dirty docs
+    /// first so the backup captures the latest edits.</summary>
+    public string? RunBackupNow()
+    {
+        if (_settings is not { BackupFolder: { Length: > 0 } folder } s || _settingsDir is null) return null;
+        FlushDirtyDocs();
+        var now = System.DateTime.UtcNow;
+        var zip = BackupService.CreateBackup(_settingsDir, folder, now);
+        BackupService.PruneBackups(folder, s.BackupKeep);
+        s.LastBackupUtc = now;
+        s.Save(_settingsDir);
+        return zip;
     }
 
     [RelayCommand]

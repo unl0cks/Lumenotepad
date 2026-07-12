@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
@@ -52,6 +53,10 @@ public sealed class AppSettings
     public List<string> TextPalette { get; set; } = new();       // empty = the built-in palette
     public string PageGrid { get; set; } = "None";          // canvas paper grid: None | Dots | Lines
     public bool GridSnap { get; set; }                      // move/resize lands on the 20px cell
+    public string? BackupFolder { get; set; }               // null = auto-backup off
+    public int BackupEveryDays { get; set; }                // 0 = off; else backup every N days on startup
+    public int BackupKeep { get; set; } = 5;                // how many zips to retain
+    public DateTime? LastBackupUtc { get; set; }            // bookkeeping (like LastPageId); not a pref, not reset
     public string ToolbarPosition { get; set; } = "Top";    // "Top" | "Left" | "Right" | "Bottom"
     public string ToolbarScope { get; set; } = "Window";    // "Window" (window edge) | "Page" (inside the page box)
     public bool ResizablePages { get; set; } = true;        // note containers show resize handles

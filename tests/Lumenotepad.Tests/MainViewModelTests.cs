@@ -355,4 +355,28 @@ public class MainViewModelTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void ResetSettingsToDefaults_restoresBackupPrefs_butNotLastBackup()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            vm.BackupFolder = @"C:\bk";
+            vm.BackupEveryDays = 7;
+            vm.BackupKeep = 9;
+
+            vm.ResetSettingsToDefaults();
+
+            Assert.Null(vm.BackupFolder);
+            Assert.Equal(0, vm.BackupEveryDays);
+            Assert.Equal(5, vm.BackupKeep);
+            var persisted = AppSettings.Load(dir);
+            Assert.Null(persisted.BackupFolder);
+            Assert.Equal(0, persisted.BackupEveryDays);
+            Assert.Equal(5, persisted.BackupKeep);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }

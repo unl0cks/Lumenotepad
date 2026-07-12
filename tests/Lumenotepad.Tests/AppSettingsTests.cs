@@ -252,4 +252,28 @@ public class AppSettingsTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void BackupSettings_defaultsAndRoundTrip()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            Assert.Null(new AppSettings().BackupFolder);
+            Assert.Equal(0, new AppSettings().BackupEveryDays);
+            Assert.Equal(5, new AppSettings().BackupKeep);
+            Assert.Null(new AppSettings().LastBackupUtc);
+
+            var when = new System.DateTime(2026, 7, 1, 8, 0, 0, System.DateTimeKind.Utc);
+            var s = new AppSettings { BackupFolder = @"C:\bk", BackupEveryDays = 7, BackupKeep = 3, LastBackupUtc = when };
+            s.Save(dir);
+            var loaded = AppSettings.Load(dir);
+
+            Assert.Equal(@"C:\bk", loaded.BackupFolder);
+            Assert.Equal(7, loaded.BackupEveryDays);
+            Assert.Equal(3, loaded.BackupKeep);
+            Assert.Equal(when, loaded.LastBackupUtc);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }
