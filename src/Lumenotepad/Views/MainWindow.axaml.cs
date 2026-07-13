@@ -43,6 +43,12 @@ public partial class MainWindow : Window
 
         if (e.PropertyName == nameof(ViewModels.MainViewModel.AlwaysOnTop) && _themeVm is { } topVm)
             Topmost = topVm.AlwaysOnTop;
+
+        if (e.PropertyName is nameof(ViewModels.MainViewModel.CloseToTray)
+            or nameof(ViewModels.MainViewModel.MinimizeToTray))
+            SyncTrayEnabled();
+        if (e.PropertyName == nameof(ViewModels.MainViewModel.SummonHotkey))
+            SyncHotkey();         // no-op until Task 3
     }
 
     private void ApplyTheme()
@@ -65,10 +71,24 @@ public partial class MainWindow : Window
     {
         base.OnClosing(e);
         (DataContext as ViewModels.MainViewModel)?.FlushDirtyDocs();   // never lose the last keystrokes
+        if (_exiting) return;                                          // tray Exit: close immediately
+        if (Vm is { CloseToTray: true })                               // close hides to the tray instead
+        {
+            e.Cancel = true;
+            HideToTray(animate: true);
+            return;
+        }
         if (_closingAnimated) return;                                  // second pass: let the close through
         e.Cancel = true;
         _closingAnimated = true;
         Motion.CollapseOut(Host, 150, Close);                          // quick fade + shrink, then close
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        DisposeTray();
+        UnregisterSummon();      // no-op until Task 3
+        base.OnClosed(e);
     }
 
     protected override void OnOpened(EventArgs e)
@@ -81,6 +101,8 @@ public partial class MainWindow : Window
         // WindowState change; re-assert it whenever the floating window regains focus — self-heals square corners.
         Activated += (_, _) => { if (WindowState == WindowState.Normal) WinChrome.RoundCorners(this, true); };
         Motion.ScaleIn(Host, 0.97, 220);                               // launch: fade + scale in
+        SyncTrayEnabled();
+        SyncHotkey();            // no-op until Task 3; safe to call now
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -89,6 +111,12 @@ public partial class MainWindow : Window
         if (change.Property != WindowStateProperty) return;
 
         var state = change.GetNewValue<WindowState>();
+
+        if (state == WindowState.Minimized && Vm is { MinimizeToTray: true })
+        {
+            HideToTray(animate: false);
+            return;               // hidden — skip the maximize-margin / chrome bookkeeping
+        }
 
         // A maximized / full-screen window must NOT expose the custom resize grips — they bypass the OS and
         // would let you drag-resize an edge a maximized window should treat as fixed. Only float them in Normal.
