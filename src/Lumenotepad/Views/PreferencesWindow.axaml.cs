@@ -8,6 +8,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Platform.Storage;
 using Lumenotepad.Editor;
 using Lumenotepad.Platform;
 using Lumenotepad.Services;
@@ -164,6 +165,74 @@ public partial class PreferencesWindow : Window
             _navGuard = true; NavList.SelectedIndex = 0; _navGuard = false;
             _lastNav = NavList.SelectedItem;
             ShowPanel("general");
+        };
+
+        BackupEveryBox.ItemsSource = BackupIntervals.Select(b => b.Label).ToArray();
+        BackupEveryBox.SelectionChanged += (_, _) =>
+        {
+            if (Vm is { } vm && BackupEveryBox.SelectedIndex is >= 0 and var i && i < BackupIntervals.Length
+                && vm.BackupEveryDays != BackupIntervals[i].Days) vm.BackupEveryDays = BackupIntervals[i].Days;
+        };
+        BackupKeepSlider.ValueChanged += (_, e) =>
+        {
+            if (Vm is { } vm && vm.BackupKeep != (int)e.NewValue) vm.BackupKeep = (int)e.NewValue;
+            BackupKeepValue.Text = ((int)e.NewValue).ToString();
+        };
+        BackupFolderBtn.Click += async (_, _) =>
+        {
+            if (StorageProvider is not { } sp) return;
+            var picks = await sp.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = "Choose a backup folder", AllowMultiple = false,
+            });
+            if (picks.Count > 0 && picks[0].TryGetLocalPath() is { } path && Vm is { } vm)
+            {
+                vm.BackupFolder = path;
+                RefreshDataPanel();
+            }
+        };
+        BackupClearBtn.Click += (_, _) => { if (Vm is { } vm) { vm.BackupFolder = null; RefreshDataPanel(); } };
+        BackupNowBtn.Click += async (_, _) =>
+        {
+            if (Vm is not { } vm) return;
+            if (string.IsNullOrEmpty(vm.BackupFolder)) { DataStatusText.Text = "Choose a backup folder first."; return; }
+            BackupNowBtn.IsEnabled = false;
+            DataStatusText.Text = "Backing up…";
+            var path = await System.Threading.Tasks.Task.Run(vm.RunBackupNow);
+            BackupNowBtn.IsEnabled = true;
+            RefreshDataPanel();
+            DataStatusText.Text = path is null ? "Backup failed." : $"Backed up to {path}";
+        };
+        ExportBtn.Click += async (_, _) =>
+        {
+            if (Vm is not { } vm || StorageProvider is not { } sp) return;
+            var picks = await sp.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = "Export all notebooks to…", AllowMultiple = false,
+            });
+            if (picks.Count == 0 || picks[0].TryGetLocalPath() is not { } dest) return;
+            ExportBtn.IsEnabled = false;
+            DataStatusText.Text = "Exporting…";
+            int n = await System.Threading.Tasks.Task.Run(() => vm.ExportAllNotebooks(dest));
+            ExportBtn.IsEnabled = true;
+            DataStatusText.Text = $"Exported {n} page{(n == 1 ? "" : "s")} to {dest}";
+        };
+        ImportBtn.Click += async (_, _) =>
+        {
+            if (Vm is not { } vm || StorageProvider is not { } sp) return;
+            if (vm.SelectedSection is null) { DataStatusText.Text = "Open a notebook section first."; return; }
+            var files = await sp.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Import a text file", AllowMultiple = false,
+                FileTypeFilter = new[]
+                {
+                    new FilePickerFileType("Text & Markdown") { Patterns = new[] { "*.txt", "*.md" } },
+                },
+            });
+            if (files.Count == 0 || files[0].TryGetLocalPath() is not { } path) return;
+            string text; try { text = File.ReadAllText(path); } catch { DataStatusText.Text = "Could not read the file."; return; }
+            var page = vm.ImportTextAsPage(Path.GetFileNameWithoutExtension(path), text);
+            DataStatusText.Text = page is null ? "Import failed." : $"Imported “{page.Title}” into the current section.";
         };
 
         AccentHexBox.KeyDown += (_, e) =>
@@ -425,6 +494,12 @@ public partial class PreferencesWindow : Window
     private static readonly string[] DateFormats =
         { "yyyy-MM-dd", "MMMM d, yyyy", "dd/MM/yyyy", "yyyy-MM-dd HH:mm", "HH:mm" };
 
+    /// <summary>The "How often" choices → days (0 = off).</summary>
+    private static readonly (string Label, int Days)[] BackupIntervals =
+    {
+        ("Off", 0), ("Daily", 1), ("Weekly", 7), ("Every 2 weeks", 14), ("Monthly", 30),
+    };
+
     /// <summary>The quick-highlight choices — the toolbar's own highlight palette
     /// (FormatToolbar.Highlights' non-null hexes, verbatim).</summary>
     private void BuildHighlightChoices()
@@ -558,6 +633,15 @@ public partial class PreferencesWindow : Window
         System.Threading.Tasks.Task.Run(() => FolderSize(dir)).ContinueWith(
             t => WorkspaceSizeText.Text = t.IsCompletedSuccessfully ? t.Result : "—",
             System.Threading.Tasks.TaskScheduler.FromCurrentSynchronizationContext());
+
+        BackupFolderText.Text = string.IsNullOrEmpty(Vm?.BackupFolder)
+            ? "Not set — automatic backups are off." : Vm!.BackupFolder;
+        BackupEveryBox.SelectedIndex = System.Math.Max(0,
+            System.Array.FindIndex(BackupIntervals, b => b.Days == (Vm?.BackupEveryDays ?? 0)));
+        BackupKeepSlider.Value = Vm?.BackupKeep ?? 5;
+        BackupKeepValue.Text = (Vm?.BackupKeep ?? 5).ToString();
+        LastBackupText.Text = Vm?.LastBackupUtc is { } t2
+            ? $"Last backup {t2.ToLocalTime():yyyy-MM-dd HH:mm}." : "Never backed up.";
     }
 
     private static string FolderSize(string dir)

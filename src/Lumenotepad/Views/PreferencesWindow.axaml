@@ -522,6 +522,55 @@
                             <TextBlock x:Name="WorkspaceSizeText" Grid.Column="1" Classes="label" Text="—"/>
                         </Grid>
 
+                        <TextBlock Classes="section" Text="AUTOMATIC BACKUP"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,10,0">
+                                <TextBlock Classes="label" Text="Backup folder"/>
+                                <TextBlock x:Name="BackupFolderText" Classes="hint" Text="Not set — automatic backups are off."/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <Button x:Name="BackupFolderBtn" Content="Choose…"/>
+                                <Button x:Name="BackupClearBtn" Content="Clear"/>
+                            </StackPanel>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="How often"/>
+                                <TextBlock Classes="hint" Text="Checked once each time Lumenotepad starts."/>
+                            </StackPanel>
+                            <ComboBox x:Name="BackupEveryBox" Grid.Column="1" Width="140" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="Keep the newest"/>
+                            <TextBlock x:Name="BackupKeepValue" Grid.Column="1" Classes="label" Text="5"/>
+                        </Grid>
+                        <Slider x:Name="BackupKeepSlider" Minimum="1" Maximum="20"
+                                TickFrequency="1" IsSnapToTickEnabled="True"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,10,0">
+                                <TextBlock Classes="label" Text="Back up now"/>
+                                <TextBlock x:Name="LastBackupText" Classes="hint" Text="Never backed up."/>
+                            </StackPanel>
+                            <Button x:Name="BackupNowBtn" Grid.Column="1" Content="Back up now" VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <TextBlock Classes="section" Text="IMPORT &amp; EXPORT"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,10,0">
+                                <TextBlock Classes="label" Text="Export all notebooks to Markdown"/>
+                                <TextBlock Classes="hint" Text="A folder of &#8249;notebook&#8250;/&#8249;section&#8250;/&#8249;page&#8250;.md files (UTF-8)."/>
+                            </StackPanel>
+                            <Button x:Name="ExportBtn" Grid.Column="1" Content="Export…" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,10,0">
+                                <TextBlock Classes="label" Text="Import a text file"/>
+                                <TextBlock Classes="hint" Text="A .txt or .md file becomes a new page in the current section."/>
+                            </StackPanel>
+                            <Button x:Name="ImportBtn" Grid.Column="1" Content="Import…" VerticalAlignment="Center"/>
+                        </Grid>
+                        <TextBlock x:Name="DataStatusText" Classes="hint" Margin="0,8,0,0" Text=""/>
+
                         <TextBlock Classes="section" Text="MAINTENANCE"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,10,0">
