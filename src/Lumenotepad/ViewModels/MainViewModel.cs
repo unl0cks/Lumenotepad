@@ -261,7 +261,10 @@ public partial class MainViewModel : ObservableObject
         RefreshHome();
 
         if (BackupDue())
+        {
+            FlushDirtyDocs();                                // UI thread — nothing dirty yet at startup, but keep the contract
             System.Threading.Tasks.Task.Run(RunBackupNow);   // off the UI thread; no-op when no folder/not due
+        }
     }
 
     partial void OnToolbarPositionChanged(string value)
@@ -933,12 +936,12 @@ public partial class MainViewModel : ObservableObject
         BackupService.IsDue(s.LastBackupUtc, s.BackupEveryDays, System.DateTime.UtcNow);
 
     /// <summary>Zip userdata to the backup folder, prune to BackupKeep, stamp LastBackupUtc. Returns the
-    /// zip path, or null if no folder is set. I/O — call from a background task. Flushes dirty docs
-    /// first so the backup captures the latest edits.</summary>
+    /// zip path, or null if no folder is set. Pure I/O (touches only <c>_settings</c> + files) — safe on a
+    /// background task. Callers must <see cref="FlushDirtyDocs"/> on the UI thread FIRST so the zip sees
+    /// the latest edits (flushing here would enumerate the dirty set off-thread and race live editing).</summary>
     public string? RunBackupNow()
     {
         if (_settings is not { BackupFolder: { Length: > 0 } folder } s || _settingsDir is null) return null;
-        FlushDirtyDocs();
         var now = System.DateTime.UtcNow;
         var zip = BackupService.CreateBackup(_settingsDir, folder, now);
         BackupService.PruneBackups(folder, s.BackupKeep);
@@ -972,34 +975,52 @@ public partial class MainViewModel : ObservableObject
         return d;
     }
 
-    /// <summary>Export every notebook to <paramref name="destFolder"/> as
-    /// &lt;notebook&gt;/&lt;section&gt;/&lt;page&gt;.md (UTF-8, no BOM). Flushes dirty docs first so
-    /// the export sees the latest edits, then reads each page from disk. Returns the page count written.</summary>
-    public int ExportAllNotebooks(string destFolder)
+    /// <summary>One page's export payload — immutable, safe to hand to a background thread (no live
+    /// model references; the notebook FOLDER string locates the page content on disk).</summary>
+    public readonly record struct ExportPage(string Folder, string NotebookName, string SectionName, string PageId, string PageTitle);
+
+    /// <summary>UI-THREAD ONLY: flush pending edits, then snapshot the whole tree into a plain immutable
+    /// list so <see cref="WriteExport"/> can run off the UI thread without racing the live collections.</summary>
+    public IReadOnlyList<ExportPage> SnapshotExport()
     {
         FlushDirtyDocs();
+        var list = new List<ExportPage>();
+        foreach (var nb in Notebooks)
+            foreach (var sec in nb.Sections)
+                foreach (var page in sec.Pages)
+                    list.Add(new ExportPage(nb.Folder, nb.Name, sec.Name, page.Id, page.Title));
+        return list;
+    }
+
+    /// <summary>Write a prepared snapshot to <paramref name="destFolder"/> as
+    /// &lt;notebook&gt;/&lt;section&gt;/&lt;page&gt;.md (UTF-8, no BOM). Pure disk I/O over immutable data
+    /// — safe on a background thread. Duplicate page titles within one output folder get " (2)", " (3)"…
+    /// suffixes. Returns the page count written.</summary>
+    public int WriteExport(IReadOnlyList<ExportPage> pages, string destFolder)
+    {
         int count = 0;
         var utf8 = new UTF8Encoding(false);
-        foreach (var nb in Notebooks)
+        var usedPerDir = new Dictionary<string, HashSet<string>>();
+        foreach (var p in pages)
         {
-            var nbDir = Path.Combine(destFolder, MarkdownExport.SafeName(nb.Name));
-            foreach (var sec in nb.Sections)
-            {
-                var secDir = Path.Combine(nbDir, MarkdownExport.SafeName(sec.Name));
-                Directory.CreateDirectory(secDir);
-                var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var page in sec.Pages)
-                {
-                    var doc = _store.LoadPageDoc(nb, page.Id) ?? new Editor.CanvasDocument();
-                    var file = UniqueFile(used, MarkdownExport.SafeName(page.Title));
-                    File.WriteAllText(Path.Combine(secDir, file + ".md"),
-                        MarkdownExport.PageToMarkdown(page.Title, doc), utf8);
-                    count++;
-                }
-            }
+            var secDir = Path.Combine(destFolder,
+                MarkdownExport.SafeName(p.NotebookName), MarkdownExport.SafeName(p.SectionName));
+            Directory.CreateDirectory(secDir);
+            if (!usedPerDir.TryGetValue(secDir, out var used))
+                usedPerDir[secDir] = used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var doc = _store.LoadPageDoc(p.Folder, p.PageId) ?? new Editor.CanvasDocument();
+            var file = UniqueFile(used, MarkdownExport.SafeName(p.PageTitle));
+            File.WriteAllText(Path.Combine(secDir, file + ".md"),
+                MarkdownExport.PageToMarkdown(p.PageTitle, doc), utf8);
+            count++;
         }
         return count;
     }
+
+    /// <summary>Convenience for synchronous callers/tests: snapshot then write on the current thread.
+    /// A UI-thread caller exporting off-thread must instead call <see cref="SnapshotExport"/> on the UI
+    /// thread and hand the result to <see cref="WriteExport"/> inside the background task.</summary>
+    public int ExportAllNotebooks(string destFolder) => WriteExport(SnapshotExport(), destFolder);
 
     private static string UniqueFile(HashSet<string> used, string name)
     {

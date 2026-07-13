@@ -120,8 +120,10 @@ public sealed class WorkspaceStore
 
     // ---- page content (one JSON per page in <notebook>/pages/) ----
 
-    private string PageDocPath(Notebook nb, string pageId) =>
-        Path.Combine(_root, nb.Folder, "pages", pageId + ".page.json");
+    private string PageDocPath(Notebook nb, string pageId) => PageDocPath(nb.Folder, pageId);
+
+    private string PageDocPath(string folder, string pageId) =>
+        Path.Combine(_root, folder, "pages", pageId + ".page.json");
 
     public void SavePageDoc(Notebook nb, string pageId, Editor.CanvasDocument doc)
     {
@@ -132,10 +134,14 @@ public sealed class WorkspaceStore
     }
 
     /// <summary>The page's saved canvas, or null if it has none yet (v1 files migrate on read).</summary>
-    public Editor.CanvasDocument? LoadPageDoc(Notebook nb, string pageId)
+    public Editor.CanvasDocument? LoadPageDoc(Notebook nb, string pageId) => LoadPageDoc(nb.Folder, pageId);
+
+    /// <summary>Same, keyed by the notebook's on-disk FOLDER (a stable string) rather than the live
+    /// model — so a background export can read page content without touching the UI-thread tree.</summary>
+    public Editor.CanvasDocument? LoadPageDoc(string folder, string pageId)
     {
-        if (string.IsNullOrEmpty(nb.Folder)) return null;
-        var path = PageDocPath(nb, pageId);
+        if (string.IsNullOrEmpty(folder)) return null;
+        var path = PageDocPath(folder, pageId);
         if (!File.Exists(path)) return null;
         try { return Editor.CanvasDocJson.FromJson(File.ReadAllText(path)); }
         catch { return null; }

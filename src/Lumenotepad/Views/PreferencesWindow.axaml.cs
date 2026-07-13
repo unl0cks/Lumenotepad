@@ -198,6 +198,7 @@ public partial class PreferencesWindow : Window
             if (string.IsNullOrEmpty(vm.BackupFolder)) { DataStatusText.Text = "Choose a backup folder first."; return; }
             BackupNowBtn.IsEnabled = false;
             DataStatusText.Text = "Backing up…";
+            vm.FlushDirtyDocs();                            // UI thread — capture edits before the off-thread zip
             var path = await System.Threading.Tasks.Task.Run(vm.RunBackupNow);
             BackupNowBtn.IsEnabled = true;
             RefreshDataPanel();
@@ -213,7 +214,8 @@ public partial class PreferencesWindow : Window
             if (picks.Count == 0 || picks[0].TryGetLocalPath() is not { } dest) return;
             ExportBtn.IsEnabled = false;
             DataStatusText.Text = "Exporting…";
-            int n = await System.Threading.Tasks.Task.Run(() => vm.ExportAllNotebooks(dest));
+            var snapshot = vm.SnapshotExport();            // UI thread — flush + snapshot the live tree
+            int n = await System.Threading.Tasks.Task.Run(() => vm.WriteExport(snapshot, dest));
             ExportBtn.IsEnabled = true;
             DataStatusText.Text = $"Exported {n} page{(n == 1 ? "" : "s")} to {dest}";
         };
