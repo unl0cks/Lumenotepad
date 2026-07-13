@@ -1,10 +1,14 @@
+using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Threading;
+using Avalonia.Win32;
 using Lumenotepad.ViewModels;
 
 namespace Lumenotepad.Views;
@@ -104,8 +108,56 @@ public partial class MainWindow
         return new WindowIcon(ms);
     }
 
-    // Temporary stubs — REPLACED with the real hotkey implementation in Task 3. Present so this task
-    // builds on its own (OnOpened/OnClosed/OnThemePropertyChanged reference them).
-    private void SyncHotkey() { }
-    private void UnregisterSummon() { }
+    // ---- global summon hotkey: Ctrl+Alt+N brings the window forward from anywhere ----
+
+    [DllImport("user32.dll")] private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+    [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+    private const uint MOD_ALT = 0x0001, MOD_CONTROL = 0x0002, MOD_NOREPEAT = 0x4000;
+    private const uint VK_N = 0x4E;
+    private const uint WM_HOTKEY = 0x0312;
+    private const int SummonHotkeyId = 0x4C4E;      // arbitrary, app-unique
+
+    private bool _hotkeyRegistered;
+    private Win32Properties.CustomWndProcHookCallback? _wndHook;
+
+    /// <summary>Install the WndProc hook once (kept for the window's life); it only reacts to our
+    /// hotkey id, so it is inert until <see cref="RegisterHotKey"/> has run.</summary>
+    private void InstallWndHook()
+    {
+        if (_wndHook is not null) return;
+        _wndHook = (IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, ref bool handled) =>
+        {
+            if (msg == WM_HOTKEY && wParam.ToInt32() == SummonHotkeyId)
+            {
+                handled = true;
+                Dispatcher.UIThread.Post(RestoreFromTray);
+            }
+            return IntPtr.Zero;
+        };
+        Win32Properties.AddWndProcHookCallback(this, _wndHook);
+    }
+
+    /// <summary>Register or unregister the global hotkey to match the pref.</summary>
+    private void SyncHotkey()
+    {
+        if (Vm is { SummonHotkey: true }) RegisterSummon();
+        else UnregisterSummon();
+    }
+
+    private void RegisterSummon()
+    {
+        if (_hotkeyRegistered) return;
+        if (TryGetPlatformHandle()?.Handle is not { } hwnd || hwnd == IntPtr.Zero) return;   // handle not ready yet
+        InstallWndHook();
+        _hotkeyRegistered = RegisterHotKey(hwnd, SummonHotkeyId, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_N);
+    }
+
+    private void UnregisterSummon()
+    {
+        if (!_hotkeyRegistered) return;
+        if (TryGetPlatformHandle()?.Handle is { } hwnd && hwnd != IntPtr.Zero)
+            UnregisterHotKey(hwnd, SummonHotkeyId);
+        _hotkeyRegistered = false;
+    }
 }
