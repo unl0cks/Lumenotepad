@@ -427,4 +427,28 @@ public class MainViewModelTests
             if (Directory.Exists(dest)) Directory.Delete(dest, true);
         }
     }
+
+    [Fact]
+    public void ResetSettingsToDefaults_restoresTrayPrefs()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            vm.CloseToTray = true;
+            vm.MinimizeToTray = true;
+            vm.SummonHotkey = true;
+
+            vm.ResetSettingsToDefaults();
+
+            Assert.False(vm.CloseToTray);
+            Assert.False(vm.MinimizeToTray);
+            Assert.False(vm.SummonHotkey);
+            var persisted = AppSettings.Load(dir);
+            Assert.False(persisted.CloseToTray);
+            Assert.False(persisted.MinimizeToTray);
+            Assert.False(persisted.SummonHotkey);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }

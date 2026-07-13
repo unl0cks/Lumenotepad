@@ -57,6 +57,9 @@ public sealed class AppSettings
     public int BackupEveryDays { get; set; }                // 0 = off; else backup every N days on startup
     public int BackupKeep { get; set; } = 5;                // how many zips to retain
     public DateTime? LastBackupUtc { get; set; }            // bookkeeping (like LastPageId); not a pref, not reset
+    public bool CloseToTray { get; set; }                   // closing hides to the tray instead of quitting
+    public bool MinimizeToTray { get; set; }                // minimizing hides to the tray
+    public bool SummonHotkey { get; set; }                  // global Ctrl+Alt+N brings the window forward
     public string ToolbarPosition { get; set; } = "Top";    // "Top" | "Left" | "Right" | "Bottom"
     public string ToolbarScope { get; set; } = "Window";    // "Window" (window edge) | "Page" (inside the page box)
     public bool ResizablePages { get; set; } = true;        // note containers show resize handles

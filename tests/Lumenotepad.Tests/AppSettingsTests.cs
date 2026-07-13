@@ -276,4 +276,25 @@ public class AppSettingsTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void TraySettings_defaultsFalse_andRoundTrip()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            Assert.False(new AppSettings().CloseToTray);
+            Assert.False(new AppSettings().MinimizeToTray);
+            Assert.False(new AppSettings().SummonHotkey);
+
+            var s = new AppSettings { CloseToTray = true, MinimizeToTray = true, SummonHotkey = true };
+            s.Save(dir);
+            var loaded = AppSettings.Load(dir);
+
+            Assert.True(loaded.CloseToTray);
+            Assert.True(loaded.MinimizeToTray);
+            Assert.True(loaded.SummonHotkey);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }

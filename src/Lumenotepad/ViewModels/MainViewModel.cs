@@ -111,6 +111,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string? _backupFolder;    // prefs: auto-backup destination (null = off)
     [ObservableProperty] private int _backupEveryDays;     // prefs: 0 = off
     [ObservableProperty] private int _backupKeep = 5;      // prefs: retained zip count
+    [ObservableProperty] private bool _closeToTray;        // prefs: close hides to tray
+    [ObservableProperty] private bool _minimizeToTray;     // prefs: minimize hides to tray
+    [ObservableProperty] private bool _summonHotkey;       // prefs: global Ctrl+Alt+N
     /// <summary>Bumped whenever a toolbar palette changes — the toolbar rebuilds its swatches.</summary>
     [ObservableProperty] private int _palettePrefsVersion;
 
@@ -240,6 +243,9 @@ public partial class MainViewModel : ObservableObject
             BackupFolder = _settings.BackupFolder;
             BackupEveryDays = _settings.BackupEveryDays;
             BackupKeep = _settings.BackupKeep;
+            CloseToTray = _settings.CloseToTray;
+            MinimizeToTray = _settings.MinimizeToTray;
+            SummonHotkey = _settings.SummonHotkey;
         }
         _workspace = store.LoadOrSeed();
         // Capture BEFORE the default selection below — its cascade re-tracks LastPageId.
@@ -628,6 +634,27 @@ public partial class MainViewModel : ObservableObject
         _settings.Save(_settingsDir);
     }
 
+    partial void OnCloseToTrayChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.CloseToTray = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnMinimizeToTrayChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.MinimizeToTray = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnSummonHotkeyChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.SummonHotkey = value;
+        _settings.Save(_settingsDir);
+    }
+
     // ---- gallery ordering (the order persists via order.json) ----
 
     public void SortNotebooksByName() =>
@@ -776,6 +803,7 @@ public partial class MainViewModel : ObservableObject
         IndentScale = d.IndentScale; SmartLists = d.SmartLists;
         PageGrid = d.PageGrid; GridSnap = d.GridSnap;
         BackupFolder = d.BackupFolder; BackupEveryDays = d.BackupEveryDays; BackupKeep = d.BackupKeep;
+        CloseToTray = d.CloseToTray; MinimizeToTray = d.MinimizeToTray; SummonHotkey = d.SummonHotkey;
         if (_settings is not null && _settingsDir is not null && _settings.BulletColors.Count > 0)
         {
             _settings.BulletColors.Clear();
