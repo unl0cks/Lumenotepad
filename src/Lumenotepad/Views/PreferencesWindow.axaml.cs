@@ -47,6 +47,7 @@ public partial class PreferencesWindow : Window
             WinChrome.RoundCorners(this, true);
             if (Content is Control root) Motion.ScaleIn(root, 0.96, 180);   // quick fade + scale in
         };
+        SmoothScroll.Attach(PrefsScroll);   // wheel-eased scrolling instead of the line-at-a-time jump
         CloseBtn.Click += (_, _) => Close();
         KeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); };
 

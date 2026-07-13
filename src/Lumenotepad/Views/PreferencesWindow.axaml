@@ -33,6 +33,28 @@
             <Setter Property="OnContent" Value="{x:Null}"/>
             <Setter Property="OffContent" Value="{x:Null}"/>
             <Setter Property="MinWidth" Value="0"/>
+            <!-- Interaction motion: Opacity/Brush transitions animate in this build (RenderTransform
+                 does not — see App.axaml + the motion spec); the knob slide is Fluent's own. -->
+            <Setter Property="Transitions">
+                <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.12"/></Transitions>
+            </Setter>
+        </Style>
+        <!-- Smooth press feedback for the prefs comboboxes + sliders (Fluent drives the popup/thumb). -->
+        <Style Selector="ComboBox">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="ComboBox:pressed">
+            <Setter Property="Opacity" Value="0.82"/>
+        </Style>
+        <Style Selector="Slider">
+            <Setter Property="Transitions">
+                <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.12"/></Transitions>
+            </Setter>
         </Style>
         <!-- theme picker chips -->
         <Style Selector="ListBox.themepick ListBoxItem">
@@ -108,8 +130,9 @@
                 </ListBox>
             </Border>
 
-            <!-- category panels (one visible at a time; ShowPanel swaps + animates) -->
-            <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
+            <!-- category panels (one visible at a time; ShowPanel swaps + animates).
+                 x:Name so SmoothScroll can attach wheel-eased scrolling in the code-behind. -->
+            <ScrollViewer x:Name="PrefsScroll" Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
                 <Panel Margin="20,4,20,18">
 
                     <StackPanel x:Name="GeneralPanel" Spacing="6">
