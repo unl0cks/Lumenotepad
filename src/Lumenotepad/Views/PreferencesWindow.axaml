@@ -159,6 +159,29 @@
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding AlwaysOnTop, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
 
+                        <TextBlock Classes="section" Text="SYSTEM TRAY"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Close to tray"/>
+                                <TextBlock Classes="hint" Text="Closing the window hides it to the system tray instead of quitting."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding CloseToTray, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Minimize to tray"/>
+                                <TextBlock Classes="hint" Text="Minimizing hides to the tray instead of the taskbar."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding MinimizeToTray, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Global shortcut (Ctrl+Alt+N)"/>
+                                <TextBlock Classes="hint" Text="Bring Lumenotepad to the front from anywhere, even from the tray."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding SummonHotkey, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+
                         <TextBlock Classes="section" Text="SAVING"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <TextBlock Classes="label" Text="Autosave after typing stops"/>
