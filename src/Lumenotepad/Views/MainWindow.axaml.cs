@@ -48,7 +48,7 @@ public partial class MainWindow : Window
             or nameof(ViewModels.MainViewModel.MinimizeToTray))
             SyncTrayEnabled();
         if (e.PropertyName == nameof(ViewModels.MainViewModel.SummonHotkey))
-            SyncHotkey();         // no-op until Task 3
+            SyncHotkey();
     }
 
     private void ApplyTheme()
@@ -87,7 +87,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         DisposeTray();
-        UnregisterSummon();      // no-op until Task 3
+        UnregisterSummon();
         base.OnClosed(e);
     }
 
@@ -102,7 +102,7 @@ public partial class MainWindow : Window
         Activated += (_, _) => { if (WindowState == WindowState.Normal) WinChrome.RoundCorners(this, true); };
         Motion.ScaleIn(Host, 0.97, 220);                               // launch: fade + scale in
         SyncTrayEnabled();
-        SyncHotkey();            // no-op until Task 3; safe to call now
+        SyncHotkey();
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
