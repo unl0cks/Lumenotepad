@@ -42,7 +42,7 @@ Geometry is computed from the page's content size so guides scale with the page.
 | **Freeform** | none | none (today's plain canvas — the default) |
 | **Cornell** | vertical divider at ~28% width; horizontal divider at ~82% height | "Cue" (left), "Notes" (right), "Summary" (bottom bar) |
 | **Two-column** | one vertical divider at 50% | "" ×2 (left, right) |
-| **Outline** | 3 faint vertical indent-stop guides near the left margin | one box seeded with a nested outline (heading + `dot` bullets at 2 indent levels) |
+| **Outline** | 3 faint vertical indent-stop guides near the left margin | one box seeded with an outline skeleton (bold heading + `dot` bullets — flat for now; the editor model has no per-paragraph indent depth yet, nested indent is a future editor feature) |
 | **Boxing** | subtle rounded box outlines in a 2×2 tidy grid | 4 labelled boxes ("Topic 1"…"Topic 4") |
 | **Charting** | N vertical column dividers + a header underline (default 3 columns) | 3 header-label boxes across the top ("Column 1"…) |
 | **Sentence** | horizontal ruled lines (like the Ruled grid) | one box seeded with a `num` (numbered) list |
