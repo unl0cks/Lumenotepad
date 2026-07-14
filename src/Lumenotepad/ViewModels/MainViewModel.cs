@@ -1113,8 +1113,11 @@ public partial class MainViewModel : ObservableObject
         if (SelectedSection is not { } sec) return;
         var pg = new Page { Title = "Untitled page" };
         sec.Pages.Add(pg);
-        SelectedPage = pg;
+        // Stamp BEFORE selecting: the SelectedPage setter synchronously syncs the canvas document in
+        // the view when motion is off (Motion.Tween invokes onDone inline) — stamping after would add
+        // boxes the already-rebuilt canvas never shows until the next Document reset.
         StampPageStyle(pg);                    // starter containers per the effective page style
+        SelectedPage = pg;
         Save();
     }
 
