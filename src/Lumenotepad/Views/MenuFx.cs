@@ -48,7 +48,9 @@ public static class MenuFx
         {
             if (TopLevel.GetTopLevel(anyInPopup) is not { } tl) return;
             var hwnd = tl.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
-            Platform.WinChrome.RoundCorners(hwnd);                        // every theme: no square popup corners
+            // Standard (8px) rounding, matching the content styles' CornerRadius 8 — mismatched
+            // radii leave a wedge of popup surface visible in each corner (owner screenshot).
+            Platform.WinChrome.RoundCorners(hwnd, small: false);
 
             var bg = ThemeManager.Current.MenuBackground;                 // "#AARRGGBB"
             if (bg.Length != 9 || Convert.ToInt32(bg.Substring(1, 2), 16) >= 0xF0) return;
