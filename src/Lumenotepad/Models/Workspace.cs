@@ -27,6 +27,13 @@ public sealed partial class Notebook : ObservableObject
     /// <summary>Paper tint hex for this notebook's pages (null = untinted). Per-notebook data,
     /// not a preference — set from the notebook context menu, untouched by Reset settings.</summary>
     [ObservableProperty] private string? _paperTint;
+    /// <summary>Per-notebook style defaults for NEW pages (M9). Grid null = inherit the global
+    /// paper-grid pref; font null = the app default. Set by the notebook wizard / customization.</summary>
+    [ObservableProperty] private string? _defaultGridStyle;
+    [ObservableProperty] private string _defaultPageStyle = "Freeform";
+    [ObservableProperty] private int _defaultPageStyleMode;
+    [ObservableProperty] private string? _defaultFont;
+    [ObservableProperty] private double _defaultFontSize = 15;
     public ObservableCollection<Section> Sections { get; set; } = new();
 }
 
@@ -43,9 +50,14 @@ public sealed partial class Section : ObservableObject
     private bool _isEditing;
 }
 
-/// <summary>A single page. Content (the freeform canvas) arrives in M3; for now just a title.</summary>
+/// <summary>A single page: title + per-page style overrides; canvas content lives in its page file.</summary>
 public sealed partial class Page : ObservableObject
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     [ObservableProperty] private string _title = "";
+    /// <summary>Per-page style overrides (M9): null = inherit the notebook's default. An explicit
+    /// PageStyle carries its own apply mode (0 guides+starters, 1 starters only, 2 rigid).</summary>
+    [ObservableProperty] private string? _gridStyle;
+    [ObservableProperty] private string? _pageStyle;
+    [ObservableProperty] private int _pageStyleMode;
 }

@@ -103,4 +103,43 @@ public class WorkspaceStoreTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void PageAndNotebookStyles_roundTrip()
+    {
+        var dir = TempDir();
+        try
+        {
+            var store = new WorkspaceStore(dir);
+            var ws = new Workspace();
+            var nb = new Notebook
+            {
+                Name = "Styled", DefaultGridStyle = "Ruled", DefaultPageStyle = "Cornell",
+                DefaultPageStyleMode = 2, DefaultFont = "Caveat", DefaultFontSize = 18,
+            };
+            var sec = new Section { Name = "S" };
+            sec.Pages.Add(new Page { Title = "P", GridStyle = "Dots", PageStyle = "Boxing", PageStyleMode = 1 });
+            sec.Pages.Add(new Page { Title = "Plain" });
+            nb.Sections.Add(sec);
+            ws.Notebooks.Add(nb);
+
+            store.Save(ws);
+            var loaded = new WorkspaceStore(dir).Load();
+
+            var lnb = loaded.Notebooks[0];
+            Assert.Equal("Ruled", lnb.DefaultGridStyle);
+            Assert.Equal("Cornell", lnb.DefaultPageStyle);
+            Assert.Equal(2, lnb.DefaultPageStyleMode);
+            Assert.Equal("Caveat", lnb.DefaultFont);
+            Assert.Equal(18, lnb.DefaultFontSize);
+            var p0 = lnb.Sections[0].Pages[0];
+            Assert.Equal("Dots", p0.GridStyle);
+            Assert.Equal("Boxing", p0.PageStyle);
+            Assert.Equal(1, p0.PageStyleMode);
+            var p1 = lnb.Sections[0].Pages[1];
+            Assert.Null(p1.GridStyle);
+            Assert.Null(p1.PageStyle);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }
