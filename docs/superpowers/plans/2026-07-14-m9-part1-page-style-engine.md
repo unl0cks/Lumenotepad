@@ -531,27 +531,34 @@ public static class PageStyleGuides
         var lines = new List<(Point, Point)>();
         var boxes = new List<Rect>();
 
+        // Positions are rounded to WHOLE PIXELS: crisper 1px lines, and fraction-of-viewport math
+        // isn't exactly representable in binary floats (900 × 0.28 = 252.00000000000003) — rounding
+        // keeps the geometry (and the tests) on clean values. PageStyleTemplate rounds identically
+        // so starters always align with the guides.
         switch (pageStyle)
         {
             case PageStyles.Cornell:
-                double cue = vw * 0.28, sum = vh * 0.80;
+                double cue = System.Math.Round(vw * 0.28), sum = System.Math.Round(vh * 0.80);
                 lines.Add((new Point(cue, 0), new Point(cue, sum)));
                 lines.Add((new Point(0, sum), new Point(cw, sum)));
                 break;
             case PageStyles.TwoColumn:
-                lines.Add((new Point(vw * 0.5, 0), new Point(vw * 0.5, ch)));
+                double half = System.Math.Round(vw * 0.5);
+                lines.Add((new Point(half, 0), new Point(half, ch)));
                 break;
             case PageStyles.Outline:
                 foreach (double x in new[] { 48.0, 88.0, 128.0 })
                     lines.Add((new Point(x, 0), new Point(x, ch)));
                 break;
             case PageStyles.Charting:
-                lines.Add((new Point(vw / 3, 0), new Point(vw / 3, ch)));
-                lines.Add((new Point(vw * 2 / 3, 0), new Point(vw * 2 / 3, ch)));
+                double c1 = System.Math.Round(vw / 3), c2 = System.Math.Round(vw * 2 / 3);
+                lines.Add((new Point(c1, 0), new Point(c1, ch)));
+                lines.Add((new Point(c2, 0), new Point(c2, ch)));
                 lines.Add((new Point(0, HeaderY), new Point(cw, HeaderY)));
                 break;
             case PageStyles.Boxing:
-                double bw = (vw - 2 * BoxMargin - BoxGap) / 2, bh = (vh - 2 * BoxMargin - BoxGap) / 2;
+                double bw = System.Math.Round((vw - 2 * BoxMargin - BoxGap) / 2);
+                double bh = System.Math.Round((vh - 2 * BoxMargin - BoxGap) / 2);
                 boxes.Add(new Rect(BoxMargin, BoxMargin, bw, bh));
                 boxes.Add(new Rect(BoxMargin + bw + BoxGap, BoxMargin, bw, bh));
                 boxes.Add(new Rect(BoxMargin, BoxMargin + bh + BoxGap, bw, bh));
@@ -723,7 +730,9 @@ public static class PageStyleTemplate
         {
             case PageStyles.Cornell:
             {
-                double cue = vw * 0.28, sum = vh * 0.80;
+                // Rounded exactly like PageStyleGuides, so starters sit ON the drawn regions
+                // (fraction-of-viewport math isn't binary-exact: 900 × 0.28 ≠ 252 unrounded).
+                double cue = System.Math.Round(vw * 0.28), sum = System.Math.Round(vh * 0.80);
                 Add(Margin, Margin, cue - 2 * Margin, sum - 2 * Margin, Label("Cue"));
                 Add(cue + Margin, Margin, vw - cue - 2 * Margin, sum - 2 * Margin, Label("Notes"));
                 Add(Margin, sum + 12, vw - 2 * Margin, vh - sum - 28, Label("Summary"));
@@ -731,7 +740,7 @@ public static class PageStyleTemplate
             }
             case PageStyles.TwoColumn:
             {
-                double half = vw * 0.5;
+                double half = System.Math.Round(vw * 0.5);
                 Add(Margin, Margin, half - 2 * Margin, vh - 2 * Margin, Label("Column 1"));
                 Add(half + Margin, Margin, half - 2 * Margin, vh - 2 * Margin, Label("Column 2"));
                 break;
@@ -746,8 +755,8 @@ public static class PageStyleTemplate
             }
             case PageStyles.Boxing:
             {
-                double bw = (vw - 2 * PageStyleGuides.BoxMargin - PageStyleGuides.BoxGap) / 2;
-                double bh = (vh - 2 * PageStyleGuides.BoxMargin - PageStyleGuides.BoxGap) / 2;
+                double bw = System.Math.Round((vw - 2 * PageStyleGuides.BoxMargin - PageStyleGuides.BoxGap) / 2);
+                double bh = System.Math.Round((vh - 2 * PageStyleGuides.BoxMargin - PageStyleGuides.BoxGap) / 2);
                 int n = 1;
                 foreach (var (rx, ry) in new[]
                 {
@@ -761,7 +770,7 @@ public static class PageStyleTemplate
             }
             case PageStyles.Charting:
             {
-                double col = vw / 3;
+                double col = System.Math.Round(vw / 3);
                 for (int i = 0; i < 3; i++)
                     Add(i * col + Margin, Margin, col - 2 * Margin, 40, Label($"Column {i + 1}"));
                 break;
