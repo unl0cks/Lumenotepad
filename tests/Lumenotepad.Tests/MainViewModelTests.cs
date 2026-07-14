@@ -451,4 +451,47 @@ public class MainViewModelTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void AddPage_stampsStarters_whenNotebookDefaultsToAStyle()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            vm.SelectedNotebook!.DefaultPageStyle = "Cornell";
+
+            vm.AddPageCommand.Execute(null);
+
+            var doc = vm.DocumentFor(vm.SelectedPage!);
+            Assert.Equal(3, doc.Boxes.Count);                   // Cue / Notes / Summary
+            Assert.Equal("Cue", doc.Boxes[0].Doc.GetText());
+
+            vm.SelectedNotebook!.DefaultPageStyle = "Freeform";
+            vm.AddPageCommand.Execute(null);
+            Assert.Empty(vm.DocumentFor(vm.SelectedPage!).Boxes);   // Freeform stamps nothing
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void SetPageStyleChoice_persists()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            var pg = vm.SelectedPage!;
+
+            vm.SetPageStyleChoice(pg, "Boxing", 2);
+            vm.SetPageGridStyle(pg, "Ruled");
+
+            var reloaded = new MainViewModel(new WorkspaceStore(dir), dir);
+            var rp = reloaded.Notebooks[0].Sections[0].Pages.First(p => p.Id == pg.Id);
+            Assert.Equal("Boxing", rp.PageStyle);
+            Assert.Equal(2, rp.PageStyleMode);
+            Assert.Equal("Ruled", rp.GridStyle);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }

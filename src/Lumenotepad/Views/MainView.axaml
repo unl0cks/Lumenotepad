@@ -527,7 +527,7 @@
                                 IsVisible="{Binding DeletedHistory}" ToolTip.Tip="Deleted containers"/>
                     </Grid>
                     <Panel>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                        <ScrollViewer x:Name="CanvasScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                                       Margin="16,12,16,16">
                             <editor:NoteCanvas x:Name="PageCanvas"/>
                         </ScrollViewer>

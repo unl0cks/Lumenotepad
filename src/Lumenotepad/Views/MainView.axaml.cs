@@ -105,6 +105,13 @@ public partial class MainView : UserControl
 
         // Keep the canvas plate's punched hole aligned with the page box (margin 14, radius 14).
         CanvasPlate.SizeChanged += (_, _) => UpdateCanvasPlateClip();
+
+        // Guides + starter templates anchor to the visible page area.
+        CanvasScroll.SizeChanged += (_, _) =>
+        {
+            PageCanvas.SetViewport(CanvasScroll.Bounds.Size);
+            if (Vm is { } vvm) vvm.CanvasViewport = (CanvasScroll.Bounds.Width, CanvasScroll.Bounds.Height);
+        };
     }
 
     // ---- transform animation (delegates to the shared Motion engine) ------------------------------
@@ -462,6 +469,26 @@ public partial class MainView : UserControl
         PageCanvas.SetStyles(grid, style, mode);
     }
 
+    /// <summary>Temporary Part-1 entry point (the Part-4 Page dialog supersedes it): set the style,
+    /// refresh the guides, and offer the starter containers — additive, never clears content.</summary>
+    private async void PickPageStyle(Models.Page pg, string? style)
+    {
+        if (Vm is not { } vm) return;
+        vm.SetPageStyleChoice(pg, style);
+        ApplyPageStyles();
+        if (style is null or Editor.PageStyles.Freeform) return;
+        var doc = vm.DocumentFor(pg);
+        if (doc.Boxes.Count > 0)
+        {
+            if (Window is not { } w) return;
+            if (!await ConfirmDialog.Show(w, "Add starter layout?",
+                $"Add the {style} starter containers to this page? Your existing notes stay untouched.",
+                "Add", danger: false)) return;
+        }
+        vm.StampPageStyle(pg);
+        if (ReferenceEquals(vm.SelectedPage, pg)) PageCanvas.Document = PageCanvas.Document;   // show the stamp
+    }
+
     /// <summary>Per-notebook paper tint: the selected notebook's PaperTint hex as a translucent
     /// veil (fixed alpha keeps text readable on both light and dark paper).</summary>
     private void ApplyPaperTint()
@@ -794,6 +821,7 @@ public partial class MainView : UserControl
     {
         Vm?.FlushDirtyDocs();                      // the page being left saves immediately
         PageCanvas.Document = Vm?.SelectedPage is { } page ? Vm.DocumentFor(page) : null;
+        ApplyPageStyles();                     // the new page's effective grid + method guides
         if (PageCanvas.Document is null) { TrashPanel.IsVisible = false; return; }
         if (TrashPanel.IsVisible) RefreshTrashPanel();
         // Page switch: title + canvas rise in instead of the content popping.
@@ -940,13 +968,61 @@ public partial class MainView : UserControl
     {
         if ((e.Source as StyledElement)?.DataContext is not Models.Page pg) return;
         if (Vm is { } vm) vm.SelectedPage = pg;
+
+        var gridMenu = new MenuItem { Header = "Grid style" };
+        foreach (var (label, key) in new (string, string?)[]
+                 { ("Inherit", null), ("Blank", Editor.PageStyles.Blank), ("Ruled", Editor.PageStyles.Ruled),
+                   ("Grid", Editor.PageStyles.Grid), ("Dots", Editor.PageStyles.Dots) })
+        {
+            var item = new MenuItem
+            {
+                Header = label,
+                FontWeight = string.Equals(pg.GridStyle, key, System.StringComparison.Ordinal)
+                    ? FontWeight.SemiBold : FontWeight.Normal,
+            };
+            var chosen = key;
+            item.Click += (_, _) => { Vm?.SetPageGridStyle(pg, chosen); ApplyPageStyles(); };
+            gridMenu.Items.Add(item);
+        }
+
+        var styleMenu = new MenuItem { Header = "Page style" };
+        foreach (var (label, key) in new (string, string?)[]
+                 { ("Inherit", null), ("Freeform", Editor.PageStyles.Freeform), ("Cornell", Editor.PageStyles.Cornell),
+                   ("Two-column", Editor.PageStyles.TwoColumn), ("Outline", Editor.PageStyles.Outline),
+                   ("Boxing", Editor.PageStyles.Boxing), ("Charting", Editor.PageStyles.Charting),
+                   ("Sentence", Editor.PageStyles.Sentence) })
+        {
+            var item = new MenuItem
+            {
+                Header = label,
+                FontWeight = string.Equals(pg.PageStyle, key, System.StringComparison.Ordinal)
+                    ? FontWeight.SemiBold : FontWeight.Normal,
+            };
+            var chosen = key;
+            item.Click += (_, _) => PickPageStyle(pg, chosen);
+            styleMenu.Items.Add(item);
+        }
+        styleMenu.Items.Add(new Separator());
+        foreach (var (label, m) in new[] { ("Apply as: guides + starters", 0), ("Apply as: starters only", 1), ("Apply as: rigid (locked)", 2) })
+        {
+            var item = new MenuItem
+            {
+                Header = label, IsEnabled = pg.PageStyle is not null,
+                FontWeight = pg.PageStyle is not null && pg.PageStyleMode == m
+                    ? FontWeight.SemiBold : FontWeight.Normal,
+            };
+            int chosen = m;
+            item.Click += (_, _) => { Vm?.SetPageStyleChoice(pg, pg.PageStyle, chosen); ApplyPageStyles(); };
+            styleMenu.Items.Add(item);
+        }
+
         var delete = new MenuItem { Header = "Delete page" };
         delete.Click += (_, _) => ConfirmThenDelete(
             "Delete this page?",
             $"“{Label(pg.Title)}” will be permanently deleted. This can't be undone.",
             Vm?.ConfirmDeletePage ?? true,
             () => CollapseThenDelete(PagesList.ContainerFromItem(pg) as Control, () => Vm?.DeletePageCommand.Execute(pg)));
-        OpenMenu(e, delete);
+        OpenMenu(e, gridMenu, styleMenu, delete);
     }
 
     // ---- homepage gallery ----

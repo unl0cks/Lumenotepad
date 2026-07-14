@@ -704,6 +704,10 @@ public partial class MainViewModel : ObservableObject
     /// <summary>The portable userdata folder backing this workspace (null in the designer).</summary>
     public string? SettingsDir => _settingsDir;
 
+    /// <summary>The canvas viewport (visible page area), pushed by the view — page-style templates
+    /// and guides anchor their regions to it. Plain doubles: the VM stays Avalonia-layout-free.</summary>
+    public (double W, double H) CanvasViewport { get; set; } = (900, 600);
+
     /// <summary>The effective hex override for a bullet style (null = the built-in default color).</summary>
     public string? BulletColorFor(string style) =>
         _settings is not null && _settings.BulletColors.TryGetValue(style, out var hex) ? hex : null;
@@ -955,6 +959,41 @@ public partial class MainViewModel : ObservableObject
         Save();
     }
 
+    /// <summary>Set (or clear with null) a page's grid style; persists the tree.</summary>
+    public void SetPageGridStyle(Page pg, string? gridStyle)
+    {
+        pg.GridStyle = gridStyle;
+        Save();
+    }
+
+    /// <summary>Set (or clear with null) a page's page style; an explicit style carries its mode.</summary>
+    public void SetPageStyleChoice(Page pg, string? pageStyle, int? mode = null)
+    {
+        pg.PageStyle = pageStyle;
+        if (mode is { } m) pg.PageStyleMode = m;
+        Save();
+    }
+
+    /// <summary>Stamp the page's effective style's starter containers into its document (no-op for
+    /// Freeform/Mindmap). Additive — never clears existing content. Flushes so the stamp persists.</summary>
+    public void StampPageStyle(Page page)
+    {
+        var owner = FindOwner(page) ?? SelectedNotebook;
+        if (owner is null) return;
+        var (style, mode) = Editor.PageStyles.EffectiveStyle(page, owner);
+        var starters = Editor.PageStyleTemplate.StartersFor(style, mode,
+            new Avalonia.Size(CanvasViewport.W, CanvasViewport.H));
+        if (starters.Count == 0) return;
+        var doc = DocumentFor(page);
+        foreach (var b in starters)
+        {
+            var added = doc.AddBox(b.X, b.Y, b.Width, b.Doc);
+            added.H = b.H;
+            added.Locked = b.Locked;
+        }
+        FlushDirtyDocs();
+    }
+
     /// <summary>When the last successful auto/manual backup ran (UTC), or null.</summary>
     public System.DateTime? LastBackupUtc => _settings?.LastBackupUtc;
 
@@ -1075,6 +1114,7 @@ public partial class MainViewModel : ObservableObject
         var pg = new Page { Title = "Untitled page" };
         sec.Pages.Add(pg);
         SelectedPage = pg;
+        StampPageStyle(pg);                    // starter containers per the effective page style
         Save();
     }
 
