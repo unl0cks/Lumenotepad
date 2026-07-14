@@ -28,6 +28,48 @@ public static class DwmAcrylic
     [DllImport("dwmapi.dll")]
     private static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd, ref MARGINS margins);
 
+    // ---- per-window blur-behind (SetWindowCompositionAttribute) ----
+    // The Win11 system-backdrop attribute above does NOT engage on popup-class windows (context
+    // menus / flyouts live in PopupRoots) — the composition-attribute acrylic does: it blurs
+    // whatever sits behind the hwnd directly, no frame extension needed.
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct AccentPolicy { public int State; public int Flags; public uint GradientColor; public int AnimationId; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct CompositionData { public int Attribute; public IntPtr Data; public int Size; }
+
+    [DllImport("user32.dll")]
+    private static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref CompositionData data);
+
+    private const int WCA_ACCENT_POLICY = 19;
+    private const int ACCENT_ENABLE_ACRYLICBLURBEHIND = 4;
+
+    /// <summary>Acrylic blur-behind on any HWND — popups included. <paramref name="tintAbgr"/> is
+    /// AABBGGRR, the tint mixed into the blur itself (keep its alpha LOW — the popup content's own
+    /// translucent brush supplies the visible tint).</summary>
+    public static void BlurBehind(IntPtr hwnd, uint tintAbgr = 0x2E1C1614)
+    {
+        if (!OperatingSystem.IsWindows() || hwnd == IntPtr.Zero) return;
+        try
+        {
+            var accent = new AccentPolicy
+            {
+                State = ACCENT_ENABLE_ACRYLICBLURBEHIND, Flags = 2, GradientColor = tintAbgr,
+            };
+            int size = Marshal.SizeOf<AccentPolicy>();
+            IntPtr ptr = Marshal.AllocHGlobal(size);
+            try
+            {
+                Marshal.StructureToPtr(accent, ptr, false);
+                var data = new CompositionData { Attribute = WCA_ACCENT_POLICY, Data = ptr, Size = size };
+                SetWindowCompositionAttribute(hwnd, ref data);
+            }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+        catch { /* unsupported builds keep the translucent fallback */ }
+    }
+
     public static void Apply(Window window, Backdrop backdrop = Backdrop.Acrylic, bool dark = true)
     {
         if (window.TryGetPlatformHandle() is { } h) Apply(h.Handle, backdrop, dark);

@@ -1050,8 +1050,10 @@ public sealed class RichTextEditor : Control
         Focus();
         var pos = PosFromPoint(pt);
 
-        // Click on a checkbox in the gutter toggles it (single click, first line of the paragraph).
-        if (e.ClickCount == 1 && IsOverCheckbox(pt, out int checkPara))
+        // Click on a checkbox in the gutter toggles it — ANY click count: rapid re-clicks arrive
+        // with ClickCount 2/3 (the OS multi-click window) and gating on 1 made the box go dead
+        // until the timer reset (owner report). Checkbox hit always outranks word/line selection.
+        if (IsOverCheckbox(pt, out int checkPara))
         {
             PushUndo();
             _doc.ToggleChecked(checkPara);

@@ -59,8 +59,9 @@ public static class MenuFx
                 WindowTransparencyLevel.AcrylicBlur,
                 WindowTransparencyLevel.Transparent,
             };
-            if (hwnd != IntPtr.Zero)
-                Platform.DwmAcrylic.Apply(hwnd, Platform.DwmAcrylic.Backdrop.Acrylic, dark: true);
+            // Composition-attribute blur-behind: the system-backdrop attribute never engages on
+            // popup-class windows, this one does (blurs directly behind the hwnd).
+            Platform.DwmAcrylic.BlurBehind(hwnd);
         }
         catch { /* popups that reject the backdrop keep the translucent fallback */ }
     }

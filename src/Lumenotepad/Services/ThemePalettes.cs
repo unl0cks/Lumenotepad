@@ -85,9 +85,9 @@ public static class ThemePalettes
             return t with
             {
                 PaperBackground = "#0BFFFFFF", PaperBorder = "#33FFFFFF",
-                // Dark enough to hold the acrylic DOWN (the OS material washes bright through a
-                // thin tint — owner saw a white menu) while staying translucent for the blur.
-                MenuBackground = "#A014161C", MenuBorder = "#33FFFFFF",
+                // Light enough that the REAL blur-behind (DwmAcrylic.BlurBehind on the popup hwnd)
+                // visibly shows; the blur's own dark gradient tint supplies the rest of the depth.
+                MenuBackground = "#6614161C", MenuBorder = "#33FFFFFF",
             };
         return paperLight
             ? t with
