@@ -468,6 +468,21 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public void ResetSettingsToDefaults_restoresDoubleClickCreate()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            vm.DoubleClickCreate = true;
+            vm.ResetSettingsToDefaults();
+            Assert.False(vm.DoubleClickCreate);
+            Assert.False(AppSettings.Load(dir).DoubleClickCreate);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public void AddPage_stampsStarters_whenNotebookDefaultsToAStyle()
     {
         var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());

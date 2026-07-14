@@ -23,9 +23,14 @@ public static class PageStyles
     public const int ModeStartersOnly = 1; // starter containers, no guides
     public const int ModeRigid = 2;        // guides + LOCKED starter containers
 
-    /// <summary>The app-wide Part-3 grid pref ("None"|"Dots"|"Lines") → a grid-style key.</summary>
+    /// <summary>The app-wide grid pref → a grid-style key. Accepts both the new-style picker
+    /// keys (Blank/Ruled/Grid/Dots) and the legacy Part-3 stored values ("None"/"Dots"/"Lines")
+    /// for backward compatibility with settings saved before the picker grew Ruled/Grid.</summary>
     public static string MapGlobalGrid(string pageGrid) => pageGrid switch
     {
+        "Blank" => Blank,
+        "Ruled" => Ruled,
+        "Grid" => Grid,
         "Dots" => Dots,
         "Lines" => Grid,
         _ => Blank,

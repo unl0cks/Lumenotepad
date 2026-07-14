@@ -50,6 +50,9 @@ public sealed class NoteCanvas : Panel
     /// <summary>"Snap to grid" preference: drag/resize/placement land on the 20px cell.</summary>
     public bool SnapToGrid { get; set; }
 
+    /// <summary>"Create notes with double-click" preference: a bare-canvas single click does nothing.</summary>
+    public bool CreateOnDoubleClick { get; set; }
+
     // The bottom guide layer: grid-style paper background + page-style guide lines (M9).
     private readonly GuideLayer _guides = new();
 
@@ -161,6 +164,7 @@ public sealed class NoteCanvas : Panel
         // Only clicks on bare canvas start a container — clicks inside one bubble with another Source.
         if (_doc is null || !ReferenceEquals(e.Source, this)) return;
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        if (CreateOnDoubleClick && e.ClickCount < 2) return;
         var p = e.GetPosition(this);
         double bx = p.X - 11, by = p.Y - 16;
         if (SnapToGrid) { bx = Math.Max(0, GridMath.Snap(bx)); by = Math.Max(0, GridMath.Snap(by)); }

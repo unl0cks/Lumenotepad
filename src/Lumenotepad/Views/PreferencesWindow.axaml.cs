@@ -313,7 +313,7 @@ public partial class PreferencesWindow : Window
             if (Vm is { } vm && Math.Abs(vm.NewNoteWidth - e.NewValue) > 0.5) vm.NewNoteWidth = e.NewValue;
             NewNoteWidthValue.Text = ((int)e.NewValue).ToString();
         };
-        PageGridBox.ItemsSource = new[] { "None", "Dots", "Lines" };
+        PageGridBox.ItemsSource = new[] { "None", "Ruled", "Grid", "Dots" };
         PageGridBox.SelectionChanged += (_, _) =>
         {
             if (Vm is { } vm && PageGridBox.SelectedItem is string g && vm.PageGrid != g) vm.PageGrid = g;
@@ -774,7 +774,15 @@ public partial class PreferencesWindow : Window
         CardSizeBox.SelectedItem = vm.CardSize;
         NewNoteWidthSlider.Value = vm.NewNoteWidth;
         NewNoteWidthValue.Text = ((int)vm.NewNoteWidth).ToString();
-        PageGridBox.SelectedItem = vm.PageGrid;
+        // The combo only offers None/Ruled/Grid/Dots; map legacy stored values ("Lines"/"Blank")
+        // and anything unrecognized to their display equivalent so the picker always shows something valid.
+        PageGridBox.SelectedItem = vm.PageGrid switch
+        {
+            "Lines" => "Grid",
+            "Blank" => "None",
+            "None" or "Ruled" or "Grid" or "Dots" => vm.PageGrid,
+            _ => "None",
+        };
         UpdateHighlightRings();
         RefreshEditorFontList();
         EditorFontSizeSlider.Value = vm.EditorFontSize;

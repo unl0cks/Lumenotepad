@@ -14,6 +14,13 @@ public class PageStylesTests
     public void MapGlobalGrid_mapsPart3Keys(string global, string expected) =>
         Assert.Equal(expected, PageStyles.MapGlobalGrid(global));
 
+    [Theory]
+    [InlineData("Blank", "Blank")]
+    [InlineData("Ruled", "Ruled")]
+    [InlineData("Grid", "Grid")]
+    public void MapGlobalGrid_passesThroughNewKeys(string stored, string expected) =>
+        Assert.Equal(expected, PageStyles.MapGlobalGrid(stored));
+
     [Fact]
     public void EffectiveGrid_pageOverNotebookOverGlobal()
     {

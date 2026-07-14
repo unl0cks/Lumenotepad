@@ -5,7 +5,7 @@
         x:Class="Lumenotepad.Views.PreferencesWindow"
         x:DataType="vm:MainViewModel"
         Title="Preferences"
-        Width="760" Height="560" MinWidth="620" MinHeight="440"
+        Width="840" Height="620" MinWidth="620" MinHeight="440"
         WindowDecorations="None" ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         FontFamily="{StaticResource UiFont}"
@@ -381,7 +381,7 @@
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                                 <TextBlock Classes="label" Text="Paper grid"/>
-                                <TextBlock Classes="hint" Text="Faint dots or lines on the page, under your notes."/>
+                                <TextBlock Classes="hint" Text="Faint ruled lines, grid, or dots on every page (pages can override)."/>
                             </StackPanel>
                             <ComboBox x:Name="PageGridBox" Grid.Column="1" Width="120" VerticalAlignment="Center"/>
                         </Grid>
@@ -391,6 +391,13 @@
                                 <TextBlock Classes="hint" Text="Moving or resizing containers lands on the 20px grid."/>
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding GridSnap, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="label" Text="Create notes with double-click"/>
+                                <TextBlock Classes="hint" Text="Off: a single click on empty paper starts a note. On: double-click instead, so stray clicks do nothing."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding DoubleClickCreate, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
                         <TextBlock Classes="hint" Margin="0,4,0,0"
                                    Text="Paper color is per notebook — right-click a notebook cover on the homepage or its chip in the rail."/>

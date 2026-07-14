@@ -310,4 +310,21 @@ public class AppSettingsTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void DoubleClickCreate_defaultsFalse_andRoundTrip()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            Assert.False(new AppSettings().DoubleClickCreate);
+
+            var s = new AppSettings { DoubleClickCreate = true };
+            s.Save(dir);
+            var loaded = AppSettings.Load(dir);
+
+            Assert.True(loaded.DoubleClickCreate);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }
