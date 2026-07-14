@@ -31,6 +31,17 @@ public static class WinChrome
     [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hWnd, int index);
     [DllImport("user32.dll")] private static extern int SetWindowLong(IntPtr hWnd, int index, int value);
 
+    /// <summary>Small corner rounding on a raw HWND — popup windows (context menus / flyouts) are
+    /// not <see cref="Window"/>s, and an un-rounded popup surface pokes square corners out behind
+    /// the rounded menu content.</summary>
+    public static void RoundCorners(IntPtr hwnd, bool small = true)
+    {
+        if (!OperatingSystem.IsWindows() || hwnd == IntPtr.Zero) return;
+        int pref = small ? DWMWCP_ROUNDSMALL : DWMWCP_ROUND;
+        try { DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref pref, sizeof(int)); }
+        catch { /* pre-Windows-11: no rounded-corner API */ }
+    }
+
     /// <summary>Round (or un-round) the window's corners on Windows 11. Safe to call anywhere.</summary>
     public static void RoundCorners(Window window, bool round = true)
     {

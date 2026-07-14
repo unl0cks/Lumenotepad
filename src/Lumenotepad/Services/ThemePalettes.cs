@@ -85,7 +85,9 @@ public static class ThemePalettes
             return t with
             {
                 PaperBackground = "#0BFFFFFF", PaperBorder = "#33FFFFFF",
-                MenuBackground = "#7014161C", MenuBorder = "#33FFFFFF",   // translucent enough for the popup acrylic to read
+                // Dark enough to hold the acrylic DOWN (the OS material washes bright through a
+                // thin tint — owner saw a white menu) while staying translucent for the blur.
+                MenuBackground = "#A014161C", MenuBorder = "#33FFFFFF",
             };
         return paperLight
             ? t with
