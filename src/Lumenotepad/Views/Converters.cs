@@ -53,9 +53,13 @@ public static class Converters
         };
     });
 
-    /// <summary>Notebook color → a same-hue, clearly darker 1px border for covers and chips.</summary>
+    /// <summary>Notebook color → a same-hue, gently darker 1px border for covers and chips. The
+    /// border is composited fully opaque (not an alpha overlay), so softening it means shrinking the
+    /// shade delta rather than the alpha — an alpha cut would just blend toward whatever sits behind
+    /// the card, which varies by theme/placement, instead of reading consistently softer everywhere.
+    /// -0.38 → -0.27 (~30% smaller delta); global across every theme by design (owner: gentler outlines).</summary>
     public static readonly IValueConverter CoverBorder = new FuncValueConverter<string?, IBrush>(hex =>
-        new SolidColorBrush(Shade(SafeParse(hex), -0.38)));
+        new SolidColorBrush(Shade(SafeParse(hex), -0.27)));
 
     /// <summary>Notebook color → a very faint glow (for the selected rail chip). Blur kept small so
     /// the halo fits inside the rail's ~12px side slack instead of clipping at the edges.</summary>
