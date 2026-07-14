@@ -804,6 +804,8 @@ public partial class MainView : UserControl
             Motion.Reveal(RailPanel, 64, Vm?.IsRailVisible ?? true);
         else if (e.PropertyName == nameof(MainViewModel.IsPagesVisible))
             Motion.Reveal(PagesPanel, Vm?.PagesPanelWidth ?? 224, Vm?.IsPagesVisible ?? true);
+        else if (e.PropertyName == nameof(MainViewModel.PagesPanelWidth))
+            ApplyPanels();          // reset-to-defaults (or any programmatic width change) applies live
         else if (e.PropertyName == nameof(MainViewModel.IsHomeVisible))
         {
             if (_rearranging) SetRearranging(false);          // leaving home exits rearrange mode
