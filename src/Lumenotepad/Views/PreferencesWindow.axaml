@@ -227,7 +227,7 @@
                             <TextBlock x:Name="AutosaveValue" Grid.Column="1" Classes="hint" Text="0.9s"/>
                         </Grid>
                         <Slider x:Name="AutosaveSlider" Minimum="100" Maximum="5000"
-                                TickFrequency="100" IsSnapToTickEnabled="True"/>
+                                TickFrequency="100"/>
 
                         <TextBlock Classes="section" Text="HOMEPAGE"/>
                         <Grid ColumnDefinitions="*,Auto">
@@ -241,7 +241,7 @@
                             <TextBlock x:Name="RecentCountValue" Grid.Column="1" Classes="label" Text="5"/>
                         </Grid>
                         <Slider x:Name="RecentCountSlider" Minimum="0" Maximum="10"
-                                TickFrequency="1" IsSnapToTickEnabled="True"/>
+                                TickFrequency="1"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
@@ -374,7 +374,7 @@
                             <TextBlock x:Name="GlassTintValue" Grid.Column="1" Classes="hint" Text="0%"/>
                         </Grid>
                         <Slider x:Name="GlassTintSlider" Minimum="-1" Maximum="1"
-                                TickFrequency="0.05" IsSnapToTickEnabled="True"/>
+                                TickFrequency="0.05"/>
                         <TextBlock Classes="hint"
                                    Text="Darken or lighten what shows through the glass. Zero is untinted; themes with no glass anywhere ignore it."/>
 
@@ -492,7 +492,7 @@
                             <TextBlock x:Name="NewNoteWidthValue" Grid.Column="1" Classes="label" Text="360"/>
                         </Grid>
                         <Slider x:Name="NewNoteWidthSlider" Minimum="240" Maximum="640"
-                                TickFrequency="20" IsSnapToTickEnabled="True"/>
+                                TickFrequency="20"/>
 
                         <TextBlock Classes="section" Text="PAPER"/>
                         <Grid ColumnDefinitions="*,Auto">
@@ -550,7 +550,7 @@
                             <TextBlock x:Name="CaretWidthValue" Grid.Column="1" Classes="hint" Text="1.6"/>
                         </Grid>
                         <Slider x:Name="CaretWidthSlider" Minimum="1" Maximum="3"
-                                TickFrequency="0.1" IsSnapToTickEnabled="True"/>
+                                TickFrequency="0.1"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
@@ -604,7 +604,7 @@
                             <TextBlock x:Name="EditorFontSizeValue" Grid.Column="1" Classes="label" Text="15"/>
                         </Grid>
                         <Slider x:Name="EditorFontSizeSlider" Minimum="11" Maximum="24"
-                                TickFrequency="1" IsSnapToTickEnabled="True"/>
+                                TickFrequency="1"/>
 
                         <TextBlock Classes="section" Text="SPACING"/>
                         <Grid ColumnDefinitions="*,Auto">
@@ -615,7 +615,7 @@
                             <TextBlock x:Name="LineSpacingValue" Grid.Column="1" Classes="hint" Text="1.0×"/>
                         </Grid>
                         <Slider x:Name="LineSpacingSlider" Minimum="1" Maximum="1.8"
-                                TickFrequency="0.1" IsSnapToTickEnabled="True"/>
+                                TickFrequency="0.1"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Classes="label" Text="Paragraph spacing"/>
@@ -624,7 +624,7 @@
                             <TextBlock x:Name="ParaSpacingValue" Grid.Column="1" Classes="hint" Text="1.0×"/>
                         </Grid>
                         <Slider x:Name="ParaSpacingSlider" Minimum="0.5" Maximum="3"
-                                TickFrequency="0.25" IsSnapToTickEnabled="True"/>
+                                TickFrequency="0.25"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Classes="label" Text="List indent"/>
@@ -633,7 +633,7 @@
                             <TextBlock x:Name="IndentScaleValue" Grid.Column="1" Classes="hint" Text="1.0×"/>
                         </Grid>
                         <Slider x:Name="IndentScaleSlider" Minimum="0.7" Maximum="2"
-                                TickFrequency="0.1" IsSnapToTickEnabled="True"/>
+                                TickFrequency="0.1"/>
 
                         <TextBlock Classes="section" Text="SMART INPUT"/>
                         <Grid ColumnDefinitions="*,Auto">
@@ -798,7 +798,7 @@
                             <TextBlock x:Name="BackupKeepValue" Grid.Column="1" Classes="label" Text="5"/>
                         </Grid>
                         <Slider x:Name="BackupKeepSlider" Minimum="1" Maximum="20"
-                                TickFrequency="1" IsSnapToTickEnabled="True"/>
+                                TickFrequency="1"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,10,0">
                                 <StackPanel Orientation="Horizontal">

@@ -104,15 +104,19 @@ public partial class PreferencesWindow : Window
             if (_syncingStartup) return;
             Platform.StartupRegistry.SetEnabled(StartupToggle.IsChecked == true);
         };
+        // Sliders no longer snap-to-tick (the thumb glides with the cursor) — snap the STORED value
+        // and the label to the tick here instead. Autosave: 100ms steps.
         AutosaveSlider.ValueChanged += (_, e) =>
         {
-            if (Vm is { } vm && vm.AutosaveMs != (int)e.NewValue) vm.AutosaveMs = (int)e.NewValue;
-            AutosaveValue.Text = $"{e.NewValue / 1000.0:0.#}s";
+            int v = (int)(Math.Round(e.NewValue / 100) * 100);
+            if (Vm is { } vm && vm.AutosaveMs != v) vm.AutosaveMs = v;
+            AutosaveValue.Text = $"{v / 1000.0:0.#}s";
         };
         RecentCountSlider.ValueChanged += (_, e) =>
         {
-            if (Vm is { } vm && vm.RecentCount != (int)e.NewValue) vm.RecentCount = (int)e.NewValue;
-            RecentCountValue.Text = ((int)e.NewValue).ToString();
+            int v = (int)Math.Round(e.NewValue);
+            if (Vm is { } vm && vm.RecentCount != v) vm.RecentCount = v;
+            RecentCountValue.Text = v.ToString();
         };
 
         NavList.SelectionChanged += async (_, _) =>
@@ -181,8 +185,9 @@ public partial class PreferencesWindow : Window
         };
         BackupKeepSlider.ValueChanged += (_, e) =>
         {
-            if (Vm is { } vm && vm.BackupKeep != (int)e.NewValue) vm.BackupKeep = (int)e.NewValue;
-            BackupKeepValue.Text = ((int)e.NewValue).ToString();
+            int v = (int)Math.Round(e.NewValue);
+            if (Vm is { } vm && vm.BackupKeep != v) vm.BackupKeep = v;
+            BackupKeepValue.Text = v.ToString();
         };
         BackupFolderBtn.Click += async (_, _) =>
         {
@@ -252,8 +257,9 @@ public partial class PreferencesWindow : Window
         };
         GlassTintSlider.ValueChanged += (_, e) =>
         {
-            if (Vm is { } vm && Math.Abs(vm.GlassTint - e.NewValue) > 1e-6) vm.GlassTint = e.NewValue;
-            GlassTintValue.Text = $"{(int)Math.Round(e.NewValue * 100)}%";
+            double v = Math.Round(e.NewValue / 0.05) * 0.05;
+            if (Vm is { } vm && Math.Abs(vm.GlassTint - v) > 1e-6) vm.GlassTint = v;
+            GlassTintValue.Text = $"{(int)Math.Round(v * 100)}%";
         };
         MotionSpeedBox.ItemsSource = new[] { "Calm", "Normal", "Snappy" };
         MotionSpeedBox.SelectionChanged += (_, _) =>
@@ -288,8 +294,9 @@ public partial class PreferencesWindow : Window
         };
         CaretWidthSlider.ValueChanged += (_, e) =>
         {
-            if (Vm is { } vm && Math.Abs(vm.CaretWidth - e.NewValue) > 1e-6) vm.CaretWidth = e.NewValue;
-            CaretWidthValue.Text = $"{e.NewValue:0.0}";
+            double v = Math.Round(e.NewValue / 0.1) * 0.1;
+            if (Vm is { } vm && Math.Abs(vm.CaretWidth - v) > 1e-6) vm.CaretWidth = v;
+            CaretWidthValue.Text = $"{v:0.0}";
         };
         BuildHighlightChoices();
         DateFormatBox.ItemsSource = DateFormats.Select(f => DateTime.Now.ToString(f)).ToArray();
@@ -310,8 +317,9 @@ public partial class PreferencesWindow : Window
         };
         NewNoteWidthSlider.ValueChanged += (_, e) =>
         {
-            if (Vm is { } vm && Math.Abs(vm.NewNoteWidth - e.NewValue) > 0.5) vm.NewNoteWidth = e.NewValue;
-            NewNoteWidthValue.Text = ((int)e.NewValue).ToString();
+            double v = Math.Round(e.NewValue / 20) * 20;
+            if (Vm is { } vm && Math.Abs(vm.NewNoteWidth - v) > 0.5) vm.NewNoteWidth = v;
+            NewNoteWidthValue.Text = ((int)v).ToString();
         };
         PageGridBox.ItemsSource = new[] { "None", "Ruled", "Grid", "Dots" };
         PageGridBox.SelectionChanged += (_, _) =>
@@ -330,15 +338,28 @@ public partial class PreferencesWindow : Window
             }
         };
         WireScaleSlider(EditorFontSizeSlider, EditorFontSizeValue, v => v.ToString("0"),
-            vm => vm.EditorFontSize, (vm, v) => vm.EditorFontSize = v);
+            vm => vm.EditorFontSize, (vm, v) => vm.EditorFontSize = v, 1);
         WireScaleSlider(LineSpacingSlider, LineSpacingValue, v => $"{v:0.0}×",
-            vm => vm.LineSpacingScale, (vm, v) => vm.LineSpacingScale = v);
+            vm => vm.LineSpacingScale, (vm, v) => vm.LineSpacingScale = v, 0.1);
         WireScaleSlider(ParaSpacingSlider, ParaSpacingValue, v => $"{v:0.0}×",
-            vm => vm.ParagraphSpacingScale, (vm, v) => vm.ParagraphSpacingScale = v);
+            vm => vm.ParagraphSpacingScale, (vm, v) => vm.ParagraphSpacingScale = v, 0.1);
         WireScaleSlider(IndentScaleSlider, IndentScaleValue, v => $"{v:0.0}×",
-            vm => vm.IndentScale, (vm, v) => vm.IndentScale = v);
+            vm => vm.IndentScale, (vm, v) => vm.IndentScale = v, 0.1);
         WirePaletteEditor(TextPaletteChips, TextPaletteHexBox, TextPaletteReset, highlight: false);
         WirePaletteEditor(HighlightPaletteChips, HighlightPaletteHexBox, HighlightPaletteReset, highlight: true);
+
+        // Dropdown open animation: Fluent has none; rise the popup content via the Motion engine.
+        // Null-safe throughout — if the popup (or its child) can't be located this silently does
+        // nothing, which is the sanctioned fallback.
+        foreach (var combo in new[] { LaunchTargetBox, MotionSpeedBox, CardSizeBox, DateFormatBox,
+                                      EditorFontBox, ToolbarPosBox, ToolbarScopeBox, PageGridBox,
+                                      BackupEveryBox, NumBoldBox, NumItalicBox, NumUnderlineBox, NumStrikeBox })
+            combo.DropDownOpened += (s, _) =>
+            {
+                if (s is ComboBox cb &&
+                    cb.GetVisualDescendants().OfType<Popup>().FirstOrDefault()?.Child is Control c)
+                    Motion.RiseIn(c, Motion.Fast);
+            };
 
         DataContextChanged += (_, _) => HookVmChanges();
         HookVmChanges();
@@ -536,14 +557,17 @@ public partial class PreferencesWindow : Window
                     string.Equals(Vm?.DefaultHighlight, hex, StringComparison.OrdinalIgnoreCase) ? 2 : 1);
     }
 
-    /// <summary>One slider + live value label bound to a double VM pref (epsilon write-guard).</summary>
+    /// <summary>One slider + live value label bound to a double VM pref (epsilon write-guard). The
+    /// slider no longer snaps its thumb to ticks (it glides with the cursor) — round the STORED
+    /// value and the label to <paramref name="step"/> here instead.</summary>
     private void WireScaleSlider(Slider slider, TextBlock label, Func<double, string> fmt,
-                                 Func<MainViewModel, double> get, Action<MainViewModel, double> set)
+                                 Func<MainViewModel, double> get, Action<MainViewModel, double> set, double step)
     {
         slider.ValueChanged += (_, e) =>
         {
-            if (Vm is { } vm && Math.Abs(get(vm) - e.NewValue) > 1e-6) set(vm, e.NewValue);
-            label.Text = fmt(e.NewValue);
+            double v = Math.Round(e.NewValue / step) * step;
+            if (Vm is { } vm && Math.Abs(get(vm) - v) > 1e-6) set(vm, v);
+            label.Text = fmt(v);
         };
     }
 

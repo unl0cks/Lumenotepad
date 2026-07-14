@@ -20,6 +20,7 @@ public sealed record ThemeTokens(
     string Accent, string AccentHover, string AccentSoft, string AccentDeep,
     string AccentGradTop, string AccentGradBottom,
     string WindowBackground,   // opaque frame-family fill for secondary windows (preferences)
+    string MenuBackground, string MenuBorder,   // right-click/flyout menu material, themed per-theme
     bool DarkChrome,           // DWM immersive dark + Fluent Dark variant
     bool GlassWindow);         // at least one region shows the acrylic backdrop
 
@@ -70,11 +71,19 @@ public static class ThemePalettes
             FrameBackground = "#02FFFFFF",
             FrameBorder = "#33FFFFFF",
             CanvasBackground = "#00000000",
+            // Full-theme-OFF context menu: dark opaque (owner's Lumen special case).
+            MenuBackground = "#F5171922", MenuBorder = "#2EFFFFFF",
             DarkChrome = true,
             GlassWindow = true,
         };
         if (fullTheme)
-            return t with { PaperBackground = "#0BFFFFFF", PaperBorder = "#33FFFFFF" };
+            // Full-theme-ON: translucent dark — reads as smoked/frosted glass over content; paired
+            // with best-effort DWM acrylic on the popup's own top-level (see MainView.OpenMenu).
+            return t with
+            {
+                PaperBackground = "#0BFFFFFF", PaperBorder = "#33FFFFFF",
+                MenuBackground = "#B814161C", MenuBorder = "#33FFFFFF",
+            };
         return paperLight
             ? t with
             {
@@ -110,6 +119,9 @@ public static class ThemePalettes
             // (alpha only, hue untouched) instead; scoped to Solid() so Lumen's own AccentDeep is
             // never touched.
             AccentDeep = Alpha(t.AccentDeep, 0x80),
+            // Context menu: the opaque frame family, bordered with this theme's (already softened)
+            // frameBorder — reads as a themed, solid menu rather than Lumen's glass/frosted variants.
+            MenuBackground = Alpha(frameBg, 0xFF), MenuBorder = frameBorder,
         };
 
         if (fullTheme)
@@ -156,7 +168,11 @@ public static class ThemePalettes
         NoteGripFill: "#12FFFFFF", NoteGripBar: "#3DFFFFFF",
         Accent: accent, AccentHover: Shade(accent, 0.15), AccentSoft: Alpha(accent, 0x38),
         AccentDeep: Shade(accent, -0.28), AccentGradTop: Shade(accent, 0.12), AccentGradBottom: Shade(accent, -0.10),
-        WindowBackground: "#FF14161C", DarkChrome: true, GlassWindow: true);
+        WindowBackground: "#FF14161C",
+        // Sensible dark-opaque default menu material — every caller (Lumen, Solid dark/light) that
+        // cares overrides both of these; this default just guarantees every path is covered.
+        MenuBackground: "#F514161C", MenuBorder: "#33FFFFFF",
+        DarkChrome: true, GlassWindow: true);
 
     /// <summary>Baseline for light solid frames: dark text and black-alpha controls on the frame.</summary>
     private static ThemeTokens LightFrameBase(string accent) => GlassRegionBase(accent) with

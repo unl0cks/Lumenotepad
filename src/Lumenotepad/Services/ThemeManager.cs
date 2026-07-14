@@ -51,6 +51,8 @@ public static class ThemeManager
         Brush("AccentSoftBrush", t.AccentSoft);
         Brush("AccentDeepBrush", t.AccentDeep);
         Brush("WindowBackgroundBrush", t.WindowBackground);
+        Brush("MenuBackgroundBrush", t.MenuBackground);
+        Brush("MenuBorderBrush", t.MenuBorder);
 
         r["AccentGradientBrush"] = new LinearGradientBrush
         {
