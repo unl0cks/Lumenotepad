@@ -1,5 +1,7 @@
 using System;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.VisualTree;
 using Lumenotepad.Services;
 
 namespace Lumenotepad.Views;
@@ -15,6 +17,25 @@ public static class MenuFx
         {
             Motion.RiseIn(menu, Motion.Fast);
             TryBlur(menu);
+        };
+    }
+
+    /// <summary>Rise-in for button flyouts (the toolbar's bullet/highlight/color/font pickers, the
+    /// dock menu, the sort menu). A plain Flyout animates its Content; a MenuFlyout has no content
+    /// control, so the presenter is reached through the first realized item — either lookup failing
+    /// just skips the animation.</summary>
+    public static void AttachFlyout(FlyoutBase flyout)
+    {
+        flyout.Opened += (_, _) =>
+        {
+            Control? target = flyout switch
+            {
+                Flyout { Content: Control c } => c,
+                MenuFlyout { Items.Count: > 0 } mf when mf.Items[0] is Control item =>
+                    item.FindAncestorOfType<MenuFlyoutPresenter>() as Control ?? item,
+                _ => null,
+            };
+            if (target is not null) Motion.RiseIn(target, Motion.Fast);
         };
     }
 

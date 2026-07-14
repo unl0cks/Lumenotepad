@@ -416,6 +416,7 @@ public partial class MainView : UserControl
         menu.Items.Add(byRecent);
         menu.Items.Add(new Separator());
         menu.Items.Add(hint);
+        MenuFx.AttachFlyout(menu);
         menu.ShowAt(SortBtn);
     }
 
@@ -423,9 +424,13 @@ public partial class MainView : UserControl
     {
         var b = CanvasPlate.Bounds;
         if (b.Width <= 30 || b.Height <= 30) { CanvasPlate.Clip = null; return; }
-        var hole = new RectangleGeometry(new Rect(14, 14, b.Width - 28, b.Height - 28))
+        // The hole is inset 1.5px INSIDE the page box's border (margin 14, radius 14, 1px stroke):
+        // a hole cut exactly at the border line leaves an anti-aliased seam where the acrylic
+        // backdrop (the wallpaper) peeks between plate and border — a colored halo, worst at the
+        // rounded corners (owner report). Tucking the plate edge under the border hides the seam.
+        var hole = new RectangleGeometry(new Rect(15.5, 15.5, b.Width - 31, b.Height - 31))
         {
-            RadiusX = 14, RadiusY = 14,
+            RadiusX = 12.5, RadiusY = 12.5,
         };
         CanvasPlate.Clip = new CombinedGeometry(GeometryCombineMode.Exclude,
             new RectangleGeometry(new Rect(0, 0, b.Width, b.Height)), hole);

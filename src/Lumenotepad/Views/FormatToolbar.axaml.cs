@@ -64,6 +64,10 @@ public partial class FormatToolbar : UserControl
     {
         InitializeComponent();
 
+        // Picker flyouts (bullets, highlight, color, font) rise in like the context menus do.
+        foreach (var btn in new[] { BulletBtn, HighlightBtn, ColorBtn, FontBtn })
+            if (btn.Flyout is { } f) MenuFx.AttachFlyout(f);
+
         BoldBtn.Click += (_, _) => Do(e => e.ToggleBold());
         ItalicBtn.Click += (_, _) => Do(e => e.ToggleItalic());
         UnderBtn.Click += (_, _) => Do(e => e.ToggleUnderline());
@@ -357,6 +361,7 @@ public partial class FormatToolbar : UserControl
         pageScope.Click += (_, _) => ScopeRequested?.Invoke("Page");
         flyout.Items.Add(winScope);
         flyout.Items.Add(pageScope);
+        MenuFx.AttachFlyout(flyout);
         DockBtn.Flyout = flyout;
         DockBtn.Click += (_, _) => flyout.ShowAt(DockBtn);
     }

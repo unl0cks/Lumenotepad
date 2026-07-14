@@ -48,18 +48,18 @@ public static class ThemePalettes
                 fullTheme),
             "Light" => Solid(
                 accent: "#3E8EE0", dark: false,
-                frameBg: "#F2F2F5F9", frameBorder: "#FFDFE3E9",
-                solidCanvas: "#E9EDF3", solidPaper: "#FFFFFF", solidPaperBorder: "#FFE3E6EC",
+                frameBg: "#F2F2F5F9", frameBorder: "#FFC9CFD8",
+                solidCanvas: "#E9EDF3", solidPaper: "#FFFFFF", solidPaperBorder: "#FFCDD3DC",
                 fullTheme),
             "Pink" => Solid(
                 accent: "#FB6F92", dark: false,
-                frameBg: "#F2FFE5EC", frameBorder: "#FFF4D3DC",
-                solidCanvas: "#FFD3DF", solidPaper: "#FFF5F8", solidPaperBorder: "#FFF4DEE5",
+                frameBg: "#F2FFE5EC", frameBorder: "#FFE9B7C6",
+                solidCanvas: "#FFD3DF", solidPaper: "#FFF5F8", solidPaperBorder: "#FFEBBECD",
                 fullTheme),
             "Light blue" => Solid(
                 accent: "#5C85E6", dark: false,
-                frameBg: "#F2EDF2FB", frameBorder: "#FFDCE4F1",
-                solidCanvas: "#D7E3FC", solidPaper: "#F8FAFF", solidPaperBorder: "#FFE1E8F3",
+                frameBg: "#F2EDF2FB", frameBorder: "#FFC5D2E7",
+                solidCanvas: "#D7E3FC", solidPaper: "#F8FAFF", solidPaperBorder: "#FFCBD7EA",
                 fullTheme),
             _ => Lumen(fullTheme, paperLight),
         };
@@ -115,7 +115,7 @@ public static class ThemePalettes
             CanvasBackground = solidCanvas,
             CanvasText = t.TextPrimary, CanvasTextMuted = t.TextMuted,
             CanvasChip = dark ? "#1AFFFFFF" : "#FFFFFFFF",
-            CanvasChipBorder = dark ? "#FF383B44" : "#FFDCE0E7",
+            CanvasChipBorder = dark ? "#FF383B44" : "#FFC9CFD8",
             // LumenButton's border (home-page "New notebook"/"Preferences") is an opaque deep-accent
             // shade, not one of the neutral frame/paper tokens above — re-pointing it at those would
             // put a mismatched gray/black edge on a colored gradient button. Soften it in place
@@ -150,7 +150,7 @@ public static class ThemePalettes
         return t with
         {
             GlassWindow = true,
-            PaperBackground = "#14FFFFFF", PaperBorder = dark ? "#FF3A3D46" : "#FFC9CED6",
+            PaperBackground = "#14FFFFFF", PaperBorder = dark ? "#FF3A3D46" : "#FFAEB5BF",
             PaperText = "#FFFFFFFF", PaperTextMuted = "#80FFFFFF",
             NoteChromeHover = "#26FFFFFF", NoteGripFill = "#12FFFFFF", NoteGripBar = "#3DFFFFFF",
             ScrollThumb = "#2EFFFFFF", ScrollThumbHover = "#52FFFFFF", ScrollThumbPressed = "#70FFFFFF",
