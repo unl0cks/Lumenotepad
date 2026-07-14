@@ -524,4 +524,64 @@ public class MainViewModelTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void CreateNotebook_buildsTree_stampsStyledPages_andOpens()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            var draft = NotebookDraft.New();
+            draft.Name = "Biology";
+            draft.Color = "#3E9C6B";
+            draft.DefaultPageStyle = "Cornell";
+            draft.DefaultFont = "Caveat";
+            draft.DefaultFontSize = 18;
+            draft.Sections.Clear();
+            draft.Sections.Add(new SectionDraft { Name = "Cells", PageTitles = { "Structure", "Mitosis" } });
+            draft.Sections.Add(new SectionDraft { Name = "Genetics", PageTitles = { "Mendel" } });
+
+            var nb = vm.CreateNotebook(draft);
+
+            Assert.Equal("Biology", nb.Name);
+            Assert.Equal("#3E9C6B", nb.Color);
+            Assert.Equal("Cornell", nb.DefaultPageStyle);
+            Assert.Equal("Caveat", nb.DefaultFont);
+            Assert.Equal(18, nb.DefaultFontSize);
+            Assert.Equal(2, nb.Sections.Count);
+            Assert.Equal(new[] { "Structure", "Mitosis" }, nb.Sections[0].Pages.Select(p => p.Title).ToArray());
+            Assert.Single(nb.Sections[1].Pages);
+            Assert.Equal(3, vm.DocumentFor(nb.Sections[0].Pages[0]).Boxes.Count);   // Cornell starters
+            Assert.Same(nb, vm.SelectedNotebook);
+            Assert.False(vm.IsHomeVisible);
+
+            var reloaded = new MainViewModel(new WorkspaceStore(dir), dir);         // persisted
+            var rnb = reloaded.Notebooks.First(n => n.Name == "Biology");
+            Assert.Equal("Cornell", rnb.DefaultPageStyle);
+            Assert.Equal(2, rnb.Sections.Count);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void CreateNotebook_guardsBlanks()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            var draft = NotebookDraft.New();
+            draft.Name = "  ";
+            draft.Sections.Clear();                                     // no sections at all
+
+            var nb = vm.CreateNotebook(draft);
+
+            Assert.Equal("New notebook", nb.Name);
+            var sec = Assert.Single(nb.Sections);                       // seeded fallback section
+            Assert.Equal("Notes", sec.Name);
+            Assert.Empty(vm.DocumentFor(sec.Pages[0]).Boxes);           // Freeform default: no starters
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }

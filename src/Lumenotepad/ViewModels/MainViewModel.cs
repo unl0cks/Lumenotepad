@@ -934,6 +934,42 @@ public partial class MainViewModel : ObservableObject
         Save();
     }
 
+    /// <summary>Materialize a wizard draft: build the tree, persist (folder assignment first — the
+    /// cover copy and page docs need it), apply the cover, stamp each page's starter template per
+    /// the notebook defaults, and open the notebook. Blank names fall back like AddNotebook's.</summary>
+    public Notebook CreateNotebook(NotebookDraft draft)
+    {
+        var nb = new Notebook
+        {
+            Name = string.IsNullOrWhiteSpace(draft.Name) ? "New notebook" : draft.Name.Trim(),
+            Color = draft.Color,
+            DefaultGridStyle = draft.DefaultGridStyle,
+            DefaultPageStyle = draft.DefaultPageStyle,
+            DefaultPageStyleMode = draft.DefaultPageStyleMode,
+            DefaultFont = draft.DefaultFont,
+            DefaultFontSize = draft.DefaultFontSize,
+        };
+        if (draft.Sections.Count == 0)
+            draft.Sections.Add(new SectionDraft { Name = "Notes", PageTitles = { "Untitled page" } });
+        foreach (var sd in draft.Sections)
+        {
+            var sec = new Section { Name = string.IsNullOrWhiteSpace(sd.Name) ? "Section" : sd.Name.Trim() };
+            foreach (var title in sd.PageTitles)
+                sec.Pages.Add(new Page { Title = string.IsNullOrWhiteSpace(title) ? "Untitled page" : title.Trim() });
+            if (sec.Pages.Count == 0 && draft.Sections.Count == 1 && sd.PageTitles.Count == 0)
+                sec.Pages.Add(new Page { Title = "Untitled page" });     // never open into a pageless notebook
+            nb.Sections.Add(sec);
+        }
+        Notebooks.Add(nb);
+        Save();                                                          // assigns nb.Folder
+        if (draft.CoverSourcePath is { } cover) SetNotebookCover(nb, cover);
+        foreach (var page in nb.Sections.SelectMany(s => s.Pages))
+            StampPageStyle(page);                                        // no-op for Freeform
+        SelectedNotebook = nb;
+        IsHomeVisible = false;
+        return nb;
+    }
+
     [RelayCommand]
     private void OpenNotebook(Notebook nb)
     {
