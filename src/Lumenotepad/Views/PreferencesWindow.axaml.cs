@@ -9,6 +9,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using Lumenotepad.Editor;
 using Lumenotepad.Platform;
 using Lumenotepad.Services;
@@ -48,6 +49,10 @@ public partial class PreferencesWindow : Window
             if (Content is Control root) Motion.ScaleIn(root, 0.96, 180);   // quick fade + scale in
         };
         SmoothScroll.Attach(PrefsScroll);   // wheel-eased scrolling instead of the line-at-a-time jump
+        // The fonts checklist needs a BOUNDED height to virtualize (the outer ScrollViewer measures
+        // with infinite height), but a fixed 300 strands it mid-window — track the viewport instead.
+        PrefsScroll.SizeChanged += (_, _) =>
+            FontsList.Height = Math.Max(240, PrefsScroll.Bounds.Height - 200);
         CloseBtn.Click += (_, _) => Close();
         KeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); };
 
@@ -668,6 +673,7 @@ public partial class PreferencesWindow : Window
     }
 
     private bool _fontTemplateSet;
+    private bool _fontsScrollSmoothed;
 
     /// <summary>(Re)build the fonts checklist: every candidate the menu COULD offer (current
     /// master-switch mode), bundled faces locked on. Lazy — runs when the panel shows, and again
@@ -713,6 +719,18 @@ public partial class PreferencesWindow : Window
             })
             .ToList();
         FontsList.ItemsSource = choices;
+
+        // The checklist scrolls via the ListBox's own inner ScrollViewer (the outer SmoothScroll
+        // deliberately defers to it) — give it the same wheel easing, once it's templated.
+        if (!_fontsScrollSmoothed)
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (FontsList.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault() is { } sv)
+                {
+                    SmoothScroll.Attach(sv);
+                    _fontsScrollSmoothed = true;
+                }
+            }, Avalonia.Threading.DispatcherPriority.Background);
     }
 
     /// <summary>Show one category panel and rise it in (the others hide).</summary>

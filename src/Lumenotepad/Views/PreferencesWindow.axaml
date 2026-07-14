@@ -520,10 +520,12 @@
                         <TextBlock Classes="section" Text="OFFERED FONTS"/>
                         <TextBlock Classes="hint"
                                    Text="Untick a font to hide it from the toolbar's menu. The bundled faces are always available."/>
-                        <!-- The fixed Height bounds the viewport so the list VIRTUALIZES inside the
-                             outer ScrollViewer (which measures with infinite height) — without it,
-                             all-installed mode realizes 500+ typeface previews at once. Keep it. -->
-                        <ListBox x:Name="FontsList" Classes="fontcheck" Height="300" Margin="0,4,0,0"
+                        <!-- A bounded Height still virtualizes the list inside the outer ScrollViewer
+                             (which measures with infinite height) — without one, all-installed mode
+                             realizes 500+ typeface previews at once. The bound is now set from
+                             code-behind (PrefsScroll.SizeChanged) so it tracks the window's viewport
+                             instead of a fixed 300px. Keep it bounded. -->
+                        <ListBox x:Name="FontsList" Classes="fontcheck" Margin="0,4,0,0"
                                  Background="Transparent" BorderThickness="0" Padding="0"/>
                     </StackPanel>
 

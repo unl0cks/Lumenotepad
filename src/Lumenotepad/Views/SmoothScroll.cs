@@ -22,7 +22,9 @@ public sealed class SmoothScroll
     private double _target;
 
     private const double StepPerNotch = 64;   // px of target movement per wheel unit
-    private const double CatchUp = 0.22;       // fraction of the remaining gap closed each 15ms tick
+    // Fraction of the remaining gap closed each tick. Scaled down from 0.22/15ms to keep the same
+    // easing feel now that ticks fire more often (0.16 per 10ms).
+    private const double CatchUp = 0.16;
 
     private SmoothScroll(ScrollViewer sv)
     {
@@ -61,20 +63,23 @@ public sealed class SmoothScroll
 
     private DispatcherTimer CreateTimer()
     {
-        var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(15) };
-        t.Tick += (_, _) =>
-        {
-            double cur = _sv.Offset.Y;
-            double next = cur + (_target - cur) * CatchUp;
-            if (Math.Abs(_target - next) < 0.5)
-            {
-                _sv.Offset = new Vector(_sv.Offset.X, _target);
-                _timer!.Stop();
-                return;
-            }
-            _sv.Offset = new Vector(_sv.Offset.X, next);
-        };
+        // Render priority + 10ms ticks: a default-priority 15ms timer queues behind input/layout
+        // work and visibly stutters (owner report). Render priority fires right before the frame.
+        var t = new DispatcherTimer(TimeSpan.FromMilliseconds(10), DispatcherPriority.Render, (_, _) => Tick());
         return t;
+    }
+
+    private void Tick()
+    {
+        double cur = _sv.Offset.Y;
+        double next = cur + (_target - cur) * CatchUp;
+        if (Math.Abs(_target - next) < 0.5)
+        {
+            _sv.Offset = new Vector(_sv.Offset.X, _target);
+            _timer?.Stop();
+            return;
+        }
+        _sv.Offset = new Vector(_sv.Offset.X, next);
     }
 
     /// <summary>True when the wheel is over a nested scrollable between the source and our ScrollViewer,
