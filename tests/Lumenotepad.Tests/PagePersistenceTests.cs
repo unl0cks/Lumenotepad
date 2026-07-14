@@ -110,6 +110,22 @@ public class PageDocStoreTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void LockedBox_roundTripsThroughJson()
+    {
+        var canvas = new CanvasDocument();
+        canvas.AddBox(10, 20, 300).Locked = true;
+        canvas.AddBox(40, 400, 300);                       // unlocked stays unlocked
+
+        var reloaded = CanvasDocJson.FromJson(CanvasDocJson.ToJson(canvas));
+
+        Assert.Equal(2, reloaded.Boxes.Count);
+        Assert.True(reloaded.Boxes[0].Locked);
+        Assert.False(reloaded.Boxes[1].Locked);
+        // default-false stays off the wire (WhenWritingDefault)
+        Assert.DoesNotContain("\"lk\":false", CanvasDocJson.ToJson(canvas));
+    }
 }
 
 public class VmPersistenceTests

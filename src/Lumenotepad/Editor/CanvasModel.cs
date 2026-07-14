@@ -17,6 +17,11 @@ public sealed class NoteBox
     public double Y { get; set; }
     public double Width { get; set; } = DefaultWidth;
     public double H { get; set; }                    // 0 = auto (content height)
+
+    /// <summary>Rigid page-style starters: a locked box cannot be moved, resized, or deleted, and
+    /// never evaporates when empty (M9). Persisted.</summary>
+    public bool Locked { get; set; }
+
     public RichDocument Doc { get; }
 
     public NoteBox(RichDocument? doc = null) => Doc = doc ?? new RichDocument();

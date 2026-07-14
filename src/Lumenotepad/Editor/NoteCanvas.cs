@@ -238,6 +238,7 @@ public sealed class NoteCanvas : Panel
     /// history is disabled). Empty boxes skip the prompt — there is nothing to lose.</summary>
     internal async void RequestDelete(NoteBoxView view)
     {
+        if (view.Box.Locked) return;                       // rigid starters can't be deleted
         if (_doc is null || !_doc.Boxes.Contains(view.Box)) return;
         if (!view.Box.IsEmpty && ConfirmDelete is not null && !await ConfirmDelete()) return;
         if (HistoryEnabled && !view.Box.IsEmpty)
@@ -273,7 +274,7 @@ public sealed class NoteCanvas : Panel
         Dispatcher.UIThread.Post(() =>
         {
             if (_doc is null || !_doc.Boxes.Contains(view.Box)) return;
-            if (!view.Box.IsEmpty || view.IsKeyboardFocusWithin) return;
+            if (!view.Box.IsEmpty || view.Box.Locked || view.IsKeyboardFocusWithin) return;
             DeleteBoxPermanently(view);
         }, DispatcherPriority.Background);
     }
@@ -432,9 +433,10 @@ internal sealed class NoteBoxView : Panel
         _chrome.BorderBrush = _dragging || focused ? FocusBorder : _hover ? HoverBorder : Brushes.Transparent;
         _grip.Background = active ? GripFill : Brushes.Transparent;
         _gripBar.IsVisible = active;
-        _close.IsVisible = active;
+        _close.IsVisible = active && !Box.Locked;
         // Hidden handles are also not hit-testable — the "Resizable pages" preference off = no resizing.
-        _resizeRight.IsVisible = _resizeBottom.IsVisible = _resizeCorner.IsVisible = _canvas.CanResize;
+        _resizeRight.IsVisible = _resizeBottom.IsVisible = _resizeCorner.IsVisible =
+            _canvas.CanResize && !Box.Locked;
     }
 
     private Point _dragStart;
@@ -446,6 +448,7 @@ internal sealed class NoteBoxView : Panel
         handle.PointerPressed += (_, e) =>
         {
             if (!e.GetCurrentPoint(handle).Properties.IsLeftButtonPressed) return;
+            if (Box.Locked) return;                        // rigid starters: no move, no resize
             _dragStart = e.GetPosition(_canvas);
             // Height origin = what's on screen now, so the first drag pixel moves from there.
             _dragOrigin = (Box.X, Box.Y, Box.Width, Box.H > 0 ? Box.H : Bounds.Height);

@@ -19,6 +19,7 @@ public static class CanvasDocJson
         [JsonPropertyName("y")] public double Y { get; set; }
         [JsonPropertyName("w")] public double W { get; set; } = NoteBox.DefaultWidth;
         [JsonPropertyName("h")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double H { get; set; }
+        [JsonPropertyName("lk")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Locked { get; set; }
         [JsonPropertyName("paras")] public List<RichDocJson.ParaDto> Paras { get; set; } = new();
     }
 
@@ -31,13 +32,13 @@ public static class CanvasDocJson
 
     private static BoxDto ToDto(NoteBox b) => new()
     {
-        X = b.X, Y = b.Y, W = b.Width, H = b.H,
+        X = b.X, Y = b.Y, W = b.Width, H = b.H, Locked = b.Locked,
         Paras = RichDocJson.ToDtos(b.Doc),
     };
 
     private static NoteBox FromDto(BoxDto b) => new(RichDocJson.FromDtos(b.Paras))
     {
-        X = b.X, Y = b.Y, Width = b.W, H = b.H,
+        X = b.X, Y = b.Y, Width = b.W, H = b.H, Locked = b.Locked,
     };
 
     public static string ToJson(CanvasDocument canvas)
@@ -65,7 +66,11 @@ public static class CanvasDocJson
                 if (dto is not null)
                 {
                     foreach (var b in dto.Boxes)
-                        canvas.AddBox(b.X, b.Y, b.W, RichDocJson.FromDtos(b.Paras)).H = b.H;
+                    {
+                        var box = canvas.AddBox(b.X, b.Y, b.W, RichDocJson.FromDtos(b.Paras));
+                        box.H = b.H;
+                        box.Locked = b.Locked;
+                    }
                     if (dto.Trash is not null)                       // trash docs hook on restore, not here
                         foreach (var b in dto.Trash)
                             canvas.Trash.Add(FromDto(b));
