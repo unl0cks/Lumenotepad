@@ -30,17 +30,22 @@ public static class DwmAcrylic
 
     public static void Apply(Window window, Backdrop backdrop = Backdrop.Acrylic, bool dark = true)
     {
-        if (!OperatingSystem.IsWindows()) return;
-        var h = window.TryGetPlatformHandle();
-        if (h is null || h.Handle == IntPtr.Zero) return;
+        if (window.TryGetPlatformHandle() is { } h) Apply(h.Handle, backdrop, dark);
+    }
+
+    /// <summary>Same recipe on a raw HWND — lets popup windows (context menus live in a PopupRoot,
+    /// which is not a <see cref="Window"/>) get the acrylic backdrop too.</summary>
+    public static void Apply(IntPtr hwnd, Backdrop backdrop = Backdrop.Acrylic, bool dark = true)
+    {
+        if (!OperatingSystem.IsWindows() || hwnd == IntPtr.Zero) return;
         try
         {
             int d = dark ? 1 : 0;
-            DwmSetWindowAttribute(h.Handle, DWMWA_USE_IMMERSIVE_DARK_MODE, ref d, sizeof(int));
+            DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref d, sizeof(int));
             var m = new MARGINS { L = -1, R = -1, T = -1, B = -1 };   // sheet of glass across the whole window
-            DwmExtendFrameIntoClientArea(h.Handle, ref m);
+            DwmExtendFrameIntoClientArea(hwnd, ref m);
             int b = (int)backdrop;
-            DwmSetWindowAttribute(h.Handle, DWMWA_SYSTEMBACKDROP_TYPE, ref b, sizeof(int));
+            DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref b, sizeof(int));
         }
         catch { /* pre-Win11: no system-backdrop API */ }
     }

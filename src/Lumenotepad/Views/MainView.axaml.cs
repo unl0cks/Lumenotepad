@@ -1207,27 +1207,11 @@ public partial class MainView : UserControl
 
     private static string Label(string? s) => string.IsNullOrWhiteSpace(s) ? "Untitled" : s;
 
-    private void OpenMenu(ContextRequestedEventArgs e, params MenuItem[] items)
+    private static void OpenMenu(ContextRequestedEventArgs e, params MenuItem[] items)
     {
         var menu = new ContextMenu();
         foreach (var i in items) menu.Items.Add(i);
-        menu.Opened += (_, _) =>
-        {
-            Motion.RiseIn(menu, Motion.Fast);
-            // Lumen Full-theme-ON "frosted glass": the translucent MenuBackground brush already
-            // reads as smoked glass over content — true blur needs acrylic on the popup's own
-            // top-level, which is best-effort (a ContextMenu's popup host is typically NOT a
-            // Window, so this commonly no-ops and the translucent background stands as-is).
-            if (Vm is { Theme: "Lumen", FullTheme: true })
-            {
-                try
-                {
-                    if (TopLevel.GetTopLevel(menu) is Window popupWindow)
-                        Platform.DwmAcrylic.Apply(popupWindow, Platform.DwmAcrylic.Backdrop.Acrylic, dark: true);
-                }
-                catch { /* translucent MenuBackground fallback already covers this */ }
-            }
-        };
+        MenuFx.Attach(menu);       // rise-in + real popup acrylic for the Lumen glass variant
         if (e.Source is Control c) { menu.Open(c); e.Handled = true; }
     }
 

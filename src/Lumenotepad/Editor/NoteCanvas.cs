@@ -379,7 +379,7 @@ internal sealed class NoteBoxView : Panel
             var del = new MenuItem { Header = "Delete container" };
             del.Click += (_, _) => _canvas.RequestDelete(this);
             menu.Items.Add(del);
-            menu.Opened += (_, _) => Views.Motion.RiseIn(menu, Views.Motion.Fast);
+            Views.MenuFx.Attach(menu);     // rise-in + Lumen glass-variant popup acrylic
             menu.Open(_grip);
             e.Handled = true;
         };

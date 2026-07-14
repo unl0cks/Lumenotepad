@@ -85,7 +85,7 @@ public static class ThemePalettes
             return t with
             {
                 PaperBackground = "#0BFFFFFF", PaperBorder = "#33FFFFFF",
-                MenuBackground = "#B814161C", MenuBorder = "#33FFFFFF",
+                MenuBackground = "#7014161C", MenuBorder = "#33FFFFFF",   // translucent enough for the popup acrylic to read
             };
         return paperLight
             ? t with
