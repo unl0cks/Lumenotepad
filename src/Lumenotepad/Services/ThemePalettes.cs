@@ -38,25 +38,28 @@ public static class ThemePalettes
         {
             // Border alphas softened 2026-07-14 (owner: dark theme borders read too bright, the
             // three light-family themes read too dark — contrast was too big on every divider/frame).
+            // Made OPAQUE 2026-07-15 (owner re-test: the translucent white/black borders composited
+            // over the wallpaper-showing acrylic glass regions and picked up a reddish/orange tint
+            // from the desktop wallpaper) — family-tinted opaque colors instead.
             "Dark" => Solid(
                 accent: "#4DA6FF", dark: true,
-                frameBg: "#F214161C", frameBorder: "#14FFFFFF",
-                solidCanvas: "#101218", solidPaper: "#1A1C24", solidPaperBorder: "#1AFFFFFF",
+                frameBg: "#F214161C", frameBorder: "#FF292C34",
+                solidCanvas: "#101218", solidPaper: "#1A1C24", solidPaperBorder: "#FF2C2F38",
                 fullTheme),
             "Light" => Solid(
                 accent: "#3E8EE0", dark: false,
-                frameBg: "#F2F2F5F9", frameBorder: "#10000000",
-                solidCanvas: "#E9EDF3", solidPaper: "#FFFFFF", solidPaperBorder: "#12000000",
+                frameBg: "#F2F2F5F9", frameBorder: "#FFDFE3E9",
+                solidCanvas: "#E9EDF3", solidPaper: "#FFFFFF", solidPaperBorder: "#FFE3E6EC",
                 fullTheme),
             "Pink" => Solid(
                 accent: "#FB6F92", dark: false,
-                frameBg: "#F2FFE5EC", frameBorder: "#14B0526E",
-                solidCanvas: "#FFD3DF", solidPaper: "#FFF5F8", solidPaperBorder: "#1AC97D97",
+                frameBg: "#F2FFE5EC", frameBorder: "#FFF4D3DC",
+                solidCanvas: "#FFD3DF", solidPaper: "#FFF5F8", solidPaperBorder: "#FFF4DEE5",
                 fullTheme),
             "Light blue" => Solid(
                 accent: "#5C85E6", dark: false,
-                frameBg: "#F2EDF2FB", frameBorder: "#145F7BAE",
-                solidCanvas: "#D7E3FC", solidPaper: "#F8FAFF", solidPaperBorder: "#1A6E86B8",
+                frameBg: "#F2EDF2FB", frameBorder: "#FFDCE4F1",
+                solidCanvas: "#D7E3FC", solidPaper: "#F8FAFF", solidPaperBorder: "#FFE1E8F3",
                 fullTheme),
             _ => Lumen(fullTheme, paperLight),
         };
@@ -112,7 +115,7 @@ public static class ThemePalettes
             CanvasBackground = solidCanvas,
             CanvasText = t.TextPrimary, CanvasTextMuted = t.TextMuted,
             CanvasChip = dark ? "#1AFFFFFF" : "#FFFFFFFF",
-            CanvasChipBorder = dark ? "#22FFFFFF" : "#12000000",
+            CanvasChipBorder = dark ? "#FF383B44" : "#FFDCE0E7",
             // LumenButton's border (home-page "New notebook"/"Preferences") is an opaque deep-accent
             // shade, not one of the neutral frame/paper tokens above — re-pointing it at those would
             // put a mismatched gray/black edge on a colored gradient button. Soften it in place
@@ -141,12 +144,13 @@ public static class ThemePalettes
         }
 
         // Real glass page over the dark acrylic → the paper region reads light on every theme.
-        // PaperBorder softened alongside the other border tokens (PaperBackground is a FILL, left
-        // untouched — same #14FFFFFF value happens to appear elsewhere in this file as a background).
+        // PaperBorder made opaque alongside the other border tokens (PaperBackground is a FILL, left
+        // untouched — same #14FFFFFF value happens to appear elsewhere in this file as a background;
+        // the glass region shows wallpaper, so a neutral opaque edge is the point here).
         return t with
         {
             GlassWindow = true,
-            PaperBackground = "#14FFFFFF", PaperBorder = "#1AFFFFFF",
+            PaperBackground = "#14FFFFFF", PaperBorder = dark ? "#FF3A3D46" : "#FFC9CED6",
             PaperText = "#FFFFFFFF", PaperTextMuted = "#80FFFFFF",
             NoteChromeHover = "#26FFFFFF", NoteGripFill = "#12FFFFFF", NoteGripBar = "#3DFFFFFF",
             ScrollThumb = "#2EFFFFFF", ScrollThumbHover = "#52FFFFFF", ScrollThumbPressed = "#70FFFFFF",
