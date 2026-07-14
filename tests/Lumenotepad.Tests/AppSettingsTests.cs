@@ -35,6 +35,19 @@ public class AppSettingsTests
     }
 
     [Fact]
+    public void PagesPanelWidth_defaultsAndRoundTrip()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            Assert.Equal(224, new AppSettings().PagesPanelWidth);
+            new AppSettings { PagesPanelWidth = 300 }.Save(dir);
+            Assert.Equal(300, AppSettings.Load(dir).PagesPanelWidth, 3);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public void StartVisible_DefaultsTrue_AndRoundTrips()
     {
         var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());

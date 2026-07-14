@@ -43,7 +43,10 @@
     </UserControl.Styles>
 
     <Border x:Name="Chrome" Padding="5,3">
-        <StackPanel x:Name="Panel" Orientation="Horizontal" Spacing="1">
+        <DockPanel x:Name="ChromeDock">
+            <Button x:Name="DockBtn" DockPanel.Dock="Right" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
+                    FontFamily="{StaticResource IconFont}" Content="&#xE712;" ToolTip.Tip="Toolbar position"/>
+            <StackPanel x:Name="Panel" Orientation="Horizontal" Spacing="1">
 
             <Button x:Name="BoldBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
                     FontFamily="{StaticResource IconFont}" Content="&#xE8DD;" ToolTip.Tip="Bold (Ctrl+B)"/>
@@ -108,8 +111,7 @@
                 </Button.Flyout>
             </Button>
 
-            <Button x:Name="DockBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
-                    FontFamily="{StaticResource IconFont}" Content="&#xE712;" ToolTip.Tip="Toolbar position"/>
-        </StackPanel>
+            </StackPanel>
+        </DockPanel>
     </Border>
 </UserControl>

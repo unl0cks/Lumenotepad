@@ -124,6 +124,30 @@ public partial class MainView : UserControl
             PageCanvas.SetViewport(CanvasScroll.Bounds.Size);
             if (Vm is { } vvm) vvm.CanvasViewport = (CanvasScroll.Bounds.Width, CanvasScroll.Bounds.Height);
         };
+
+        // Drag the pages panel's right edge to resize it (clamped); persists via the VM setting.
+        bool panelDragging = false; double panelStartX = 0, panelStartW = 0;
+        PagesResizeGrip.PointerPressed += (_, e) =>
+        {
+            if (!e.GetCurrentPoint(PagesResizeGrip).Properties.IsLeftButtonPressed) return;
+            panelDragging = true;
+            panelStartX = e.GetPosition(this).X;
+            panelStartW = PagesPanel.Bounds.Width;
+            e.Pointer.Capture(PagesResizeGrip);
+            e.Handled = true;
+        };
+        PagesResizeGrip.PointerMoved += (_, e) =>
+        {
+            if (!panelDragging) return;
+            PagesPanel.Width = System.Math.Clamp(panelStartW + (e.GetPosition(this).X - panelStartX), 180, 340);
+        };
+        PagesResizeGrip.PointerReleased += (_, e) =>
+        {
+            if (!panelDragging) return;
+            panelDragging = false;
+            e.Pointer.Capture(null);
+            if (Vm is { } pvm) pvm.PagesPanelWidth = PagesPanel.Width;   // persist once, on release
+        };
     }
 
     // ---- transform animation (delegates to the shared Motion engine) ------------------------------
@@ -581,7 +605,7 @@ public partial class MainView : UserControl
     {
         if (Vm is not { } vm) return;
         RailPanel.Width = vm.IsRailVisible ? 64 : 0; RailPanel.Opacity = vm.IsRailVisible ? 1 : 0;
-        PagesPanel.Width = vm.IsPagesVisible ? 224 : 0; PagesPanel.Opacity = vm.IsPagesVisible ? 1 : 0;
+        PagesPanel.Width = vm.IsPagesVisible ? vm.PagesPanelWidth : 0; PagesPanel.Opacity = vm.IsPagesVisible ? 1 : 0;
     }
 
     /// <summary>Initial home/editor surface state (no animation); the switch zooms in code (their
@@ -777,7 +801,7 @@ public partial class MainView : UserControl
         else if (e.PropertyName == nameof(MainViewModel.IsRailVisible))
             Motion.Reveal(RailPanel, 64, Vm?.IsRailVisible ?? true);
         else if (e.PropertyName == nameof(MainViewModel.IsPagesVisible))
-            Motion.Reveal(PagesPanel, 224, Vm?.IsPagesVisible ?? true);
+            Motion.Reveal(PagesPanel, Vm?.PagesPanelWidth ?? 224, Vm?.IsPagesVisible ?? true);
         else if (e.PropertyName == nameof(MainViewModel.IsHomeVisible))
         {
             if (_rearranging) SetRearranging(false);          // leaving home exits rearrange mode

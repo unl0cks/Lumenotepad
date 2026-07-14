@@ -95,6 +95,8 @@ public partial class FormatToolbar : UserControl
         bool vertical = dock is Dock.Left or Dock.Right;
         Panel.Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;
         SizeGroup.Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;
+        // Keep the "..." overflow button at the opposite end of the strip's flow for every dock.
+        DockPanel.SetDock(DockBtn, vertical ? Dock.Bottom : Dock.Right);
         Chrome.Padding = vertical ? new Thickness(2, 6) : new Thickness(6, 4);
 
         var placement = dock switch

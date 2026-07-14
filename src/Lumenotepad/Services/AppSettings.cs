@@ -60,6 +60,7 @@ public sealed class AppSettings
     public bool CloseToTray { get; set; }                   // closing hides to the tray instead of quitting
     public bool MinimizeToTray { get; set; }                // minimizing hides to the tray
     public bool SummonHotkey { get; set; }                  // global Ctrl+Alt+N brings the window forward
+    public double PagesPanelWidth { get; set; } = 224;      // pages side panel width; drag-resizable
     public string ToolbarPosition { get; set; } = "Top";    // "Top" | "Left" | "Right" | "Bottom"
     public string ToolbarScope { get; set; } = "Window";    // "Window" (window edge) | "Page" (inside the page box)
     public bool ResizablePages { get; set; } = true;        // note containers show resize handles

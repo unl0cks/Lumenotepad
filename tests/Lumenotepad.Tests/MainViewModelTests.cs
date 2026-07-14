@@ -453,6 +453,21 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public void ResetSettingsToDefaults_restoresPagesPanelWidth()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            vm.PagesPanelWidth = 320;
+            vm.ResetSettingsToDefaults();
+            Assert.Equal(224, vm.PagesPanelWidth);
+            Assert.Equal(224, AppSettings.Load(dir).PagesPanelWidth, 3);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public void AddPage_stampsStarters_whenNotebookDefaultsToAStyle()
     {
         var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
