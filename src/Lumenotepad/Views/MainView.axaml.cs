@@ -103,6 +103,18 @@ public partial class MainView : UserControl
         RecentList.PointerMoved += (_, e) => SetHoverChip(Ancestor(e.Source, "recentchip"));
         RecentList.PointerExited += (_, _) => SetHoverChip(null);
 
+        // Recycled containers keep whatever LOCAL Opacity/RenderTransform a Motion tween left on
+        // them (a deleted row collapsed to opacity 0, a cancelled rise…) — the next item presented
+        // in that container then renders INVISIBLE. Reset the visual state every time a container
+        // is (re)prepared; legit add-animations start AFTER this (posted at Background priority).
+        foreach (var list in new ItemsControl[] { NotebooksList, SectionsList, PagesList, HomeCards })
+            list.ContainerPrepared += (_, e) =>
+            {
+                Motion.Stop(e.Container);
+                e.Container.ClearValue(Visual.OpacityProperty);
+                e.Container.ClearValue(Visual.RenderTransformProperty);
+            };
+
         // Keep the canvas plate's punched hole aligned with the page box (margin 14, radius 14).
         CanvasPlate.SizeChanged += (_, _) => UpdateCanvasPlateClip();
 
@@ -551,11 +563,17 @@ public partial class MainView : UserControl
         }, DispatcherPriority.Background);
     }
 
-    /// <summary>Collapse an item's container out, then run the actual delete.</summary>
+    /// <summary>Collapse an item's container out, then run the actual delete. The container may be
+    /// RECYCLED for another item afterwards — restore its visual state once the delete has run.</summary>
     private void CollapseThenDelete(Control? container, System.Action delete)
     {
         if (container is null) { delete(); return; }
-        Motion.CollapseOut(container, Motion.Base, delete);
+        Motion.CollapseOut(container, Motion.Base, () =>
+        {
+            delete();
+            container.ClearValue(Visual.OpacityProperty);
+            container.ClearValue(Visual.RenderTransformProperty);
+        });
     }
 
     /// <summary>Initial rail/pages panel state (no animation); the toggles animate via Motion.Reveal.</summary>
