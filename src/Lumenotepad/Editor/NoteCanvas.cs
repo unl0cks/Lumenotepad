@@ -47,62 +47,22 @@ public sealed class NoteCanvas : Panel
     /// <summary>Asked before a container is deleted via its ✕ button / menu; null = no prompt.</summary>
     public Func<Task<bool>>? ConfirmDelete { get; set; }
 
-    /// <summary>The paper grid ("Paper grid" preference): "None" | "Dots" | "Lines". The dots and
-    /// lines sit on the same 20px lattice the snap uses, so snapped containers land exactly on them.</summary>
-    public string GridStyle
-    {
-        get => _gridStyle;
-        set { if (_gridStyle == value) return; _gridStyle = value; RefreshGrid(); }
-    }
-    private string _gridStyle = "None";
-
     /// <summary>"Snap to grid" preference: drag/resize/placement land on the 20px cell.</summary>
     public bool SnapToGrid { get; set; }
 
-    // The grid underlay: a Border filled with a TILED DrawingBrush — one 20px cell drawn once and
-    // repeated by the compositor. Per-dot geometry would put tens of thousands of nodes in the
-    // scene. A child element because Panel.Render is sealed (same lesson as the starter hint).
-    private readonly Border _gridLayer = new() { IsHitTestVisible = false };
+    // The bottom guide layer: grid-style paper background + page-style guide lines (M9).
+    private readonly GuideLayer _guides = new();
 
-    private void RefreshGrid() => _gridLayer.Background = BuildGridBrush(_gridStyle);
+    /// <summary>Push the page's effective styles (grid background, method guides, apply mode).</summary>
+    public void SetStyles(string gridStyle, string pageStyle, int mode) =>
+        _guides.SetStyles(gridStyle, pageStyle, mode);
 
-    private static IBrush? BuildGridBrush(string style)
+    /// <summary>The visible page area — guide dividers anchor to it (MainView pushes it on layout).</summary>
+    public void SetViewport(Size viewport)
     {
-        var t = Services.ThemeManager.Current;
-        if (style == "Dots")
-        {
-            // Full dots at all four tile corners: each is clipped to its quarter inside the cell
-            // and the neighbouring tiles complete it — the assembled sheet shows whole dots
-            // exactly on the 20px lattice.
-            var g = new GeometryGroup();
-            foreach (var (x, y) in new[] { (0.0, 0.0), (GridMath.Cell, 0.0), (0.0, GridMath.Cell), (GridMath.Cell, GridMath.Cell) })
-                g.Children.Add(new EllipseGeometry(new Rect(x - 1.1, y - 1.1, 2.2, 2.2)));
-            return Tile(new GeometryDrawing
-            {
-                Geometry = g,
-                Brush = new SolidColorBrush(Color.Parse(Services.ThemePalettes.Alpha(t.PaperText, 0x30))),
-            });
-        }
-        if (style == "Lines")
-        {
-            var g = new GeometryGroup();
-            g.Children.Add(new LineGeometry(new Point(0, 0), new Point(GridMath.Cell, 0)));
-            g.Children.Add(new LineGeometry(new Point(0, 0), new Point(0, GridMath.Cell)));
-            return Tile(new GeometryDrawing
-            {
-                Geometry = g,
-                Pen = new Pen(new SolidColorBrush(Color.Parse(Services.ThemePalettes.Alpha(t.PaperText, 0x1E)))),
-            });
-        }
-        return null;
+        _guides.Viewport = viewport;
+        _guides.InvalidateVisual();
     }
-
-    private static DrawingBrush Tile(Drawing cell) => new()
-    {
-        Drawing = cell, TileMode = TileMode.Tile, Stretch = Stretch.None,
-        SourceRect = new RelativeRect(0, 0, GridMath.Cell, GridMath.Cell, RelativeUnit.Absolute),
-        DestinationRect = new RelativeRect(0, 0, GridMath.Cell, GridMath.Cell, RelativeUnit.Absolute),
-    };
 
     /// <summary>The editor of the most recently focused container (what the toolbar targets).</summary>
     public RichTextEditor? ActiveEditor { get; private set; }
@@ -144,8 +104,8 @@ public sealed class NoteCanvas : Panel
     {
         Children.Clear();
         SetActive(null);
-        Children.Add(_gridLayer);      // first child = bottom of z-order: under every container
-        RefreshGrid();                 // theme changes arrive as a Document reset — re-tint here
+        Children.Add(_guides);         // first child = bottom of z-order: under every container
+        _guides.Refresh();             // theme changes arrive as a Document reset — re-tint here
         Children.Add(_hint);
         if (_doc is not null)
             foreach (var box in _doc.Boxes)
@@ -177,7 +137,7 @@ public sealed class NoteCanvas : Panel
     {
         foreach (var child in Children)
         {
-            if (ReferenceEquals(child, _gridLayer))
+            if (ReferenceEquals(child, _guides))
             {
                 child.Arrange(new Rect(finalSize));     // the grid covers the whole scrollable page
                 continue;

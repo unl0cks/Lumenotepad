@@ -442,10 +442,24 @@ public partial class MainView : UserControl
         if (Vm is not { } vm) return;
         PageCanvas.CanResize = vm.ResizablePages;
         PageCanvas.HistoryEnabled = vm.DeletedHistory;
-        PageCanvas.GridStyle = vm.PageGrid;
+        ApplyPageStyles();             // per-page effective styles (falls back to the global grid pref)
         PageCanvas.SnapToGrid = vm.GridSnap;
         if (!vm.DeletedHistory) TrashPanel.IsVisible = false;
         ApplyFlatCovers();
+    }
+
+    /// <summary>Resolve the selected page's effective grid + page styles (page ?? notebook ?? global
+    /// pref) and push them onto the canvas guide layer.</summary>
+    private void ApplyPageStyles()
+    {
+        if (Vm is not { } vm) return;
+        string grid = vm.SelectedPage is { } pg && vm.SelectedNotebook is { } nb
+            ? PageStyles.EffectiveGrid(pg, nb, vm.PageGrid)
+            : PageStyles.MapGlobalGrid(vm.PageGrid);
+        var (style, mode) = vm.SelectedPage is { } p && vm.SelectedNotebook is { } n
+            ? PageStyles.EffectiveStyle(p, n)
+            : (PageStyles.Freeform, 0);
+        PageCanvas.SetStyles(grid, style, mode);
     }
 
     /// <summary>Per-notebook paper tint: the selected notebook's PaperTint hex as a translucent
