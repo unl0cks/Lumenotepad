@@ -4,7 +4,7 @@
         xmlns:controls="using:Lumenotepad.Controls"
         x:Class="Lumenotepad.Views.MainWindow"
         Title="Lumenotepad"
-        Width="1180" Height="720" MinWidth="720" MinHeight="460"
+        Width="1320" Height="820" MinWidth="720" MinHeight="460"
         WindowStartupLocation="CenterScreen"
         Background="Transparent"
         TransparencyLevelHint="AcrylicBlur, Transparent, None"

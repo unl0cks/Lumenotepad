@@ -50,9 +50,9 @@ public partial class PreferencesWindow : Window
         };
         SmoothScroll.Attach(PrefsScroll);   // wheel-eased scrolling instead of the line-at-a-time jump
         // The fonts checklist needs a BOUNDED height to virtualize (the outer ScrollViewer measures
-        // with infinite height), but a fixed 300 strands it mid-window — track the viewport instead.
-        PrefsScroll.SizeChanged += (_, _) =>
-            FontsList.Height = Math.Max(240, PrefsScroll.Bounds.Height - 200);
+        // with infinite height) — anchored to its real on-screen offset (see SizeFontsList) rather
+        // than a fixed guess, so it fills the window down to the bottom.
+        PrefsScroll.SizeChanged += (_, _) => SizeFontsList();
         CloseBtn.Click += (_, _) => Close();
         KeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); };
 
@@ -755,6 +755,18 @@ public partial class PreferencesWindow : Window
                     _fontsScrollSmoothed = true;
                 }
             }, Avalonia.Threading.DispatcherPriority.Background);
+        // Re-anchor the height now that the panel has real content and layout has (or is about to
+        // have) run — posted at Background so it happens after the panel becomes visible/measured.
+        Avalonia.Threading.Dispatcher.UIThread.Post(SizeFontsList, Avalonia.Threading.DispatcherPriority.Background);
+    }
+
+    /// <summary>Size the fonts checklist to fill the viewport below its actual header (a fixed
+    /// guess undershoots as the header wraps/grows) — still bounded, so it keeps virtualizing.</summary>
+    private void SizeFontsList()
+    {
+        if (!FontsPanel.IsVisible) return;
+        double top = FontsList.TranslatePoint(default, PrefsScroll)?.Y ?? 200;
+        FontsList.Height = Math.Max(240, PrefsScroll.Bounds.Height - top - 22);
     }
 
     /// <summary>Show one category panel and rise it in (the others hide).</summary>

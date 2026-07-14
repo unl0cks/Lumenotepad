@@ -5,7 +5,7 @@
         x:Class="Lumenotepad.Views.PreferencesWindow"
         x:DataType="vm:MainViewModel"
         Title="Preferences"
-        Width="840" Height="620" MinWidth="620" MinHeight="440"
+        Width="920" Height="680" MinWidth="620" MinHeight="440"
         WindowDecorations="None" ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         FontFamily="{StaticResource UiFont}"
@@ -756,7 +756,8 @@
                                 </StackPanel>
                                 <TextBlock x:Name="DataFolderText" Classes="hint" Text="—"/>
                             </StackPanel>
-                            <Button x:Name="OpenDataBtn" Grid.Column="1" Content="Open" VerticalAlignment="Center"/>
+                            <Button x:Name="OpenDataBtn" Grid.Column="1" Content="Open" VerticalAlignment="Center"
+                                    Theme="{StaticResource LumenButton}" FontSize="12" Padding="12,5"/>
                         </Grid>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Orientation="Horizontal">
@@ -776,8 +777,10 @@
                                 <TextBlock x:Name="BackupFolderText" Classes="hint" Text="Not set — automatic backups are off."/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                <Button x:Name="BackupFolderBtn" Content="Choose…"/>
-                                <Button x:Name="BackupClearBtn" Content="Clear"/>
+                                <Button x:Name="BackupFolderBtn" Content="Choose…"
+                                        Theme="{StaticResource LumenButton}" FontSize="12" Padding="12,5"/>
+                                <Button x:Name="BackupClearBtn" Content="Clear"
+                                        Theme="{StaticResource LumenButton}" FontSize="12" Padding="12,5"/>
                             </StackPanel>
                         </Grid>
                         <Grid ColumnDefinitions="*,Auto">
@@ -807,7 +810,8 @@
                                 </StackPanel>
                                 <TextBlock x:Name="LastBackupText" Classes="hint" Text="Never backed up."/>
                             </StackPanel>
-                            <Button x:Name="BackupNowBtn" Grid.Column="1" Content="Back up now" VerticalAlignment="Center"/>
+                            <Button x:Name="BackupNowBtn" Grid.Column="1" Content="Back up now" VerticalAlignment="Center"
+                                    Theme="{StaticResource LumenButton}" FontSize="12" Padding="12,5"/>
                         </Grid>
 
                         <TextBlock Classes="section" Text="IMPORT &amp; EXPORT"/>
@@ -819,7 +823,8 @@
                                 </StackPanel>
                                 <TextBlock Classes="hint" Text="A folder of &#8249;notebook&#8250;/&#8249;section&#8250;/&#8249;page&#8250;.md files (UTF-8)."/>
                             </StackPanel>
-                            <Button x:Name="ExportBtn" Grid.Column="1" Content="Export…" VerticalAlignment="Center"/>
+                            <Button x:Name="ExportBtn" Grid.Column="1" Content="Export…" VerticalAlignment="Center"
+                                    Theme="{StaticResource LumenButton}" FontSize="12" Padding="12,5"/>
                         </Grid>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,10,0">
@@ -829,7 +834,8 @@
                                 </StackPanel>
                                 <TextBlock Classes="hint" Text="A .txt or .md file becomes a new page in the current section."/>
                             </StackPanel>
-                            <Button x:Name="ImportBtn" Grid.Column="1" Content="Import…" VerticalAlignment="Center"/>
+                            <Button x:Name="ImportBtn" Grid.Column="1" Content="Import…" VerticalAlignment="Center"
+                                    Theme="{StaticResource LumenButton}" FontSize="12" Padding="12,5"/>
                         </Grid>
                         <TextBlock x:Name="DataStatusText" Classes="hint" Margin="0,8,0,0" Text=""/>
 
@@ -842,7 +848,8 @@
                                 </StackPanel>
                                 <TextBlock Classes="hint" Text="Every preference returns to its default. Notebooks and notes stay."/>
                             </StackPanel>
-                            <Button x:Name="ResetBtn" Grid.Column="1" Content="Reset…" VerticalAlignment="Center"/>
+                            <Button x:Name="ResetBtn" Grid.Column="1" Content="Reset…" VerticalAlignment="Center"
+                                    Theme="{StaticResource LumenButton}" FontSize="12" Padding="12,5"/>
                         </Grid>
                         <Grid ColumnDefinitions="*,Auto" Margin="0,10,0,0">
                             <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,10,0">
@@ -852,7 +859,8 @@
                                 </StackPanel>
                                 <TextBlock Classes="hint" Text="Hide the advanced categories behind the confirmation again."/>
                             </StackPanel>
-                            <Button x:Name="RelockBtn" Grid.Column="1" Content="Lock" VerticalAlignment="Center"/>
+                            <Button x:Name="RelockBtn" Grid.Column="1" Content="Lock" VerticalAlignment="Center"
+                                    Theme="{StaticResource LumenButton}" FontSize="12" Padding="12,5"/>
                         </Grid>
                     </StackPanel>
 
