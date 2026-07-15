@@ -48,6 +48,22 @@ public sealed class NoteCanvas : Panel
     /// <summary>Whether deleting a container keeps it in the page history ("Deleted pages history" preference).</summary>
     public bool HistoryEnabled { get; set; } = true;
 
+    /// <summary>Absolute folder that image-box paths ("images/xxx.png") resolve against — the current
+    /// notebook's folder, pushed by MainView when the page loads (M10).</summary>
+    public string? ImageRoot { get; set; }
+
+    /// <summary>Insert an image box (M10): a movable/resizable container showing the picture at
+    /// <paramref name="relPath"/> (relative to <see cref="ImageRoot"/>).</summary>
+    public void AddImage(string relPath, double x, double y, double width = 340)
+    {
+        if (_doc is null) return;
+        if (SnapToGrid) { x = Math.Max(0, GridMath.Snap(x)); y = Math.Max(0, GridMath.Snap(y)); }
+        var box = _doc.AddBox(x, y, width);
+        box.ImagePath = relPath;
+        AddBoxView(box);
+        _doc.CommitGeometry();                 // persist with the image path set
+    }
+
     /// <summary>Asked before a container is deleted via its ✕ button / menu; null = no prompt.</summary>
     public Func<Task<bool>>? ConfirmDelete { get; set; }
 
@@ -369,7 +385,10 @@ internal sealed class NoteBoxView : Panel
 
         var body = new DockPanel();
         body.Children.Add(_grip);
-        body.Children.Add(Editor);
+        if (box.ImagePath is { Length: > 0 })
+            body.Children.Add(BuildImage(box.ImagePath));   // image box: picture instead of the editor
+        else
+            body.Children.Add(Editor);
 
         _chrome = new Border
         {
@@ -421,8 +440,11 @@ internal sealed class NoteBoxView : Panel
 
         PointerEntered += (_, _) => { _hover = true; RefreshChrome(); };
         PointerExited += (_, _) => { _hover = false; RefreshChrome(); };
-        Editor.GotFocus += (_, _) => { _canvas.SetActive(Editor); RefreshChrome(); };
-        Editor.LostFocus += (_, _) => { RefreshChrome(); _canvas.OnEditorLostFocus(this); };
+        if (box.ImagePath is null)      // image boxes have no editor to focus / evaporate
+        {
+            Editor.GotFocus += (_, _) => { _canvas.SetActive(Editor); RefreshChrome(); };
+            Editor.LostFocus += (_, _) => { RefreshChrome(); _canvas.OnEditorLostFocus(this); };
+        }
 
         WireDrag(_grip, DragMode.Move);
         WireDrag(_resizeRight, DragMode.Width);
@@ -443,7 +465,24 @@ internal sealed class NoteBoxView : Panel
         RefreshChrome();
     }
 
-    internal void FocusEditor() => Editor.Focus();
+    internal void FocusEditor() { if (Box.ImagePath is null) Editor.Focus(); }
+
+    /// <summary>The picture control for an image box, loaded from ImageRoot + the box's relative path.</summary>
+    private Control BuildImage(string relPath)
+    {
+        var img = new Avalonia.Controls.Image
+        {
+            Stretch = Stretch.Uniform, Margin = new Thickness(5, 0, 5, 5),
+        };
+        try
+        {
+            var root = _canvas.ImageRoot;
+            var full = root is { Length: > 0 } ? System.IO.Path.Combine(root, relPath) : relPath;
+            if (System.IO.File.Exists(full)) img.Source = new Avalonia.Media.Imaging.Bitmap(full);
+        }
+        catch { /* missing/unreadable image → empty box (still movable/deletable) */ }
+        return img;
+    }
 
     internal void RefreshChrome()
     {

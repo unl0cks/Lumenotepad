@@ -65,6 +65,7 @@ public partial class MainView : UserControl
         Toolbar.DockRequested += pos => { if (Vm is { } vm) vm.ToolbarPosition = pos; };
         Toolbar.ScopeRequested += scope => { if (Vm is { } vm) vm.ToolbarScope = scope; };
         Toolbar.CustomizeRequested += () => { if (Vm?.SelectedNotebook is { } nb) OpenNotebookWizard(nb); };
+        Toolbar.InsertImageRequested += async () => await InsertImageAsync();
 
         // Section/page rename: double-click, the rename button, or right-click → Rename — all open
         // the zoomed rename overlay (the background blurs until the name is saved).
@@ -917,6 +918,7 @@ public partial class MainView : UserControl
     private void SyncEditorDocument()
     {
         Vm?.FlushDirtyDocs();                      // the page being left saves immediately
+        PageCanvas.ImageRoot = Vm?.SelectedNotebookDir;   // set BEFORE Document so image boxes resolve
         PageCanvas.Document = Vm?.SelectedPage is { } page ? Vm.DocumentFor(page) : null;
         ApplyPageStyles();                     // the new page's effective grid + method guides
         if (PageCanvas.Document is null) { TrashPanel.IsVisible = false; return; }
@@ -1260,6 +1262,29 @@ public partial class MainView : UserControl
         {
             OpenMenu(e, open, customize, rename, moveLeft, moveRight, color, paper, cover, delete);
         }
+    }
+
+    /// <summary>Pick an image file and drop it on the current page as an image box (copied into the
+    /// notebook's images folder, so the page stays self-contained).</summary>
+    private async System.Threading.Tasks.Task InsertImageAsync()
+    {
+        if (Vm is not { SelectedPage: not null } vm || TopLevel.GetTopLevel(this)?.StorageProvider is not { } sp) return;
+        var files = await sp.OpenFilePickerAsync(new Avalonia.Platform.Storage.FilePickerOpenOptions
+        {
+            Title = "Insert image", AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new Avalonia.Platform.Storage.FilePickerFileType("Images")
+                { Patterns = new[] { "*.png", "*.jpg", "*.jpeg", "*.webp", "*.bmp", "*.gif" } },
+            },
+        });
+        if (files.Count == 0 || files[0].TryGetLocalPath() is not { } path) return;
+        if (vm.ImportPageImage(path) is not { } rel) return;
+        // Drop it near the top-left of what's currently in view.
+        double x = CanvasScroll.Offset.X / _canvasZoom + 40;
+        double y = CanvasScroll.Offset.Y / _canvasZoom + 40;
+        PageCanvas.ImageRoot = vm.SelectedNotebookDir;
+        PageCanvas.AddImage(rel, x, y);
     }
 
     /// <summary>Export one page to a file the user picks — the format follows the chosen file type

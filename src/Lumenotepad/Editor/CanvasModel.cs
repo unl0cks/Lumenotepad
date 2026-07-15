@@ -22,13 +22,17 @@ public sealed class NoteBox
     /// never evaporates when empty (M9). Persisted.</summary>
     public bool Locked { get; set; }
 
+    /// <summary>An IMAGE box (M10): a path relative to the notebook folder ("images/xxx.png").
+    /// When set the box renders the image instead of a text editor. Persisted.</summary>
+    public string? ImagePath { get; set; }
+
     public RichDocument Doc { get; }
 
     public NoteBox(RichDocument? doc = null) => Doc = doc ?? new RichDocument();
 
     /// <summary>True while the box holds nothing but a single bare paragraph — such boxes
-    /// evaporate when focus settles elsewhere (OneNote behavior).</summary>
-    public bool IsEmpty => IsBlank(Doc);
+    /// evaporate when focus settles elsewhere (OneNote behavior). Image boxes are never empty.</summary>
+    public bool IsEmpty => ImagePath is null && IsBlank(Doc);
 
     public static bool IsBlank(RichDocument doc) =>
         doc.Paragraphs.Count == 1 && doc.Paragraphs[0].Runs.Count == 0 && doc.Paragraphs[0].Bullet is null;

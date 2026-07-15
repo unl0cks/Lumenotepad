@@ -86,6 +86,8 @@
 
             <Button x:Name="LinkBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
                     FontFamily="{StaticResource IconFont}" Content="&#xE71B;" ToolTip.Tip="Add link"/>
+            <Button x:Name="ImageBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
+                    FontFamily="{StaticResource IconFont}" Content="&#xEB9F;" ToolTip.Tip="Insert image"/>
 
             <Button x:Name="BulletBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
                     FontFamily="{StaticResource IconFont}" Content="&#xE8FD;" ToolTip.Tip="Bullets &amp; lists (Ctrl+Shift+8)">

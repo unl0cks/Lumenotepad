@@ -1142,6 +1142,14 @@ public partial class MainViewModel : ObservableObject
         Save();
     }
 
+    /// <summary>The selected notebook's absolute folder (image boxes resolve their paths against it).</summary>
+    public string? SelectedNotebookDir => SelectedNotebook is { } nb ? _store.NotebookDir(nb) : null;
+
+    /// <summary>Copy an inserted image into the selected notebook's images folder; returns the stored
+    /// relative path ("images/xxx.png") for the image box, or null on failure (M10).</summary>
+    public string? ImportPageImage(string sourcePath) =>
+        SelectedNotebook is { } nb ? _store.SavePageImage(nb, sourcePath) : null;
+
     public void SetNotebookCover(Notebook nb, string sourcePath)
     {
         var dest = _store.SaveCover(nb, sourcePath);

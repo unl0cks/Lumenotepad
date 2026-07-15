@@ -111,6 +111,27 @@ public sealed class WorkspaceStore
         DeleteCoverFiles(Path.Combine(_root, nb.Folder));
     }
 
+    /// <summary>The notebook's absolute folder (image-box paths resolve against it), or null when
+    /// the notebook hasn't been persisted yet.</summary>
+    public string? NotebookDir(Notebook nb) =>
+        string.IsNullOrEmpty(nb.Folder) ? null : Path.Combine(_root, nb.Folder);
+
+    /// <summary>Copy an inserted image into the notebook's <c>images/</c> subfolder under a unique
+    /// name; returns the path RELATIVE to the notebook folder ("images/xxx.png"), or null on failure.</summary>
+    public string? SavePageImage(Notebook nb, string sourcePath)
+    {
+        if (string.IsNullOrEmpty(nb.Folder)) return null;
+        try
+        {
+            var imagesDir = Path.Combine(_root, nb.Folder, "images");
+            Directory.CreateDirectory(imagesDir);
+            var name = Guid.NewGuid().ToString("N") + Path.GetExtension(sourcePath).ToLowerInvariant();
+            File.Copy(sourcePath, Path.Combine(imagesDir, name), overwrite: true);
+            return "images/" + name;
+        }
+        catch { return null; }
+    }
+
     private static void DeleteCoverFiles(string dir)
     {
         if (!Directory.Exists(dir)) return;

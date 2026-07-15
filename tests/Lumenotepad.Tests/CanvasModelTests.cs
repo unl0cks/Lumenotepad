@@ -238,6 +238,21 @@ public class CanvasJsonTests
     }
 
     [Fact]
+    public void ImageBox_notEmpty_roundTrips()
+    {
+        var canvas = new CanvasDocument();
+        var img = canvas.AddBox(20, 30, 300);
+        img.ImagePath = "images/pic.png";
+        Assert.False(img.IsEmpty);                       // an image box never evaporates
+
+        var reloaded = CanvasDocJson.FromJson(CanvasDocJson.ToJson(canvas));
+        var box = Assert.Single(reloaded.Boxes);
+        Assert.Equal("images/pic.png", box.ImagePath);
+        Assert.Equal(20, box.X);
+        Assert.Equal(300, box.Width);
+    }
+
+    [Fact]
     public void Links_absentWhenNone_badPairsIgnored()
     {
         var canvas = new CanvasDocument();

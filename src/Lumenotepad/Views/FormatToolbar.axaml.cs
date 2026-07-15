@@ -53,6 +53,9 @@ public partial class FormatToolbar : UserControl
     /// edit mode for the selected notebook.</summary>
     public event Action? CustomizeRequested;
 
+    /// <summary>Raised by the image button — MainView picks a file and drops an image box on the page.</summary>
+    public event Action? InsertImageRequested;
+
     public RichTextEditor? Target
     {
         get => _target;
@@ -89,6 +92,7 @@ public partial class FormatToolbar : UserControl
         SuperBtn.Click += (_, _) => Do(e => e.ToggleSuper());
         SubBtn.Click += (_, _) => Do(e => e.ToggleSub());
         LinkBtn.Click += async (_, _) => await AddLinkAsync();
+        ImageBtn.Click += (_, _) => InsertImageRequested?.Invoke();
         BuildAlignChoices();
         BuildTypeChoices();
         SizeMinus.Click += (_, _) => NudgeSize(-1);
