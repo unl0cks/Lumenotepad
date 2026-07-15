@@ -1150,13 +1150,16 @@ public partial class MainView : UserControl
             RefreshAfterStyleDialog(pg);
         };
 
+        var export = new MenuItem { Header = "Export page…" };
+        export.Click += async (_, _) => await ExportPageAsync(pg);
+
         var delete = new MenuItem { Header = "Delete page" };
         delete.Click += (_, _) => ConfirmThenDelete(
             "Delete this page?",
             $"“{Label(pg.Title)}” will be permanently deleted. This can't be undone.",
             Vm?.ConfirmDeletePage ?? true,
             () => CollapseThenDelete(PagesList.ContainerFromItem(pg) as Control, () => Vm?.DeletePageCommand.Execute(pg)));
-        OpenMenu(e, rename, customize, delete);
+        OpenMenu(e, rename, customize, export, delete);
     }
 
     /// <summary>After a customization dialog closes: re-apply the guides and re-push the canvas
@@ -1256,6 +1259,37 @@ public partial class MainView : UserControl
         else
         {
             OpenMenu(e, open, customize, rename, moveLeft, moveRight, color, paper, cover, delete);
+        }
+    }
+
+    /// <summary>Export one page to a file the user picks — the format follows the chosen file type
+    /// (all eight offered), so it's one Save dialog, no extra prompt.</summary>
+    private async System.Threading.Tasks.Task ExportPageAsync(Models.Page pg)
+    {
+        if (Vm is not { } vm || TopLevel.GetTopLevel(this)?.StorageProvider is not { } sp) return;
+        var choices = Services.PageExport.Formats.Select(f =>
+            new Avalonia.Platform.Storage.FilePickerFileType(f.Label) { Patterns = new[] { "*" + f.Ext } }).ToArray();
+        var file = await sp.SaveFilePickerAsync(new Avalonia.Platform.Storage.FilePickerSaveOptions
+        {
+            Title = "Export page",
+            SuggestedFileName = Services.MarkdownExport.SafeName(pg.Title),
+            DefaultExtension = "pdf",
+            FileTypeChoices = choices,
+        });
+        if (file?.TryGetLocalPath() is not { } path) return;
+
+        var ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
+        var fmt = Services.PageExport.Formats.FirstOrDefault(f => f.Ext == ext, Services.PageExport.Formats[4]).Fmt;   // default PDF
+        try
+        {
+            vm.FlushDirtyDocs();
+            var bytes = Services.PageExport.Export(fmt, pg.Title, vm.DocumentFor(pg));
+            await System.IO.File.WriteAllBytesAsync(path, bytes);
+        }
+        catch (System.Exception ex)
+        {
+            if (Window is { } w)
+                await ConfirmDialog.Show(w, "Export failed", ex.Message, "OK", "Close", danger: false);
         }
     }
 

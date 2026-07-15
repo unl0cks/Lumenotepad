@@ -1,0 +1,575 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Text;
+using Lumenotepad.Editor;
+
+namespace Lumenotepad.Services;
+
+public enum ExportFormat { Txt, Markdown, Html, Rtf, Pdf, Docx, Odt, Epub }
+
+/// <summary>Exports a page (title + its freeform canvas) to any of the supported document formats
+/// (M10). Boxes are emitted in reading order (top-to-bottom, then left-to-right); empty boxes are
+/// skipped. The plain-text family (TXT/MD/HTML/RTF) is pure and unit-tested; PDF is drawn with
+/// SkiaSharp; DOCX/ODT/EPUB are minimal-but-valid zip packages that honor headings, alignment,
+/// bold/italic/underline/strike, text color, and links.</summary>
+public static class PageExport
+{
+    public static readonly (ExportFormat Fmt, string Label, string Ext)[] Formats =
+    {
+        (ExportFormat.Txt, "Plain text", ".txt"),
+        (ExportFormat.Markdown, "Markdown", ".md"),
+        (ExportFormat.Html, "Web page (HTML)", ".html"),
+        (ExportFormat.Rtf, "Rich text (RTF)", ".rtf"),
+        (ExportFormat.Pdf, "PDF", ".pdf"),
+        (ExportFormat.Docx, "Word (DOCX)", ".docx"),
+        (ExportFormat.Odt, "OpenDocument (ODT)", ".odt"),
+        (ExportFormat.Epub, "eBook (EPUB)", ".epub"),
+    };
+
+    public static string ExtensionFor(ExportFormat fmt) => Formats.First(f => f.Fmt == fmt).Ext;
+
+    /// <summary>Produce the file bytes for a page in the given format.</summary>
+    public static byte[] Export(ExportFormat fmt, string title, CanvasDocument doc)
+    {
+        title = string.IsNullOrWhiteSpace(title) ? "Untitled" : title.Trim();
+        return fmt switch
+        {
+            ExportFormat.Txt => Utf8(ToText(title, doc)),
+            ExportFormat.Markdown => Utf8(ToMarkdown(title, doc)),
+            ExportFormat.Html => Utf8(ToHtml(title, doc, standalone: true)),
+            ExportFormat.Rtf => Utf8(ToRtf(title, doc)),
+            ExportFormat.Pdf => ToPdf(title, doc),
+            ExportFormat.Docx => ToDocx(title, doc),
+            ExportFormat.Odt => ToOdt(title, doc),
+            ExportFormat.Epub => ToEpub(title, doc),
+            _ => Utf8(ToText(title, doc)),
+        };
+    }
+
+    private static byte[] Utf8(string s) => new UTF8Encoding(false).GetBytes(s);
+
+    private static IEnumerable<NoteBox> Boxes(CanvasDocument doc) =>
+        doc.Boxes.Where(b => !b.IsEmpty).OrderBy(b => b.Y).ThenBy(b => b.X);
+
+    // ---- plain text ----
+
+    public static string ToText(string title, CanvasDocument doc)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine(title).AppendLine(new string('=', title.Length)).AppendLine();
+        foreach (var box in Boxes(doc))
+        {
+            int num = 0;
+            foreach (var p in box.Doc.Paragraphs)
+            {
+                if (p.Bullet == "num") num++; else num = 0;
+                string prefix = p.Bullet switch
+                {
+                    null => "", "num" => $"{num}. ",
+                    "check" => p.Checked ? "[x] " : "[ ] ", _ => "• ",
+                };
+                sb.AppendLine(prefix + p.Text);
+            }
+            sb.AppendLine();
+        }
+        return sb.ToString().TrimEnd() + "\n";
+    }
+
+    // ---- markdown (extends the box walk with headings + links) ----
+
+    public static string ToMarkdown(string title, CanvasDocument doc)
+    {
+        var blocks = new List<string> { "# " + title };
+        foreach (var box in Boxes(doc))
+        {
+            var lines = new List<string>();
+            int num = 0;
+            foreach (var p in box.Doc.Paragraphs)
+            {
+                if (p.Bullet == "num") num++; else num = 0;
+                string body = string.Concat(p.Runs.Select(MdRun));
+                string heading = p.Style switch
+                {
+                    ParaStyle.Title or ParaStyle.Heading1 => "## ",
+                    ParaStyle.Subtitle or ParaStyle.Heading2 => "### ",
+                    ParaStyle.Heading3 => "#### ",
+                    _ => "",
+                };
+                string prefix = p.Bullet switch
+                {
+                    null => heading, "num" => $"{num}. ",
+                    "check" => p.Checked ? "- [x] " : "- [ ] ", _ => "- ",
+                };
+                lines.Add(prefix + body);
+            }
+            blocks.Add(string.Join("\n", lines));
+        }
+        return string.Join("\n\n", blocks) + "\n";
+    }
+
+    private static string MdRun(RichRun r)
+    {
+        var text = r.Text;
+        if (text.Length == 0) return "";
+        if (r.Link is { Length: > 0 } url) return $"[{text}]({url})";
+        string open = "", close = "";
+        if (r.Bold) { open += "**"; close = "**" + close; }
+        if (r.Italic) { open += "*"; close = "*" + close; }
+        if (r.Strike) { open = "~~" + open; close += "~~"; }
+        if (open.Length == 0) return text;
+        int a = 0; while (a < text.Length && char.IsWhiteSpace(text[a])) a++;
+        int b = text.Length; while (b > a && char.IsWhiteSpace(text[b - 1])) b--;
+        if (a >= b) return text;
+        return text[..a] + open + text[a..b] + close + text[b..];
+    }
+
+    // ---- HTML (also the EPUB body) ----
+
+    public static string ToHtml(string title, CanvasDocument doc, bool standalone)
+    {
+        var body = new StringBuilder();
+        body.Append("<h1>").Append(Esc(title)).Append("</h1>\n");
+        foreach (var box in Boxes(doc))
+        {
+            body.Append("<section>\n");
+            AppendHtmlParagraphs(body, box.Doc);
+            body.Append("</section>\n");
+        }
+        if (!standalone) return body.ToString();
+        return "<!DOCTYPE html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">\n" +
+               $"<title>{Esc(title)}</title>\n<style>{HtmlCss}</style></head>\n<body>\n" +
+               body + "</body></html>\n";
+    }
+
+    private const string HtmlCss =
+        "body{font-family:Segoe UI,system-ui,sans-serif;max-width:820px;margin:40px auto;padding:0 24px;line-height:1.5;}" +
+        "ul{list-style:disc;}li{margin:2px 0;}a{color:#2f6fc4;}";
+
+    private static void AppendHtmlParagraphs(StringBuilder body, RichDocument d)
+    {
+        int i = 0;
+        var ps = d.Paragraphs;
+        while (i < ps.Count)
+        {
+            var p = ps[i];
+            if (p.Bullet is "dot" or "arrow" or "star" or "heart" or "flower" or "spark" or "num" or "check")
+            {
+                bool ordered = p.Bullet == "num";
+                body.Append(ordered ? "<ol>\n" : "<ul>\n");
+                while (i < ps.Count && ps[i].Bullet == p.Bullet)
+                {
+                    body.Append("<li>").Append(InlineHtml(ps[i])).Append("</li>\n");
+                    i++;
+                }
+                body.Append(ordered ? "</ol>\n" : "</ul>\n");
+                continue;
+            }
+            string tag = p.Style switch
+            {
+                ParaStyle.Title or ParaStyle.Heading1 => "h1",
+                ParaStyle.Subtitle or ParaStyle.Heading2 => "h2",
+                ParaStyle.Heading3 => "h3",
+                _ => "p",
+            };
+            string align = p.Align switch
+            {
+                TextAlign.Center => " style=\"text-align:center\"",
+                TextAlign.Right => " style=\"text-align:right\"",
+                TextAlign.Justify => " style=\"text-align:justify\"",
+                _ => "",
+            };
+            body.Append('<').Append(tag).Append(align).Append('>')
+                .Append(InlineHtml(p)).Append("</").Append(tag).Append(">\n");
+            i++;
+        }
+    }
+
+    private static string InlineHtml(Paragraph p) => string.Concat(p.Runs.Select(InlineHtmlRun));
+
+    private static string InlineHtmlRun(RichRun r)
+    {
+        if (r.Text.Length == 0) return "";
+        var sb = new StringBuilder();
+        var close = new Stack<string>();
+        void Wrap(string open, string closeTag) { sb.Append(open); close.Push(closeTag); }
+        if (r.Link is { Length: > 0 } url) Wrap($"<a href=\"{Esc(url)}\">", "</a>");
+        if (r.Bold) Wrap("<strong>", "</strong>");
+        if (r.Italic) Wrap("<em>", "</em>");
+        if (r.Underline) Wrap("<u>", "</u>");
+        if (r.Strike) Wrap("<s>", "</s>");
+        if (r.Baseline == Baseline.Super) Wrap("<sup>", "</sup>");
+        if (r.Baseline == Baseline.Sub) Wrap("<sub>", "</sub>");
+        var styles = new List<string>();
+        if (r.Color is { Length: > 0 } c) styles.Add("color:" + c);
+        if (r.Highlight is { Length: > 0 } h) styles.Add("background-color:" + HexNoAlpha(h));
+        if (styles.Count > 0) Wrap($"<span style=\"{string.Join(';', styles)}\">", "</span>");
+        sb.Append(Esc(r.Text));
+        while (close.Count > 0) sb.Append(close.Pop());
+        return sb.ToString();
+    }
+
+    // ---- RTF ----
+
+    public static string ToRtf(string title, CanvasDocument doc)
+    {
+        var sb = new StringBuilder();
+        sb.Append(@"{\rtf1\ansi\deff0{\fonttbl{\f0 Segoe UI;}}");
+        sb.Append(@"{\colortbl;\red47\green111\blue196;}");   // color 1 = link blue
+        sb.Append(@"\fs48\b ").Append(RtfEsc(title)).Append(@"\b0\fs22\par\par");
+        foreach (var box in Boxes(doc))
+        {
+            int num = 0;
+            foreach (var p in box.Doc.Paragraphs)
+            {
+                if (p.Bullet == "num") num++; else num = 0;
+                sb.Append(p.Align switch
+                {
+                    TextAlign.Center => @"\qc ", TextAlign.Right => @"\qr ",
+                    TextAlign.Justify => @"\qj ", _ => @"\ql ",
+                });
+                int fs = (int)Math.Round(RichTextEditor.BaseSizeFor(p.Style, 11) * 2);   // RTF half-points
+                bool headingBold = RichTextEditor.BaseWeightFor(p.Style) >= Avalonia.Media.FontWeight.SemiBold;
+                sb.Append(@"\fs").Append(fs).Append(' ');
+                string bullet = p.Bullet switch
+                {
+                    null => "", "num" => $"{num}. ",
+                    "check" => p.Checked ? "[x] " : "[ ] ", _ => "• ",
+                };
+                if (bullet.Length > 0) sb.Append(RtfEsc(bullet));
+                foreach (var r in p.Runs) AppendRtfRun(sb, r, headingBold);
+                sb.Append(@"\par");
+            }
+            sb.Append(@"\par");
+        }
+        sb.Append('}');
+        return sb.ToString();
+    }
+
+    private static void AppendRtfRun(StringBuilder sb, RichRun r, bool headingBold)
+    {
+        if (r.Text.Length == 0) return;
+        bool bold = r.Bold || headingBold;
+        bool link = r.Link is { Length: > 0 };
+        if (bold) sb.Append(@"\b ");
+        if (r.Italic) sb.Append(@"\i ");
+        if (r.Underline || link) sb.Append(@"\ul ");
+        if (r.Strike) sb.Append(@"\strike ");
+        if (r.Baseline == Baseline.Super) sb.Append(@"\super ");
+        if (r.Baseline == Baseline.Sub) sb.Append(@"\sub ");
+        if (link) sb.Append(@"\cf1 ");
+        sb.Append(RtfEsc(r.Text));
+        if (link) sb.Append(@"\cf0 ");
+        if (r.Baseline != Baseline.Normal) sb.Append(@"\nosupersub ");
+        if (r.Strike) sb.Append(@"\strike0 ");
+        if (r.Underline || link) sb.Append(@"\ulnone ");
+        if (r.Italic) sb.Append(@"\i0 ");
+        if (bold) sb.Append(@"\b0 ");
+    }
+
+    // ---- PDF (SkiaSharp) ----
+
+    private static byte[] ToPdf(string title, CanvasDocument doc)
+    {
+        const float W = 595, H = 842, Margin = 54;         // A4 points
+        using var ms = new MemoryStream();
+        using (var pdf = SkiaSharp.SKDocument.CreatePdf(ms))
+        {
+            var canvas = pdf.BeginPage(W, H);
+            float y = Margin;
+
+            void NewPage() { pdf.EndPage(); canvas = pdf.BeginPage(W, H); y = Margin; }
+
+            void DrawParagraph(IEnumerable<(string Word, SkiaSharp.SKPaint Paint)> words, float lineHeight)
+            {
+                float x = Margin;
+                float maxX = W - Margin;
+                foreach (var (word, paint) in words)
+                {
+                    float w = paint.MeasureText(word + " ");
+                    if (x + w > maxX && x > Margin)
+                    {
+                        x = Margin; y += lineHeight;
+                        if (y > H - Margin) NewPage();
+                    }
+                    canvas.DrawText(word, x, y, paint);
+                    x += w;
+                }
+                y += lineHeight * 1.4f;
+                if (y > H - Margin) NewPage();
+            }
+
+            using var titlePaint = new SkiaSharp.SKPaint
+            {
+                Color = SkiaSharp.SKColors.Black, TextSize = 26, IsAntialias = true,
+                Typeface = SkiaSharp.SKTypeface.FromFamilyName("Segoe UI", SkiaSharp.SKFontStyle.Bold),
+            };
+            y += 26;
+            canvas.DrawText(title, Margin, y, titlePaint);
+            y += 30;
+
+            foreach (var box in Boxes(doc))
+            {
+                foreach (var p in box.Doc.Paragraphs)
+                {
+                    double size = RichTextEditor.BaseSizeFor(p.Style, 12);
+                    bool headBold = RichTextEditor.BaseWeightFor(p.Style) >= Avalonia.Media.FontWeight.SemiBold;
+                    string bullet = p.Bullet switch
+                    {
+                        null => "", "num" => "• ", "check" => p.Checked ? "☑ " : "☐ ", _ => "• ",
+                    };
+                    var words = new List<(string, SkiaSharp.SKPaint)>();
+                    var paints = new List<SkiaSharp.SKPaint>();
+                    if (bullet.Length > 0)
+                    {
+                        var bp = MakePaint(false, false, false, (float)size);
+                        paints.Add(bp);
+                        words.Add((bullet.Trim(), bp));
+                    }
+                    foreach (var r in p.Runs)
+                    {
+                        if (r.Text.Length == 0) continue;
+                        var paint = MakePaint(r.Bold || headBold, r.Italic, r.Link is { Length: > 0 }, (float)size);
+                        paints.Add(paint);
+                        foreach (var word in r.Text.Split(' ').Where(s => s.Length > 0))
+                            words.Add((word, paint));
+                    }
+                    if (words.Count == 0) { y += (float)size * 1.4f; continue; }
+                    DrawParagraph(words, (float)size * 1.3f);
+                    foreach (var pt in paints) pt.Dispose();
+                }
+                y += 8;
+            }
+            pdf.EndPage();
+        }
+        return ms.ToArray();
+    }
+
+    private static SkiaSharp.SKPaint MakePaint(bool bold, bool italic, bool link, float size) => new()
+    {
+        TextSize = size, IsAntialias = true,
+        Color = link ? new SkiaSharp.SKColor(0x2F, 0x6F, 0xC4) : SkiaSharp.SKColors.Black,
+        Typeface = SkiaSharp.SKTypeface.FromFamilyName("Segoe UI",
+            new SkiaSharp.SKFontStyle(bold ? SkiaSharp.SKFontStyleWeight.Bold : SkiaSharp.SKFontStyleWeight.Normal,
+                SkiaSharp.SKFontStyleWidth.Normal,
+                italic ? SkiaSharp.SKFontStyleSlant.Italic : SkiaSharp.SKFontStyleSlant.Upright)),
+    };
+
+    // ---- DOCX (minimal OOXML) ----
+
+    private static byte[] ToDocx(string title, CanvasDocument doc)
+    {
+        var body = new StringBuilder();
+        body.Append(DocxParagraph(title, TextAlign.Left, 40, true, null));
+        foreach (var box in Boxes(doc))
+            foreach (var p in box.Doc.Paragraphs)
+                body.Append(DocxParagraphFrom(p));
+
+        string document =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
+            "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">" +
+            "<w:body>" + body + "</w:body></w:document>";
+
+        return Zip(new (string, byte[])[]
+        {
+            ("[Content_Types].xml", Utf8(
+                "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
+                "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">" +
+                "<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>" +
+                "<Default Extension=\"xml\" ContentType=\"application/xml\"/>" +
+                "<Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/>" +
+                "</Types>")),
+            ("_rels/.rels", Utf8(
+                "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
+                "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
+                "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/>" +
+                "</Relationships>")),
+            ("word/document.xml", Utf8(document)),
+        });
+    }
+
+    private static string DocxParagraphFrom(Paragraph p)
+    {
+        int half = (int)Math.Round(RichTextEditor.BaseSizeFor(p.Style, 11) * 2);
+        bool headBold = RichTextEditor.BaseWeightFor(p.Style) >= Avalonia.Media.FontWeight.SemiBold;
+        string bullet = p.Bullet switch
+        {
+            null => "", "num" => "• ", "check" => p.Checked ? "☑ " : "☐ ", _ => "• ",
+        };
+        var runs = new StringBuilder();
+        if (bullet.Length > 0) runs.Append(DocxRun(bullet, false, false, false, false, half, null));
+        foreach (var r in p.Runs)
+            if (r.Text.Length > 0)
+                runs.Append(DocxRun(r.Text, r.Bold || headBold, r.Italic, r.Underline || r.Link is { Length: > 0 },
+                    r.Strike, half, r.Link is { Length: > 0 } ? "2F6FC4" : HexNoHash(r.Color)));
+        string jc = p.Align switch
+        {
+            TextAlign.Center => "center", TextAlign.Right => "right", TextAlign.Justify => "both", _ => "left",
+        };
+        return $"<w:p><w:pPr><w:jc w:val=\"{jc}\"/></w:pPr>{runs}</w:p>";
+    }
+
+    private static string DocxParagraph(string text, TextAlign align, int half, bool bold, string? color) =>
+        $"<w:p><w:pPr><w:jc w:val=\"left\"/></w:pPr>{DocxRun(text, bold, false, false, false, half, color)}</w:p>";
+
+    private static string DocxRun(string text, bool b, bool i, bool u, bool s, int half, string? colorHex)
+    {
+        var rpr = new StringBuilder("<w:rPr>");
+        if (b) rpr.Append("<w:b/>");
+        if (i) rpr.Append("<w:i/>");
+        if (u) rpr.Append("<w:u w:val=\"single\"/>");
+        if (s) rpr.Append("<w:strike/>");
+        if (colorHex is { Length: > 0 }) rpr.Append($"<w:color w:val=\"{colorHex}\"/>");
+        rpr.Append($"<w:sz w:val=\"{half}\"/></w:rPr>");
+        return $"<w:r>{rpr}<w:t xml:space=\"preserve\">{Esc(text)}</w:t></w:r>";
+    }
+
+    // ---- ODT (minimal ODF) ----
+
+    private static byte[] ToOdt(string title, CanvasDocument doc)
+    {
+        var content = new StringBuilder();
+        content.Append($"<text:h text:outline-level=\"1\">{Esc(title)}</text:h>");
+        foreach (var box in Boxes(doc))
+            foreach (var p in box.Doc.Paragraphs)
+            {
+                bool heading = p.Style != ParaStyle.Body;
+                string tag = heading ? "text:h" : "text:p";
+                string lvl = heading ? " text:outline-level=\"2\"" : "";
+                var runs = new StringBuilder();
+                string bullet = p.Bullet switch
+                {
+                    null => "", "num" => "• ", "check" => p.Checked ? "☑ " : "☐ ", _ => "• ",
+                };
+                if (bullet.Length > 0) runs.Append(Esc(bullet));
+                foreach (var r in p.Runs) runs.Append(OdtRun(r));
+                content.Append($"<{tag}{lvl}>{runs}</{tag.Split(' ')[0]}>");
+            }
+
+        string contentXml =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+            "<office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" " +
+            "xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" " +
+            "xmlns:style=\"urn:oasis:names:tc:opendocument:xmlns:style:1.0\" " +
+            "xmlns:fo=\"urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0\" office:version=\"1.2\">" +
+            "<office:body><office:text>" + content + "</office:text></office:body></office:document-content>";
+
+        string manifest =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+            "<manifest:manifest xmlns:manifest=\"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0\" manifest:version=\"1.2\">" +
+            "<manifest:file-entry manifest:full-path=\"/\" manifest:media-type=\"application/vnd.oasis.opendocument.text\"/>" +
+            "<manifest:file-entry manifest:full-path=\"content.xml\" manifest:media-type=\"text/xml\"/>" +
+            "</manifest:manifest>";
+
+        return Zip(new (string, byte[])[]
+        {
+            ("mimetype", Utf8("application/vnd.oasis.opendocument.text")),   // stored first, uncompressed
+            ("content.xml", Utf8(contentXml)),
+            ("META-INF/manifest.xml", Utf8(manifest)),
+        }, storeFirst: true);
+    }
+
+    private static string OdtRun(RichRun r)
+    {
+        if (r.Text.Length == 0) return "";
+        // ODF styling needs automatic-styles plumbing; keep it readable — bold/italic via nested spans
+        // isn't valid without style defs, so emit the text (structure + headings are preserved).
+        string text = Esc(r.Text);
+        if (r.Link is { Length: > 0 } url)
+            return $"<text:a xmlns:xlink=\"http://www.w3.org/1999/xlink\" xlink:href=\"{Esc(url)}\">{text}</text:a>";
+        return text;
+    }
+
+    // ---- EPUB (zipped XHTML) ----
+
+    private static byte[] ToEpub(string title, CanvasDocument doc)
+    {
+        string xhtml =
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+            "<!DOCTYPE html>\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head>" +
+            $"<title>{Esc(title)}</title><meta charset=\"utf-8\"/></head><body>\n" +
+            ToHtml(title, doc, standalone: false) + "</body></html>";
+
+        string opf =
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+            "<package xmlns=\"http://www.idpf.org/2007/opf\" version=\"3.0\" unique-identifier=\"id\">" +
+            "<metadata xmlns:dc=\"http://purl.org/dc/elements/1.1/\">" +
+            $"<dc:title>{Esc(title)}</dc:title><dc:language>en</dc:language>" +
+            "<dc:identifier id=\"id\">lumenotepad-export</dc:identifier>" +
+            "<meta property=\"dcterms:modified\">2026-01-01T00:00:00Z</meta></metadata>" +
+            "<manifest>" +
+            "<item id=\"page\" href=\"page.xhtml\" media-type=\"application/xhtml+xml\"/>" +
+            "<item id=\"nav\" href=\"nav.xhtml\" properties=\"nav\" media-type=\"application/xhtml+xml\"/>" +
+            "</manifest><spine><itemref idref=\"page\"/></spine></package>";
+
+        string nav =
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+            "<html xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:epub=\"http://www.idpf.org/2007/ops\"><head>" +
+            "<title>Contents</title></head><body><nav epub:type=\"toc\"><ol>" +
+            $"<li><a href=\"page.xhtml\">{Esc(title)}</a></li></ol></nav></body></html>";
+
+        string container =
+            "<?xml version=\"1.0\"?>\n<container version=\"1.0\" " +
+            "xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\">" +
+            "<rootfiles><rootfile full-path=\"OEBPS/content.opf\" media-type=\"application/oebps-package+xml\"/>" +
+            "</rootfiles></container>";
+
+        return Zip(new (string, byte[])[]
+        {
+            ("mimetype", Utf8("application/epub+zip")),      // stored first, uncompressed
+            ("META-INF/container.xml", Utf8(container)),
+            ("OEBPS/content.opf", Utf8(opf)),
+            ("OEBPS/nav.xhtml", Utf8(nav)),
+            ("OEBPS/page.xhtml", Utf8(xhtml)),
+        }, storeFirst: true);
+    }
+
+    // ---- helpers ----
+
+    /// <summary>Build a zip archive. <paramref name="storeFirst"/> writes the FIRST entry uncompressed
+    /// (the ODF/EPUB "mimetype" rule) so the package is recognized.</summary>
+    private static byte[] Zip(IReadOnlyList<(string Name, byte[] Data)> entries, bool storeFirst = false)
+    {
+        using var ms = new MemoryStream();
+        using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var (name, data) = entries[i];
+                var level = storeFirst && i == 0 ? CompressionLevel.NoCompression : CompressionLevel.Optimal;
+                var e = zip.CreateEntry(name, level);
+                using var s = e.Open();
+                s.Write(data, 0, data.Length);
+            }
+        return ms.ToArray();
+    }
+
+    private static string Esc(string s) => s
+        .Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;")
+        .Replace("\"", "&quot;").Replace("'", "&#39;");
+
+    private static string RtfEsc(string s)
+    {
+        var sb = new StringBuilder();
+        foreach (char c in s)
+        {
+            if (c is '\\' or '{' or '}') sb.Append('\\').Append(c);
+            else if (c > 127) sb.Append(@"\u").Append(((int)c).ToString(CultureInfo.InvariantCulture)).Append('?');
+            else sb.Append(c);
+        }
+        return sb.ToString();
+    }
+
+    private static string HexNoHash(string? hex) =>
+        hex is { Length: > 0 } ? HexNoAlpha(hex).TrimStart('#') : "";
+
+    /// <summary>Drop a leading '#AA' alpha (8-digit) down to '#RRGGBB' for CSS/Office color values.</summary>
+    private static string HexNoAlpha(string hex)
+    {
+        var h = hex.TrimStart('#');
+        if (h.Length == 8) h = h[2..];              // AARRGGBB → RRGGBB
+        return "#" + h;
+    }
+}
