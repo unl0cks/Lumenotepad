@@ -147,7 +147,7 @@ public static class PageExport
 
     private const string HtmlCss =
         "body{font-family:Segoe UI,system-ui,sans-serif;max-width:820px;margin:40px auto;padding:0 24px;line-height:1.5;}" +
-        "ul{list-style:disc;}li{margin:2px 0;}a{color:#2f6fc4;}";
+        "ul{list-style:disc;}ul.tasklist{list-style:none;padding-left:1em;}li{margin:2px 0;}a{color:#2f6fc4;}";
 
     private static void AppendHtmlParagraphs(StringBuilder body, RichDocument d)
     {
@@ -156,7 +156,20 @@ public static class PageExport
         while (i < ps.Count)
         {
             var p = ps[i];
-            if (p.Bullet is "dot" or "arrow" or "star" or "heart" or "flower" or "spark" or "num" or "check")
+            if (p.Bullet == "check")     // a checklist: real (disabled) checkboxes, not plain bullets
+            {
+                body.Append("<ul class=\"tasklist\">\n");
+                while (i < ps.Count && ps[i].Bullet == "check")
+                {
+                    body.Append("<li><input type=\"checkbox\" disabled")
+                        .Append(ps[i].Checked ? " checked" : "").Append("> ")
+                        .Append(InlineHtml(ps[i])).Append("</li>\n");
+                    i++;
+                }
+                body.Append("</ul>\n");
+                continue;
+            }
+            if (p.Bullet is "dot" or "arrow" or "star" or "heart" or "flower" or "spark" or "num")
             {
                 bool ordered = p.Bullet == "num";
                 body.Append(ordered ? "<ol>\n" : "<ul>\n");
@@ -319,7 +332,7 @@ public static class PageExport
                     bool headBold = RichTextEditor.BaseWeightFor(p.Style) >= Avalonia.Media.FontWeight.SemiBold;
                     string bullet = p.Bullet switch
                     {
-                        null => "", "num" => "• ", "check" => p.Checked ? "☑ " : "☐ ", _ => "• ",
+                        null => "", "num" => "• ", "check" => p.Checked ? "[x] " : "[ ] ", _ => "• ",
                     };
                     var words = new List<(string, SkiaSharp.SKPaint)>();
                     var paints = new List<SkiaSharp.SKPaint>();
@@ -397,7 +410,7 @@ public static class PageExport
         bool headBold = RichTextEditor.BaseWeightFor(p.Style) >= Avalonia.Media.FontWeight.SemiBold;
         string bullet = p.Bullet switch
         {
-            null => "", "num" => "• ", "check" => p.Checked ? "☑ " : "☐ ", _ => "• ",
+            null => "", "num" => "• ", "check" => p.Checked ? "[x] " : "[ ] ", _ => "• ",
         };
         var runs = new StringBuilder();
         if (bullet.Length > 0) runs.Append(DocxRun(bullet, false, false, false, false, half, null));
@@ -442,7 +455,7 @@ public static class PageExport
                 var runs = new StringBuilder();
                 string bullet = p.Bullet switch
                 {
-                    null => "", "num" => "• ", "check" => p.Checked ? "☑ " : "☐ ", _ => "• ",
+                    null => "", "num" => "• ", "check" => p.Checked ? "[x] " : "[ ] ", _ => "• ",
                 };
                 if (bullet.Length > 0) runs.Append(Esc(bullet));
                 foreach (var r in p.Runs) runs.Append(OdtRun(r));

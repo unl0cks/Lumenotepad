@@ -65,6 +65,19 @@ public class PageExportTests
         Assert.Contains("<strong>bold</strong>", s);
         Assert.Contains("<a href=\"https://x.test\">site</a>", s);
         Assert.Contains("<ul>", s);
+        Assert.Contains("<input type=\"checkbox\" disabled checked>", s);   // the ticked "done" item
+        Assert.DoesNotContain("☑", s);                                      // no tofu-prone ballot glyphs
+    }
+
+    [Theory]
+    [InlineData(ExportFormat.Txt)]
+    [InlineData(ExportFormat.Rtf)]
+    public void Checkboxes_useAsciiBrackets_notBallotGlyphs(ExportFormat fmt)
+    {
+        var s = Text(PageExport.Export(fmt, "T", Page()));
+        Assert.DoesNotContain("☑", s);
+        Assert.DoesNotContain("☐", s);
+        Assert.Contains("[x]", s);
     }
 
     [Fact]
