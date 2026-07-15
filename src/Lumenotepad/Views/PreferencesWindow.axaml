@@ -27,6 +27,20 @@
             <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
             <Setter Property="Margin" Value="0,6,0,0"/>
         </Style>
+        <!-- Inline code/text fields + secondary buttons across the panels wear the app's themed
+             controls (raw Fluent defaults clashed — owner report). Explicitly-themed controls keep
+             their own theme (a local Theme= beats these Style setters). -->
+        <Style Selector="TextBox.field">
+            <Setter Property="Theme" Value="{StaticResource RoundedFieldTextBox}"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.secondary">
+            <Setter Property="Theme" Value="{StaticResource LumenButtonGray}"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="14,6"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
         <Style Selector="TextBlock.hint">
             <Setter Property="FontSize" Value="11.5"/>
             <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
@@ -266,7 +280,7 @@
                                 </StackPanel>
                                 <TextBlock Classes="hint" Text="Blank keeps the plain greeting."/>
                             </StackPanel>
-                            <TextBox x:Name="UserNameBox" Grid.Column="1" Width="150" FontSize="12.5"
+                            <TextBox x:Name="UserNameBox" Classes="field" Grid.Column="1" Width="150" FontSize="12.5"
                                      VerticalAlignment="Center"/>
                         </Grid>
                         <Grid ColumnDefinitions="*,Auto">
@@ -377,7 +391,7 @@
                                            Text="Custom hex — Enter applies; blank returns to the theme's own accent."/>
                                 <Border Classes="qmark" ToolTip.Tip="The highlight color used for buttons and selections. Type a color code like #4DA6FF, or press Enter on an empty box to go back to the theme's own color."><TextBlock/></Border>
                             </StackPanel>
-                            <TextBox x:Name="AccentHexBox" Grid.Column="1" Width="110" FontSize="12.5"
+                            <TextBox x:Name="AccentHexBox" Classes="field" Grid.Column="1" Width="110" FontSize="12.5"
                                      PlaceholderText="#RRGGBB" VerticalAlignment="Center"/>
                         </Grid>
 
@@ -577,7 +591,7 @@
                                 </StackPanel>
                                 <TextBlock Classes="hint" Text="Blank hex returns to the accent color."/>
                             </StackPanel>
-                            <TextBox x:Name="CaretColorBox" Grid.Column="1" Width="110" FontSize="12.5"
+                            <TextBox x:Name="CaretColorBox" Classes="field" Grid.Column="1" Width="110" FontSize="12.5"
                                      PlaceholderText="#RRGGBB" VerticalAlignment="Center"/>
                         </Grid>
                         <Grid ColumnDefinitions="*,Auto">
@@ -694,8 +708,8 @@
                             </StackPanel>
                             <WrapPanel x:Name="TextPaletteChips" Grid.Column="1" VerticalAlignment="Center"/>
                             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                <TextBox x:Name="TextPaletteHexBox" Width="92" FontSize="12" PlaceholderText="#RRGGBB"/>
-                                <Button x:Name="TextPaletteReset" Content="Reset" FontSize="11.5"/>
+                                <TextBox x:Name="TextPaletteHexBox" Classes="field" Width="96" FontSize="12" PlaceholderText="#RRGGBB"/>
+                                <Button x:Name="TextPaletteReset" Classes="secondary" Content="Reset"/>
                             </StackPanel>
                         </Grid>
                         <Grid ColumnDefinitions="90,*,Auto">
@@ -705,8 +719,8 @@
                             </StackPanel>
                             <WrapPanel x:Name="HighlightPaletteChips" Grid.Column="1" VerticalAlignment="Center"/>
                             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                <TextBox x:Name="HighlightPaletteHexBox" Width="92" FontSize="12" PlaceholderText="#RRGGBB"/>
-                                <Button x:Name="HighlightPaletteReset" Content="Reset" FontSize="11.5"/>
+                                <TextBox x:Name="HighlightPaletteHexBox" Classes="field" Width="96" FontSize="12" PlaceholderText="#RRGGBB"/>
+                                <Button x:Name="HighlightPaletteReset" Classes="secondary" Content="Reset"/>
                             </StackPanel>
                         </Grid>
                     </StackPanel>
@@ -715,7 +729,7 @@
                         <TextBlock Classes="section" Text="CUSTOM SHORTCUTS" Margin="0,4,0,2"/>
                         <TextBlock Classes="hint" Text="Click a shortcut, then press the keys you want instead. Press Backspace while choosing to go back to the normal one, or Esc to keep what you have."/>
                         <StackPanel x:Name="ShortcutEditRows" Spacing="4" Margin="0,4,0,0"/>
-                        <Button x:Name="ResetShortcutsBtn" Content="Reset all shortcuts" FontSize="11.5"
+                        <Button x:Name="ResetShortcutsBtn" Classes="secondary" Content="Reset all shortcuts"
                                 HorizontalAlignment="Left" Margin="0,4,0,0"/>
 
                         <TextBlock Classes="section" Text="FIXED SHORTCUTS"/>
@@ -800,7 +814,7 @@
                                 </StackPanel>
                                 <TextBlock x:Name="DataFolderText" Classes="hint" Text="—"/>
                             </StackPanel>
-                            <Button x:Name="OpenDataBtn" Grid.Column="1" Content="Open" VerticalAlignment="Center"
+                            <Button x:Name="OpenDataBtn" Classes="secondary" Grid.Column="1" Content="Open" VerticalAlignment="Center"
                                     Theme="{StaticResource LumenButton}" FontSize="12" Padding="12,5"/>
                         </Grid>
                         <Grid ColumnDefinitions="*,Auto">
@@ -821,9 +835,9 @@
                                 <TextBlock x:Name="BackupFolderText" Classes="hint" Text="Not set — automatic backups are off."/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                <Button x:Name="BackupFolderBtn" Content="Choose…"
+                                <Button x:Name="BackupFolderBtn" Classes="secondary" Content="Choose…"
                                         Theme="{StaticResource LumenButton}" FontSize="12" Padding="12,5"/>
-                                <Button x:Name="BackupClearBtn" Content="Clear"
+                                <Button x:Name="BackupClearBtn" Classes="secondary" Content="Clear"
                                         Theme="{StaticResource LumenButton}" FontSize="12" Padding="12,5"/>
                             </StackPanel>
                         </Grid>
@@ -854,7 +868,7 @@
                                 </StackPanel>
                                 <TextBlock x:Name="LastBackupText" Classes="hint" Text="Never backed up."/>
                             </StackPanel>
-                            <Button x:Name="BackupNowBtn" Grid.Column="1" Content="Back up now" VerticalAlignment="Center"
+                            <Button x:Name="BackupNowBtn" Classes="secondary" Grid.Column="1" Content="Back up now" VerticalAlignment="Center"
                                     Theme="{StaticResource LumenButton}" FontSize="12" Padding="12,5"/>
                         </Grid>
 
@@ -867,7 +881,7 @@
                                 </StackPanel>
                                 <TextBlock Classes="hint" Text="A folder of &#8249;notebook&#8250;/&#8249;section&#8250;/&#8249;page&#8250;.md files (UTF-8)."/>
                             </StackPanel>
-                            <Button x:Name="ExportBtn" Grid.Column="1" Content="Export…" VerticalAlignment="Center"
+                            <Button x:Name="ExportBtn" Classes="secondary" Grid.Column="1" Content="Export…" VerticalAlignment="Center"
                                     Theme="{StaticResource LumenButton}" FontSize="12" Padding="12,5"/>
                         </Grid>
                         <Grid ColumnDefinitions="*,Auto">
@@ -878,7 +892,7 @@
                                 </StackPanel>
                                 <TextBlock Classes="hint" Text="A .txt or .md file becomes a new page in the current section."/>
                             </StackPanel>
-                            <Button x:Name="ImportBtn" Grid.Column="1" Content="Import…" VerticalAlignment="Center"
+                            <Button x:Name="ImportBtn" Classes="secondary" Grid.Column="1" Content="Import…" VerticalAlignment="Center"
                                     Theme="{StaticResource LumenButton}" FontSize="12" Padding="12,5"/>
                         </Grid>
                         <TextBlock x:Name="DataStatusText" Classes="hint" Margin="0,8,0,0" Text=""/>
@@ -892,7 +906,7 @@
                                 </StackPanel>
                                 <TextBlock Classes="hint" Text="Every preference returns to its default. Notebooks and notes stay."/>
                             </StackPanel>
-                            <Button x:Name="ResetBtn" Grid.Column="1" Content="Reset…" VerticalAlignment="Center"
+                            <Button x:Name="ResetBtn" Classes="secondary" Grid.Column="1" Content="Reset…" VerticalAlignment="Center"
                                     Theme="{StaticResource LumenButton}" FontSize="12" Padding="12,5"/>
                         </Grid>
                         <Grid ColumnDefinitions="*,Auto" Margin="0,10,0,0">
