@@ -93,6 +93,7 @@ public partial class FormatToolbar : UserControl
         SubBtn.Click += (_, _) => Do(e => e.ToggleSub());
         LinkBtn.Click += async (_, _) => await AddLinkAsync();
         ImageBtn.Click += (_, _) => InsertImageRequested?.Invoke();
+        FootnoteBtn.Click += async (_, _) => await AddFootnoteAsync();
         BuildAlignChoices();
         BuildTypeChoices();
         SizeMinus.Click += (_, _) => NudgeSize(-1);
@@ -379,6 +380,17 @@ public partial class FormatToolbar : UserControl
         }
         _target.Focus();
         UpdateFromEditor();
+    }
+
+    /// <summary>Prompt for the footnote text and insert a numbered marker + bottom entry.</summary>
+    private async System.Threading.Tasks.Task AddFootnoteAsync()
+    {
+        if (_target is null || TopLevel.GetTopLevel(this) is not Window owner) return;
+        var r = await InputDialog.Show(owner, "Insert footnote",
+            new[] { ("Footnote text", "The note that appears at the bottom", "") }, "Insert");
+        if (r is null || string.IsNullOrWhiteSpace(r[0])) return;
+        _target.InsertFootnote(r[0]);
+        _target.Focus();
     }
 
     private Button? _numB, _numI, _numU, _numS;

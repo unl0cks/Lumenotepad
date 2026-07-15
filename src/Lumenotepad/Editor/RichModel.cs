@@ -84,6 +84,11 @@ public sealed class Paragraph
     /// <summary>Text type / named paragraph style (M10): Body default, or a heading/title.</summary>
     public ParaStyle Style;
 
+    /// <summary>A footnote entry line (M10): appended at the bottom of the box, rendered smaller +
+    /// muted, with a divider above the first. Its leading superscript marker matches an in-text
+    /// reference. Excluded from the count of "content" paragraphs.</summary>
+    public bool Footnote;
+
     public int Length => Runs.Sum(r => r.Text.Length);
     public string Text => string.Concat(Runs.Select(r => r.Text));
 
@@ -93,7 +98,7 @@ public sealed class Paragraph
         Bullet = Bullet,
         Checked = Checked,
         NumBold = NumBold, NumItalic = NumItalic, NumUnderline = NumUnderline, NumStrike = NumStrike,
-        Align = Align, Style = Style,
+        Align = Align, Style = Style, Footnote = Footnote,
     };
 
     /// <summary>Ensure a run boundary exists exactly at <paramref name="offset"/>; returns the index of the
@@ -234,6 +239,7 @@ public sealed class RichDocument
             Bullet = para.Bullet,
             Align = para.Align,
             Style = ParaStyle.Body,
+            Footnote = para.Footnote,          // a split footnote line stays a footnote line
         };
         para.Runs.RemoveRange(runIdx, para.Runs.Count - runIdx);
         para.Version++;
@@ -409,6 +415,23 @@ public sealed class RichDocument
         for (int pi = a.Para + 1; pi <= b.Para; pi++)
             if (Paragraphs[pi].Style != first) return null;
         return first;
+    }
+
+    /// <summary>Insert a footnote (M10): a superscript reference marker "[n]" at <paramref name="pos"/>,
+    /// and an auto-numbered footnote line appended at the bottom. Returns the caret position just
+    /// after the marker. Numbering is insertion order (n = existing footnote lines + 1).</summary>
+    public DocPos InsertFootnote(DocPos pos, string text)
+    {
+        int n = Paragraphs.Count(p => p.Footnote) + 1;
+        var marker = new RunFormat(false, false, false, false, null, null, null, null, Baseline.Super, null);
+        var caretAfter = InsertText(pos, $"[{n}]", marker);      // fires Changed
+
+        var fp = new Paragraph { Footnote = true };
+        fp.Runs.Add(new RichRun { Text = $"[{n}] ", Baseline = Baseline.Super });
+        fp.Runs.Add(new RichRun { Text = text });
+        Paragraphs.Add(fp);
+        OnChanged();
+        return caretAfter;
     }
 
     /// <summary>Flip a checkbox paragraph's ticked state.</summary>

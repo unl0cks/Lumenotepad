@@ -37,6 +37,7 @@ public static class RichDocJson
         [JsonPropertyName("ns")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public bool? Ns { get; set; }
         [JsonPropertyName("al")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Al { get; set; }
         [JsonPropertyName("ps")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Ps { get; set; }
+        [JsonPropertyName("fn")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Fn { get; set; }
     }
 
     private sealed class DocDto
@@ -53,7 +54,7 @@ public static class RichDocJson
             Bul = p.Bullet,
             Chk = p.Checked,
             Nb = p.NumBold, Ni = p.NumItalic, Nu = p.NumUnderline, Ns = p.NumStrike,
-            Al = (int)p.Align, Ps = (int)p.Style,
+            Al = (int)p.Align, Ps = (int)p.Style, Fn = p.Footnote,
             Runs = p.Runs.Select(r => new RunDto
             {
                 T = r.Text, B = r.Bold, I = r.Italic, U = r.Underline, S = r.Strike,
@@ -74,7 +75,7 @@ public static class RichDocJson
             {
                 Bullet = p.Bul, Checked = p.Chk,
                 NumBold = p.Nb, NumItalic = p.Ni, NumUnderline = p.Nu, NumStrike = p.Ns,
-                Align = (TextAlign)p.Al, Style = (ParaStyle)p.Ps,
+                Align = (TextAlign)p.Al, Style = (ParaStyle)p.Ps, Footnote = p.Fn,
             };
             foreach (var r in p.Runs.Where(r => r.T.Length > 0))
                 para.Runs.Add(new RichRun

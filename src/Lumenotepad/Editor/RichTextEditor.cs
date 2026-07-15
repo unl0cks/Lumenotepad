@@ -196,7 +196,7 @@ public sealed class RichTextEditor : Control
     {
         if (p.Bullet is not null && double.IsFinite(width)) width -= IndentOf(p);
         double maxWidth = double.IsFinite(width) && width > 1 ? width : double.PositiveInfinity;
-        double baseSize = BaseSizeFor(p.Style, FontSize);
+        double baseSize = p.Footnote ? Math.Max(9, FontSize * 0.82) : BaseSizeFor(p.Style, FontSize);
         var align = MapAlign(p.Align);
         if (p.Runs.Count == 0)
             return new TextLayout("", new Typeface(FontFamily, weight: BaseWeightFor(p.Style)), baseSize, Foreground,
@@ -221,8 +221,8 @@ public sealed class RichTextEditor : Control
 
         public TextRun? GetTextRun(int index)
         {
-            double baseSize = BaseSizeFor(_p.Style, _e.FontSize);
-            var baseWeight = BaseWeightFor(_p.Style);
+            double baseSize = _p.Footnote ? Math.Max(9, _e.FontSize * 0.82) : BaseSizeFor(_p.Style, _e.FontSize);
+            var baseWeight = _p.Footnote ? FontWeight.Normal : BaseWeightFor(_p.Style);
             int acc = 0;
             foreach (var r in _p.Runs)
             {
@@ -337,6 +337,15 @@ public sealed class RichTextEditor : Control
         // bullets + text
         for (int i = 0; i < _layouts.Count; i++)
         {
+            // A thin divider above the FIRST footnote line separates footnotes from the body (M10).
+            if (i < _doc.Paragraphs.Count && _doc.Paragraphs[i].Footnote &&
+                (i == 0 || !_doc.Paragraphs[i - 1].Footnote))
+            {
+                double dy = ParagraphTop(i) - ParagraphSpacing * 0.5;
+                var pen = new Pen(new SolidColorBrush(Color.Parse(
+                    Services.ThemePalettes.Alpha(Services.ThemeManager.Current.PaperText, 0x33))), 1);
+                ctx.DrawLine(pen, new Point(0, dy), new Point(Math.Min(180, Bounds.Width), dy));
+            }
             DrawBullet(ctx, i, ParagraphTop(i));
             _layouts[i].Draw(ctx, new Point(IndentOf(i), ParagraphTop(i)));
         }
@@ -883,6 +892,17 @@ public sealed class RichTextEditor : Control
         if (HasSelection) DeleteSelection();
         var fmt = _doc.FormatAt(_caret) with { Link = url.Trim(), Underline = true };
         _caret = _anchor = _doc.InsertText(_caret, text, fmt);
+        AfterEdit();
+    }
+
+    /// <summary>Insert a footnote (M10): a superscript marker at the caret + an auto-numbered line
+    /// at the bottom of the box.</summary>
+    public void InsertFootnote(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+        PushUndo();
+        if (HasSelection) DeleteSelection();
+        _caret = _anchor = _doc.InsertFootnote(_caret, text.Trim());
         AfterEdit();
     }
 

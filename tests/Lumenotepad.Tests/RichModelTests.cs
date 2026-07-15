@@ -274,6 +274,33 @@ public class RichModelTests
     }
 
     [Fact]
+    public void InsertFootnote_addsMarkerAndNumberedEntry()
+    {
+        var d = Doc("See here.");
+        var caret = d.InsertFootnote(new DocPos(0, 8), "A source.");   // before the period
+        Assert.Equal(new DocPos(0, 11), caret);                        // caret after "[1]"
+
+        Assert.Contains("[1]", d.Paragraphs[0].Text);
+        var fn = d.Paragraphs[^1];
+        Assert.True(fn.Footnote);
+        Assert.Equal("[1] A source.", fn.Text);
+
+        d.InsertFootnote(new DocPos(0, 0), "Second.");                 // numbering continues
+        Assert.Equal(2, d.Paragraphs.Count(p => p.Footnote));
+        Assert.Equal("[2] Second.", d.Paragraphs[^1].Text);
+    }
+
+    [Fact]
+    public void Footnote_flag_roundTrips()
+    {
+        var d = Doc("body");
+        d.InsertFootnote(new DocPos(0, 4), "note");
+        var back = RichDocJson.FromJson(RichDocJson.ToJson(d));
+        Assert.True(back.Paragraphs[^1].Footnote);
+        Assert.Equal("[1] note", back.Paragraphs[^1].Text);
+    }
+
+    [Fact]
     public void TextTypeSizes_scaleFromBody()
     {
         Assert.Equal(15, RichTextEditor.BaseSizeFor(ParaStyle.Body, 15));
