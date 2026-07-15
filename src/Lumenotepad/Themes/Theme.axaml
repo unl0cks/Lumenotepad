@@ -99,6 +99,44 @@
         <Setter Property="BorderBrush" Value="{DynamicResource FrameBorderBrush}"/>
     </ControlTheme>
 
+    <!-- Motion-driven toggle switch: Fluent's own knob slide only worked sometimes in this build
+         (transform styling is unreliable here — see the motion spec), so the knob is tweened by
+         ToggleFx from code while the track colors ride Brush transitions (those DO work). -->
+    <ControlTheme x:Key="{x:Type ToggleSwitch}" TargetType="ToggleSwitch">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Panel>
+                    <!-- ToggleSwitch REQUIRES this part (compile-time check); it only feeds the
+                         control's built-in drag/slide logic, which our code-driven knob replaces —
+                         so it exists, invisibly, and does nothing. -->
+                    <Panel x:Name="PART_MovingKnobs" Width="0" Height="0" IsVisible="False"/>
+                    <Border x:Name="track" Width="42" Height="22" CornerRadius="11"
+                            Background="{DynamicResource ControlPressedBrush}"
+                            BorderBrush="{DynamicResource FrameBorderBrush}" BorderThickness="1">
+                        <Border.Transitions>
+                            <Transitions>
+                                <BrushTransition Property="Background" Duration="0:0:0.16"/>
+                                <BrushTransition Property="BorderBrush" Duration="0:0:0.16"/>
+                            </Transitions>
+                        </Border.Transitions>
+                        <Border x:Name="knob" Width="16" Height="16" CornerRadius="8" Margin="2,0"
+                                HorizontalAlignment="Left" VerticalAlignment="Center"
+                                Background="#F2FFFFFF" BoxShadow="0 1 3 0 #55000000"/>
+                    </Border>
+                </Panel>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:checked /template/ Border#track">
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="^:pointerover /template/ Border#track">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="^:disabled"><Setter Property="Opacity" Value="0.4"/></Style>
+    </ControlTheme>
+
     <!-- Color swatch button: the button's Background IS the payload, so no state may repaint it
          (the default Fluent theme's hover swaps in its gray brush — owner saw yellow turn gray).
          Hover feedback is the accent ring from the callers' `.swatch` styles; press just dims. -->

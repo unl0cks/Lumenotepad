@@ -186,7 +186,10 @@
         </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="38,*">
+    <Panel>
+    <!-- AppRoot wraps ALL regular content so the rename overlay can blur it as one visual
+         (the overlay is its SIBLING and stays sharp). -->
+    <Grid x:Name="AppRoot" RowDefinitions="38,*">
 
         <!-- Glass tint: a veil UNDER all content that lightens/darkens what the acrylic shows
              through (prefs slider). First child = bottom of z-order; hidden only when the theme
@@ -563,4 +566,25 @@
 
         </Panel>
     </Grid>
+
+    <!-- Zoomed rename: everything behind blurs (AppRoot gets a BlurEffect from code), a veil dims,
+         and the rename box sits big and centered — Enter/click-away saves, Esc cancels. -->
+    <Panel x:Name="RenameOverlay" IsVisible="False">
+        <Border x:Name="RenameVeil" Background="#66000000"/>
+        <Border x:Name="RenameCard" Width="460" HorizontalAlignment="Center" VerticalAlignment="Center"
+                CornerRadius="12" Padding="20,16"
+                Background="{DynamicResource MenuBackgroundBrush}"
+                BorderBrush="{DynamicResource MenuBorderBrush}" BorderThickness="1"
+                BoxShadow="0 12 44 0 #55000000">
+            <StackPanel Spacing="10">
+                <TextBlock x:Name="RenameTitle" FontSize="12" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextMutedBrush}" Text="RENAME"/>
+                <TextBox x:Name="RenameBox" Theme="{StaticResource RoundedFieldTextBox}"
+                         FontSize="20" Padding="10,7"/>
+                <TextBlock FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
+                           Text="Enter to save  ·  Esc to cancel"/>
+            </StackPanel>
+        </Border>
+    </Panel>
+    </Panel>
 </UserControl>

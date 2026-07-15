@@ -89,13 +89,13 @@
             </Button>
 
             <StackPanel x:Name="SizeGroup" Orientation="Horizontal" Spacing="0">
-                <Button x:Name="SizeMinus" Theme="{StaticResource IconButton}" Width="24" Height="30" FontSize="11"
+                <Button x:Name="SizeMinus" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="11"
                         FontFamily="{StaticResource IconFont}" Content="&#xE949;" ToolTip.Tip="Smaller"/>
                 <TextBox x:Name="SizeBox" Theme="{StaticResource RoundedFieldTextBox}"
                          Width="30" Height="26" FontSize="12" Text="15"
                          VerticalAlignment="Center" VerticalContentAlignment="Center"
                          TextAlignment="Center" ToolTip.Tip="Font size — type a number and press Enter"/>
-                <Button x:Name="SizePlus" Theme="{StaticResource IconButton}" Width="24" Height="30" FontSize="11"
+                <Button x:Name="SizePlus" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="11"
                         FontFamily="{StaticResource IconFont}" Content="&#xE948;" ToolTip.Tip="Larger"/>
             </StackPanel>
 

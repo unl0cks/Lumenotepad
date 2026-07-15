@@ -65,11 +65,17 @@ public partial class MainView : UserControl
         Toolbar.DockRequested += pos => { if (Vm is { } vm) vm.ToolbarPosition = pos; };
         Toolbar.ScopeRequested += scope => { if (Vm is { } vm) vm.ToolbarScope = scope; };
 
-        // Section inline rename: double-click a tab, the rename button, or right-click → Rename.
+        // Section/page rename: double-click, the rename button, or right-click → Rename — all open
+        // the zoomed rename overlay (the background blurs until the name is saved).
         RenameSectionBtn.Click += (_, _) => BeginRenameSection(Vm?.SelectedSection);
         SectionsList.DoubleTapped += (_, e) => BeginRenameSection((e.Source as StyledElement)?.DataContext as Section);
-        SectionsList.AddHandler(LostFocusEvent, OnSectionEditLostFocus, RoutingStrategies.Bubble, handledEventsToo: true);
-        SectionsList.AddHandler(KeyDownEvent, OnSectionEditKeyDown, RoutingStrategies.Bubble, handledEventsToo: true);
+        PagesList.DoubleTapped += (_, e) => BeginRenamePage((e.Source as StyledElement)?.DataContext as Models.Page);
+        RenameBox.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter) { EndRenameOverlay(commit: true); e.Handled = true; }
+            else if (e.Key == Key.Escape) { EndRenameOverlay(commit: false); e.Handled = true; }
+        };
+        RenameVeil.PointerPressed += (_, _) => EndRenameOverlay(commit: true);
 
         // Delete lives on the right-click menu now (no delete buttons), always behind an "are you sure" prompt.
         SectionsList.ContextRequested += OnSectionsContextRequested;
@@ -202,9 +208,14 @@ public partial class MainView : UserControl
     private void ScaleSelect(ref Control? cur, Control? next, double scale)
     {
         if (ReferenceEquals(cur, next)) return;
-        if (cur is not null) Motion.Tween(cur, 0, 0, ScaleNow(cur), 0, 0, 1.0, 140);
+        // Always carry opacity to 1: one tween per element, so this CANCELS any in-flight rise-in
+        // on the same container — without opacity params the kill strands a just-added section/page
+        // at opacity ~0 (invisible until its container is re-prepared by leaving the notebook).
+        if (cur is not null) Motion.Tween(cur, 0, 0, ScaleNow(cur), 0, 0, 1.0, 140,
+                                          fromOpacity: cur.Opacity, toOpacity: 1);
         cur = next;
-        if (next is not null) Motion.Tween(next, 0, 0, ScaleNow(next), 0, 0, scale, 170);
+        if (next is not null) Motion.Tween(next, 0, 0, ScaleNow(next), 0, 0, scale, 170,
+                                           fromOpacity: next.Opacity, toOpacity: 1);
     }
 
     private void UpdateSelectionScale()
@@ -959,33 +970,91 @@ public partial class MainView : UserControl
     {
         if (sec is null) return;
         if (Vm is { } vm) vm.SelectedSection = sec;
-        sec.IsEditing = true;
-        // The rename TextBox becomes visible this frame; focus + select it once it's realized.
-        Dispatcher.UIThread.Post(() =>
+        BeginRenameOverlay("RENAME SECTION", sec.Name, n => { sec.Name = n; Vm?.Save(); }, SectionsList);
+    }
+
+    private void BeginRenamePage(Models.Page? pg)
+    {
+        if (pg is null) return;
+        if (Vm is { } vm) vm.SelectedPage = pg;
+        BeginRenameOverlay("RENAME PAGE", pg.Title, t => { pg.Title = t; Vm?.Save(); }, PagesList);
+    }
+
+    // ---- zoomed rename overlay: blur the whole app, dim it, and float one big name box ----------
+    private System.Action<string>? _renameCommit;
+    private Control? _renameReturnFocus;
+    private Avalonia.Media.BlurEffect? _renameBlur;
+    private Avalonia.Threading.DispatcherTimer? _renameBlurTimer;
+
+    private void BeginRenameOverlay(string title, string current, System.Action<string> commit, Control? returnFocus)
+    {
+        _renameCommit = commit;
+        _renameReturnFocus = returnFocus;
+        RenameTitle.Text = title;
+        RenameBox.Text = current;
+
+        RenameOverlay.IsVisible = true;
+        AnimateBlur(to: 16);
+        Motion.FadeIn(RenameVeil, Motion.Fast);
+        Motion.ScaleIn(RenameCard, 0.92, Motion.Fast);
+        Dispatcher.UIThread.Post(() => { RenameBox.Focus(); RenameBox.SelectAll(); }, DispatcherPriority.Background);
+    }
+
+    private void EndRenameOverlay(bool commit)
+    {
+        if (!RenameOverlay.IsVisible) return;
+        if (commit)
         {
-            var box = SectionsList.ContainerFromItem(sec)?.GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
-            if (box is not null) Motion.FadeIn(box, Motion.Fast);
-            box?.Focus();
-            box?.SelectAll();
-        }, DispatcherPriority.Background);
+            var name = (RenameBox.Text ?? "").Trim();
+            if (name.Length > 0) _renameCommit?.Invoke(name);   // empty keeps the old name
+        }
+        _renameCommit = null;
+
+        AnimateBlur(to: 0);
+        Motion.FadeOut(RenameCard, Motion.Fast);
+        Motion.FadeOut(RenameVeil, Motion.Fast, () =>
+        {
+            RenameOverlay.IsVisible = false;
+            _renameReturnFocus?.Focus();
+            _renameReturnFocus = null;
+        });
     }
 
-    private void CommitSection(Section sec)
+    /// <summary>Ease AppRoot's blur radius toward a target (the same 15ms code-tween style as
+    /// Motion — Effect properties have no declarative animation path here). Radius 0 removes the
+    /// effect entirely so normal rendering pays nothing.</summary>
+    private void AnimateBlur(double to)
     {
-        if (!sec.IsEditing) return;
-        sec.IsEditing = false;
-        Vm?.Save();
-    }
-
-    private void OnSectionEditLostFocus(object? sender, RoutedEventArgs e)
-    {
-        if (e.Source is TextBox { DataContext: Section sec }) CommitSection(sec);
-    }
-
-    private void OnSectionEditKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Source is not TextBox { DataContext: Section sec }) return;
-        if (e.Key is Key.Enter or Key.Escape) { CommitSection(sec); SectionsList.Focus(); e.Handled = true; }
+        _renameBlurTimer?.Stop();
+        _renameBlurTimer = null;
+        if (to > 0 && _renameBlur is null)
+        {
+            _renameBlur = new Avalonia.Media.BlurEffect { Radius = 0.01 };
+            AppRoot.Effect = _renameBlur;
+        }
+        if (!Motion.Enabled || _renameBlur is null)
+        {
+            if (to <= 0) { AppRoot.Effect = null; _renameBlur = null; }
+            else _renameBlur!.Radius = to;
+            return;
+        }
+        double from = _renameBlur.Radius;
+        int step = 0, steps = Motion.Steps(Motion.Ms(Motion.Fast));
+        var timer = new Avalonia.Threading.DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(15) };
+        timer.Tick += (_, _) =>
+        {
+            step++;
+            double e = Motion.EaseOut(System.Math.Min(1.0, step / (double)steps));
+            if (_renameBlur is { } b) b.Radius = System.Math.Max(0.01, Motion.Lerp(from, to, e));
+            if (step >= steps)
+            {
+                timer.Stop();
+                if (ReferenceEquals(_renameBlurTimer, timer)) _renameBlurTimer = null;
+                if (to <= 0) { AppRoot.Effect = null; _renameBlur = null; }
+            }
+        };
+        _renameBlurTimer = timer;
+        timer.Start();
     }
 
     // ---- right-click delete menus (with confirm) for notebooks, sections, pages ----
@@ -1082,13 +1151,16 @@ public partial class MainView : UserControl
             styleMenu.Items.Add(item);
         }
 
+        var rename = new MenuItem { Header = "Rename" };
+        rename.Click += (_, _) => BeginRenamePage(pg);
+
         var delete = new MenuItem { Header = "Delete page" };
         delete.Click += (_, _) => ConfirmThenDelete(
             "Delete this page?",
             $"“{Label(pg.Title)}” will be permanently deleted. This can't be undone.",
             Vm?.ConfirmDeletePage ?? true,
             () => CollapseThenDelete(PagesList.ContainerFromItem(pg) as Control, () => Vm?.DeletePageCommand.Execute(pg)));
-        OpenMenu(e, gridMenu, styleMenu, delete);
+        OpenMenu(e, rename, gridMenu, styleMenu, delete);
     }
 
     // ---- homepage gallery ----

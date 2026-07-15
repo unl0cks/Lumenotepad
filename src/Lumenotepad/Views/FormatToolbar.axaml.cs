@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using Lumenotepad.Editor;
 
 namespace Lumenotepad.Views;
@@ -67,6 +68,15 @@ public partial class FormatToolbar : UserControl
         // Picker flyouts (bullets, highlight, color, font) rise in like the context menus do.
         foreach (var btn in new[] { BulletBtn, HighlightBtn, ColorBtn, FontBtn })
             if (btn.Flyout is { } f) MenuFx.AttachFlyout(f);
+
+        // The font list glides like every other list (its ScrollViewer only exists once opened).
+        bool fontScrollSmoothed = false;
+        if (FontBtn.Flyout is { } fontFly) fontFly.Opened += (_, _) =>
+        {
+            if (fontScrollSmoothed) return;
+            if (FontList.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault() is { } sv)
+            { SmoothScroll.Attach(sv); fontScrollSmoothed = true; }
+        };
 
         BoldBtn.Click += (_, _) => Do(e => e.ToggleBold());
         ItalicBtn.Click += (_, _) => Do(e => e.ToggleItalic());

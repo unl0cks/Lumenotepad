@@ -12,6 +12,7 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        ToggleFx.Install();   // Motion-driven ToggleSwitch knob (one global hook pair)
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             desktop.MainWindow = new MainWindow { DataContext = new MainViewModel() };
         base.OnFrameworkInitializationCompleted();
