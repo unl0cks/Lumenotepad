@@ -86,7 +86,7 @@ public partial class NotebookWizardWindow : Window
     private void CreateAndClose()
     {
         _vm.CreateNotebook(_draft);
-        _tempCover = null;                   // consumed by SetNotebookCover — nothing to clean
+        CleanupTempCover();                  // SetNotebookCover COPIED the crop — delete our temp now
         Close();
     }
 
