@@ -9,11 +9,22 @@ public class PageStyleTemplateTests
 {
     private static readonly Size Vp = new(900, 600);
 
-    [Theory]
-    [InlineData("Freeform")]
-    [InlineData("Mindmap")]
-    public void FreeformAndMindmap_noStarters(string style) =>
-        Assert.Empty(PageStyleTemplate.StartersFor(style, PageStyles.ModeGuides, Vp));
+    [Fact]
+    public void Freeform_noStarters() =>
+        Assert.Empty(PageStyleTemplate.StartersFor(PageStyles.Freeform, PageStyles.ModeGuides, Vp));
+
+    [Fact]
+    public void Mindmap_oneCentralBubble_neverLocked()
+    {
+        var boxes = PageStyleTemplate.StartersFor(PageStyles.Mindmap, PageStyles.ModeRigid, Vp);
+        var box = Assert.Single(boxes);
+        Assert.Equal("Central idea", box.Doc.GetText());
+        Assert.Equal(340, box.X);               // 900/2 − 110
+        Assert.Equal(240, box.Y);               // 600 × 0.4
+        Assert.Equal(220, box.Width);
+        Assert.False(box.Locked);               // a mindmap's bubbles always move, even in rigid mode
+        Assert.Equal(0, box.H);
+    }
 
     [Fact]
     public void Cornell_threeLabelledRegions()

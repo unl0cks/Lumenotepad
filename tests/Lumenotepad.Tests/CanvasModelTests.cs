@@ -178,4 +178,74 @@ public class CanvasJsonTests
     {
         Assert.Empty(CanvasDocJson.FromJson(json).Boxes);
     }
+
+    // ---- mindmap links (M9 Part 5) ----
+
+    [Fact]
+    public void ToggleLink_linksThenUnlinks_firesChanged_ignoresSelf()
+    {
+        var canvas = new CanvasDocument();
+        var a = canvas.AddBox(0, 0);
+        var b = canvas.AddBox(400, 0);
+        int changed = 0;
+        canvas.Changed += () => changed++;
+
+        Assert.False(canvas.ToggleLink(a, a));           // self-link refused
+        Assert.Empty(canvas.Links);
+
+        Assert.True(canvas.ToggleLink(a, b));
+        Assert.Single(canvas.Links);
+        Assert.False(canvas.ToggleLink(b, a));           // same pair, either order → unlink
+        Assert.Empty(canvas.Links);
+        Assert.Equal(2, changed);
+    }
+
+    [Fact]
+    public void RemoveOrTrashBox_dropsItsLinks()
+    {
+        var canvas = new CanvasDocument();
+        var a = canvas.AddBox(0, 0);
+        var b = canvas.AddBox(400, 0);
+        var c = canvas.AddBox(0, 400);
+        canvas.ToggleLink(a, b);
+        canvas.ToggleLink(b, c);
+        canvas.ToggleLink(a, c);
+
+        canvas.DeleteToTrash(b);
+        Assert.Single(canvas.Links);                     // only a—c survives
+        Assert.True(ReferenceEquals(canvas.Links[0].A, a) && ReferenceEquals(canvas.Links[0].B, c));
+
+        canvas.RemoveBox(a);
+        Assert.Empty(canvas.Links);
+    }
+
+    [Fact]
+    public void Links_roundTripAsIndexPairs()
+    {
+        var canvas = new CanvasDocument();
+        var a = canvas.AddBox(0, 0);
+        a.Doc.InsertText(new DocPos(0, 0), "center");
+        var b = canvas.AddBox(400, 0);
+        b.Doc.InsertText(new DocPos(0, 0), "branch");
+        canvas.AddBox(0, 400);                           // unlinked third box
+        canvas.ToggleLink(a, b);
+
+        var reloaded = CanvasDocJson.FromJson(CanvasDocJson.ToJson(canvas));
+
+        var link = Assert.Single(reloaded.Links);
+        Assert.Equal("center", link.A.Doc.GetText());
+        Assert.Equal("branch", link.B.Doc.GetText());
+    }
+
+    [Fact]
+    public void Links_absentWhenNone_badPairsIgnored()
+    {
+        var canvas = new CanvasDocument();
+        canvas.AddBox(0, 0);
+        Assert.DoesNotContain("\"links\"", CanvasDocJson.ToJson(canvas));
+
+        var json = "{\"v\":2,\"boxes\":[{\"x\":0,\"y\":0,\"w\":360,\"paras\":[]}]," +
+                   "\"links\":[[0,5],[0,0],[1],[0,-1]]}";
+        Assert.Empty(CanvasDocJson.FromJson(json).Links); // out-of-range/self/short pairs all dropped
+    }
 }

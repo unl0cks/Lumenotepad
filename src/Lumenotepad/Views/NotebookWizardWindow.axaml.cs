@@ -304,7 +304,11 @@ public partial class NotebookWizardWindow : Window
     /// <summary>One selectable page-style chip: a live mini GuideLayer preview + the style name.</summary>
     private Control MakeStyleChip(string style)
     {
-        var preview = new Editor.GuideLayer { Width = 120, Height = 72, Viewport = new Avalonia.Size(120, 72) };
+        var preview = new Editor.GuideLayer
+        {
+            Width = 120, Height = 72, Viewport = new Avalonia.Size(120, 72),
+            PreviewMotif = true,      // styles with no real-page guides (Mindmap) still illustrate
+        };
         preview.SetStyles(Editor.PageStyles.Blank, style, Editor.PageStyles.ModeGuides);
         var chip = new Border
         {

@@ -21,6 +21,11 @@ public sealed class GuideLayer : Control
     /// canvas. Pushed by MainView from the ScrollViewer.</summary>
     public Size Viewport { get; set; }
 
+    /// <summary>Chip-preview instances set this (wizard + customize dialogs): styles whose real
+    /// page draws NOTHING (Mindmap — bubbles + links only) still get a little illustrative motif
+    /// so their chip isn't a blank square. The live canvas leaves it false.</summary>
+    public bool PreviewMotif { get; set; }
+
     public void SetStyles(string gridStyle, string pageStyle, int mode)
     {
         _gridStyle = gridStyle;
@@ -40,6 +45,7 @@ public sealed class GuideLayer : Control
     {
         var size = Bounds.Size;
         if (_gridBrush is not null) ctx.FillRectangle(_gridBrush, new Rect(size));
+        if (PreviewMotif && _pageStyle == PageStyles.Mindmap) { RenderMindmapMotif(ctx, size); return; }
         if (_mode == PageStyles.ModeStartersOnly) return;          // starters-only: no guides
         var set = PageStyleGuides.For(_pageStyle, Viewport, size);
         if (set.Lines.Count == 0 && set.Boxes.Count == 0) return;
@@ -47,6 +53,22 @@ public sealed class GuideLayer : Control
             Color.Parse(Services.ThemePalettes.Alpha(Services.ThemeManager.Current.PaperText, 0x26))), 1);
         foreach (var (a, b) in set.Lines) ctx.DrawLine(pen, a, b);
         foreach (var r in set.Boxes) ctx.DrawRectangle(null, pen, r, 10, 10);
+    }
+
+    /// <summary>The Mindmap chip illustration: a central bubble with two linked branches.</summary>
+    private static void RenderMindmapMotif(DrawingContext ctx, Size size)
+    {
+        var t = Services.ThemeManager.Current;
+        var line = new Pen(new SolidColorBrush(Color.Parse(Services.ThemePalettes.Alpha(t.Accent, 0x8C))), 1.6);
+        var ring = new Pen(new SolidColorBrush(Color.Parse(Services.ThemePalettes.Alpha(t.PaperText, 0x40))), 1.2);
+        var center = new Point(size.Width * 0.5, size.Height * 0.5);
+        var left = new Point(size.Width * 0.2, size.Height * 0.26);
+        var right = new Point(size.Width * 0.78, size.Height * 0.72);
+        ctx.DrawLine(line, center, left);
+        ctx.DrawLine(line, center, right);
+        ctx.DrawEllipse(null, ring, center, size.Width * 0.13, size.Height * 0.14);
+        ctx.DrawEllipse(null, ring, left, size.Width * 0.09, size.Height * 0.11);
+        ctx.DrawEllipse(null, ring, right, size.Width * 0.09, size.Height * 0.11);
     }
 
     // ---- grid-style paper backgrounds (tiled brushes — one cell, GPU-repeated) ----

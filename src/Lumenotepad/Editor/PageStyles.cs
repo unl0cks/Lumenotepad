@@ -11,12 +11,13 @@ public static class PageStyles
     public const string Blank = "Blank", Ruled = "Ruled", Grid = "Grid", Dots = "Dots";
     public static readonly string[] GridStyles = { Blank, Ruled, Grid, Dots };
 
-    // Page styles (methods). Mindmap is reserved for M9 Part 5 — renders like Freeform until then.
+    // Page styles (methods). Mindmap (M9 Part 5) is interactive: bubbles link by dragging
+    // one onto another (the Mapping Method folded in).
     public const string Freeform = "Freeform", Cornell = "Cornell", TwoColumn = "Two-column",
         Outline = "Outline", Boxing = "Boxing", Charting = "Charting", Sentence = "Sentence",
         Mindmap = "Mindmap";
     public static readonly string[] Styles =
-        { Freeform, Cornell, TwoColumn, Outline, Boxing, Charting, Sentence };
+        { Freeform, Cornell, TwoColumn, Outline, Boxing, Charting, Sentence, Mindmap };
 
     // Apply modes for the guide-based styles.
     public const int ModeGuides = 0;       // guides + starter containers

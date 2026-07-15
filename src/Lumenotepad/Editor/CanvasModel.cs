@@ -43,7 +43,34 @@ public sealed class CanvasDocument
     public List<NoteBox> Boxes { get; } = new();
     public List<NoteBox> Trash { get; } = new();
 
+    /// <summary>Mindmap links (M9 Part 5): undirected box pairs, created by dropping one bubble
+    /// onto another while the page's style is Mindmap. Object references — a removed or trashed
+    /// box takes its links with it (a restore comes back unlinked).</summary>
+    public List<(NoteBox A, NoteBox B)> Links { get; } = new();
+
     public event Action? Changed;
+
+    /// <summary>Link two boxes, or UNLINK them when the link already exists (drop again to undo).
+    /// Returns true when the pair is linked after the call.</summary>
+    public bool ToggleLink(NoteBox a, NoteBox b)
+    {
+        if (ReferenceEquals(a, b)) return false;
+        int i = Links.FindIndex(l =>
+            (ReferenceEquals(l.A, a) && ReferenceEquals(l.B, b)) ||
+            (ReferenceEquals(l.A, b) && ReferenceEquals(l.B, a)));
+        if (i >= 0)
+        {
+            Links.RemoveAt(i);
+            Changed?.Invoke();
+            return false;
+        }
+        Links.Add((a, b));
+        Changed?.Invoke();
+        return true;
+    }
+
+    private void DropLinks(NoteBox box) =>
+        Links.RemoveAll(l => ReferenceEquals(l.A, box) || ReferenceEquals(l.B, box));
 
     public NoteBox AddBox(double x, double y, double width = NoteBox.DefaultWidth, RichDocument? doc = null)
     {
@@ -63,6 +90,7 @@ public sealed class CanvasDocument
     public void RemoveBox(NoteBox box)
     {
         if (!Boxes.Remove(box)) return;
+        DropLinks(box);
         box.Doc.Changed -= OnBoxDocChanged;
         Changed?.Invoke();
     }
@@ -71,6 +99,7 @@ public sealed class CanvasDocument
     public void DeleteToTrash(NoteBox box)
     {
         if (!Boxes.Remove(box)) return;
+        DropLinks(box);
         box.Doc.Changed -= OnBoxDocChanged;
         Trash.Insert(0, box);
         Changed?.Invoke();

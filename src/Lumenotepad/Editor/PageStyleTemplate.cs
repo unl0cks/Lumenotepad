@@ -79,6 +79,19 @@ public static class PageStyleTemplate
                 Add(Margin, 40, vw - 2 * Margin, vh - 80, doc);
                 break;
             }
+            case PageStyles.Mindmap:
+            {
+                // One central bubble; branches grow by dragging new bubbles onto it. Never rigid —
+                // a mindmap's whole point is moving bubbles, so the lock flag is ignored here.
+                var box = new NoteBox(Label("Central idea"))
+                {
+                    X = System.Math.Round(vw / 2) - 110,
+                    Y = System.Math.Round(vh * 0.4),
+                    Width = 220,
+                };
+                list.Add(box);
+                break;
+            }
         }
         return list;
     }

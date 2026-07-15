@@ -55,10 +55,16 @@ public sealed class NoteCanvas : Panel
 
     // The bottom guide layer: grid-style paper background + page-style guide lines (M9).
     private readonly GuideLayer _guides = new();
+    // The mindmap connector layer: above the guides, under every container (M9 Part 5).
+    private readonly LinkLayer _links = new();
+    private string _pageStyle = PageStyles.Freeform;
 
     /// <summary>Push the page's effective styles (grid background, method guides, apply mode).</summary>
-    public void SetStyles(string gridStyle, string pageStyle, int mode) =>
+    public void SetStyles(string gridStyle, string pageStyle, int mode)
+    {
+        _pageStyle = pageStyle;
         _guides.SetStyles(gridStyle, pageStyle, mode);
+    }
 
     /// <summary>The visible page area — guide dividers anchor to it (MainView pushes it on layout).</summary>
     public void SetViewport(Size viewport)
@@ -109,12 +115,25 @@ public sealed class NoteCanvas : Panel
         SetActive(null);
         Children.Add(_guides);         // first child = bottom of z-order: under every container
         _guides.Refresh();             // theme changes arrive as a Document reset — re-tint here
+        _links.Doc = _doc;             // connectors run under the bubbles, over the paper
+        _links.Resolve = BoxRect;
+        _links.Refresh();
+        Children.Add(_links);
         Children.Add(_hint);
         if (_doc is not null)
             foreach (var box in _doc.Boxes)
                 Children.Add(new NoteBoxView(this, box));
         UpdateHint();
         InvalidateMeasure();
+    }
+
+    /// <summary>A box's current on-screen rect (the arranged view), for the link layer.</summary>
+    private Rect? BoxRect(NoteBox box)
+    {
+        foreach (var child in Children)
+            if (child is NoteBoxView v && ReferenceEquals(v.Box, box))
+                return v.Bounds;
+        return null;
     }
 
     private void UpdateHint()
@@ -140,9 +159,9 @@ public sealed class NoteCanvas : Panel
     {
         foreach (var child in Children)
         {
-            if (ReferenceEquals(child, _guides))
+            if (ReferenceEquals(child, _guides) || ReferenceEquals(child, _links))
             {
-                child.Arrange(new Rect(finalSize));     // the grid covers the whole scrollable page
+                child.Arrange(new Rect(finalSize));     // full-page layers under every container
                 continue;
             }
             if (child is not NoteBoxView v)
@@ -155,6 +174,7 @@ public sealed class NoteCanvas : Panel
             }
             v.Arrange(new Rect(v.Box.X, v.Box.Y, v.Box.Width, Math.Max(v.DesiredSize.Height, v.Box.H)));
         }
+        _links.InvalidateVisual();               // connectors follow bubbles live during drags
         return finalSize;
     }
 
@@ -228,6 +248,36 @@ public sealed class NoteCanvas : Panel
         Children.Remove(view);
         if (ReferenceEquals(ActiveEditor, view.Editor)) SetActive(null);
         UpdateHint();
+        InvalidateMeasure();
+    }
+
+    /// <summary>Mindmap linking (M9 Part 5): a MOVE drag that ends with the bubble overlapping
+    /// another toggles a link between them (drop again to unlink). Only while the page's effective
+    /// style is Mindmap — every other style keeps plain drags. A heavy overlap nudges the dropped
+    /// bubble past the target's nearest edge so both stay visible with the connector showing.</summary>
+    internal void OnBoxDragEnd(NoteBoxView view)
+    {
+        if (_doc is null || _pageStyle != PageStyles.Mindmap) return;
+        NoteBoxView? hit = null;
+        foreach (var child in Children)                    // later child = higher z — keep the last hit
+            if (child is NoteBoxView v && !ReferenceEquals(v, view) && v.Bounds.Intersects(view.Bounds))
+                hit = v;
+        if (hit is null) return;
+        bool linked = _doc.ToggleLink(view.Box, hit.Box);
+        if (linked) NudgeApart(view, hit);
+        _links.InvalidateVisual();
+    }
+
+    private void NudgeApart(NoteBoxView moved, NoteBoxView target)
+    {
+        var a = moved.Bounds;
+        var b = target.Bounds;
+        var overlap = a.Intersect(b);
+        if (overlap.Width * overlap.Height < 0.35 * a.Width * a.Height) return;   // just touching — leave it
+        if (Math.Abs(a.Center.X - b.Center.X) >= Math.Abs(a.Center.Y - b.Center.Y))
+            moved.Box.X = a.Center.X >= b.Center.X ? b.Right + 24 : Math.Max(0, b.X - a.Width - 24);
+        else
+            moved.Box.Y = a.Center.Y >= b.Center.Y ? b.Bottom + 24 : Math.Max(0, b.Y - a.Height - 24);
         InvalidateMeasure();
     }
 
@@ -455,6 +505,9 @@ internal sealed class NoteBoxView : Panel
             _dragging = false;
             e.Pointer.Capture(null);
             RefreshChrome();                          // back to hover/focus-driven now the drag is done
+            // Mindmap: dropping onto another bubble links them — BEFORE the commit, so any nudge
+            // the link applies persists in the same save.
+            if (mode == DragMode.Move) _canvas.OnBoxDragEnd(this);
             _canvas.Document?.CommitGeometry();      // persist the final geometry once
             e.Handled = true;
         };

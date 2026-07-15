@@ -28,6 +28,8 @@ public static class CanvasDocJson
         [JsonPropertyName("v")] public int V { get; set; } = 2;
         [JsonPropertyName("boxes")] public List<BoxDto> Boxes { get; set; } = new();
         [JsonPropertyName("trash")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<BoxDto>? Trash { get; set; }
+        /// <summary>Mindmap links as BOX-INDEX pairs into <see cref="Boxes"/> (M9 Part 5).</summary>
+        [JsonPropertyName("links")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<int[]>? Links { get; set; }
     }
 
     private static BoxDto ToDto(NoteBox b) => new()
@@ -47,6 +49,12 @@ public static class CanvasDocJson
         {
             Boxes = canvas.Boxes.Select(ToDto).ToList(),
             Trash = canvas.Trash.Count > 0 ? canvas.Trash.Select(ToDto).ToList() : null,
+            Links = canvas.Links.Count > 0
+                ? canvas.Links
+                    .Select(l => new[] { canvas.Boxes.IndexOf(l.A), canvas.Boxes.IndexOf(l.B) })
+                    .Where(p => p[0] >= 0 && p[1] >= 0)
+                    .ToList()
+                : null,
         };
         return JsonSerializer.Serialize(dto, RichDocJson.Options);
     }
@@ -74,6 +82,13 @@ public static class CanvasDocJson
                     if (dto.Trash is not null)                       // trash docs hook on restore, not here
                         foreach (var b in dto.Trash)
                             canvas.Trash.Add(FromDto(b));
+                    if (dto.Links is not null)                       // invalid/out-of-range pairs ignored
+                        foreach (var pair in dto.Links)
+                            if (pair is { Length: 2 } &&
+                                pair[0] >= 0 && pair[0] < canvas.Boxes.Count &&
+                                pair[1] >= 0 && pair[1] < canvas.Boxes.Count &&
+                                pair[0] != pair[1])
+                                canvas.Links.Add((canvas.Boxes[pair[0]], canvas.Boxes[pair[1]]));
                 }
                 return canvas;
             }

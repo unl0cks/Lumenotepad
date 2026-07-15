@@ -120,7 +120,11 @@ public partial class CustomizeSheetWindow : Window
         }
         else
         {
-            var layer = new Editor.GuideLayer { Width = 104, Height = 62, Viewport = new Avalonia.Size(104, 62) };
+            var layer = new Editor.GuideLayer
+            {
+                Width = 104, Height = 62, Viewport = new Avalonia.Size(104, 62),
+                PreviewMotif = true,  // styles with no real-page guides (Mindmap) still illustrate
+            };
             layer.SetStyles(Editor.PageStyles.Blank, key, Editor.PageStyles.ModeGuides);
             preview = layer;
         }
