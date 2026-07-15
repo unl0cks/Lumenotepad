@@ -37,6 +37,11 @@
     <SolidColorBrush x:Key="PaperTextBrush" Color="#FFFFFFFF"/>
     <SolidColorBrush x:Key="PaperTextMutedBrush" Color="#80FFFFFF"/>
     <SolidColorBrush x:Key="FieldSelectionBrush" Color="#784DA6FF"/>
+
+    <!-- Corner-roundness defaults (M8 Part 6) — ThemeManager.PushRoundness rescales these.
+         Menus stay fixed at 8 (their popup windows use fixed DWM rounding). -->
+    <CornerRadius x:Key="RadiusPage">14</CornerRadius>
+    <CornerRadius x:Key="RadiusPageInner">13</CornerRadius>
     <SolidColorBrush x:Key="ScrollThumbBrush" Color="#2EFFFFFF"/>
     <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#52FFFFFF"/>
     <SolidColorBrush x:Key="ScrollThumbPressedBrush" Color="#70FFFFFF"/>

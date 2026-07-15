@@ -7,6 +7,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
@@ -154,6 +155,11 @@ public partial class PreferencesWindow : Window
                 System.Diagnostics.Process.Start(
                     new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{d}\"") { UseShellExecute = true });
         };
+        ResetShortcutsBtn.Click += (_, _) =>
+        {
+            Vm?.ResetKeyBindings();
+            BuildShortcutRows();
+        };
         ResetBtn.Click += async (_, _) =>
         {
             if (Vm is not { } vm) return;
@@ -260,6 +266,12 @@ public partial class PreferencesWindow : Window
             double v = Math.Round(e.NewValue / 0.05) * 0.05;
             if (Vm is { } vm && Math.Abs(vm.GlassTint - v) > 1e-6) vm.GlassTint = v;
             GlassTintValue.Text = $"{(int)Math.Round(v * 100)}%";
+        };
+        RoundnessSlider.ValueChanged += (_, e) =>
+        {
+            double v = Math.Round(e.NewValue / 0.05) * 0.05;
+            if (Vm is { } vm && Math.Abs(vm.CornerRoundness - v) > 1e-6) vm.CornerRoundness = v;
+            RoundnessValue.Text = $"{(int)Math.Round(v * 100)}%";
         };
         MotionSpeedBox.ItemsSource = new[] { "Calm", "Normal", "Snappy" };
         MotionSpeedBox.SelectionChanged += (_, _) =>
@@ -613,23 +625,47 @@ public partial class PreferencesWindow : Window
         }
     }
 
-    /// <summary>The keyboard reference table: build once on first nav to "shortcuts" (static content).</summary>
+    // Which action is currently listening for its new keys (null = none), and its button.
+    private (string Action, Button Btn)? _capturing;
+
+    /// <summary>The Shortcuts page: an editable row per rebindable action (Keymap), then the fixed
+    /// keyboard reference. Rebuilt on every visit so the buttons always show the live combos.</summary>
     private void BuildShortcutRows()
     {
-        if (ShortcutRows.Children.Count > 0) return;
+        ShortcutEditRows.Children.Clear();
+        foreach (var (action, label, _) in Services.Keymap.Actions)
+        {
+            var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+            var name = new TextBlock
+            {
+                Text = label, FontSize = 12.5,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            };
+            var btn = new Button
+            {
+                Content = Services.Keymap.DisplayFor(action),
+                FontSize = 12, MinWidth = 150,
+                HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                FontWeight = Services.Keymap.IsDefault(action) ? FontWeight.Normal : FontWeight.SemiBold,
+            };
+            ToolTip.SetTip(btn, "Click, then press the keys you want");
+            var captured = action;
+            btn.Click += (_, _) => BeginShortcutCapture(captured, btn);
+            Grid.SetColumn(btn, 1);
+            row.Children.Add(name);
+            row.Children.Add(btn);
+            ShortcutEditRows.Children.Add(row);
+        }
+
+        if (ShortcutRows.Children.Count > 0) return;               // the fixed table is static
         foreach (var (keys, what) in new[]
         {
-            ("Ctrl+B / Ctrl+I / Ctrl+U", "Bold / italic / underline"),
-            ("Ctrl+Shift+S", "Strikethrough"),
-            ("Ctrl+Shift+H", "Quick highlight (color set above)"),
-            ("Ctrl+Shift+8", "Bullet list"),
-            ("Ctrl+Shift+7", "Numbered list"),
-            ("Ctrl+Shift+T", "Insert date & time"),
             ("Ctrl+A", "Select all"),
             ("Ctrl+Z / Ctrl+Y", "Undo / redo"),
             ("Ctrl+C / Ctrl+X / Ctrl+V", "Copy / cut / paste"),
             ("Ctrl+Left / Ctrl+Right", "Jump by word"),
             ("Ctrl+Backspace / Ctrl+Delete", "Delete previous / next word"),
+            ("Ctrl+scroll wheel / Ctrl+0", "Zoom the page in and out / back to normal"),
             ("Escape", "Close dialogs and the preferences window"),
         })
         {
@@ -641,6 +677,47 @@ public partial class PreferencesWindow : Window
             row.Children.Add(w);
             ShortcutRows.Children.Add(row);
         }
+    }
+
+    /// <summary>Arm the capture: the next key press becomes the shortcut. Esc keeps the current
+    /// combo, Backspace/Delete restores the default. One window-level tunnel handler, unhooked
+    /// as soon as the capture resolves.</summary>
+    private void BeginShortcutCapture(string action, Button btn)
+    {
+        if (_capturing is { } prev) EndShortcutCapture(prev.Btn, prev.Action);   // only one at a time
+        _capturing = (action, btn);
+        btn.Content = "Press keys…";
+
+        void Handler(object? s, KeyEventArgs e)
+        {
+            e.Handled = true;
+            if (e.Key == Key.Escape) { Finish(); return; }
+            if (e.Key is Key.Back or Key.Delete)
+            {
+                Vm?.SetKeyBinding(action, null);                  // back to the default
+                Finish();
+                return;
+            }
+            var gesture = Services.Keymap.FromEvent(e);
+            if (gesture is null) return;                          // bare modifier / unbindable — keep waiting
+            Vm?.SetKeyBinding(action, gesture);
+            Finish();
+        }
+
+        void Finish()
+        {
+            RemoveHandler(KeyDownEvent, Handler);
+            _capturing = null;
+            EndShortcutCapture(btn, action);
+        }
+
+        AddHandler(KeyDownEvent, Handler, RoutingStrategies.Tunnel);
+    }
+
+    private void EndShortcutCapture(Button btn, string action)
+    {
+        btn.Content = Services.Keymap.DisplayFor(action);
+        btn.FontWeight = Services.Keymap.IsDefault(action) ? FontWeight.Normal : FontWeight.SemiBold;
     }
 
     private static string NumOpt(bool? v) => v switch { true => "Always on", false => "Always off", _ => "Match text" };
@@ -784,6 +861,8 @@ public partial class PreferencesWindow : Window
         BuildAccentSwatches();
         GlassTintSlider.Value = vm.GlassTint;
         GlassTintValue.Text = $"{(int)Math.Round(vm.GlassTint * 100)}%";
+        RoundnessSlider.Value = vm.CornerRoundness;
+        RoundnessValue.Text = $"{(int)Math.Round(vm.CornerRoundness * 100)}%";
         MotionSpeedBox.SelectedItem = vm.MotionSpeed;
         NumBoldBox.SelectedItem = NumOpt(vm.NumBoldDefault);
         NumItalicBox.SelectedItem = NumOpt(vm.NumItalicDefault);

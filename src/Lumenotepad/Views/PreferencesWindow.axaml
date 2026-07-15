@@ -378,6 +378,18 @@
                         <TextBlock Classes="hint"
                                    Text="Darken or lighten what shows through the glass. Zero is untinted; themes with no glass anywhere ignore it."/>
 
+                        <TextBlock Classes="section" Text="SHAPE"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Classes="label" Text="Corner roundness"/>
+                                <Border Classes="qmark" ToolTip.Tip="How rounded the page and the note containers look. Lower is squarer, higher is softer. 100% is the normal look."><TextBlock/></Border>
+                            </StackPanel>
+                            <TextBlock x:Name="RoundnessValue" Grid.Column="1" Classes="hint" Text="100%"/>
+                        </Grid>
+                        <Slider x:Name="RoundnessSlider" Minimum="0.5" Maximum="1.5" TickFrequency="0.05"/>
+                        <TextBlock Classes="hint"
+                                   Text="Changes the corners of the page and your notes. Menus keep their own shape."/>
+
                         <TextBlock Classes="section" Text="MOTION"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
@@ -674,8 +686,14 @@
                     </StackPanel>
 
                     <StackPanel x:Name="ShortcutsPanel" Spacing="6" IsVisible="False">
-                        <TextBlock Classes="section" Text="KEYBOARD SHORTCUTS" Margin="0,4,0,2"/>
-                        <TextBlock Classes="hint" Text="Everything the keyboard can do today. Custom bindings come later."/>
+                        <TextBlock Classes="section" Text="CUSTOM SHORTCUTS" Margin="0,4,0,2"/>
+                        <TextBlock Classes="hint" Text="Click a shortcut, then press the keys you want instead. Press Backspace while choosing to go back to the normal one, or Esc to keep what you have."/>
+                        <StackPanel x:Name="ShortcutEditRows" Spacing="4" Margin="0,4,0,0"/>
+                        <Button x:Name="ResetShortcutsBtn" Content="Reset all shortcuts" FontSize="11.5"
+                                HorizontalAlignment="Left" Margin="0,4,0,0"/>
+
+                        <TextBlock Classes="section" Text="FIXED SHORTCUTS"/>
+                        <TextBlock Classes="hint" Text="These always work the same way."/>
                         <StackPanel x:Name="ShortcutRows" Spacing="2" Margin="0,4,0,0"/>
                     </StackPanel>
 

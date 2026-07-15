@@ -19,6 +19,10 @@ public sealed class NoteCanvas : Panel
     public static readonly DataFormat<NoteBox> TrashFormat =
         DataFormat.CreateInProcessFormat<NoteBox>("lumenotepad-trash-box");
 
+    /// <summary>Note-container corner radius (M8 Part 6 roundness pref; default 9). Views read it
+    /// at construction — pushing a new value takes effect on the next canvas rebuild.</summary>
+    public static double NoteRadiusPref = 9;
+
     private CanvasDocument? _doc;
     private bool _canResize = true;
 
@@ -353,10 +357,11 @@ internal sealed class NoteBoxView : Panel
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
             IsVisible = false,
         };
+        double r = NoteCanvas.NoteRadiusPref;
         _grip = new Border
         {
             Height = 17, Background = Brushes.Transparent, Child = _gripBar,
-            CornerRadius = new CornerRadius(9, 9, 0, 0),
+            CornerRadius = new CornerRadius(r, r, 0, 0),
             Cursor = new Cursor(StandardCursorType.SizeAll),
         };
         DockPanel.SetDock(_grip, Dock.Top);
@@ -367,7 +372,7 @@ internal sealed class NoteBoxView : Panel
 
         _chrome = new Border
         {
-            Child = body, CornerRadius = new CornerRadius(9),
+            Child = body, CornerRadius = new CornerRadius(r),
             BorderThickness = new Thickness(1), BorderBrush = Brushes.Transparent,
             Background = Brushes.Transparent,
         };
@@ -380,7 +385,7 @@ internal sealed class NoteBoxView : Panel
         };
         _close = new Border
         {
-            Width = 17, Height = 17, CornerRadius = new CornerRadius(0, 9, 0, 6),
+            Width = 17, Height = 17, CornerRadius = new CornerRadius(0, r, 0, 6),
             Background = Brushes.Transparent, Child = _closeGlyph, IsVisible = false,
             HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top,
             Cursor = new Cursor(StandardCursorType.Hand),

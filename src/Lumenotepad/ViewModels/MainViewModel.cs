@@ -70,6 +70,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _advancedUnlocked;            // prefs: advanced gate accepted
     [ObservableProperty] private string? _customAccent;             // prefs: accent override; null = theme's own
     [ObservableProperty] private double _glassTint;                 // prefs: -1..1 glass veil; 0 = off
+    [ObservableProperty] private double _cornerRoundness = 1.0;     // prefs: 0.5..1.5 corner-radius scale
     [ObservableProperty] private bool _reduceMotion;                // prefs: skip animations
     [ObservableProperty] private string _motionSpeed = "Normal";    // prefs: Calm | Normal | Snappy
     [ObservableProperty] private bool? _numBoldDefault;             // prefs: number-style defaults;
@@ -208,6 +209,8 @@ public partial class MainViewModel : ObservableObject
             AdvancedUnlocked = _settings.AdvancedUnlocked;
             CustomAccent = _settings.CustomAccent;
             GlassTint = _settings.GlassTint;
+            CornerRoundness = _settings.CornerRoundness;
+            Services.Keymap.SetOverrides(_settings.KeyOverrides);
             ReduceMotion = _settings.ReduceMotion;
             MotionSpeed = _settings.MotionSpeed;
             NumBoldDefault = _settings.NumBoldDefault;
@@ -384,6 +387,35 @@ public partial class MainViewModel : ObservableObject
         if (_settings is null || _settingsDir is null) return;
         _settings.GlassTint = value;
         _settings.Save(_settingsDir);
+    }
+
+    partial void OnCornerRoundnessChanged(double value)
+    {
+        // Applied even during ctor-load (unlike the save) so a persisted scale shows at startup.
+        Editor.NoteCanvas.NoteRadiusPref = 9 * value;
+        if (Avalonia.Application.Current is { } app) Services.ThemeManager.PushRoundness(app, value);
+        if (_settings is null || _settingsDir is null) return;
+        _settings.CornerRoundness = value;
+        _settings.Save(_settingsDir);
+    }
+
+    /// <summary>Rebind one editor shortcut (null gesture = back to the default). The view's capture
+    /// UI validates the gesture string before it lands here.</summary>
+    public void SetKeyBinding(string action, string? gesture)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        if (gesture is null) _settings.KeyOverrides.Remove(action);
+        else _settings.KeyOverrides[action] = gesture;
+        _settings.Save(_settingsDir);
+        Services.Keymap.SetOverrides(_settings.KeyOverrides);
+    }
+
+    public void ResetKeyBindings()
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.KeyOverrides.Clear();
+        _settings.Save(_settingsDir);
+        Services.Keymap.SetOverrides(null);
     }
 
     partial void OnReduceMotionChanged(bool value)
@@ -809,6 +841,7 @@ public partial class MainViewModel : ObservableObject
         AdvancedUnlocked = d.AdvancedUnlocked;
         CustomAccent = d.CustomAccent;
         GlassTint = d.GlassTint;
+        CornerRoundness = d.CornerRoundness;
         ReduceMotion = d.ReduceMotion; MotionSpeed = d.MotionSpeed;
         NumBoldDefault = d.NumBoldDefault; NumItalicDefault = d.NumItalicDefault;
         NumUnderlineDefault = d.NumUnderlineDefault; NumStrikeDefault = d.NumStrikeDefault;
@@ -847,6 +880,7 @@ public partial class MainViewModel : ObservableObject
             _settings.Save(_settingsDir);
             PalettePrefsVersion++;
         }
+        ResetKeyBindings();
     }
 
     // Per-page canvas documents: loaded from disk on first access, dirty-tracked on edit, saved by

@@ -129,14 +129,24 @@ public partial class MainView : UserControl
         // Keep the canvas plate's punched hole aligned with the page box (margin 14, radius 14).
         CanvasPlate.SizeChanged += (_, _) => UpdateCanvasPlateClip();
 
-        // Guides + starter templates anchor to the visible page area.
-        CanvasScroll.SizeChanged += (_, _) =>
-        {
-            PageCanvas.SetViewport(CanvasScroll.Bounds.Size);
-            if (Vm is { } vvm) vvm.CanvasViewport = (CanvasScroll.Bounds.Width, CanvasScroll.Bounds.Height);
-        };
-        // The page glides like every other pane (Ctrl+wheel passes through for future zoom).
+        // Guides + starter templates anchor to the visible page area (in CANVAS coordinates, so
+        // the zoom divides out).
+        CanvasScroll.SizeChanged += (_, _) => PushCanvasViewport();
+        // The page glides like every other pane (SmoothScroll leaves Ctrl+wheel to the zoom below).
         SmoothScroll.Attach(CanvasScroll);
+        // Ctrl+wheel canvas zoom (M8 Part 6): 50%–200% in ×1.1 notches, Ctrl+0 resets. Tunnel so
+        // the ScrollViewer never also scrolls on the same notch.
+        CanvasScroll.AddHandler(PointerWheelChangedEvent, (_, e) =>
+        {
+            if (!e.KeyModifiers.HasFlag(KeyModifiers.Control)) return;
+            SetCanvasZoom(_canvasZoom * (e.Delta.Y > 0 ? 1.1 : 1 / 1.1));
+            e.Handled = true;
+        }, RoutingStrategies.Tunnel);
+        AddHandler(KeyDownEvent, (_, e) =>
+        {
+            if ((e.Key is Key.D0 or Key.NumPad0) && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+            { SetCanvasZoom(1.0); e.Handled = true; }
+        }, RoutingStrategies.Tunnel);
 
         // Drag the pages panel's right edge to resize it (clamped); persists via the VM setting.
         bool panelDragging = false; double panelStartX = 0, panelStartW = 0;
@@ -446,9 +456,11 @@ public partial class MainView : UserControl
         // a hole cut exactly at the border line leaves an anti-aliased seam where the acrylic
         // backdrop (the wallpaper) peeks between plate and border — a colored halo, worst at the
         // rounded corners (owner report). Tucking the plate edge under the border hides the seam.
+        // Hole radius tracks the (roundness-scaled) page-box radius minus the 1.5px tuck-under.
+        double holeR = System.Math.Max(1, System.Math.Round(14 * Services.ThemeManager.Roundness) - 1.5);
         var hole = new RectangleGeometry(new Rect(15.5, 15.5, b.Width - 31, b.Height - 31))
         {
-            RadiusX = 12.5, RadiusY = 12.5,
+            RadiusX = holeR, RadiusY = holeR,
         };
         CanvasPlate.Clip = new CombinedGeometry(GeometryCombineMode.Exclude,
             new RectangleGeometry(new Rect(0, 0, b.Width, b.Height)), hole);
@@ -783,6 +795,11 @@ public partial class MainView : UserControl
                  or nameof(MainViewModel.PageGrid) or nameof(MainViewModel.GridSnap)
                  or nameof(MainViewModel.DoubleClickCreate))
             ApplyCanvasPrefs();
+        else if (e.PropertyName == nameof(MainViewModel.CornerRoundness))
+        {
+            UpdateCanvasPlateClip();                     // the punched hole follows the page radius
+            ApplyEditorPrefs(rebuild: true);             // canvas rebuild re-reads NoteRadiusPref
+        }
         else if (e.PropertyName == nameof(MainViewModel.FlatCovers))
             ApplyFlatCovers();
         else if (e.PropertyName == nameof(MainViewModel.GlossyAccents))
@@ -1129,6 +1146,27 @@ public partial class MainView : UserControl
         ApplyPageStyles();
         if (pg is null || ReferenceEquals(Vm?.SelectedPage, pg))
             PageCanvas.Document = PageCanvas.Document;
+    }
+
+    // ---- Ctrl+wheel canvas zoom (session-only viewing posture, not a preference) ----
+    private double _canvasZoom = 1.0;
+
+    private void SetCanvasZoom(double zoom)
+    {
+        zoom = System.Math.Round(System.Math.Clamp(zoom, 0.5, 2.0), 2);
+        if (System.Math.Abs(zoom - _canvasZoom) < 0.001) return;
+        _canvasZoom = zoom;
+        CanvasZoomHost.LayoutTransform = zoom == 1.0 ? null : new ScaleTransform(zoom, zoom);
+        PushCanvasViewport();
+    }
+
+    /// <summary>Guides/starters think in canvas coordinates — the visible area is the scroll
+    /// viewport divided by the zoom.</summary>
+    private void PushCanvasViewport()
+    {
+        var s = new Size(CanvasScroll.Bounds.Width / _canvasZoom, CanvasScroll.Bounds.Height / _canvasZoom);
+        PageCanvas.SetViewport(s);
+        if (Vm is { } vm) vm.CanvasViewport = (s.Width, s.Height);
     }
 
     // ---- homepage gallery ----

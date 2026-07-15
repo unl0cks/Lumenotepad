@@ -583,6 +583,11 @@ public sealed class RichTextEditor : Control
         base.OnKeyDown(e);
         bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
         bool shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+
+        // Rebindable formatting shortcuts (Keymap, M8 Part 6) run FIRST so custom combos win.
+        // Structural keys (Ctrl+A/Z/Y/C/X/V, navigation) stay fixed in the switch below.
+        if (HandleKeymapShortcut(e)) { e.Handled = true; return; }
+
         bool handled = true;
 
         switch (e.Key)
@@ -644,30 +649,6 @@ public sealed class RichTextEditor : Control
                 InvalidateVisual();
                 RaiseSelectionChanged();
                 break;
-            case Key.B when ctrl:
-                ToggleBold();
-                break;
-            case Key.I when ctrl:
-                ToggleItalic();
-                break;
-            case Key.U when ctrl:
-                ToggleUnderline();
-                break;
-            case Key.S when ctrl && shift:
-                ToggleStrike();
-                break;
-            case Key.H when ctrl && shift:
-                ToggleDefaultHighlight();
-                break;
-            case Key.T when ctrl && shift:
-                InsertDateTime();
-                break;
-            case Key.D8 when ctrl && shift:              // Ctrl+Shift+8 — dot bullets
-                ApplyBullet("dot");
-                break;
-            case Key.D7 when ctrl && shift:              // Ctrl+Shift+7 — numbered list
-                ApplyBullet("num");
-                break;
             case Key.Z when ctrl:
                 Undo(); AfterEdit(pushedUndo: false);
                 break;
@@ -688,6 +669,22 @@ public sealed class RichTextEditor : Control
                 break;
         }
         if (handled) e.Handled = true;
+    }
+
+    /// <summary>The Keymap-driven (rebindable) shortcuts: formatting, quick highlight, date
+    /// insert, list toggles. Returns true when the event matched one.</summary>
+    private bool HandleKeymapShortcut(KeyEventArgs e)
+    {
+        if (Services.Keymap.Matches("bold", e)) ToggleBold();
+        else if (Services.Keymap.Matches("italic", e)) ToggleItalic();
+        else if (Services.Keymap.Matches("underline", e)) ToggleUnderline();
+        else if (Services.Keymap.Matches("strike", e)) ToggleStrike();
+        else if (Services.Keymap.Matches("highlight", e)) ToggleDefaultHighlight();
+        else if (Services.Keymap.Matches("date", e)) InsertDateTime();
+        else if (Services.Keymap.Matches("bullets", e)) ApplyBullet("dot");
+        else if (Services.Keymap.Matches("numbers", e)) ApplyBullet("num");
+        else return false;
+        return true;
     }
 
     /// <summary>The format the caret currently "carries" (pending toggles, or the char before the caret;

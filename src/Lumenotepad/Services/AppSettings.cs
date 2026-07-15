@@ -69,6 +69,8 @@ public sealed class AppSettings
     public bool StartRailVisible { get; set; } = true;      // notebooks rail shown at launch
     public bool StartPagesVisible { get; set; } = true;     // pages panel shown at launch
     public bool AdvancedUnlocked { get; set; }              // advanced prefs gate accepted
+    public double CornerRoundness { get; set; } = 1.0;      // 0.5..1.5 — scales the UI corner radii
+    public Dictionary<string, string> KeyOverrides { get; set; } = new();  // action → custom shortcut
 
     private const string FileName = "settings.json";
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };

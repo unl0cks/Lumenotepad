@@ -14,6 +14,22 @@ public static class ThemeManager
 {
     public static ThemeTokens Current { get; private set; } = ThemePalettes.Resolve("Lumen", false, false);
 
+    /// <summary>The active corner-roundness scale (M8 Part 6) for CODE-drawn corners (canvas plate
+    /// hole, note-container chrome). XAML consumers restyle via the Radius* resources instead.</summary>
+    public static double Roundness { get; private set; } = 1.0;
+
+    /// <summary>Scale the app's corner radii: writes the Radius* CornerRadius resources (page box,
+    /// paper veil) and records the scale for code-drawn corners. Menus are deliberately EXCLUDED —
+    /// their popup windows carry fixed 8px DWM rounding, and a mismatched content radius brings the
+    /// corner wedges back (PF3 lesson).</summary>
+    public static void PushRoundness(Application app, double scale)
+    {
+        Roundness = scale;
+        var r = app.Resources;
+        r["RadiusPage"] = new CornerRadius(System.Math.Round(14 * scale));
+        r["RadiusPageInner"] = new CornerRadius(System.Math.Round(13 * scale));
+    }
+
     public static void Apply(Application app, ThemeTokens t)
     {
         Current = t;
