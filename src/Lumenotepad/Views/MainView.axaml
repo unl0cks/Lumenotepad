@@ -17,20 +17,24 @@
     </UserControl.Resources>
 
     <UserControl.Styles>
-        <!-- flat, borderless rename fields -->
+        <!-- Rename fields: flat at rest (they read as headings), but hover hints and focus shows a
+             REAL box + accent ring so the editing surface is unmissable (owner report). Neutral
+             gray-alpha fills read on light paper AND dark frame; border thickness stays 1 at rest
+             (brush transparent) so focusing never shifts the text. -->
         <Style Selector="TextBox.rename">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}"/>
         </Style>
         <Style Selector="TextBox.rename /template/ Border#PART_BorderElement">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
         </Style>
         <Style Selector="TextBox.rename:pointerover /template/ Border#PART_BorderElement">
-            <Setter Property="Background" Value="#12FFFFFF"/>
+            <Setter Property="Background" Value="#1A808080"/>
         </Style>
         <Style Selector="TextBox.rename:focus /template/ Border#PART_BorderElement">
-            <Setter Property="Background" Value="#18FFFFFF"/>
+            <Setter Property="Background" Value="#26808080"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
         </Style>
         <!-- rail chips. The item STRETCHES to the full rail width (not just the 36px chip) and centres
              the chip inside — the GPU compositor clips a scaled element to its layout SLOT, so the chip
@@ -166,18 +170,18 @@
         <Style Selector="ListBox.flat Border.cardfx">
             <Setter Property="IsVisible" Value="False"/>
         </Style>
-        <!-- inline rename box (section tab) -->
+        <!-- inline rename box (section tab) — only exists WHILE editing, so it always wears the
+             full editing box: gray fill + accent ring (was a near-invisible white-alpha) -->
         <Style Selector="TextBox.inlineedit">
-            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Padding" Value="2,0"/>
             <Setter Property="MinHeight" Value="0"/>
             <Setter Property="MinWidth" Value="64"/>
-            <Setter Property="Background" Value="Transparent"/>
             <Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
         <Style Selector="TextBox.inlineedit /template/ Border#PART_BorderElement">
-            <Setter Property="Background" Value="#1FFFFFFF"/>
-            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="#26808080"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
             <Setter Property="CornerRadius" Value="6"/>
         </Style>
     </UserControl.Styles>

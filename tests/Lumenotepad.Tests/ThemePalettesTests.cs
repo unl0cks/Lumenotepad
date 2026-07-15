@@ -114,7 +114,7 @@ public class ThemePalettesTests
         Assert.Equal(ThemePalettes.Shade("#E27BA6", -0.28), seeded.AccentDeep);
         Assert.Equal(ThemePalettes.Shade("#E27BA6", 0.12), seeded.AccentGradTop);
         Assert.Equal(ThemePalettes.Shade("#E27BA6", -0.10), seeded.AccentGradBottom);
-        Assert.Equal(ThemePalettes.Alpha("#E27BA6", 0x55), seeded.FieldSelection);
+        Assert.Equal(ThemePalettes.Alpha("#E27BA6", 0x78), seeded.FieldSelection);
         Assert.Equal(ThemePalettes.Alpha("#E27BA6", 0x4D), seeded.NoteChromeFocus);
         // non-accent tokens untouched
         Assert.Equal(t.FrameBackground, seeded.FrameBackground);

@@ -198,6 +198,9 @@ public partial class FormatToolbar : UserControl
         {
             var b = new Button
             {
+                // SwatchButton: the default theme's hover repaints Background gray, hiding the color.
+                // App-level lookup — the toolbar isn't in the tree yet when its ctor builds these.
+                Theme = (Avalonia.Styling.ControlTheme)Application.Current!.FindResource("SwatchButton")!,
                 Classes = { "swatch" },
                 Background = hex is null ? Brushes.Transparent : new SolidColorBrush(Color.Parse(hex)),
                 Content = hex is null ? new TextBlock { Text = "∅", FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center } : null,

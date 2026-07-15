@@ -473,6 +473,9 @@ public partial class PreferencesWindow : Window
 
             var swatch = new Button
             {
+                // SwatchButton: the default theme's hover repaints Background gray, hiding the color.
+                // App-level lookup — rebuilt rows may not be attached when this runs.
+                Theme = (Avalonia.Styling.ControlTheme)Application.Current!.FindResource("SwatchButton")!,
                 Width = 34, Height = 22, CornerRadius = new CornerRadius(6), Padding = new Thickness(0),
                 Background = new SolidColorBrush(Color.Parse(effective)),
                 BorderBrush = new SolidColorBrush(Color.Parse("#66808080")), BorderThickness = new Thickness(1),

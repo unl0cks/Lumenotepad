@@ -169,7 +169,7 @@ public static class ThemePalettes
         CanvasChip: "#14FFFFFF", CanvasChipBorder: "#33FFFFFF",
         PaperBackground: "#0BFFFFFF", PaperBorder: "#33FFFFFF",
         PaperText: "#FFFFFFFF", PaperTextMuted: "#80FFFFFF",
-        FieldSelection: Alpha(accent, 0x55),
+        FieldSelection: Alpha(accent, 0x78),
         NoteChromeHover: "#26FFFFFF", NoteChromeFocus: Alpha(accent, 0x4D),
         NoteGripFill: "#12FFFFFF", NoteGripBar: "#3DFFFFFF",
         Accent: accent, AccentHover: Shade(accent, 0.15), AccentSoft: Alpha(accent, 0x38),
@@ -197,7 +197,7 @@ public static class ThemePalettes
         AccentDeep = Shade(seed, -0.28),
         AccentGradTop = Shade(seed, 0.12),
         AccentGradBottom = Shade(seed, -0.10),
-        FieldSelection = Alpha(seed, 0x55),
+        FieldSelection = Alpha(seed, 0x78),
         NoteChromeFocus = Alpha(seed, 0x4D),
     };
 

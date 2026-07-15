@@ -36,7 +36,7 @@
     <SolidColorBrush x:Key="PaperBorderBrush" Color="#33FFFFFF"/>
     <SolidColorBrush x:Key="PaperTextBrush" Color="#FFFFFFFF"/>
     <SolidColorBrush x:Key="PaperTextMutedBrush" Color="#80FFFFFF"/>
-    <SolidColorBrush x:Key="FieldSelectionBrush" Color="#554DA6FF"/>
+    <SolidColorBrush x:Key="FieldSelectionBrush" Color="#784DA6FF"/>
     <SolidColorBrush x:Key="ScrollThumbBrush" Color="#2EFFFFFF"/>
     <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#52FFFFFF"/>
     <SolidColorBrush x:Key="ScrollThumbPressedBrush" Color="#70FFFFFF"/>
@@ -99,6 +99,32 @@
         <Setter Property="BorderBrush" Value="{DynamicResource FrameBorderBrush}"/>
     </ControlTheme>
 
+    <!-- Color swatch button: the button's Background IS the payload, so no state may repaint it
+         (the default Fluent theme's hover swaps in its gray brush — owner saw yellow turn gray).
+         Hover feedback is the accent ring from the callers' `.swatch` styles; press just dims. -->
+    <ControlTheme x:Key="SwatchButton" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border x:Name="bg" Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{TemplateBinding CornerRadius}">
+                    <Border.Transitions>
+                        <Transitions>
+                            <BrushTransition Property="BorderBrush" Duration="0:0:0.1"/>
+                            <DoubleTransition Property="Opacity" Duration="0:0:0.08"/>
+                        </Transitions>
+                    </Border.Transitions>
+                    <ContentPresenter x:Name="cp" Content="{TemplateBinding Content}"
+                                      Foreground="{TemplateBinding Foreground}" FontSize="{TemplateBinding FontSize}"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pressed /template/ Border#bg"><Setter Property="Opacity" Value="0.72"/></Style>
+    </ControlTheme>
+
     <!-- Round icon button (title-bar app mark, generic actions) -->
     <ControlTheme x:Key="IconButton" TargetType="Button">
         <Setter Property="Focusable" Value="False"/>
@@ -139,12 +165,24 @@
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}"/>
         <Setter Property="SelectionBrush" Value="Transparent"/>
-        <Setter Property="Background" Value="Transparent"/>
+        <!-- A field should LOOK like a place to type: neutral gray-alpha fill + hairline reads
+             on light and dark surfaces alike, so no per-theme tokens are needed. -->
+        <Setter Property="Background" Value="#1A808080"/>
+        <Setter Property="BorderBrush" Value="#40808080"/>
+        <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Padding" Value="4,2"/>
         <Setter Property="MinHeight" Value="0"/>
         <Setter Property="Template">
             <ControlTemplate>
-                <Border Name="PART_BorderElement" Background="{TemplateBinding Background}" CornerRadius="6">
+                <Border Name="PART_BorderElement" Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="6">
+                    <Border.Transitions>
+                        <Transitions>
+                            <BrushTransition Property="Background" Duration="0:0:0.12"/>
+                            <BrushTransition Property="BorderBrush" Duration="0:0:0.12"/>
+                        </Transitions>
+                    </Border.Transitions>
                     <ScrollViewer Name="PART_ScrollViewer" Padding="{TemplateBinding Padding}"
                                   HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
                         <Panel>
@@ -153,6 +191,7 @@
                             <TextBlock Name="watermark" Text="{TemplateBinding PlaceholderText}"
                                        Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"
                                        IsVisible="{TemplateBinding Text, Converter={x:Static StringConverters.IsNullOrEmpty}}"/>
+                            <!-- stock caret off (Transparent) — GlidingCaret paints the animated one -->
                             <TextPresenter Name="PART_TextPresenter"
                                 Text="{TemplateBinding Text, Mode=TwoWay}"
                                 CaretIndex="{TemplateBinding CaretIndex}"
@@ -160,14 +199,20 @@
                                 SelectionEnd="{TemplateBinding SelectionEnd}"
                                 TextAlignment="{TemplateBinding TextAlignment}"
                                 TextWrapping="NoWrap"
-                                CaretBrush="{TemplateBinding CaretBrush}"
+                                CaretBrush="Transparent"
                                 SelectionBrush="{TemplateBinding SelectionBrush}"
                                 VerticalAlignment="Center"/>
+                            <controls:GlidingCaret Brush="{TemplateBinding CaretBrush}"
+                                Presenter="{Binding #PART_TextPresenter}"/>
                         </Panel>
                     </ScrollViewer>
                 </Border>
             </ControlTemplate>
         </Setter>
+        <Style Selector="^:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#22808080"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+        </Style>
     </ControlTheme>
 
     <!-- ============== Slim glass scrollbars ============== -->

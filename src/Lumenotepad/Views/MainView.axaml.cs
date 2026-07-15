@@ -128,6 +128,8 @@ public partial class MainView : UserControl
             PageCanvas.SetViewport(CanvasScroll.Bounds.Size);
             if (Vm is { } vvm) vvm.CanvasViewport = (CanvasScroll.Bounds.Width, CanvasScroll.Bounds.Height);
         };
+        // The page glides like every other pane (Ctrl+wheel passes through for future zoom).
+        SmoothScroll.Attach(CanvasScroll);
 
         // Drag the pages panel's right edge to resize it (clamped); persists via the VM setting.
         bool panelDragging = false; double panelStartX = 0, panelStartW = 0;
