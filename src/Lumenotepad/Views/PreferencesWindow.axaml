@@ -130,7 +130,8 @@
         <!-- Search across every category (declutter): type to filter all settings at once. -->
         <Border DockPanel.Dock="Top" Padding="16,0,16,8">
             <TextBox x:Name="SearchBox" Theme="{StaticResource RoundedFieldTextBox}" FontSize="13"
-                     Padding="10,6" PlaceholderText="Search settings…"/>
+                     MinHeight="34" Padding="10,8" VerticalContentAlignment="Center"
+                     PlaceholderText="Search settings…"/>
         </Border>
 
         <Grid ColumnDefinitions="158,*">
