@@ -69,8 +69,8 @@ public partial class FormatToolbar : UserControl
     {
         InitializeComponent();
 
-        // Picker flyouts (bullets, highlight, color, font) rise in like the context menus do.
-        foreach (var btn in new[] { BulletBtn, HighlightBtn, ColorBtn, FontBtn })
+        // Picker flyouts (bullets, highlight, color, font, text type, alignment) rise in like the menus do.
+        foreach (var btn in new[] { BulletBtn, HighlightBtn, ColorBtn, FontBtn, TypeBtn, AlignBtn })
             if (btn.Flyout is { } f) MenuFx.AttachFlyout(f);
 
         // The font list glides like every other list (its ScrollViewer only exists once opened).
@@ -86,6 +86,11 @@ public partial class FormatToolbar : UserControl
         ItalicBtn.Click += (_, _) => Do(e => e.ToggleItalic());
         UnderBtn.Click += (_, _) => Do(e => e.ToggleUnderline());
         StrikeBtn.Click += (_, _) => Do(e => e.ToggleStrike());
+        SuperBtn.Click += (_, _) => Do(e => e.ToggleSuper());
+        SubBtn.Click += (_, _) => Do(e => e.ToggleSub());
+        LinkBtn.Click += async (_, _) => await AddLinkAsync();
+        BuildAlignChoices();
+        BuildTypeChoices();
         SizeMinus.Click += (_, _) => NudgeSize(-1);
         SizePlus.Click += (_, _) => NudgeSize(+1);
         SizeBox.KeyDown += (_, e) =>
@@ -127,7 +132,7 @@ public partial class FormatToolbar : UserControl
             Dock.Bottom => PlacementMode.Top,
             _ => PlacementMode.Bottom,
         };
-        foreach (var b in new[] { BulletBtn, HighlightBtn, ColorBtn, FontBtn })
+        foreach (var b in new[] { BulletBtn, HighlightBtn, ColorBtn, FontBtn, TypeBtn, AlignBtn })
             if (b.Flyout is PopupFlyoutBase pf) pf.Placement = placement;
         if (DockBtn.Flyout is PopupFlyoutBase df) df.Placement = placement;
 
@@ -275,6 +280,103 @@ public partial class FormatToolbar : UserControl
         }
     }
 
+    // ---- M10: alignment, text type, link ----
+
+    // Icon-font glyph per alignment (Left/Center/Right are real Segoe glyphs; Justify has none, so
+    // its row leads with a bars symbol from the symbol font instead).
+    private static readonly (TextAlign Align, string Glyph, string Name)[] Aligns =
+    {
+        (TextAlign.Left, "", "Left"), (TextAlign.Center, "", "Center"),
+        (TextAlign.Right, "", "Right"), (TextAlign.Justify, "≡", "Justify"),
+    };
+
+    private void BuildAlignChoices()
+    {
+        var iconFont = (FontFamily)Application.Current!.FindResource("IconFont")!;
+        var symbolFont = new FontFamily("Segoe UI Symbol, Segoe UI");
+        foreach (var (align, glyph, name) in Aligns)
+        {
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            row.Children.Add(new TextBlock
+            {
+                Text = glyph, FontSize = 14,
+                FontFamily = align == TextAlign.Justify ? symbolFont : iconFont,
+                Width = 18, TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            });
+            row.Children.Add(new TextBlock { Text = name, FontSize = 13, VerticalAlignment = VerticalAlignment.Center });
+            var b = new Button
+            {
+                Theme = (Avalonia.Styling.ControlTheme)Application.Current!.FindResource("LumenButtonGray")!,
+                HorizontalContentAlignment = HorizontalAlignment.Left,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Padding = new Thickness(10, 5), Content = row,
+            };
+            b.Click += (_, _) => { Do(e => e.SetAlignment(align)); AlignBtn.Flyout?.Hide(); };
+            AlignChoices.Children.Add(b);
+        }
+    }
+
+    private static readonly (ParaStyle Style, string Name)[] TextTypes =
+    {
+        (ParaStyle.Body, "Body"), (ParaStyle.Title, "Title"), (ParaStyle.Subtitle, "Subtitle"),
+        (ParaStyle.Heading1, "Heading 1"), (ParaStyle.Heading2, "Heading 2"), (ParaStyle.Heading3, "Heading 3"),
+    };
+
+    private void BuildTypeChoices()
+    {
+        foreach (var (style, name) in TextTypes)
+        {
+            // Preview the type at its own size/weight so the menu reads like a style gallery.
+            double size = style switch
+            {
+                ParaStyle.Title => 20, ParaStyle.Subtitle => 15.5, ParaStyle.Heading1 => 18,
+                ParaStyle.Heading2 => 16, ParaStyle.Heading3 => 14.5, _ => 13,
+            };
+            var b = new Button
+            {
+                Theme = (Avalonia.Styling.ControlTheme)Application.Current!.FindResource("LumenButtonGray")!,
+                HorizontalContentAlignment = HorizontalAlignment.Left,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Padding = new Thickness(10, 5), Margin = new Thickness(0, 0, 0, 0),
+                Content = new TextBlock
+                {
+                    Text = name, FontSize = size,
+                    FontWeight = RichTextEditor.BaseWeightFor(style),
+                },
+            };
+            b.Click += (_, _) => { Do(e => e.SetTextType(style)); TypeBtn.Flyout?.Hide(); };
+            TypeChoices.Children.Add(b);
+        }
+    }
+
+    /// <summary>Add a hyperlink: link the selection (prompt for the URL only), or — with nothing
+    /// selected — prompt for both the text to show and the URL, then insert it.</summary>
+    private async System.Threading.Tasks.Task AddLinkAsync()
+    {
+        if (_target is null || TopLevel.GetTopLevel(this) is not Window owner) return;
+        string? existing = _target.CurrentLink;
+        bool hasSelection = _target.HasSelection;
+
+        if (hasSelection)
+        {
+            var r = await InputDialog.Show(owner, existing is null ? "Add link" : "Edit link",
+                new[] { ("Address", "https://example.com", existing ?? "") }, "Apply");
+            if (r is null) return;
+            _target.ApplyLink(string.IsNullOrWhiteSpace(r[0]) ? null : r[0]);
+        }
+        else
+        {
+            var r = await InputDialog.Show(owner, "Add link",
+                new[] { ("Text to show", "Link text", ""), ("Address", "https://example.com", "") }, "Add");
+            if (r is null || string.IsNullOrWhiteSpace(r[1])) return;
+            var text = string.IsNullOrWhiteSpace(r[0]) ? r[1] : r[0];
+            _target.InsertLink(text, r[1]);
+        }
+        _target.Focus();
+        UpdateFromEditor();
+    }
+
     private Button? _numB, _numI, _numU, _numS;
 
     /// <summary>The per-list number-style row: label + B/I/U/S toggles + "match text" reset. Lives in
@@ -399,6 +501,11 @@ public partial class FormatToolbar : UserControl
             StrikeBtn.Classes.Set("on", f.Strike);
             HighlightBtn.Classes.Set("on", f.Highlight is not null);
             ColorBtn.Classes.Set("on", f.Color is not null);
+            SuperBtn.Classes.Set("on", f.Baseline == Baseline.Super);
+            SubBtn.Classes.Set("on", f.Baseline == Baseline.Sub);
+            LinkBtn.Classes.Set("on", f.Link is not null);
+            AlignBtn.Classes.Set("on", _target.CurrentAlign != TextAlign.Left);
+            TypeBtn.Classes.Set("on", _target.CurrentTextType != ParaStyle.Body);
             BulletBtn.Classes.Set("on", _target.CurrentBullet is not null);
             NumStylePanel.IsVisible = _target.CurrentBullet == "num";
             if (_target.CurrentNumStyle is { } ns)

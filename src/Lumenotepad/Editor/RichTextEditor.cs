@@ -26,6 +26,8 @@ public sealed class RichTextEditor : Control
     public IBrush Foreground { get; set; } = Brushes.White;
     public IBrush SelectionBrush { get; set; } = new SolidColorBrush(Color.Parse("#554DA6FF"));
     public IBrush CaretBrush { get; set; } = new SolidColorBrush(Color.Parse("#4DA6FF"));
+    /// <summary>Color for hyperlink runs (M10) — set to the theme accent by the host container.</summary>
+    public IBrush LinkBrush { get; set; } = new SolidColorBrush(Color.Parse("#4DA6FF"));
     public double ParagraphSpacing { get; set; } = 4;
 
     private RichDocument _doc = new();
@@ -164,20 +166,49 @@ public sealed class RichTextEditor : Control
     private double IndentOf(int pi) =>
         pi >= 0 && pi < _doc.Paragraphs.Count ? IndentOf(_doc.Paragraphs[pi]) : 0;
 
+    // ---- text types (M10): a named paragraph style sets a base size + weight; runs scale from it ----
+    public static double BaseSizeFor(ParaStyle s, double bodySize) => s switch
+    {
+        ParaStyle.Title => bodySize * 2.0,
+        ParaStyle.Subtitle => bodySize * 1.35,
+        ParaStyle.Heading1 => bodySize * 1.7,
+        ParaStyle.Heading2 => bodySize * 1.4,
+        ParaStyle.Heading3 => bodySize * 1.18,
+        _ => bodySize,
+    };
+
+    public static FontWeight BaseWeightFor(ParaStyle s) => s switch
+    {
+        ParaStyle.Title => FontWeight.Bold,
+        ParaStyle.Heading1 or ParaStyle.Heading2 or ParaStyle.Heading3 => FontWeight.SemiBold,
+        _ => FontWeight.Normal,
+    };
+
+    private static TextAlignment MapAlign(TextAlign a) => a switch
+    {
+        TextAlign.Center => TextAlignment.Center,
+        TextAlign.Right => TextAlignment.Right,
+        TextAlign.Justify => TextAlignment.Justify,
+        _ => TextAlignment.Left,
+    };
+
     private TextLayout BuildLayout(Paragraph p, double width)
     {
         if (p.Bullet is not null && double.IsFinite(width)) width -= IndentOf(p);
         double maxWidth = double.IsFinite(width) && width > 1 ? width : double.PositiveInfinity;
+        double baseSize = BaseSizeFor(p.Style, FontSize);
+        var align = MapAlign(p.Align);
         if (p.Runs.Count == 0)
-            return new TextLayout("", new Typeface(FontFamily), FontSize, Foreground,
-                                  textWrapping: TextWrapping.Wrap, maxWidth: maxWidth);
+            return new TextLayout("", new Typeface(FontFamily, weight: BaseWeightFor(p.Style)), baseSize, Foreground,
+                                  align, TextWrapping.Wrap, maxWidth: maxWidth);
 
-        var defaultProps = new GenericTextRunProperties(new Typeface(FontFamily), FontSize, foregroundBrush: Foreground);
+        var defaultProps = new GenericTextRunProperties(
+            new Typeface(FontFamily, weight: BaseWeightFor(p.Style)), baseSize, foregroundBrush: Foreground);
         double lineHeight = double.NaN;
         if (LineSpacingScalePref > 1.005 && p.Runs.Count > 0)
-            lineHeight = p.Runs.Max(r => r.Size ?? FontSize) * 1.35 * LineSpacingScalePref;
+            lineHeight = p.Runs.Max(r => r.Size ?? baseSize) * 1.35 * LineSpacingScalePref;
         var paraProps = new GenericTextParagraphProperties(
-            FlowDirection.LeftToRight, TextAlignment.Left, true, false,
+            FlowDirection.LeftToRight, align, true, false,
             defaultProps, TextWrapping.Wrap, lineHeight, 0, 0);
         return new TextLayout(new RunsTextSource(p, this), paraProps, maxWidth: maxWidth);
     }
@@ -190,6 +221,8 @@ public sealed class RichTextEditor : Control
 
         public TextRun? GetTextRun(int index)
         {
+            double baseSize = BaseSizeFor(_p.Style, _e.FontSize);
+            var baseWeight = BaseWeightFor(_p.Style);
             int acc = 0;
             foreach (var r in _p.Runs)
             {
@@ -199,9 +232,12 @@ public sealed class RichTextEditor : Control
                     var typeface = new Typeface(
                         r.Font is { Length: > 0 } f ? Services.AppFonts.Family(f) : _e.FontFamily,
                         r.Italic ? FontStyle.Italic : FontStyle.Normal,
-                        r.Bold ? FontWeight.Bold : FontWeight.Normal);
+                        r.Bold ? FontWeight.Bold : baseWeight);
+                    bool link = r.Link is { Length: > 0 };
+                    // A link always shows underlined (plus any explicit strike); otherwise honor the run flags.
+                    bool underline = r.Underline || link;
                     TextDecorationCollection? deco =
-                        (r.Underline, r.Strike) switch
+                        (underline, r.Strike) switch
                         {
                             (true, true) => new TextDecorationCollection(
                                 TextDecorations.Underline.Concat(TextDecorations.Strikethrough)),
@@ -209,8 +245,18 @@ public sealed class RichTextEditor : Control
                             (false, true) => TextDecorations.Strikethrough,
                             _ => null,
                         };
-                    var props = new GenericTextRunProperties(typeface, r.Size ?? _e.FontSize,
-                        textDecorations: deco, foregroundBrush: BrushFor(r.Color) ?? _e.Foreground);
+                    // Super/subscript: shrink and shift the baseline (M10).
+                    double size = r.Size ?? baseSize;
+                    if (r.Baseline != Baseline.Normal) size *= 0.72;
+                    var baseline = r.Baseline switch
+                    {
+                        Baseline.Super => BaselineAlignment.Superscript,
+                        Baseline.Sub => BaselineAlignment.Subscript,
+                        _ => BaselineAlignment.Baseline,
+                    };
+                    var fg = link ? _e.LinkBrush : BrushFor(r.Color) ?? _e.Foreground;
+                    var props = new GenericTextRunProperties(typeface, size, textDecorations: deco,
+                        foregroundBrush: fg, baselineAlignment: baseline);
                     return new TextCharacters(r.Text.Substring(index - acc), props);
                 }
                 acc = end;
@@ -477,7 +523,7 @@ public sealed class RichTextEditor : Control
     }
 
     private (DocPos a, DocPos b) SelOrdered() => _anchor <= _caret ? (_anchor, _caret) : (_caret, _anchor);
-    private bool HasSelection => _anchor != _caret;
+    public bool HasSelection => _anchor != _caret;
 
     // =========================== hit testing ===========================
 
@@ -774,6 +820,72 @@ public sealed class RichTextEditor : Control
         RaiseSelectionChanged();
     }
 
+    // ---- M10: super/subscript, alignment, text types, links ----
+
+    /// <summary>The baseline (super/sub/normal) the caret carries — pending, selection start, or caret.</summary>
+    public Baseline CurrentBaseline =>
+        _hasPending && !HasSelection ? _pending.Baseline : CurrentFormat.Baseline;
+
+    public void ToggleSuper() => ToggleBaseline(Baseline.Super);
+    public void ToggleSub() => ToggleBaseline(Baseline.Sub);
+
+    private void ToggleBaseline(Baseline target)
+    {
+        var next = CurrentBaseline == target ? Baseline.Normal : target;
+        ApplyValue(r => r.Baseline = next, f => f with { Baseline = next });
+    }
+
+    /// <summary>Alignment of the paragraph at the selection start — for toolbar state.</summary>
+    public TextAlign CurrentAlign
+    {
+        get { var (a, _) = SelOrdered(); _doc.Clamp(ref a); return _doc.Paragraphs[a.Para].Align; }
+    }
+
+    /// <summary>Text type of the paragraph at the selection start — for toolbar state.</summary>
+    public ParaStyle CurrentTextType
+    {
+        get { var (a, _) = SelOrdered(); _doc.Clamp(ref a); return _doc.Paragraphs[a.Para].Style; }
+    }
+
+    public void SetAlignment(TextAlign align)
+    {
+        PushUndo();
+        var (a, b) = SelOrdered();
+        _doc.SetAlign(a, b, align);
+        _typingBurst = false;
+        RaiseSelectionChanged();
+    }
+
+    public void SetTextType(ParaStyle style)
+    {
+        PushUndo();
+        var (a, b) = SelOrdered();
+        _doc.SetParaStyle(a, b, style);
+        _typingBurst = false;
+        RaiseSelectionChanged();
+    }
+
+    /// <summary>The link URL at the selection start (null = not a link) — for toolbar state.</summary>
+    public string? CurrentLink => CurrentFormat.Link;
+
+    /// <summary>Set/clear the hyperlink on the selection (blank clears), or pending at the caret.</summary>
+    public void ApplyLink(string? url)
+    {
+        string? u = string.IsNullOrWhiteSpace(url) ? null : url!.Trim();
+        ApplyValue(r => r.Link = u, f => f with { Link = u });
+    }
+
+    /// <summary>Insert linked text at the caret (used when there's no selection to link).</summary>
+    public void InsertLink(string text, string url)
+    {
+        if (string.IsNullOrEmpty(text) || string.IsNullOrWhiteSpace(url)) return;
+        PushUndo();
+        if (HasSelection) DeleteSelection();
+        var fmt = _doc.FormatAt(_caret) with { Link = url.Trim(), Underline = true };
+        _caret = _anchor = _doc.InsertText(_caret, text, fmt);
+        AfterEdit();
+    }
+
     public void ToggleBold() => ToggleFlag(r => r.Bold, (r, v) => r.Bold = v, f => f with { Bold = !f.Bold });
     public void ToggleItalic() => ToggleFlag(r => r.Italic, (r, v) => r.Italic = v, f => f with { Italic = !f.Italic });
     public void ToggleUnderline() => ToggleFlag(r => r.Underline, (r, v) => r.Underline = v, f => f with { Underline = !f.Underline });
@@ -1060,6 +1172,14 @@ public sealed class RichTextEditor : Control
             return;
         }
 
+        // Ctrl+click a hyperlink opens it (plain click still places the caret so links stay editable).
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && LinkAt(pos) is { } url)
+        {
+            OpenLink(url);
+            e.Handled = true;
+            return;
+        }
+
         if (e.ClickCount == 2) { SelectWordAt(pos); }
         else if (e.ClickCount >= 3)
         {
@@ -1084,6 +1204,37 @@ public sealed class RichTextEditor : Control
 
     private static readonly Cursor IbeamCursor = new(StandardCursorType.Ibeam);
     private static readonly Cursor HandCursor = new(StandardCursorType.Hand);
+
+    /// <summary>The link URL of the run covering this position (null = not a link).</summary>
+    private string? LinkAt(DocPos pos)
+    {
+        _doc.Clamp(ref pos);
+        var para = _doc.Paragraphs[pos.Para];
+        int acc = 0;
+        foreach (var r in para.Runs)
+        {
+            int end = acc + r.Text.Length;
+            if (pos.Off < end || (pos.Off == end && r == para.Runs[^1])) return r.Link;
+            acc = end;
+        }
+        return null;
+    }
+
+    /// <summary>Open a hyperlink in the default browser (http/https/mailto only — no local commands).</summary>
+    private static void OpenLink(string url)
+    {
+        var u = url.Trim();
+        if (!u.Contains("://") && !u.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
+            u = "https://" + u;                      // bare "example.com" → https
+        if (!u.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !u.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+            !u.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase)) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(u) { UseShellExecute = true });
+        }
+        catch { /* nothing sensible to do if the shell refuses */ }
+    }
 
     /// <summary>Is the point on a checkbox glyph (its paragraph's gutter, first line)?</summary>
     private bool IsOverCheckbox(Point pt, out int paraIndex)

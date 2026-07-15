@@ -207,4 +207,78 @@ public class RichModelTests
         Assert.Null(RichTextEditor.SmartListKind(""));
         Assert.Null(RichTextEditor.SmartListKind("hello -"));
     }
+
+    // ---- M10: alignment, text types, super/subscript, links ----
+
+    [Fact]
+    public void SetAlign_and_AlignOf_acrossParagraphs()
+    {
+        var d = Doc("one\ntwo\nthree");
+        d.SetAlign(new DocPos(0, 0), new DocPos(1, 0), TextAlign.Center);
+        Assert.Equal(TextAlign.Center, d.Paragraphs[0].Align);
+        Assert.Equal(TextAlign.Center, d.Paragraphs[1].Align);
+        Assert.Equal(TextAlign.Left, d.Paragraphs[2].Align);
+        Assert.Equal(TextAlign.Center, d.AlignOf(new DocPos(0, 0), new DocPos(1, 1)));
+        Assert.Null(d.AlignOf(new DocPos(0, 0), new DocPos(2, 0)));   // mixed → null
+    }
+
+    [Fact]
+    public void SetParaStyle_and_ParaStyleOf()
+    {
+        var d = Doc("heading\nbody");
+        d.SetParaStyle(new DocPos(0, 0), new DocPos(0, 3), ParaStyle.Heading1);
+        Assert.Equal(ParaStyle.Heading1, d.Paragraphs[0].Style);
+        Assert.Equal(ParaStyle.Body, d.Paragraphs[1].Style);
+        Assert.Equal(ParaStyle.Heading1, d.ParaStyleOf(new DocPos(0, 0), new DocPos(0, 3)));
+        Assert.Null(d.ParaStyleOf(new DocPos(0, 0), new DocPos(1, 0)));
+    }
+
+    [Fact]
+    public void SplitParagraph_carriesAlign_continuesAsBody()
+    {
+        var d = Doc("title text");
+        d.SetAlign(new DocPos(0, 0), new DocPos(0, 0), TextAlign.Right);
+        d.SetParaStyle(new DocPos(0, 0), new DocPos(0, 0), ParaStyle.Title);
+        d.SplitParagraph(new DocPos(0, 10));
+        Assert.Equal(TextAlign.Right, d.Paragraphs[1].Align);        // alignment carries
+        Assert.Equal(ParaStyle.Body, d.Paragraphs[1].Style);         // heading → body after Enter
+    }
+
+    [Fact]
+    public void Baseline_and_Link_areRunFormatState()
+    {
+        var d = Doc("H2O and a link");
+        d.ApplyFormat(new DocPos(0, 1), new DocPos(0, 2), r => r.Baseline = Baseline.Sub);   // the "2"
+        Assert.True(d.RangeAll(new DocPos(0, 1), new DocPos(0, 2), r => r.Baseline == Baseline.Sub));
+        Assert.True(d.RangeAll(new DocPos(0, 0), new DocPos(0, 1), r => r.Baseline == Baseline.Normal));
+
+        d.ApplyFormat(new DocPos(0, 10), new DocPos(0, 14), r => r.Link = "https://x.test");
+        Assert.True(d.RangeAll(new DocPos(0, 10), new DocPos(0, 14), r => r.Link == "https://x.test"));
+        Assert.NotEqual(d.FormatAt(new DocPos(0, 11)).Link, d.FormatAt(new DocPos(0, 1)).Link);
+    }
+
+    [Fact]
+    public void Json_roundTrips_alignStyleBaselineLink()
+    {
+        var d = Doc("H2O title");
+        d.SetAlign(new DocPos(0, 0), new DocPos(0, 0), TextAlign.Justify);
+        d.SetParaStyle(new DocPos(0, 0), new DocPos(0, 0), ParaStyle.Subtitle);
+        d.ApplyFormat(new DocPos(0, 1), new DocPos(0, 2), r => r.Baseline = Baseline.Sub);
+        d.ApplyFormat(new DocPos(0, 4), new DocPos(0, 9), r => r.Link = "https://a.test");
+
+        var back = RichDocJson.FromJson(RichDocJson.ToJson(d));
+        Assert.Equal(TextAlign.Justify, back.Paragraphs[0].Align);
+        Assert.Equal(ParaStyle.Subtitle, back.Paragraphs[0].Style);
+        Assert.True(back.RangeAll(new DocPos(0, 1), new DocPos(0, 2), r => r.Baseline == Baseline.Sub));
+        Assert.True(back.RangeAll(new DocPos(0, 4), new DocPos(0, 9), r => r.Link == "https://a.test"));
+    }
+
+    [Fact]
+    public void TextTypeSizes_scaleFromBody()
+    {
+        Assert.Equal(15, RichTextEditor.BaseSizeFor(ParaStyle.Body, 15));
+        Assert.Equal(30, RichTextEditor.BaseSizeFor(ParaStyle.Title, 15));
+        Assert.True(RichTextEditor.BaseSizeFor(ParaStyle.Heading1, 15) > RichTextEditor.BaseSizeFor(ParaStyle.Heading2, 15));
+        Assert.True(RichTextEditor.BaseSizeFor(ParaStyle.Heading2, 15) > RichTextEditor.BaseSizeFor(ParaStyle.Heading3, 15));
+    }
 }

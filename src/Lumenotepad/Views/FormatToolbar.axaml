@@ -59,6 +59,33 @@
                     FontFamily="{StaticResource IconFont}" Content="&#xE8DC;" ToolTip.Tip="Underline (Ctrl+U)"/>
             <Button x:Name="StrikeBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
                     FontFamily="{StaticResource IconFont}" Content="&#xEDE0;" ToolTip.Tip="Strikethrough (Ctrl+Shift+S)"/>
+            <Button x:Name="SuperBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="13"
+                    Content="x²" ToolTip.Tip="Superscript"/>
+            <Button x:Name="SubBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="13"
+                    Content="x₂" ToolTip.Tip="Subscript"/>
+
+            <!-- Text type (Body / Title / Subtitle / Heading 1–3) -->
+            <Button x:Name="TypeBtn" Theme="{StaticResource IconButton}" Width="34" Height="30" FontSize="13"
+                    Content="&#xE8D2;" FontFamily="{StaticResource IconFont}" ToolTip.Tip="Text type">
+                <Button.Flyout>
+                    <Flyout Placement="Bottom">
+                        <StackPanel x:Name="TypeChoices" Width="168" Spacing="2"/>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
+
+            <!-- Alignment -->
+            <Button x:Name="AlignBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
+                    FontFamily="{StaticResource IconFont}" Content="&#xE8E4;" ToolTip.Tip="Alignment">
+                <Button.Flyout>
+                    <Flyout Placement="Bottom">
+                        <StackPanel x:Name="AlignChoices" Width="150" Spacing="2"/>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
+
+            <Button x:Name="LinkBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
+                    FontFamily="{StaticResource IconFont}" Content="&#xE71B;" ToolTip.Tip="Add link"/>
 
             <Button x:Name="BulletBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
                     FontFamily="{StaticResource IconFont}" Content="&#xE8FD;" ToolTip.Tip="Bullets &amp; lists (Ctrl+Shift+8)">

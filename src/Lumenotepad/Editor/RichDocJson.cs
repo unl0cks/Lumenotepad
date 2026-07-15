@@ -22,6 +22,8 @@ public static class RichDocJson
         [JsonPropertyName("c")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? C { get; set; }
         [JsonPropertyName("fs")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public double? Fs { get; set; }
         [JsonPropertyName("f")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? F { get; set; }
+        [JsonPropertyName("bl")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Bl { get; set; }
+        [JsonPropertyName("lnk")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Lnk { get; set; }
     }
 
     internal sealed class ParaDto
@@ -33,6 +35,8 @@ public static class RichDocJson
         [JsonPropertyName("ni")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public bool? Ni { get; set; }
         [JsonPropertyName("nu")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public bool? Nu { get; set; }
         [JsonPropertyName("ns")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public bool? Ns { get; set; }
+        [JsonPropertyName("al")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Al { get; set; }
+        [JsonPropertyName("ps")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Ps { get; set; }
     }
 
     private sealed class DocDto
@@ -49,10 +53,12 @@ public static class RichDocJson
             Bul = p.Bullet,
             Chk = p.Checked,
             Nb = p.NumBold, Ni = p.NumItalic, Nu = p.NumUnderline, Ns = p.NumStrike,
+            Al = (int)p.Align, Ps = (int)p.Style,
             Runs = p.Runs.Select(r => new RunDto
             {
                 T = r.Text, B = r.Bold, I = r.Italic, U = r.Underline, S = r.Strike,
                 Hl = r.Highlight, C = r.Color, Fs = r.Size, F = r.Font,
+                Bl = (int)r.Baseline, Lnk = r.Link,
             }).ToList(),
         }).ToList();
 
@@ -68,12 +74,14 @@ public static class RichDocJson
             {
                 Bullet = p.Bul, Checked = p.Chk,
                 NumBold = p.Nb, NumItalic = p.Ni, NumUnderline = p.Nu, NumStrike = p.Ns,
+                Align = (TextAlign)p.Al, Style = (ParaStyle)p.Ps,
             };
             foreach (var r in p.Runs.Where(r => r.T.Length > 0))
                 para.Runs.Add(new RichRun
                 {
                     Text = r.T, Bold = r.B, Italic = r.I, Underline = r.U, Strike = r.S,
                     Highlight = r.Hl, Color = r.C, Size = r.Fs, Font = r.F,
+                    Baseline = (Baseline)r.Bl, Link = r.Lnk,
                 });
             doc.Paragraphs.Add(para);
         }

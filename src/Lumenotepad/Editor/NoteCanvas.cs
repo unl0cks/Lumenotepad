@@ -345,6 +345,7 @@ internal sealed class NoteBoxView : Panel
             Document = box.Doc, Margin = new Thickness(10, 3, 10, 9),
             Foreground = B(t.PaperText),
             CaretBrush = B(RichTextEditor.CaretColorOverride ?? t.Accent),
+            LinkBrush = B(t.Accent),
             SelectionBrush = B(t.FieldSelection),
             FontFamily = Services.AppFonts.Family(RichTextEditor.EditorFontPref),
             FontSize = Math.Clamp(RichTextEditor.EditorFontSizePref, 11, 24),

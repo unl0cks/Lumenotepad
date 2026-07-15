@@ -5,6 +5,9 @@ using System.Text;
 
 namespace Lumenotepad.Editor;
 
+/// <summary>Vertical baseline shift for a run (M10): normal, superscript, or subscript.</summary>
+public enum Baseline { Normal, Super, Sub }
+
 /// <summary>One contiguous stretch of identically-formatted text inside a paragraph.</summary>
 public sealed class RichRun
 {
@@ -17,29 +20,42 @@ public sealed class RichRun
     public string? Color;       // hex or null = theme default
     public double? Size;        // null = editor default
     public string? Font;        // family name or null = editor default
+    public Baseline Baseline;   // super/subscript (M10)
+    public string? Link;        // hyperlink URL, or null = plain text (M10)
 
     public RichRun Clone() => new()
     {
         Text = Text, Bold = Bold, Italic = Italic, Underline = Underline, Strike = Strike,
         Highlight = Highlight, Color = Color, Size = Size, Font = Font,
+        Baseline = Baseline, Link = Link,
     };
 
     public bool SameFormat(RichRun o) =>
         Bold == o.Bold && Italic == o.Italic && Underline == o.Underline && Strike == o.Strike &&
-        Highlight == o.Highlight && Color == o.Color && Size == o.Size && Font == o.Font;
+        Highlight == o.Highlight && Color == o.Color && Size == o.Size && Font == o.Font &&
+        Baseline == o.Baseline && Link == o.Link;
 
-    public RunFormat Format => new(Bold, Italic, Underline, Strike, Highlight, Color, Size, Font);
+    public RunFormat Format => new(Bold, Italic, Underline, Strike, Highlight, Color, Size, Font, Baseline, Link);
     public void SetFormat(RunFormat f)
     {
         Bold = f.Bold; Italic = f.Italic; Underline = f.Underline; Strike = f.Strike;
         Highlight = f.Highlight; Color = f.Color; Size = f.Size; Font = f.Font;
+        Baseline = f.Baseline; Link = f.Link;
     }
 }
 
 /// <summary>A complete character format — what the caret "carries" and what runs store.</summary>
 public readonly record struct RunFormat(
     bool Bold, bool Italic, bool Underline, bool Strike,
-    string? Highlight, string? Color, double? Size, string? Font);
+    string? Highlight, string? Color, double? Size, string? Font,
+    Baseline Baseline = Baseline.Normal, string? Link = null);
+
+/// <summary>Paragraph horizontal alignment (M10).</summary>
+public enum TextAlign { Left, Center, Right, Justify }
+
+/// <summary>Paragraph "text type" (M10): a named style that sets a base size + weight. Body is the
+/// default; the editor's own font size is the Body size, and headings scale from it.</summary>
+public enum ParaStyle { Body, Title, Subtitle, Heading1, Heading2, Heading3 }
 
 /// <summary>A paragraph = an ordered list of runs (zero runs = an empty paragraph).</summary>
 public sealed class Paragraph
@@ -62,6 +78,12 @@ public sealed class Paragraph
     /// preferences/context UI can override them independently).</summary>
     public bool? NumBold, NumItalic, NumUnderline, NumStrike;
 
+    /// <summary>Horizontal alignment (M10).</summary>
+    public TextAlign Align;
+
+    /// <summary>Text type / named paragraph style (M10): Body default, or a heading/title.</summary>
+    public ParaStyle Style;
+
     public int Length => Runs.Sum(r => r.Text.Length);
     public string Text => string.Concat(Runs.Select(r => r.Text));
 
@@ -71,6 +93,7 @@ public sealed class Paragraph
         Bullet = Bullet,
         Checked = Checked,
         NumBold = NumBold, NumItalic = NumItalic, NumUnderline = NumUnderline, NumStrike = NumStrike,
+        Align = Align, Style = Style,
     };
 
     /// <summary>Ensure a run boundary exists exactly at <paramref name="offset"/>; returns the index of the
@@ -203,8 +226,15 @@ public sealed class RichDocument
         Clamp(ref pos);
         var para = Paragraphs[pos.Para];
         int runIdx = para.SplitAt(pos.Off);
-        // The new paragraph continues the list (standard list behavior); the tick state does not carry over.
-        var next = new Paragraph { Runs = para.Runs.Skip(runIdx).ToList(), Bullet = para.Bullet };
+        // The new paragraph continues the list + alignment; the tick state does not carry over, and a
+        // heading/title continues as Body (word-processor behavior: Enter after a heading starts body).
+        var next = new Paragraph
+        {
+            Runs = para.Runs.Skip(runIdx).ToList(),
+            Bullet = para.Bullet,
+            Align = para.Align,
+            Style = ParaStyle.Body,
+        };
         para.Runs.RemoveRange(runIdx, para.Runs.Count - runIdx);
         para.Version++;
         Paragraphs.Insert(pos.Para + 1, next);
@@ -331,6 +361,54 @@ public sealed class RichDocument
         for (int pi = a.Para; pi <= b.Para; pi++)
             if (Paragraphs[pi].Bullet != style) return false;
         return true;
+    }
+
+    /// <summary>Set the horizontal alignment on every paragraph the range touches (M10).</summary>
+    public void SetAlign(DocPos a, DocPos b, TextAlign align)
+    {
+        Clamp(ref a); Clamp(ref b);
+        if (a > b) (a, b) = (b, a);
+        for (int pi = a.Para; pi <= b.Para; pi++)
+        {
+            Paragraphs[pi].Align = align;
+            Paragraphs[pi].Version++;
+        }
+        OnChanged();
+    }
+
+    /// <summary>The shared alignment across the range, or null when it's mixed (M10).</summary>
+    public TextAlign? AlignOf(DocPos a, DocPos b)
+    {
+        Clamp(ref a); Clamp(ref b);
+        if (a > b) (a, b) = (b, a);
+        var first = Paragraphs[a.Para].Align;
+        for (int pi = a.Para + 1; pi <= b.Para; pi++)
+            if (Paragraphs[pi].Align != first) return null;
+        return first;
+    }
+
+    /// <summary>Set the text type / named paragraph style across the range (M10).</summary>
+    public void SetParaStyle(DocPos a, DocPos b, ParaStyle style)
+    {
+        Clamp(ref a); Clamp(ref b);
+        if (a > b) (a, b) = (b, a);
+        for (int pi = a.Para; pi <= b.Para; pi++)
+        {
+            Paragraphs[pi].Style = style;
+            Paragraphs[pi].Version++;
+        }
+        OnChanged();
+    }
+
+    /// <summary>The shared text type across the range, or null when it's mixed (M10).</summary>
+    public ParaStyle? ParaStyleOf(DocPos a, DocPos b)
+    {
+        Clamp(ref a); Clamp(ref b);
+        if (a > b) (a, b) = (b, a);
+        var first = Paragraphs[a.Para].Style;
+        for (int pi = a.Para + 1; pi <= b.Para; pi++)
+            if (Paragraphs[pi].Style != first) return null;
+        return first;
     }
 
     /// <summary>Flip a checkbox paragraph's ticked state.</summary>
