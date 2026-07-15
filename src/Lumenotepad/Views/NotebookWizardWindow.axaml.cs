@@ -192,8 +192,122 @@ public partial class NotebookWizardWindow : Window
         }
     }
 
-    // ---- step 2 (populated in the next task) ----
+    // ---- step 2: style previews, defaults, pages ----
 
-    private void BuildStep2() { }
-    private void SyncStep2() { }
+    private void BuildStep2()
+    {
+        foreach (var style in Editor.PageStyles.Styles)
+            StyleChips.Children.Add(MakeStyleChip(style));
+        ModeGuides.IsCheckedChanged += (_, _) => { if (ModeGuides.IsChecked == true) _draft.DefaultPageStyleMode = Editor.PageStyles.ModeGuides; };
+        ModeStarters.IsCheckedChanged += (_, _) => { if (ModeStarters.IsChecked == true) _draft.DefaultPageStyleMode = Editor.PageStyles.ModeStartersOnly; };
+        ModeRigid.IsCheckedChanged += (_, _) => { if (ModeRigid.IsChecked == true) _draft.DefaultPageStyleMode = Editor.PageStyles.ModeRigid; };
+
+        GridBox.ItemsSource = new[] { "Use my app setting", "Blank", "Ruled", "Grid", "Dots" };
+        GridBox.SelectedIndex = 0;
+        GridBox.SelectionChanged += (_, _) =>
+            _draft.DefaultGridStyle = GridBox.SelectedIndex <= 0 ? null : (string?)GridBox.SelectedItem;
+
+        FontBox.ItemsSource = new[] { "(App default)" }
+            .Concat(Services.AppFonts.ListNames(_vm.ExtendedFonts)).ToArray();
+        FontBox.SelectedIndex = 0;
+        FontBox.SelectionChanged += (_, _) =>
+            _draft.DefaultFont = FontBox.SelectedIndex <= 0 ? null : FontBox.SelectedItem as string;
+
+        SizeSlider.ValueChanged += (_, e) =>
+        {
+            double v = System.Math.Round(e.NewValue);
+            _draft.DefaultFontSize = v;
+            SizeValue.Text = v.ToString("0");
+        };
+    }
+
+    /// <summary>One selectable page-style chip: a live mini GuideLayer preview + the style name.</summary>
+    private Control MakeStyleChip(string style)
+    {
+        var preview = new Editor.GuideLayer { Width = 84, Height = 56, Viewport = new Avalonia.Size(84, 56) };
+        preview.SetStyles(Editor.PageStyles.Blank, style, Editor.PageStyles.ModeGuides);
+        var chip = new Border
+        {
+            CornerRadius = new CornerRadius(9), Padding = new Avalonia.Thickness(6),
+            BorderThickness = new Avalonia.Thickness(string.Equals(_draft.DefaultPageStyle, style, StringComparison.Ordinal) ? 2 : 1),
+            BorderBrush = string.Equals(_draft.DefaultPageStyle, style, StringComparison.Ordinal)
+                ? (this.FindResource("AccentBrush") as IBrush ?? Brushes.White)
+                : (this.FindResource("FrameBorderBrush") as IBrush ?? Brushes.Gray),
+            Margin = new Avalonia.Thickness(0, 0, 8, 8),
+            Cursor = new Cursor(StandardCursorType.Hand),
+            Child = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new Border
+                    {
+                        Width = 84, Height = 56, CornerRadius = new CornerRadius(6), ClipToBounds = true,
+                        Background = (this.FindResource("PaperBackgroundBrush") as IBrush ?? Brushes.Black),
+                        Child = preview,
+                    },
+                    new TextBlock
+                    {
+                        Text = style, FontSize = 11.5,
+                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    },
+                },
+            },
+        };
+        chip.PointerPressed += (_, _) =>
+        {
+            _draft.DefaultPageStyle = style;
+            StyleChips.Children.Clear();
+            foreach (var s in Editor.PageStyles.Styles) StyleChips.Children.Add(MakeStyleChip(s));
+        };
+        return chip;
+    }
+
+    /// <summary>Re-sync the per-section pages editors with Step 1's current section list.</summary>
+    private void SyncStep2()
+    {
+        PagesEditors.Children.Clear();
+        foreach (var sd in _draft.Sections)
+        {
+            var header = new TextBlock
+            {
+                Text = string.IsNullOrWhiteSpace(sd.Name) ? "Section" : sd.Name,
+                FontSize = 12.5, FontWeight = FontWeight.SemiBold,
+            };
+            var rows = new StackPanel { Spacing = 4, Margin = new Avalonia.Thickness(0, 4, 0, 0) };
+            void Rebuild()
+            {
+                rows.Children.Clear();
+                for (int i = 0; i < sd.PageTitles.Count; i++)
+                {
+                    int idx = i;
+                    var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+                    var title = new TextBox
+                    {
+                        Theme = (ControlTheme)this.FindResource("RoundedFieldTextBox")!,
+                        FontSize = 12.5, Text = sd.PageTitles[idx], PlaceholderText = "Page title",
+                    };
+                    title.TextChanged += (_, _) => sd.PageTitles[idx] = title.Text ?? "";
+                    var remove = new Button
+                    {
+                        Theme = (ControlTheme)this.FindResource("IconButton")!,
+                        Width = 26, Height = 26, FontSize = 11, Content = "",
+                        FontFamily = (FontFamily)this.FindResource("IconFont")!,
+                    };
+                    ToolTip.SetTip(remove, "Remove page");
+                    remove.Click += (_, _) => { sd.PageTitles.RemoveAt(idx); Rebuild(); };
+                    Grid.SetColumn(remove, 1);
+                    row.Children.Add(title);
+                    row.Children.Add(remove);
+                    rows.Children.Add(row);
+                }
+                var add = new Button { Content = "Add page", FontSize = 12 };
+                add.Click += (_, _) => { sd.PageTitles.Add($"Page {sd.PageTitles.Count + 1}"); Rebuild(); };
+                rows.Children.Add(add);
+            }
+            Rebuild();
+            var block = new StackPanel { Children = { header, rows } };
+            PagesEditors.Children.Add(block);
+        }
+    }
 }

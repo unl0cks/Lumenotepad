@@ -250,7 +250,7 @@
                                 FontSize="15" FontFamily="{StaticResource IconFont}" Content="&#xE8CB;"
                                 Foreground="{DynamicResource CanvasTextBrush}" ToolTip.Tip="Sort notebooks"/>
                         <Button x:Name="NewNotebookBtn"
-                                Theme="{StaticResource LumenButton}" Command="{Binding AddNotebookCommand}">
+                                Theme="{StaticResource LumenButton}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <TextBlock Text="&#xE710;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center"/>
                                 <TextBlock Text="New notebook" FontSize="13"/>
@@ -399,9 +399,9 @@
                     Background="{DynamicResource FrameBackgroundBrush}"
                     BorderBrush="{DynamicResource FrameBorderBrush}" BorderThickness="0,0,1,0">
                 <DockPanel Margin="0,10">
-                    <Button DockPanel.Dock="Bottom" Theme="{StaticResource IconButton}" Width="40" Height="40"
+                    <Button x:Name="RailAddBtn" DockPanel.Dock="Bottom" Theme="{StaticResource IconButton}" Width="40" Height="40"
                             HorizontalAlignment="Center" Margin="0,8,0,0" FontFamily="{StaticResource IconFont}"
-                            Content="&#xE710;" Command="{Binding AddNotebookCommand}" ToolTip.Tip="New notebook"/>
+                            Content="&#xE710;" ToolTip.Tip="New notebook"/>
                     <!-- No outer ScrollViewer: it reserved scrollbar width, which shrank + shifted the
                          chips and clipped their left edge. The ListBox scrolls itself with an OVERLAY
                          scrollbar that doesn't reserve space, so the 40px chips stay centred in the 64px

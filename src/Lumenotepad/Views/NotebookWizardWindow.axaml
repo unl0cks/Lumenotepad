@@ -77,7 +77,37 @@
                 </StackPanel>
 
                 <StackPanel x:Name="Step2Panel" Spacing="6" IsVisible="False">
-                    <!-- Task 3 populates: grid style, page style previews, apply mode, font, size, pages editor -->
+                    <TextBlock Classes="section" Text="PAGE STYLE" Margin="0,4,0,4"/>
+                    <TextBlock Classes="hint" Text="How new pages in this notebook are laid out. Every page can pick its own later."/>
+                    <WrapPanel x:Name="StyleChips" Margin="0,4,0,0"/>
+
+                    <TextBlock Classes="section" Text="APPLY AS"/>
+                    <StackPanel x:Name="ModeRadios" Spacing="4">
+                        <RadioButton x:Name="ModeGuides" GroupName="mode" FontSize="12.5" IsChecked="True"
+                                     Content="Guides + starter notes — lines on the paper plus labelled note boxes"/>
+                        <RadioButton x:Name="ModeStarters" GroupName="mode" FontSize="12.5"
+                                     Content="Starter notes only — just the labelled boxes, no lines"/>
+                        <RadioButton x:Name="ModeRigid" GroupName="mode" FontSize="12.5"
+                                     Content="Rigid — the boxes are locked in place and can't be moved"/>
+                    </StackPanel>
+
+                    <TextBlock Classes="section" Text="GRID STYLE"/>
+                    <ComboBox x:Name="GridBox" Width="180"/>
+
+                    <TextBlock Classes="section" Text="TEXT DEFAULTS"/>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Classes="label" Text="Default font"/>
+                        <ComboBox x:Name="FontBox" Grid.Column="1" Width="180"/>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Classes="label" Text="Default text size"/>
+                        <TextBlock x:Name="SizeValue" Grid.Column="1" Classes="label" Text="15"/>
+                    </Grid>
+                    <Slider x:Name="SizeSlider" Minimum="11" Maximum="24" TickFrequency="1" Value="15"/>
+
+                    <TextBlock Classes="section" Text="PAGES"/>
+                    <TextBlock Classes="hint" Text="Name the pages each section starts with."/>
+                    <StackPanel x:Name="PagesEditors" Spacing="10" Margin="0,4,0,0"/>
                 </StackPanel>
 
             </Panel>

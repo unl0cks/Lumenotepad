@@ -90,6 +90,10 @@ public partial class MainView : UserControl
         HomePrefsBtn.Click += (_, _) => OpenPreferences();
         SortBtn.Click += (_, _) => OpenSortMenu();
 
+        // "New notebook" opens the wizard (M9) — the instant-create command remains for tests only.
+        NewNotebookBtn.Click += (_, _) => OpenNotebookWizard();
+        RailAddBtn.Click += (_, _) => OpenNotebookWizard();
+
         // Rearrange mode: cards wiggle and can be dragged into new slots (click the button again to stop).
         RearrangeBtn.Click += (_, _) => SetRearranging(!_rearranging);
         HomeCards.AddHandler(PointerPressedEvent, OnRearrangePressed, RoutingStrategies.Tunnel);
@@ -446,6 +450,12 @@ public partial class MainView : UserControl
         if (Window is { } w) _prefs.Show(w);
     }
 
+    private void OpenNotebookWizard()
+    {
+        if (Vm is not { } vm || Window is not { } w) return;
+        new NotebookWizardWindow(vm).ShowDialog(w);
+    }
+
     private MainViewModel? Vm => DataContext as MainViewModel;
     private Window? Window => TopLevel.GetTopLevel(this) as Window;
 
@@ -693,8 +703,11 @@ public partial class MainView : UserControl
         RichTextEditor.DefaultHighlightPref = vm.DefaultHighlight;
         RichTextEditor.DateFormatPref = vm.DateFormat;
         RichTextEditor.NewNoteWidthPref = vm.NewNoteWidth;
-        RichTextEditor.EditorFontPref = vm.EditorFont;
-        RichTextEditor.EditorFontSizePref = vm.EditorFontSize;
+        var nb = vm.SelectedNotebook;
+        RichTextEditor.EditorFontPref = nb?.DefaultFont ?? vm.EditorFont;
+        RichTextEditor.EditorFontSizePref =
+            nb is { } n && (n.DefaultFont is not null || System.Math.Abs(n.DefaultFontSize - 15) > 0.01)
+                ? n.DefaultFontSize : vm.EditorFontSize;
         RichTextEditor.LineSpacingScalePref = vm.LineSpacingScale;
         RichTextEditor.ParagraphSpacingScalePref = vm.ParagraphSpacingScale;
         RichTextEditor.IndentScalePref = vm.IndentScale;
@@ -755,7 +768,7 @@ public partial class MainView : UserControl
             ReassertListSelection();
 
         // Re-point the add-animation hooks at the current section/page collections.
-        if (e.PropertyName == nameof(MainViewModel.SelectedNotebook)) { RehookSections(); ApplyPaperTint(); }
+        if (e.PropertyName == nameof(MainViewModel.SelectedNotebook)) { RehookSections(); ApplyPaperTint(); ApplyEditorPrefs(rebuild: true); }
         if (e.PropertyName == nameof(MainViewModel.SelectedSection)) RehookPages();
 
         // Section switch: the repopulated pages list rises in instead of popping.
