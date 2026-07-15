@@ -47,7 +47,7 @@ public static class InputDialog
             });
             var box = new TextBox
             {
-                Theme = fieldTheme, FontSize = 13, Padding = new Thickness(8, 6), Text = initial,
+                Theme = fieldTheme, FontSize = 13, MinHeight = 34, Padding = new Thickness(10, 8), Text = initial,
                 PlaceholderText = placeholder, VerticalContentAlignment = VerticalAlignment.Center,
             };
             boxes.Add(box);

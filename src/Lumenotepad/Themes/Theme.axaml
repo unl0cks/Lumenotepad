@@ -159,9 +159,11 @@
                             <DoubleTransition Property="Opacity" Duration="0:0:0.08"/>
                         </Transitions>
                     </Border.Transitions>
+                    <!-- Fill the border and center the CONTENT (element alignment left the ∅ glyph
+                         off-center — owner report); content-alignment centers the glyph reliably. -->
                     <ContentPresenter x:Name="cp" Content="{TemplateBinding Content}"
                                       Foreground="{TemplateBinding Foreground}" FontSize="{TemplateBinding FontSize}"
-                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                      HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
                 </Border>
             </ControlTemplate>
         </Setter>
