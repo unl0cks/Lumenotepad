@@ -584,4 +584,115 @@ public class MainViewModelTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void FromNotebook_seedsEditDraftWithSources()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            var draft = NotebookDraft.New();
+            draft.Name = "Biology";
+            draft.Color = "#3E9C6B";
+            draft.DefaultPageStyle = "Cornell";
+            draft.DefaultFontSize = 18;
+            draft.Sections.Clear();
+            draft.Sections.Add(new SectionDraft { Name = "Cells", PageTitles = { "Structure", "Mitosis" } });
+            var nb = vm.CreateNotebook(draft);
+
+            var seeded = NotebookDraft.FromNotebook(nb);
+
+            Assert.Equal("Biology", seeded.Name);
+            Assert.Equal("#3E9C6B", seeded.Color);
+            Assert.Equal("Cornell", seeded.DefaultPageStyle);
+            Assert.Equal(18, seeded.DefaultFontSize);
+            var sd = Assert.Single(seeded.Sections);
+            Assert.Same(nb.Sections[0], sd.Source);
+            Assert.Equal(new[] { "Structure", "Mitosis" }, sd.PageTitles.ToArray());
+            Assert.Same(nb.Sections[0].Pages[0], sd.SourceAt(0));
+            Assert.Same(nb.Sections[0].Pages[1], sd.SourceAt(1));
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void ApplyNotebookCustomization_renames_keepsIdentity_addsAndDeletes()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            var create = NotebookDraft.New();
+            create.Name = "Biology";
+            create.DefaultPageStyle = "Cornell";
+            create.Sections.Clear();
+            create.Sections.Add(new SectionDraft { Name = "Cells", PageTitles = { "Structure", "Mitosis" } });
+            create.Sections.Add(new SectionDraft { Name = "Genetics", PageTitles = { "Mendel" } });
+            var nb = vm.CreateNotebook(create);
+            var keptSection = nb.Sections[0];
+            var keptPage = keptSection.Pages[0];
+
+            var draft = NotebookDraft.FromNotebook(nb);
+            draft.Name = "Bio II";
+            draft.Sections[0].Name = "Cell biology";
+            draft.Sections[0].PageTitles[0] = "Cell structure";
+            draft.Sections[0].RemovePageAt(1);                 // drop "Mitosis"
+            draft.Sections[0].AddPage("Meiosis");              // brand-new page
+            draft.Sections.RemoveAt(1);                        // drop "Genetics" entirely
+            draft.Sections.Add(new SectionDraft { Name = "Exams" });
+
+            vm.ApplyNotebookCustomization(nb, draft);
+
+            Assert.Equal("Bio II", nb.Name);
+            Assert.Equal(2, nb.Sections.Count);
+            Assert.Same(keptSection, nb.Sections[0]);          // identity survives the edit
+            Assert.Equal("Cell biology", keptSection.Name);
+            Assert.Same(keptPage, keptSection.Pages[0]);
+            Assert.Equal("Cell structure", keptPage.Title);
+            Assert.Equal(new[] { "Cell structure", "Meiosis" }, keptSection.Pages.Select(p => p.Title).ToArray());
+            Assert.Equal("Exams", nb.Sections[1].Name);
+            Assert.Equal(3, vm.DocumentFor(keptSection.Pages[1]).Boxes.Count);   // new page got Cornell starters
+
+            Assert.Same(nb, vm.SelectedNotebook);              // selection re-validated
+            Assert.Contains(vm.SelectedSection, nb.Sections);
+            Assert.Contains(vm.SelectedPage, vm.SelectedSection!.Pages);
+
+            var reloaded = new MainViewModel(new WorkspaceStore(dir), dir);      // persisted
+            var rnb = reloaded.Notebooks.First(n => n.Name == "Bio II");
+            Assert.Equal(new[] { "Cell biology", "Exams" }, rnb.Sections.Select(s => s.Name).ToArray());
+            Assert.Equal(new[] { "Cell structure", "Meiosis" }, rnb.Sections[0].Pages.Select(p => p.Title).ToArray());
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void ApplyNotebookCustomization_blankNameKeepsOld_coverRulesHold()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            var nb = vm.Notebooks[0];
+            var src = Path.Combine(dir, "photo.png");
+            File.WriteAllBytes(src, new byte[] { 1, 2, 3 });
+            vm.SetNotebookCover(nb, src);
+            var coverPath = nb.CoverPath;
+
+            var draft = NotebookDraft.FromNotebook(nb);        // CoverSourcePath == current CoverPath
+            draft.Name = "   ";
+            var oldName = nb.Name;
+            vm.ApplyNotebookCustomization(nb, draft);
+            Assert.Equal(oldName, nb.Name);                    // blank keeps the old name
+            Assert.Equal(coverPath, nb.CoverPath);             // unchanged path leaves the cover alone
+            Assert.True(File.Exists(nb.CoverPath));
+
+            var draft2 = NotebookDraft.FromNotebook(nb);
+            draft2.CoverSourcePath = null;                     // "No cover"
+            vm.ApplyNotebookCustomization(nb, draft2);
+            Assert.Null(nb.CoverPath);
+            Assert.Equal("", nb.Cover);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }

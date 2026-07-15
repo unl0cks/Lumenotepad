@@ -970,6 +970,91 @@ public partial class MainViewModel : ObservableObject
         return nb;
     }
 
+    /// <summary>Apply a wizard EDIT draft back onto an existing notebook (M9 Part 3). Rows that
+    /// carry a Source keep that object — ids, docs and canvas content survive a rename; sourceless
+    /// rows become new sections/pages (stamped after save); real items missing from the draft are
+    /// deleted exactly like the right-click delete flows (doc files included — the wizard already
+    /// confirmed those removals at click time). Cover: an unchanged CoverPath is untouched, a new
+    /// temp path is copied in, null clears an existing cover.</summary>
+    public void ApplyNotebookCustomization(Notebook nb, NotebookDraft draft)
+    {
+        FlushDirtyDocs();                                    // pending edits land before any doc is dropped
+
+        if (!string.IsNullOrWhiteSpace(draft.Name)) nb.Name = draft.Name.Trim();
+        nb.Color = draft.Color;
+        nb.DefaultGridStyle = draft.DefaultGridStyle;
+        nb.DefaultPageStyle = draft.DefaultPageStyle;
+        nb.DefaultPageStyleMode = draft.DefaultPageStyleMode;
+        nb.DefaultFont = draft.DefaultFont;
+        nb.DefaultFontSize = draft.DefaultFontSize;
+
+        if (draft.Sections.Count == 0)                       // the wizard prevents this; belt + braces
+            draft.Sections.Add(new SectionDraft { Name = "Notes", PageTitles = { "Untitled page" } });
+
+        var target = new List<Section>();
+        var born = new List<Page>();
+        foreach (var sd in draft.Sections)
+        {
+            var sec = sd.Source ?? new Section();
+            if (!string.IsNullOrWhiteSpace(sd.Name)) sec.Name = sd.Name.Trim();
+            else if (sd.Source is null) sec.Name = "Section";
+
+            var pages = new List<Page>();
+            for (int i = 0; i < sd.PageTitles.Count; i++)
+            {
+                var pg = sd.SourceAt(i);
+                if (pg is null) { pg = new Page(); born.Add(pg); }
+                var title = sd.PageTitles[i];
+                if (!string.IsNullOrWhiteSpace(title)) pg.Title = title.Trim();
+                else if (string.IsNullOrWhiteSpace(pg.Title)) pg.Title = "Untitled page";
+                pages.Add(pg);
+            }
+            if (pages.Count == 0 && draft.Sections.Count == 1)
+            {
+                var pg = new Page { Title = "Untitled page" };   // never leave a pageless notebook
+                born.Add(pg);
+                pages.Add(pg);
+            }
+
+            foreach (var gone in sec.Pages.Where(p => !pages.Contains(p)).ToList())
+                ForgetPageDoc(gone, deleteFile: true);
+            if (!sec.Pages.SequenceEqual(pages))
+            {
+                sec.Pages.Clear();
+                foreach (var p in pages) sec.Pages.Add(p);
+            }
+            target.Add(sec);
+        }
+
+        foreach (var gone in nb.Sections.Where(s => !target.Contains(s)).ToList())
+            foreach (var page in gone.Pages) ForgetPageDoc(page, deleteFile: true);
+        if (!nb.Sections.SequenceEqual(target))
+        {
+            nb.Sections.Clear();
+            foreach (var s in target) nb.Sections.Add(s);
+        }
+
+        if (ReferenceEquals(SelectedNotebook, nb))
+        {
+            if (SelectedSection is null || !nb.Sections.Contains(SelectedSection))
+                SelectedSection = nb.Sections.FirstOrDefault();
+            if (SelectedPage is null || SelectedSection is null || !SelectedSection.Pages.Contains(SelectedPage))
+                SelectedPage = SelectedSection?.Pages.FirstOrDefault();
+        }
+
+        Save();
+        foreach (var pg in born) StampPageStyle(pg);         // starters per the (possibly new) defaults
+
+        if (draft.CoverSourcePath is null)
+        {
+            if (!string.IsNullOrEmpty(nb.Cover)) ClearNotebookCover(nb);
+        }
+        else if (!string.Equals(draft.CoverSourcePath, nb.CoverPath, StringComparison.OrdinalIgnoreCase))
+        {
+            SetNotebookCover(nb, draft.CoverSourcePath);
+        }
+    }
+
     [RelayCommand]
     private void OpenNotebook(Notebook nb)
     {

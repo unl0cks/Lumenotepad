@@ -64,6 +64,7 @@ public partial class MainView : UserControl
         };
         Toolbar.DockRequested += pos => { if (Vm is { } vm) vm.ToolbarPosition = pos; };
         Toolbar.ScopeRequested += scope => { if (Vm is { } vm) vm.ToolbarScope = scope; };
+        Toolbar.CustomizeRequested += () => { if (Vm?.SelectedNotebook is { } nb) OpenNotebookWizard(nb); };
 
         // Section/page rename: double-click, the rename button, or right-click → Rename — all open
         // the zoomed rename overlay (the background blurs until the name is saved).
@@ -463,10 +464,10 @@ public partial class MainView : UserControl
         if (Window is { } w) _prefs.Show(w);
     }
 
-    private void OpenNotebookWizard()
+    private void OpenNotebookWizard(Models.Notebook? edit = null)
     {
         if (Vm is not { } vm || Window is not { } w) return;
-        new NotebookWizardWindow(vm).ShowDialog(w);
+        new NotebookWizardWindow(vm, edit).ShowDialog(w);
     }
 
     private MainViewModel? Vm => DataContext as MainViewModel;
@@ -1074,6 +1075,13 @@ public partial class MainView : UserControl
         OpenMenu(e, rename, delete);
     }
 
+    private MenuItem CustomizeMenuItem(Notebook nb)
+    {
+        var customize = new MenuItem { Header = "Customize notebook…" };
+        customize.Click += (_, _) => OpenNotebookWizard(nb);
+        return customize;
+    }
+
     private void OnNotebooksContextRequested(object? sender, ContextRequestedEventArgs e)
     {
         if ((e.Source as StyledElement)?.DataContext is not Notebook nb) return;
@@ -1084,7 +1092,7 @@ public partial class MainView : UserControl
             $"“{Label(nb.Name)}” and all its sections and pages will be permanently deleted. This can't be undone.",
             Vm?.ConfirmDeleteNotebook ?? true,
             () => CollapseThenDelete(NotebooksList.ContainerFromItem(nb) as Control, () => Vm?.DeleteNotebookCommand.Execute(nb)));
-        OpenMenu(e, PaperTintMenu(nb), delete);
+        OpenMenu(e, CustomizeMenuItem(nb), PaperTintMenu(nb), delete);
     }
 
     private void OnNotebookNameContextRequested(object? sender, ContextRequestedEventArgs e)
@@ -1096,7 +1104,7 @@ public partial class MainView : UserControl
             $"“{Label(nb.Name)}” and all its sections and pages will be permanently deleted. This can't be undone.",
             Vm?.ConfirmDeleteNotebook ?? true,
             () => CollapseThenDelete(NotebooksList.ContainerFromItem(nb) as Control, () => Vm?.DeleteNotebookCommand.Execute(nb)));
-        OpenMenu(e, delete);
+        OpenMenu(e, CustomizeMenuItem(nb), delete);
     }
 
     private void OnPagesContextRequested(object? sender, ContextRequestedEventArgs e)
@@ -1219,15 +1227,17 @@ public partial class MainView : UserControl
             Vm?.ConfirmDeleteNotebook ?? true,
             () => CollapseThenDelete(HomeCards.ContainerFromItem(nb) as Control, () => Vm?.DeleteNotebookCommand.Execute(nb)));
 
+        var customize = CustomizeMenuItem(nb);
+
         if (nb.CoverPath is not null)
         {
             var removeCover = new MenuItem { Header = "Remove cover image" };
             removeCover.Click += (_, _) => Vm?.ClearNotebookCover(nb);
-            OpenMenu(e, open, rename, moveLeft, moveRight, color, paper, cover, removeCover, delete);
+            OpenMenu(e, open, customize, rename, moveLeft, moveRight, color, paper, cover, removeCover, delete);
         }
         else
         {
-            OpenMenu(e, open, rename, moveLeft, moveRight, color, paper, cover, delete);
+            OpenMenu(e, open, customize, rename, moveLeft, moveRight, color, paper, cover, delete);
         }
     }
 

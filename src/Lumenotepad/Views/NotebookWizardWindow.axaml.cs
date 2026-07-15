@@ -13,18 +13,35 @@ namespace Lumenotepad.Views;
 
 /// <summary>The two-step notebook creation wizard (M9): Step 1 = identity (name/color/cover/
 /// sections), Step 2 = pages (styles, defaults, page titles per section). Everything edits a
-/// NotebookDraft — nothing real exists until Create. Edit mode arrives in M9 Part 3.</summary>
+/// NotebookDraft — nothing real exists until Create. EDIT MODE (M9 Part 3): pass an existing
+/// notebook and the same window opens pre-filled as "Customize notebook"; Save applies the draft
+/// back through ApplyNotebookCustomization (row removals confirm at click time).</summary>
 public partial class NotebookWizardWindow : Window
 {
     private readonly MainViewModel _vm;
-    private readonly NotebookDraft _draft = NotebookDraft.New();
+    private readonly Models.Notebook? _edit;
+    private readonly NotebookDraft _draft;
     private int _step;                       // 0 or 1
     private string? _tempCover;              // cropped temp file; deleted on close if unused
 
-    public NotebookWizardWindow(MainViewModel vm)
+    public NotebookWizardWindow(MainViewModel vm, Models.Notebook? edit = null)
     {
         _vm = vm;
+        _edit = edit;
+        _draft = edit is null ? NotebookDraft.New() : NotebookDraft.FromNotebook(edit);
+        // The color picker's family row must ring the family the draft's color belongs to.
+        for (int i = 0; i < MainViewModel.NotebookPalette.Length; i++)
+            if (MainViewModel.NotebookPalette[i].Shades.Any(s => string.Equals(s.Hex, _draft.Color, StringComparison.OrdinalIgnoreCase)))
+            { _familyIx = i; break; }
         InitializeComponent();
+
+        if (edit is not null)
+        {
+            Title = "Customize notebook";
+            WizTitle.Text = "Customize notebook";
+            CreateBtn.Content = "Save";
+            NameBox.Text = _draft.Name;
+        }
 
         Opened += (_, _) =>
         {
@@ -86,7 +103,8 @@ public partial class NotebookWizardWindow : Window
 
     private void CreateAndClose()
     {
-        _vm.CreateNotebook(_draft);
+        if (_edit is { } nb) _vm.ApplyNotebookCustomization(nb, _draft);
+        else _vm.CreateNotebook(_draft);
         CleanupTempCover();                  // SetNotebookCover COPIED the crop — delete our temp now
         Close();
     }
@@ -213,7 +231,19 @@ public partial class NotebookWizardWindow : Window
                 IsEnabled = _draft.Sections.Count > 1,       // at least one section stays
             };
             ToolTip.SetTip(remove, _draft.Sections.Count > 1 ? "Remove section" : "A notebook needs at least one section");
-            remove.Click += (_, _) => { _draft.Sections.Remove(sd); BuildSectionRows(); };
+            remove.Click += async (_, _) =>
+            {
+                if (sd.Source is { } real)   // edit mode: this row is a REAL section — ask first
+                {
+                    int n = sd.PageTitles.Count;
+                    bool ok = await ConfirmDialog.Show(this, "Delete this section when you save?",
+                        $"“{(string.IsNullOrWhiteSpace(real.Name) ? "Section" : real.Name)}” and its {n} page{(n == 1 ? "" : "s")} " +
+                        "will be permanently deleted when you press Save. Cancel the window to keep everything.");
+                    if (!ok) return;
+                }
+                _draft.Sections.Remove(sd);
+                BuildSectionRows();
+            };
             Grid.SetColumn(remove, 1);
             row.Children.Add(name);
             row.Children.Add(remove);
@@ -227,21 +257,34 @@ public partial class NotebookWizardWindow : Window
     {
         foreach (var style in Editor.PageStyles.Styles)
             StyleChips.Children.Add(MakeStyleChip(style));
+
+        // Seed every control FROM the draft before its handler attaches — a fresh draft seeds the
+        // same defaults the XAML declares, and an EDIT draft opens showing the notebook's truth.
+        (_draft.DefaultPageStyleMode switch
+        {
+            Editor.PageStyles.ModeStartersOnly => ModeStarters,
+            Editor.PageStyles.ModeRigid => ModeRigid,
+            _ => ModeGuides,
+        }).IsChecked = true;
         ModeGuides.IsCheckedChanged += (_, _) => { if (ModeGuides.IsChecked == true) _draft.DefaultPageStyleMode = Editor.PageStyles.ModeGuides; };
         ModeStarters.IsCheckedChanged += (_, _) => { if (ModeStarters.IsChecked == true) _draft.DefaultPageStyleMode = Editor.PageStyles.ModeStartersOnly; };
         ModeRigid.IsCheckedChanged += (_, _) => { if (ModeRigid.IsChecked == true) _draft.DefaultPageStyleMode = Editor.PageStyles.ModeRigid; };
 
-        GridBox.ItemsSource = new[] { "Use my app setting", "Blank", "Ruled", "Grid", "Dots" };
-        GridBox.SelectedIndex = 0;
+        var gridChoices = new[] { "Use my app setting", "Blank", "Ruled", "Grid", "Dots" };
+        GridBox.ItemsSource = gridChoices;
+        GridBox.SelectedIndex = System.Math.Max(0, System.Array.IndexOf(gridChoices, _draft.DefaultGridStyle));
         GridBox.SelectionChanged += (_, _) =>
             _draft.DefaultGridStyle = GridBox.SelectedIndex <= 0 ? null : (string?)GridBox.SelectedItem;
 
-        FontBox.ItemsSource = new[] { "(App default)" }
+        var fontChoices = new[] { "(App default)" }
             .Concat(Services.AppFonts.ListNames(_vm.ExtendedFonts)).ToArray();
-        FontBox.SelectedIndex = 0;
+        FontBox.ItemsSource = fontChoices;
+        FontBox.SelectedIndex = System.Math.Max(0, System.Array.IndexOf(fontChoices, _draft.DefaultFont));
         FontBox.SelectionChanged += (_, _) =>
             _draft.DefaultFont = FontBox.SelectedIndex <= 0 ? null : FontBox.SelectedItem as string;
 
+        SizeSlider.Value = _draft.DefaultFontSize;
+        SizeValue.Text = _draft.DefaultFontSize.ToString("0");
         SizeSlider.ValueChanged += (_, e) =>
         {
             double v = System.Math.Round(e.NewValue);
@@ -336,7 +379,18 @@ public partial class NotebookWizardWindow : Window
                         FontFamily = (FontFamily)this.FindResource("IconFont")!,
                     };
                     ToolTip.SetTip(remove, "Remove page");
-                    remove.Click += (_, _) => { sd.PageTitles.RemoveAt(idx); Rebuild(); };
+                    remove.Click += async (_, _) =>
+                    {
+                        if (sd.SourceAt(idx) is { } real)   // edit mode: a REAL page — ask first
+                        {
+                            bool ok = await ConfirmDialog.Show(this, "Delete this page when you save?",
+                                $"“{(string.IsNullOrWhiteSpace(real.Title) ? "Untitled page" : real.Title)}” and everything on it " +
+                                "will be permanently deleted when you press Save. Cancel the window to keep everything.");
+                            if (!ok) return;
+                        }
+                        sd.RemovePageAt(idx);
+                        Rebuild();
+                    };
                     Grid.SetColumn(remove, 1);
                     row.Children.Add(title);
                     row.Children.Add(remove);
@@ -348,7 +402,7 @@ public partial class NotebookWizardWindow : Window
                     Content = "Add page", FontSize = 12,
                     Padding = new Avalonia.Thickness(12, 5),
                 };
-                add.Click += (_, _) => { sd.PageTitles.Add($"Page {sd.PageTitles.Count + 1}"); Rebuild(); };
+                add.Click += (_, _) => { sd.AddPage($"Page {sd.PageTitles.Count + 1}"); Rebuild(); };
                 rows.Children.Add(add);
             }
             Rebuild();

@@ -49,6 +49,10 @@ public partial class FormatToolbar : UserControl
     /// or "Page" (toolbar lives inside the page box).</summary>
     public event Action<string>? ScopeRequested;
 
+    /// <summary>Raised by the far-end Customize button — MainView opens the notebook wizard in
+    /// edit mode for the selected notebook.</summary>
+    public event Action? CustomizeRequested;
+
     public RichTextEditor? Target
     {
         get => _target;
@@ -93,6 +97,8 @@ public partial class FormatToolbar : UserControl
         };
         SizeBox.LostFocus += (_, _) => ApplyTypedSize();
 
+        CustomizeBtn.Click += (_, _) => CustomizeRequested?.Invoke();
+
         BuildSwatches(HighlightSwatches, Highlights, hex => Do(e => e.ApplyHighlight(hex)), HighlightBtn);
         BuildSwatches(ColorSwatches, TextColors, hex => Do(e => e.ApplyColor(hex)), ColorBtn);
         BuildBulletChoices();
@@ -109,8 +115,9 @@ public partial class FormatToolbar : UserControl
         bool vertical = dock is Dock.Left or Dock.Right;
         Panel.Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;
         SizeGroup.Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;
-        // Keep the "..." overflow button at the opposite end of the strip's flow for every dock.
+        // Keep the "..." overflow + customize buttons at the opposite end of the strip for every dock.
         DockPanel.SetDock(DockBtn, vertical ? Dock.Bottom : Dock.Right);
+        DockPanel.SetDock(CustomizeBtn, vertical ? Dock.Bottom : Dock.Right);
         Chrome.Padding = vertical ? new Thickness(2, 6) : new Thickness(6, 4);
 
         var placement = dock switch

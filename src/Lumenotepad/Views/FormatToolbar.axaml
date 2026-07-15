@@ -46,6 +46,9 @@
         <DockPanel x:Name="ChromeDock">
             <Button x:Name="DockBtn" DockPanel.Dock="Right" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
                     FontFamily="{StaticResource IconFont}" Content="&#xE712;" ToolTip.Tip="Toolbar position"/>
+            <!-- Customize sits at the FAR end, away from the formatting tools (owner request) -->
+            <Button x:Name="CustomizeBtn" DockPanel.Dock="Right" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
+                    FontFamily="{StaticResource IconFont}" Content="&#xE790;" ToolTip.Tip="Customize notebook"/>
             <StackPanel x:Name="Panel" Orientation="Horizontal" Spacing="1">
 
             <Button x:Name="BoldBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
