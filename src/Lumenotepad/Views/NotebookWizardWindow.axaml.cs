@@ -62,6 +62,7 @@ public partial class NotebookWizardWindow : Window
         BuildSectionRows();
         RefreshCoverPreview();
 
+        SmoothScroll.Attach(WizScroll);      // same wheel easing as the preferences window
         NextBtn.Click += (_, _) => ShowStep(1);
         BackBtn.Click += (_, _) => ShowStep(0);
         CreateBtn.Click += (_, _) => CreateAndClose();
@@ -92,31 +93,59 @@ public partial class NotebookWizardWindow : Window
 
     // ---- step 1: color ----
 
+    /// <summary>The picked FAMILY (big circles = the 9 family base colors); its 5 shades show as
+    /// small circles underneath, like the right-click Color menu (owner request).</summary>
+    private int _familyIx = 6;               // Blue — the family of the draft's initial color
+
     private void BuildColorSwatches()
     {
         ColorSwatches.Children.Clear();
-        foreach (var (hex, name) in MainViewModel.NotebookColors)
-            ColorSwatches.Children.Add(MakeSwatch(hex, name));
-        foreach (var (family, shades) in MainViewModel.NotebookPalette)
-            ColorSwatches.Children.Add(MakeSwatch(shades[2].Hex, family, small: true));
+        for (int i = 0; i < MainViewModel.NotebookPalette.Length; i++)
+        {
+            int ix = i;
+            var (family, shades) = MainViewModel.NotebookPalette[i];
+            bool familyActive = ix == _familyIx;
+            var b = MakeSwatch(shades[2].Hex, family, size: 26, ringed: familyActive);
+            b.PointerPressed += (_, _) =>
+            {
+                _familyIx = ix;
+                _draft.Color = MainViewModel.NotebookPalette[ix].Shades[2].Hex;   // base shade selected
+                BuildColorSwatches();
+                RefreshCoverPreview();
+            };
+            ColorSwatches.Children.Add(b);
+        }
+        ShadeSwatches.Children.Clear();
+        foreach (var (shadeName, hex) in MainViewModel.NotebookPalette[_familyIx].Shades)
+        {
+            var chosen = hex;
+            var b = MakeSwatch(hex, shadeName, size: 18,
+                ringed: string.Equals(_draft.Color, hex, StringComparison.OrdinalIgnoreCase));
+            b.PointerPressed += (_, _) =>
+            {
+                _draft.Color = chosen;
+                BuildColorSwatches();
+                RefreshCoverPreview();
+            };
+            ShadeSwatches.Children.Add(b);
+        }
+        Motion.FadeIn(ShadeSwatches, Motion.Fast);   // the shade row follows the family pick
     }
 
-    private Control MakeSwatch(string hex, string tip, bool small = false)
+    private Border MakeSwatch(string hex, string tip, double size, bool ringed)
     {
-        bool active = string.Equals(_draft.Color, hex, StringComparison.OrdinalIgnoreCase);
         var b = new Border
         {
-            Width = small ? 18 : 26, Height = small ? 18 : 26,
-            CornerRadius = new CornerRadius(small ? 9 : 13),
+            Width = size, Height = size,
+            CornerRadius = new CornerRadius(size / 2),
             Margin = new Avalonia.Thickness(0, 2, 8, 4),
             Background = new SolidColorBrush(Color.Parse(hex)),
-            BorderBrush = active ? (this.FindResource("TextPrimaryBrush") as IBrush ?? Brushes.White)
+            BorderBrush = ringed ? (this.FindResource("TextPrimaryBrush") as IBrush ?? Brushes.White)
                                  : new SolidColorBrush(Color.Parse("#66808080")),
-            BorderThickness = new Avalonia.Thickness(active ? 2 : 1),
+            BorderThickness = new Avalonia.Thickness(ringed ? 2 : 1),
             Cursor = new Cursor(StandardCursorType.Hand),
         };
         ToolTip.SetTip(b, tip);
-        b.PointerPressed += (_, _) => { _draft.Color = hex; BuildColorSwatches(); RefreshCoverPreview(); };
         return b;
     }
 
@@ -219,12 +248,20 @@ public partial class NotebookWizardWindow : Window
             _draft.DefaultFontSize = v;
             SizeValue.Text = v.ToString("0");
         };
+
+        MenuFx.AttachDropDown(GridBox);      // rise-in + rounded/blurred popup + eased list scroll
+        MenuFx.AttachDropDown(FontBox);
+        foreach (var radio in new[] { ModeGuides, ModeStarters, ModeRigid })
+            radio.IsCheckedChanged += (s, _) =>
+            {
+                if (s is RadioButton { IsChecked: true } r) Motion.ScaleIn(r, 0.96, Motion.Fast);
+            };
     }
 
     /// <summary>One selectable page-style chip: a live mini GuideLayer preview + the style name.</summary>
     private Control MakeStyleChip(string style)
     {
-        var preview = new Editor.GuideLayer { Width = 84, Height = 56, Viewport = new Avalonia.Size(84, 56) };
+        var preview = new Editor.GuideLayer { Width = 120, Height = 72, Viewport = new Avalonia.Size(120, 72) };
         preview.SetStyles(Editor.PageStyles.Blank, style, Editor.PageStyles.ModeGuides);
         var chip = new Border
         {
@@ -242,7 +279,7 @@ public partial class NotebookWizardWindow : Window
                 {
                     new Border
                     {
-                        Width = 84, Height = 56, CornerRadius = new CornerRadius(6), ClipToBounds = true,
+                        Width = 120, Height = 72, CornerRadius = new CornerRadius(6), ClipToBounds = true,
                         Background = (this.FindResource("PaperBackgroundBrush") as IBrush ?? Brushes.Black),
                         Child = preview,
                     },
@@ -259,7 +296,11 @@ public partial class NotebookWizardWindow : Window
             _draft.DefaultPageStyle = style;
             StyleChips.Children.Clear();
             foreach (var s in Editor.PageStyles.Styles) StyleChips.Children.Add(MakeStyleChip(s));
+            // pop the freshly selected chip (the rebuilt row loses the pressed element)
+            if (StyleChips.Children.OfType<Border>().FirstOrDefault(c => Equals(c.Tag, style)) is { } picked)
+                Motion.ScaleIn(picked, 0.94, Motion.Fast);
         };
+        chip.Tag = style;
         return chip;
     }
 
@@ -301,7 +342,12 @@ public partial class NotebookWizardWindow : Window
                     row.Children.Add(remove);
                     rows.Children.Add(row);
                 }
-                var add = new Button { Content = "Add page", FontSize = 12 };
+                var add = new Button
+                {
+                    Theme = (ControlTheme)this.FindResource("LumenButton")!,
+                    Content = "Add page", FontSize = 12,
+                    Padding = new Avalonia.Thickness(12, 5),
+                };
                 add.Click += (_, _) => { sd.PageTitles.Add($"Page {sd.PageTitles.Count + 1}"); Rebuild(); };
                 rows.Children.Add(add);
             }

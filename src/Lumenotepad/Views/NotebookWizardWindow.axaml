@@ -41,8 +41,8 @@
         <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="20,10,20,16">
             <TextBlock x:Name="StepLabel" Classes="hint" VerticalAlignment="Center" Text="Step 1 of 2 — Notebook"/>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                <Button x:Name="CancelBtn" Content="Cancel" FontSize="13" Padding="14,7"/>
-                <Button x:Name="BackBtn" Content="Back" FontSize="13" Padding="14,7" IsVisible="False"/>
+                <Button x:Name="CancelBtn" Theme="{StaticResource LumenButtonGray}" Content="Cancel" FontSize="13"/>
+                <Button x:Name="BackBtn" Theme="{StaticResource LumenButtonGray}" Content="Back" FontSize="13" IsVisible="False"/>
                 <Button x:Name="NextBtn" Theme="{StaticResource LumenButton}" Content="Next" FontSize="13"/>
                 <Button x:Name="CreateBtn" Theme="{StaticResource LumenButton}" Content="Create" FontSize="13" IsVisible="False"/>
             </StackPanel>
@@ -58,14 +58,16 @@
 
                     <TextBlock Classes="section" Text="COLOR"/>
                     <WrapPanel x:Name="ColorSwatches"/>
+                    <!-- the picked family's five shades, like the right-click Color menu -->
+                    <WrapPanel x:Name="ShadeSwatches" Margin="0,2,0,0"/>
 
                     <TextBlock Classes="section" Text="COVER IMAGE"/>
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <Border x:Name="CoverPreview" Width="96" Height="64" CornerRadius="10"
                                 BorderBrush="{DynamicResource FrameBorderBrush}" BorderThickness="1"/>
                         <StackPanel Spacing="6" VerticalAlignment="Center">
-                            <Button x:Name="CoverPickBtn" Content="Choose image…" FontSize="12.5"/>
-                            <Button x:Name="CoverClearBtn" Content="No cover" FontSize="12.5"/>
+                            <Button x:Name="CoverPickBtn" Theme="{StaticResource LumenButton}" Content="Choose image…" FontSize="12.5" Padding="12,5"/>
+                            <Button x:Name="CoverClearBtn" Theme="{StaticResource LumenButtonGray}" Content="No cover" FontSize="12.5" Padding="12,5"/>
                         </StackPanel>
                     </StackPanel>
                     <TextBlock Classes="hint" Text="Without an image the cover shows the color above."/>
@@ -73,7 +75,7 @@
                     <TextBlock Classes="section" Text="SECTIONS"/>
                     <TextBlock Classes="hint" Text="The tabs inside the notebook. Add as many as you like — pages come next."/>
                     <StackPanel x:Name="SectionRows" Spacing="6" Margin="0,4,0,0"/>
-                    <Button x:Name="AddSectionBtn" Content="Add section" FontSize="12.5" HorizontalAlignment="Left"/>
+                    <Button x:Name="AddSectionBtn" Theme="{StaticResource LumenButton}" Content="Add section" FontSize="12.5" Padding="12,5" HorizontalAlignment="Left"/>
                 </StackPanel>
 
                 <StackPanel x:Name="Step2Panel" Spacing="6" IsVisible="False">

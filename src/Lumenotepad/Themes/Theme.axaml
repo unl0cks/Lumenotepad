@@ -91,6 +91,14 @@
         <Style Selector="^:disabled"><Setter Property="Opacity" Value="0.4"/></Style>
     </ControlTheme>
 
+    <!-- The accent button's NEUTRAL twin (Cancel/Back and other secondary actions): same shape,
+         press scale, and hover veil — just the quiet frame-family fill instead of the accent. -->
+    <ControlTheme x:Key="LumenButtonGray" TargetType="Button" BasedOn="{StaticResource LumenButton}">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource FrameBorderBrush}"/>
+    </ControlTheme>
+
     <!-- Round icon button (title-bar app mark, generic actions) -->
     <ControlTheme x:Key="IconButton" TargetType="Button">
         <Setter Property="Focusable" Value="False"/>

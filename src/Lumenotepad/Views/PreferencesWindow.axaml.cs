@@ -348,18 +348,12 @@ public partial class PreferencesWindow : Window
         WirePaletteEditor(TextPaletteChips, TextPaletteHexBox, TextPaletteReset, highlight: false);
         WirePaletteEditor(HighlightPaletteChips, HighlightPaletteHexBox, HighlightPaletteReset, highlight: true);
 
-        // Dropdown open animation: Fluent has none; rise the popup content via the Motion engine.
-        // Null-safe throughout — if the popup (or its child) can't be located this silently does
-        // nothing, which is the sanctioned fallback.
+        // Dropdown treatment (shared with the wizard): rise-in, rounded/blurred popup window, and
+        // eased wheel scrolling inside the popup's list. Null-safe throughout.
         foreach (var combo in new[] { LaunchTargetBox, MotionSpeedBox, CardSizeBox, DateFormatBox,
                                       EditorFontBox, ToolbarPosBox, ToolbarScopeBox, PageGridBox,
                                       BackupEveryBox, NumBoldBox, NumItalicBox, NumUnderlineBox, NumStrikeBox })
-            combo.DropDownOpened += (s, _) =>
-            {
-                if (s is ComboBox cb &&
-                    cb.GetVisualDescendants().OfType<Popup>().FirstOrDefault()?.Child is Control c)
-                    Motion.RiseIn(c, Motion.Fast);
-            };
+            MenuFx.AttachDropDown(combo);
 
         DataContextChanged += (_, _) => HookVmChanges();
         HookVmChanges();

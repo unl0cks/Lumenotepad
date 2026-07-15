@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.VisualTree;
@@ -39,6 +40,25 @@ public static class MenuFx
             if (target is null) return;
             Motion.RiseIn(target, Motion.Fast);
             ApplyPopupFx(target);
+        };
+    }
+
+    /// <summary>Full dropdown treatment for a ComboBox: rise-in, popup-window fx (rounded corners +
+    /// the Lumen glass-variant blur), and eased wheel scrolling inside the popup's list (attached
+    /// once, on first open — the popup's ScrollViewer doesn't exist until then).</summary>
+    public static void AttachDropDown(ComboBox combo)
+    {
+        bool smoothed = false;
+        combo.DropDownOpened += (_, _) =>
+        {
+            if (combo.GetVisualDescendants().OfType<Popup>().FirstOrDefault()?.Child is not Control c) return;
+            Motion.RiseIn(c, Motion.Fast);
+            ApplyPopupFx(c);
+            if (!smoothed && c.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault() is { } sv)
+            {
+                SmoothScroll.Attach(sv);
+                smoothed = true;
+            }
         };
     }
 
