@@ -29,10 +29,11 @@
 
     <Grid>
     <DockPanel>
-        <Grid DockPanel.Dock="Top" Height="36" ColumnDefinitions="*,Auto" x:Name="SheetTitleBar" Background="Transparent">
+        <Grid DockPanel.Dock="Top" Height="38" ColumnDefinitions="*,Auto" x:Name="SheetTitleBar" Background="Transparent">
             <TextBlock x:Name="SheetTitle" Text="Customize" FontSize="13" FontWeight="SemiBold"
                        VerticalAlignment="Center" Margin="16,0,0,0"/>
-            <Button x:Name="CloseBtn" Grid.Column="1" Theme="{StaticResource CloseCaptionButton}" Content="&#xE8BB;"/>
+            <Button x:Name="CloseBtn" Grid.Column="1" Theme="{StaticResource CloseCaptionButton}"
+                    Content="&#xE8BB;" VerticalAlignment="Center" Margin="0,0,3,0"/>
         </Grid>
 
         <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="20,10,20,16">
