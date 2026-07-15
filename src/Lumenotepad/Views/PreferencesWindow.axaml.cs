@@ -8,6 +8,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
@@ -141,6 +142,7 @@ public partial class PreferencesWindow : Window
                 UpdateGateVisuals();
             }
             _lastNav = NavList.SelectedItem;
+            if (_searching) SearchBox.Text = "";   // clicking a category leaves search (restores rows)
             if (key == "data") RefreshDataPanel();
             if (key == "fonts") RefreshFontChoices();
             if (key == "shortcuts") BuildShortcutRows();
@@ -148,6 +150,7 @@ public partial class PreferencesWindow : Window
         };
         NavList.SelectedIndex = 0;
         _lastNav = NavList.SelectedItem;
+        SetupSettingsSearch();
 
         OpenDataBtn.Click += (_, _) =>
         {
@@ -850,6 +853,130 @@ public partial class PreferencesWindow : Window
         foreach (var (k, p) in _panels) p.IsVisible = k == key;
         Motion.RiseIn(panel, Motion.Fast);
     }
+
+    // ---- settings search (declutter): filter every category at once ------------------------------
+
+    private static readonly Dictionary<string, string> CategoryNames = new()
+    {
+        ["general"] = "General", ["appearance"] = "Appearance", ["layout"] = "Layout",
+        ["canvas"] = "Canvas", ["editor"] = "Editor", ["shortcuts"] = "Shortcuts",
+        ["fonts"] = "Fonts", ["bullets"] = "Bullets & numbers", ["data"] = "Data & tools",
+    };
+
+    private readonly List<(string Key, Panel Panel, TextBlock Header)> _searchIndex = new();
+    private readonly Dictionary<Control, bool> _origVisible = new();
+    private bool _searching;
+    private bool _searchPrimed;
+
+    /// <summary>Inject a per-panel category heading (shown only during search) and wire the box.</summary>
+    private void SetupSettingsSearch()
+    {
+        foreach (var (key, ctrl) in _panels)
+        {
+            if (ctrl is not Panel panel) continue;
+            var header = new TextBlock { Text = CategoryNames.GetValueOrDefault(key, key), IsVisible = false };
+            header.Classes.Add("searchcat");
+            panel.Children.Insert(0, header);
+            _searchIndex.Add((key, panel, header));
+        }
+        SearchBox.TextChanged += (_, _) => ApplySearch(SearchBox.Text ?? "");
+    }
+
+    /// <summary>Lazily-built panels (shortcuts/fonts/data) must have their rows realized before a
+    /// search can match them; build once on first use.</summary>
+    private void PrimeSearchPanels()
+    {
+        if (_searchPrimed) return;
+        _searchPrimed = true;
+        BuildShortcutRows();
+        if (Vm is not null) RefreshFontChoices();
+        RefreshDataPanel();
+    }
+
+    private void ApplySearch(string raw)
+    {
+        string q = raw.Trim();
+        if (q.Length == 0)
+        {
+            _searching = false;
+            SearchEmptyNote.IsVisible = false;
+            foreach (var (c, vis) in _origVisible) c.IsVisible = vis;   // restore every row we touched
+            _origVisible.Clear();
+            foreach (var (_, _, header) in _searchIndex) header.IsVisible = false;
+            if (NavList.SelectedItem is ListBoxItem { Tag: string curKey }) ShowPanel(curKey);
+            return;
+        }
+
+        if (!_searching) { _searching = true; PrimeSearchPanels(); }
+
+        // Search reaches EVERY category — including Advanced — so any setting stays findable
+        // (the nav gate still guards browsing). Owner may prefer gating search too; easy to flip.
+        int total = 0;
+        foreach (var (_, panel, header) in _searchIndex)
+            total += FilterPanel(panel, header, q);
+        SearchEmptyNote.IsVisible = total == 0;
+        PrefsScroll.Offset = new Avalonia.Vector(0, 0);
+    }
+
+    /// <summary>Show only the rows in <paramref name="panel"/> that match; a SECTION header shows
+    /// only when a row beneath it (before the next section) matched. Returns the match count; the
+    /// panel + its category heading hide entirely when nothing matched.</summary>
+    private int FilterPanel(Panel panel, TextBlock catHeader, string q)
+    {
+        var kids = panel.Children;
+        int n = kids.Count, matches = 0;
+        var isSection = new bool[n];
+        var rowMatched = new bool[n];
+
+        for (int i = 0; i < n; i++)
+        {
+            var child = kids[i];
+            if (ReferenceEquals(child, catHeader)) continue;
+            if (child is TextBlock { } tb && tb.Classes.Contains("section")) { isSection[i] = true; continue; }
+            if (!OrigVisible(child)) { SetSearchVis(child, false); continue; }  // never reveal a designed-hidden row
+            bool m = MatchesQuery(child, q);
+            rowMatched[i] = m;
+            SetSearchVis(child, m);
+            if (m) matches++;
+        }
+        for (int i = 0; i < n; i++)
+        {
+            if (!isSection[i]) continue;
+            bool any = false;
+            for (int j = i + 1; j < n && !isSection[j]; j++)
+                if (rowMatched[j]) { any = true; break; }
+            SetSearchVis(kids[i], any);
+        }
+        catHeader.IsVisible = matches > 0;
+        panel.IsVisible = matches > 0;
+        return matches;
+    }
+
+    private bool OrigVisible(Control c)
+    {
+        if (!_origVisible.TryGetValue(c, out var v)) { v = c.IsVisible; _origVisible[c] = v; }
+        return v;
+    }
+
+    private void SetSearchVis(Control c, bool vis)
+    {
+        if (!_origVisible.ContainsKey(c)) _origVisible[c] = c.IsVisible;
+        c.IsVisible = vis;
+    }
+
+    private static bool MatchesQuery(Control block, string q)
+    {
+        if (TipContains(block, q)) return true;
+        foreach (var d in block.GetLogicalDescendants())
+        {
+            if (d is TextBlock tb && tb.Text is { } t && t.Contains(q, StringComparison.OrdinalIgnoreCase)) return true;
+            if (d is Control c && TipContains(c, q)) return true;
+        }
+        return false;
+    }
+
+    private static bool TipContains(Control c, string q) =>
+        ToolTip.GetTip(c) is string tip && tip.Contains(q, StringComparison.OrdinalIgnoreCase);
 
     private void SyncFromVm()
     {
