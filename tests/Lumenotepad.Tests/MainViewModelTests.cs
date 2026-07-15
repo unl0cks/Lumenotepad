@@ -695,4 +695,33 @@ public class MainViewModelTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void ApplySectionStyle_bulkWritesOverrides_stampsOnlyEmptyPages()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            var create = NotebookDraft.New();
+            create.Name = "Chem";
+            create.Sections.Clear();
+            create.Sections.Add(new SectionDraft { Name = "Labs", PageTitles = { "Empty", "Full" } });
+            var nb = vm.CreateNotebook(create);
+            var sec = nb.Sections[0];
+            vm.DocumentFor(sec.Pages[1]).Boxes.Add(new Lumenotepad.Editor.NoteBox());   // "Full" has content
+
+            vm.ApplySectionStyle(sec, setStyle: true, style: "Cornell", mode: 1, setGrid: true, grid: "Dots");
+
+            Assert.All(sec.Pages, p => Assert.Equal("Cornell", p.PageStyle));
+            Assert.All(sec.Pages, p => Assert.Equal(1, p.PageStyleMode));
+            Assert.All(sec.Pages, p => Assert.Equal("Dots", p.GridStyle));
+            Assert.Equal(3, vm.DocumentFor(sec.Pages[0]).Boxes.Count);    // empty page got the starters
+            Assert.Equal(1, vm.DocumentFor(sec.Pages[1]).Boxes.Count);    // page with notes untouched
+
+            vm.ApplySectionStyle(sec, setStyle: false, style: null, mode: 0, setGrid: false, grid: null);
+            Assert.All(sec.Pages, p => Assert.Equal("Cornell", p.PageStyle));   // no-op leaves overrides
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }

@@ -1055,6 +1055,29 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>Bulk style from the SECTION customization dialog (M9 Part 4): write the page-style
+    /// and/or grid override onto every page of the section (set flags false = leave that axis
+    /// alone), save once, then stamp starter boxes — but only onto pages whose canvases are EMPTY;
+    /// pages with content keep their notes untouched, no prompts.</summary>
+    public void ApplySectionStyle(Section sec, bool setStyle, string? style, int mode, bool setGrid, string? grid)
+    {
+        if (!setStyle && !setGrid) { Save(); return; }
+        foreach (var pg in sec.Pages)
+        {
+            if (setStyle)
+            {
+                pg.PageStyle = style;
+                if (style is not null) pg.PageStyleMode = mode;
+            }
+            if (setGrid) pg.GridStyle = grid;
+        }
+        Save();
+        if (setStyle && style is not null && style != Editor.PageStyles.Freeform)
+            foreach (var pg in sec.Pages)
+                if (DocumentFor(pg).Boxes.Count == 0)
+                    StampPageStyle(pg);
+    }
+
     [RelayCommand]
     private void OpenNotebook(Notebook nb)
     {

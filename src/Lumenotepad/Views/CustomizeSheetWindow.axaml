@@ -1,0 +1,73 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Lumenotepad.Views.CustomizeSheetWindow"
+        Title="Customize"
+        Width="560" Height="640" MinWidth="520" MinHeight="520"
+        WindowDecorations="None" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="{StaticResource UiFont}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
+        TextOptions.TextRenderingMode="Antialias"
+        Background="{DynamicResource WindowBackgroundBrush}">
+
+    <Window.Styles>
+        <Style Selector="TextBlock.section">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+            <Setter Property="Margin" Value="0,14,0,4"/>
+        </Style>
+        <Style Selector="TextBlock.hint">
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="RadioButton">
+            <Setter Property="FontSize" Value="12.5"/>
+        </Style>
+    </Window.Styles>
+
+    <Grid>
+    <DockPanel>
+        <Grid DockPanel.Dock="Top" Height="36" ColumnDefinitions="*,Auto" x:Name="SheetTitleBar" Background="Transparent">
+            <TextBlock x:Name="SheetTitle" Text="Customize" FontSize="13" FontWeight="SemiBold"
+                       VerticalAlignment="Center" Margin="16,0,0,0"/>
+            <Button x:Name="CloseBtn" Grid.Column="1" Theme="{StaticResource CloseCaptionButton}" Content="&#xE8BB;"/>
+        </Grid>
+
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="20,10,20,16">
+            <TextBlock x:Name="FootHint" Classes="hint" VerticalAlignment="Center"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="CancelBtn" Theme="{StaticResource LumenButtonGray}" Content="Cancel" FontSize="13"/>
+                <Button x:Name="SaveBtn" Theme="{StaticResource LumenButton}" Content="Save" FontSize="13"/>
+            </StackPanel>
+        </Grid>
+
+        <ScrollViewer x:Name="SheetScroll" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="20,4,20,8" Spacing="6">
+                <TextBlock Classes="section" Text="NAME" Margin="0,4,0,4"/>
+                <TextBox x:Name="NameBox" Theme="{StaticResource RoundedFieldTextBox}" FontSize="14"/>
+
+                <TextBlock x:Name="ScopeHint" Classes="hint" Margin="0,8,0,0" IsVisible="False"
+                           Text="The style choices below apply to every page in this section."/>
+
+                <TextBlock Classes="section" Text="PAGE STYLE"/>
+                <WrapPanel x:Name="StyleChips"/>
+
+                <TextBlock Classes="section" Text="APPLY AS"/>
+                <StackPanel x:Name="ModePanel" Spacing="6">
+                    <RadioButton x:Name="ModeGuides" GroupName="sheetmode"
+                                 Content="Guides + starter notes — lines on the paper plus labelled note boxes"/>
+                    <RadioButton x:Name="ModeStarters" GroupName="sheetmode"
+                                 Content="Starter notes only — just the labelled boxes, no lines"/>
+                    <RadioButton x:Name="ModeRigid" GroupName="sheetmode"
+                                 Content="Rigid — the boxes are locked in place and can't be moved"/>
+                </StackPanel>
+
+                <TextBlock Classes="section" Text="GRID STYLE"/>
+                <ComboBox x:Name="GridBox" MinWidth="200" FontSize="12.5"/>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+    </Grid>
+</Window>
