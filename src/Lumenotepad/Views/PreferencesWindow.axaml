@@ -472,6 +472,16 @@
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding StartPagesVisible, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Classes="label" Text="Sections in their own sidebar"/>
+                                    <Border Classes="qmark" ToolTip.Tip="Moves your sections into a separate strip beside the notebooks, instead of listing them above the pages. Handy when a notebook has lots of sections."><TextBlock/></Border>
+                                </StackPanel>
+                                <TextBlock Classes="hint" Text="Sections get their own column next to the notebooks rail."/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding SectionsSidebar, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
                     </StackPanel>
 
                     <StackPanel x:Name="CanvasPanel" Spacing="6" IsVisible="False">

@@ -1,0 +1,42 @@
+<!-- Lumenotepad icon MASTER (owner spec: standalone notebook + pencil, NOT a squircle badge,
+     with the "lumen" lightbulb glowing in a folded page corner). The shipped .ico is generated
+     from the SkiaSharp twin of this drawing: tools/icongen (dotnet run). Keep the two in sync. -->
+<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cover" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#57B0FF"/><stop offset="1" stop-color="#3584D8"/>
+    </linearGradient>
+    <linearGradient id="fold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F4F8FD"/><stop offset="1" stop-color="#D5E1F0"/>
+    </linearGradient>
+    <linearGradient id="pencil" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFC962"/><stop offset="1" stop-color="#E8A53C"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FFD866" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#FFD866" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- notebook cover with the top-right corner cut for the fold -->
+  <path fill="url(#cover)" d="M72 32 h74 l62 62 v106 a24 24 0 0 1 -24 24 H72 a24 24 0 0 1 -24 -24 V56 a24 24 0 0 1 24 -24 Z"/>
+  <!-- spine -->
+  <path fill="#2563A8" d="M48 56 a24 24 0 0 1 24 -24 v192 a24 24 0 0 1 -24 -24 Z"/>
+  <!-- page hint -->
+  <line x1="203" y1="102" x2="203" y2="204" stroke="#EAF1FA" stroke-opacity="0.7" stroke-width="3"/>
+  <!-- folded-down paper corner -->
+  <path fill="url(#fold)" d="M146 32 L208 94 L146 94 Z"/>
+  <!-- lumen bulb + glow on the fold -->
+  <circle cx="166" cy="72" r="30" fill="url(#glow)"/>
+  <circle cx="166" cy="68" r="11.5" fill="#F7B52B"/>
+  <rect x="161" y="78" width="10" height="8" rx="2.5" fill="#8A93A3"/>
+  <path d="M162.5 66 L166 71 L169.5 66" stroke="#B57400" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  <!-- pencil -->
+  <g transform="rotate(-38 128 178)">
+    <path fill="#EEC994" d="M40 178 L66 164 L66 192 Z"/>
+    <path fill="#333840" d="M40 178 L50 172.6 L50 183.4 Z"/>
+    <rect x="66" y="164" width="144" height="28" fill="url(#pencil)"/>
+    <rect x="210" y="164" width="12" height="28" fill="#C9CFD8"/>
+    <rect x="222" y="164" width="18" height="28" rx="7" fill="#F08A9B"/>
+  </g>
+</svg>

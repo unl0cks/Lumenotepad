@@ -70,6 +70,10 @@ public partial class MainView : UserControl
         // the zoomed rename overlay (the background blurs until the name is saved).
         RenameSectionBtn.Click += (_, _) => BeginRenameSection(Vm?.SelectedSection);
         SectionsList.DoubleTapped += (_, e) => BeginRenameSection((e.Source as StyledElement)?.DataContext as Section);
+        // Sections sidebar (preference): same rename / context behaviour as the in-panel list.
+        SideRenameSectionBtn.Click += (_, _) => BeginRenameSection(Vm?.SelectedSection);
+        SectionsSidebarList.DoubleTapped += (_, e) => BeginRenameSection((e.Source as StyledElement)?.DataContext as Section);
+        SectionsSidebarList.ContextRequested += OnSectionsContextRequested;
         PagesList.DoubleTapped += (_, e) => BeginRenamePage((e.Source as StyledElement)?.DataContext as Models.Page);
         RenameBox.KeyDown += (_, e) =>
         {
@@ -118,7 +122,7 @@ public partial class MainView : UserControl
         // them (a deleted row collapsed to opacity 0, a cancelled rise…) — the next item presented
         // in that container then renders INVISIBLE. Reset the visual state every time a container
         // is (re)prepared; legit add-animations start AFTER this (posted at Background priority).
-        foreach (var list in new ItemsControl[] { NotebooksList, SectionsList, PagesList, HomeCards })
+        foreach (var list in new ItemsControl[] { NotebooksList, SectionsList, SectionsSidebarList, PagesList, HomeCards })
             list.ContainerPrepared += (_, e) =>
             {
                 Motion.Stop(e.Container);
@@ -509,6 +513,7 @@ public partial class MainView : UserControl
             ApplyGlossyAccents();
             ApplyCardSize();
             ApplyPanels();
+            ApplySectionsSidebar();
             ApplyGlassTint();
             ApplyMotionPrefs();
             ApplyHomeSurface();
@@ -632,6 +637,18 @@ public partial class MainView : UserControl
         PagesPanel.Width = vm.IsPagesVisible ? vm.PagesPanelWidth : 0; PagesPanel.Opacity = vm.IsPagesVisible ? 1 : 0;
     }
 
+    /// <summary>"Sections in their own sidebar" preference: when on, the sections list moves out of
+    /// the pages panel into a dedicated column, and the pages panel's inline sections header + list
+    /// hide (SelectedSection binding still drives both — they share the VM).</summary>
+    private void ApplySectionsSidebar()
+    {
+        bool side = Vm?.SectionsSidebar ?? false;
+        SectionsSidebar.IsVisible = side;
+        SectionsSidebar.Width = side ? 152 : 0;
+        SectionsHeader.IsVisible = !side;
+        SectionsList.IsVisible = !side;
+    }
+
     /// <summary>Initial home/editor surface state (no animation); the switch zooms in code (their
     /// IsVisible bindings were removed so we control the fade timing). BOTH stay laid out — the hidden
     /// one just sits at opacity 0 — so opening a notebook doesn't pay a first-time editor layout that
@@ -649,6 +666,7 @@ public partial class MainView : UserControl
         bool glossy = Vm?.GlossyAccents ?? true;
         RecentList.Classes.Set("glossy", glossy);
         SectionsList.Classes.Set("glossy", glossy);
+        SectionsSidebarList.Classes.Set("glossy", glossy);
         PagesList.Classes.Set("glossy", glossy);
         // NOT the rail: its item now stretches full-width, so the glossy accent-gradient selection
         // fill would show as an ugly full-width blue bar. The rail chip shows its own colour + glow.
@@ -800,6 +818,8 @@ public partial class MainView : UserControl
             UpdateCanvasPlateClip();                     // the punched hole follows the page radius
             ApplyEditorPrefs(rebuild: true);             // canvas rebuild re-reads NoteRadiusPref
         }
+        else if (e.PropertyName == nameof(MainViewModel.SectionsSidebar))
+            ApplySectionsSidebar();
         else if (e.PropertyName == nameof(MainViewModel.FlatCovers))
             ApplyFlatCovers();
         else if (e.PropertyName == nameof(MainViewModel.GlossyAccents))

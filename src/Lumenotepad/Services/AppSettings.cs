@@ -71,6 +71,7 @@ public sealed class AppSettings
     public bool AdvancedUnlocked { get; set; }              // advanced prefs gate accepted
     public double CornerRoundness { get; set; } = 1.0;      // 0.5..1.5 — scales the UI corner radii
     public Dictionary<string, string> KeyOverrides { get; set; } = new();  // action → custom shortcut
+    public bool SectionsSidebar { get; set; }               // sections as their own left sidebar
 
     private const string FileName = "settings.json";
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };

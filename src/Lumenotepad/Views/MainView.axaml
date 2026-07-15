@@ -399,7 +399,7 @@
 
         <DockPanel x:Name="BodyDock" IsVisible="False">
         <v:FormatToolbar x:Name="Toolbar" DockPanel.Dock="Top"/>
-        <Grid ColumnDefinitions="Auto,Auto,*">
+        <Grid ColumnDefinitions="Auto,Auto,Auto,*">
 
             <!-- Notebooks rail -->
             <Border x:Name="RailPanel" Grid.Column="0" Width="64" ClipToBounds="True"
@@ -448,8 +448,35 @@
                 </DockPanel>
             </Border>
 
+            <!-- Sections as their OWN sidebar (preference; hidden = sections live in the pages panel) -->
+            <Border x:Name="SectionsSidebar" Grid.Column="1" Width="152" IsVisible="False" ClipToBounds="True"
+                    Background="{DynamicResource FrameBackgroundBrush}"
+                    BorderBrush="{DynamicResource FrameBorderBrush}" BorderThickness="0,0,1,0">
+                <DockPanel Margin="10,12,10,8">
+                    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="2,0,0,6">
+                        <TextBlock Text="Sections" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
+                        <Button Grid.Column="1" Theme="{StaticResource IconButton}" Width="24" Height="24" FontSize="12"
+                                FontFamily="{StaticResource IconFont}" Content="&#xE710;"
+                                Command="{Binding AddSectionCommand}" ToolTip.Tip="New section"/>
+                        <Button x:Name="SideRenameSectionBtn" Grid.Column="2" Theme="{StaticResource IconButton}" Width="24" Height="24"
+                                FontSize="12" FontFamily="{StaticResource IconFont}" Content="&#xE70F;"
+                                ToolTip.Tip="Rename section"/>
+                    </Grid>
+                    <ListBox x:Name="SectionsSidebarList" Classes="sections" Background="Transparent" BorderThickness="0" Padding="0"
+                             ItemsSource="{Binding SelectedNotebook.Sections}"
+                             SelectedItem="{Binding SelectedSection, Mode=TwoWay}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="models:Section">
+                                <TextBlock Text="{Binding Name}" FontSize="12.5" TextTrimming="CharacterEllipsis"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
             <!-- Sections + pages -->
-            <Border x:Name="PagesPanel" Grid.Column="1" Width="224" ClipToBounds="True"
+            <Border x:Name="PagesPanel" Grid.Column="2" Width="224" ClipToBounds="True"
                     Background="{DynamicResource FrameBackgroundBrush}"
                     BorderBrush="{DynamicResource FrameBorderBrush}" BorderThickness="0,0,1,0">
               <Panel>
@@ -459,7 +486,7 @@
                              Classes="rename" FontSize="16" FontWeight="SemiBold"
                              PlaceholderText="Notebook" Text="{Binding SelectedNotebook.Name, Mode=TwoWay}"/>
 
-                    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,10,0,4">
+                    <Grid x:Name="SectionsHeader" DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,10,0,4">
                         <TextBlock Text="Sections" FontSize="11" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
                         <Button Grid.Column="2" Theme="{StaticResource IconButton}" Width="24" Height="24" FontSize="12"
@@ -514,7 +541,7 @@
             <!-- Page area: an OPAQUE canvas plate with a rounded HOLE punched under the page box
                  (clip set in code), so the acrylic backdrop blurs through the page ONLY — solid
                  themes get a real-glass page with solid surroundings. -->
-            <Panel Grid.Column="2">
+            <Panel Grid.Column="3">
             <Border x:Name="CanvasPlate" Background="{DynamicResource CanvasBackgroundBrush}"/>
             <!-- Page: title + freeform canvas of note containers -->
             <Border Margin="14" CornerRadius="{DynamicResource RadiusPage}"

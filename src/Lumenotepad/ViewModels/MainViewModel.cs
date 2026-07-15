@@ -71,6 +71,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string? _customAccent;             // prefs: accent override; null = theme's own
     [ObservableProperty] private double _glassTint;                 // prefs: -1..1 glass veil; 0 = off
     [ObservableProperty] private double _cornerRoundness = 1.0;     // prefs: 0.5..1.5 corner-radius scale
+    [ObservableProperty] private bool _sectionsSidebar;             // prefs: sections as their own sidebar
     [ObservableProperty] private bool _reduceMotion;                // prefs: skip animations
     [ObservableProperty] private string _motionSpeed = "Normal";    // prefs: Calm | Normal | Snappy
     [ObservableProperty] private bool? _numBoldDefault;             // prefs: number-style defaults;
@@ -210,6 +211,7 @@ public partial class MainViewModel : ObservableObject
             CustomAccent = _settings.CustomAccent;
             GlassTint = _settings.GlassTint;
             CornerRoundness = _settings.CornerRoundness;
+            SectionsSidebar = _settings.SectionsSidebar;
             Services.Keymap.SetOverrides(_settings.KeyOverrides);
             ReduceMotion = _settings.ReduceMotion;
             MotionSpeed = _settings.MotionSpeed;
@@ -386,6 +388,13 @@ public partial class MainViewModel : ObservableObject
     {
         if (_settings is null || _settingsDir is null) return;
         _settings.GlassTint = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnSectionsSidebarChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.SectionsSidebar = value;
         _settings.Save(_settingsDir);
     }
 
@@ -842,6 +851,7 @@ public partial class MainViewModel : ObservableObject
         CustomAccent = d.CustomAccent;
         GlassTint = d.GlassTint;
         CornerRoundness = d.CornerRoundness;
+        SectionsSidebar = d.SectionsSidebar;
         ReduceMotion = d.ReduceMotion; MotionSpeed = d.MotionSpeed;
         NumBoldDefault = d.NumBoldDefault; NumItalicDefault = d.NumItalicDefault;
         NumUnderlineDefault = d.NumUnderlineDefault; NumStrikeDefault = d.NumStrikeDefault;
