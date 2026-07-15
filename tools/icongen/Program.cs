@@ -48,6 +48,11 @@ static void Draw(SKCanvas c)
     // dark (no more generic yellow), eraser squared where it meets the ferrule.
     c.Clear(SKColors.Transparent);
 
+    // Fill the frame: the artwork was drawn on a 256 grid but only spanned x:46–210 (~18% empty
+    // margin each side), so it rendered tiny in the taskbar. Scale the whole scene up about the
+    // centre — the notebook is portrait, so this fills the width without overflowing top/bottom.
+    c.Scale(1.2f, 1.2f, 128f, 128f);
+
     var accent = new SKColor(0x4D, 0xA6, 0xFF);
 
     // soft drop shadow under everything
