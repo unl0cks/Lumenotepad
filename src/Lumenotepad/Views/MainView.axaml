@@ -238,7 +238,10 @@
         <!-- Homepage: the notebook gallery -->
         <ScrollViewer x:Name="HomeHost" VerticalScrollBarVisibility="Auto"
                       Background="{DynamicResource CanvasBackgroundBrush}">
-            <StackPanel Margin="36,26,36,32" Spacing="20" MaxWidth="1100">
+            <!-- Content column grows with the window (a stretched column auto-centers once it hits
+                 MaxWidth), capped so it never stretches edge-to-edge on very wide screens — fills
+                 fullscreen without feeling empty, and the card grid flows more columns as it widens. -->
+            <StackPanel Margin="48,26,48,32" Spacing="20" MaxWidth="1560">
                 <Grid ColumnDefinitions="*,Auto">
                     <StackPanel Spacing="3" VerticalAlignment="Center">
                         <TextBlock Text="{Binding Greeting}" FontSize="12.5"
