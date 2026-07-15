@@ -1,0 +1,88 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:Lumenotepad.Controls"
+        x:Class="Lumenotepad.Views.NotebookWizardWindow"
+        Title="New notebook"
+        Width="720" Height="560" MinWidth="600" MinHeight="480"
+        WindowDecorations="None" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="{StaticResource UiFont}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
+        TextOptions.TextRenderingMode="Antialias"
+        Background="{DynamicResource WindowBackgroundBrush}">
+
+    <Window.Styles>
+        <Style Selector="TextBlock.section">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+            <Setter Property="Margin" Value="0,14,0,4"/>
+        </Style>
+        <Style Selector="TextBlock.hint">
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.label">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </Window.Styles>
+
+    <Grid>
+    <DockPanel>
+        <Grid DockPanel.Dock="Top" Height="36" ColumnDefinitions="*,Auto" x:Name="WizTitleBar" Background="Transparent">
+            <TextBlock x:Name="WizTitle" Text="New notebook" FontSize="13" FontWeight="SemiBold"
+                       VerticalAlignment="Center" Margin="16,0,0,0"/>
+            <Button x:Name="CloseBtn" Grid.Column="1" Theme="{StaticResource CloseCaptionButton}" Content="&#xE8BB;"/>
+        </Grid>
+
+        <!-- footer: step indicator left, actions right -->
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="20,10,20,16">
+            <TextBlock x:Name="StepLabel" Classes="hint" VerticalAlignment="Center" Text="Step 1 of 2 — Notebook"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="CancelBtn" Content="Cancel" FontSize="13" Padding="14,7"/>
+                <Button x:Name="BackBtn" Content="Back" FontSize="13" Padding="14,7" IsVisible="False"/>
+                <Button x:Name="NextBtn" Theme="{StaticResource LumenButton}" Content="Next" FontSize="13"/>
+                <Button x:Name="CreateBtn" Theme="{StaticResource LumenButton}" Content="Create" FontSize="13" IsVisible="False"/>
+            </StackPanel>
+        </Grid>
+
+        <ScrollViewer x:Name="WizScroll" HorizontalScrollBarVisibility="Disabled">
+            <Panel Margin="20,4,20,8">
+
+                <StackPanel x:Name="Step1Panel" Spacing="6">
+                    <TextBlock Classes="section" Text="NAME" Margin="0,4,0,4"/>
+                    <TextBox x:Name="NameBox" Theme="{StaticResource RoundedFieldTextBox}" FontSize="14"
+                             PlaceholderText="My notebook"/>
+
+                    <TextBlock Classes="section" Text="COLOR"/>
+                    <WrapPanel x:Name="ColorSwatches"/>
+
+                    <TextBlock Classes="section" Text="COVER IMAGE"/>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border x:Name="CoverPreview" Width="96" Height="64" CornerRadius="10"
+                                BorderBrush="{DynamicResource FrameBorderBrush}" BorderThickness="1"/>
+                        <StackPanel Spacing="6" VerticalAlignment="Center">
+                            <Button x:Name="CoverPickBtn" Content="Choose image…" FontSize="12.5"/>
+                            <Button x:Name="CoverClearBtn" Content="No cover" FontSize="12.5"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <TextBlock Classes="hint" Text="Without an image the cover shows the color above."/>
+
+                    <TextBlock Classes="section" Text="SECTIONS"/>
+                    <TextBlock Classes="hint" Text="The tabs inside the notebook. Add as many as you like — pages come next."/>
+                    <StackPanel x:Name="SectionRows" Spacing="6" Margin="0,4,0,0"/>
+                    <Button x:Name="AddSectionBtn" Content="Add section" FontSize="12.5" HorizontalAlignment="Left"/>
+                </StackPanel>
+
+                <StackPanel x:Name="Step2Panel" Spacing="6" IsVisible="False">
+                    <!-- Task 3 populates: grid style, page style previews, apply mode, font, size, pages editor -->
+                </StackPanel>
+
+            </Panel>
+        </ScrollViewer>
+    </DockPanel>
+    <controls:WindowResizeBorder/>
+    </Grid>
+</Window>
