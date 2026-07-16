@@ -67,6 +67,7 @@ public partial class MainView : UserControl
         Toolbar.CustomizeRequested += () => { if (Vm?.SelectedNotebook is { } nb) OpenNotebookWizard(nb); };
         Toolbar.InsertImageRequested += async () => await InsertImageAsync();
         Toolbar.InsertDividerRequested += InsertDivider;
+        Toolbar.InsertAttachmentRequested += async () => await InsertAttachmentAsync();
 
         // Section/page rename: double-click, the rename button, or right-click → Rename — all open
         // the zoomed rename overlay (the background blurs until the name is saved).
@@ -1294,6 +1295,23 @@ public partial class MainView : UserControl
         double y = CanvasScroll.Offset.Y / _canvasZoom + 40;
         PageCanvas.ImageRoot = vm.SelectedNotebookDir;
         PageCanvas.AddImage(rel, x, y);
+    }
+
+    /// <summary>Pick any file and drop it on the current page as an attachment chip (copied into
+    /// the notebook's assets folder, so the page stays self-contained).</summary>
+    private async System.Threading.Tasks.Task InsertAttachmentAsync()
+    {
+        if (Vm is not { SelectedPage: not null } vm || TopLevel.GetTopLevel(this)?.StorageProvider is not { } sp) return;
+        var files = await sp.OpenFilePickerAsync(new Avalonia.Platform.Storage.FilePickerOpenOptions
+        {
+            Title = "Attach file", AllowMultiple = false,
+        });
+        if (files.Count == 0 || files[0].TryGetLocalPath() is not { } path) return;
+        if (vm.ImportPageAsset(path) is not { } rel) return;
+        double x = CanvasScroll.Offset.X / _canvasZoom + 40;
+        double y = CanvasScroll.Offset.Y / _canvasZoom + 40;
+        PageCanvas.ImageRoot = vm.SelectedNotebookDir;
+        PageCanvas.AddAttachment(rel, x, y);
     }
 
     /// <summary>Drop a line divider ("h"/"v") on the current page, near the top-left of the view.</summary>

@@ -59,6 +59,9 @@ public partial class FormatToolbar : UserControl
     /// <summary>Raised by the divider button ("h"/"v") — MainView drops a line-divider box on the page.</summary>
     public event Action<string>? InsertDividerRequested;
 
+    /// <summary>Raised by the attach button — MainView picks a file and drops an attachment chip on the page.</summary>
+    public event Action? InsertAttachmentRequested;
+
     public RichTextEditor? Target
     {
         get => _target;
@@ -96,6 +99,7 @@ public partial class FormatToolbar : UserControl
         SubBtn.Click += (_, _) => Do(e => e.ToggleSub());
         LinkBtn.Click += async (_, _) => await AddLinkAsync();
         ImageBtn.Click += (_, _) => InsertImageRequested?.Invoke();
+        AttachBtn.Click += (_, _) => InsertAttachmentRequested?.Invoke();
         FootnoteBtn.Click += async (_, _) => await AddFootnoteAsync();
         BuildAlignChoices();
         BuildTypeChoices();

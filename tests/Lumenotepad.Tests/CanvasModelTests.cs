@@ -270,6 +270,19 @@ public class CanvasJsonTests
     }
 
     [Fact]
+    public void AttachmentBox_notEmpty_roundTrips()
+    {
+        var canvas = new CanvasDocument();
+        var att = canvas.AddBox(10, 20, 260);
+        att.AttachPath = "assets/report (2).pdf";
+        Assert.False(att.IsEmpty);                       // an attachment box never evaporates
+
+        var reloaded = CanvasDocJson.FromJson(CanvasDocJson.ToJson(canvas));
+        var box = Assert.Single(reloaded.Boxes);
+        Assert.Equal("assets/report (2).pdf", box.AttachPath);
+    }
+
+    [Fact]
     public void Links_absentWhenNone_badPairsIgnored()
     {
         var canvas = new CanvasDocument();

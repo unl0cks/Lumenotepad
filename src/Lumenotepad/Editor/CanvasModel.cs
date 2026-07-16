@@ -33,14 +33,19 @@ public sealed class NoteBox
     /// shows — dragging it stretches the line. Persisted.</summary>
     public string? Divider { get; set; }
 
+    /// <summary>A FILE-ATTACHMENT box (M11): a path relative to the notebook folder
+    /// ("assets/report.pdf"). When set the box renders a file chip instead of a text editor;
+    /// double-click opens the file with its default app. Persisted.</summary>
+    public string? AttachPath { get; set; }
+
     public RichDocument Doc { get; }
 
     public NoteBox(RichDocument? doc = null) => Doc = doc ?? new RichDocument();
 
     /// <summary>True while the box holds nothing but a single bare paragraph — such boxes
-    /// evaporate when focus settles elsewhere (OneNote behavior). Image and divider boxes
-    /// are never empty.</summary>
-    public bool IsEmpty => ImagePath is null && Divider is null && IsBlank(Doc);
+    /// evaporate when focus settles elsewhere (OneNote behavior). Image, divider, and
+    /// attachment boxes are never empty.</summary>
+    public bool IsEmpty => ImagePath is null && Divider is null && AttachPath is null && IsBlank(Doc);
 
     public static bool IsBlank(RichDocument doc) =>
         doc.Paragraphs.Count == 1 && doc.Paragraphs[0].Runs.Count == 0 && doc.Paragraphs[0].Bullet is null;

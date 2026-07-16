@@ -1150,6 +1150,11 @@ public partial class MainViewModel : ObservableObject
     public string? ImportPageImage(string sourcePath) =>
         SelectedNotebook is { } nb ? _store.SavePageImage(nb, sourcePath) : null;
 
+    /// <summary>Copy an attached file into the selected notebook's assets folder; returns the stored
+    /// relative path ("assets/report.pdf") for the attachment box, or null on failure (M11).</summary>
+    public string? ImportPageAsset(string sourcePath) =>
+        SelectedNotebook is { } nb ? _store.SavePageAsset(nb, sourcePath) : null;
+
     public void SetNotebookCover(Notebook nb, string sourcePath)
     {
         var dest = _store.SaveCover(nb, sourcePath);

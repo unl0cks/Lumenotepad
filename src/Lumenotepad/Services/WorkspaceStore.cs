@@ -132,6 +132,28 @@ public sealed class WorkspaceStore
         catch { return null; }
     }
 
+    /// <summary>Copy an attached file into the notebook's <c>assets/</c> subfolder, KEEPING the
+    /// original filename (the user opens it later and should recognize it) — an existing name gets
+    /// a " (2)"-style counter; returns the path RELATIVE to the notebook folder ("assets/report.pdf"),
+    /// or null on failure (M11).</summary>
+    public string? SavePageAsset(Notebook nb, string sourcePath)
+    {
+        if (string.IsNullOrEmpty(nb.Folder)) return null;
+        try
+        {
+            var assetsDir = Path.Combine(_root, nb.Folder, "assets");
+            Directory.CreateDirectory(assetsDir);
+            string stem = Path.GetFileNameWithoutExtension(sourcePath);
+            string ext = Path.GetExtension(sourcePath);
+            string name = stem + ext;
+            for (int i = 2; File.Exists(Path.Combine(assetsDir, name)); i++)
+                name = $"{stem} ({i}){ext}";
+            File.Copy(sourcePath, Path.Combine(assetsDir, name));
+            return "assets/" + name;
+        }
+        catch { return null; }
+    }
+
     private static void DeleteCoverFiles(string dir)
     {
         if (!Directory.Exists(dir)) return;

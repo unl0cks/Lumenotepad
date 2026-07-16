@@ -57,6 +57,8 @@ public static class PageExport
     private static IEnumerable<NoteBox> Boxes(CanvasDocument doc) =>
         doc.Boxes.Where(b => !b.IsEmpty).OrderBy(b => b.Y).ThenBy(b => b.X);
 
+    private static string AttachName(NoteBox b) => Path.GetFileName(b.AttachPath ?? "");
+
     // ---- plain text ----
 
     public static string ToText(string title, CanvasDocument doc)
@@ -65,6 +67,9 @@ public static class PageExport
         sb.AppendLine(title).AppendLine(new string('=', title.Length)).AppendLine();
         foreach (var box in Boxes(doc))
         {
+            if (box.Divider is not null) { sb.AppendLine(new string('-', 24)).AppendLine(); continue; }
+            if (box.AttachPath is { Length: > 0 }) { sb.AppendLine("Attachment: " + AttachName(box)).AppendLine(); continue; }
+            if (box.ImagePath is not null) continue;   // pictures can't ride along in plain text
             int num = 0;
             foreach (var p in box.Doc.Paragraphs)
             {
@@ -88,6 +93,9 @@ public static class PageExport
         var blocks = new List<string> { "# " + title };
         foreach (var box in Boxes(doc))
         {
+            if (box.Divider is not null) { blocks.Add("---"); continue; }
+            if (box.AttachPath is { Length: > 0 }) { blocks.Add("**Attachment:** " + AttachName(box)); continue; }
+            if (box.ImagePath is not null) continue;   // the .md leaves the notebook — no path survives
             var lines = new List<string>();
             int num = 0;
             foreach (var p in box.Doc.Paragraphs)
@@ -137,6 +145,10 @@ public static class PageExport
         body.Append("<h1>").Append(Esc(title)).Append("</h1>\n");
         foreach (var box in Boxes(doc))
         {
+            if (box.Divider is not null) { body.Append("<hr/>\n"); continue; }   // self-closed: EPUB is XHTML
+            if (box.AttachPath is { Length: > 0 })
+            { body.Append("<p class=\"attachment\">📎 ").Append(Esc(AttachName(box))).Append("</p>\n"); continue; }
+            if (box.ImagePath is not null) continue;
             body.Append("<section>\n");
             AppendHtmlParagraphs(body, box.Doc);
             body.Append("</section>\n");
@@ -237,6 +249,10 @@ public static class PageExport
         sb.Append(@"\fs48\b ").Append(RtfEsc(title)).Append(@"\b0\fs22\par\par");
         foreach (var box in Boxes(doc))
         {
+            if (box.Divider is not null) { sb.Append(@"\ql ").Append(new string('_', 32)).Append(@"\par\par"); continue; }
+            if (box.AttachPath is { Length: > 0 })
+            { sb.Append(@"\ql\i Attachment: ").Append(RtfEsc(AttachName(box))).Append(@"\i0\par\par"); continue; }
+            if (box.ImagePath is not null) continue;
             int num = 0;
             foreach (var p in box.Doc.Paragraphs)
             {
@@ -359,6 +375,16 @@ public static class PageExport
             {
                 if (box.Divider is not null) { DrawDivider(box); continue; }
                 if (box.ImagePath is { Length: > 0 }) { DrawImage(box); continue; }
+                if (box.AttachPath is { Length: > 0 })
+                {
+                    // The file itself can't ride inside the page — a quiet italic marker names it.
+                    EnsureRoom(20);
+                    using var ap = MakePaint(false, true, false, 12);
+                    ap.Color = new SkiaSharp.SKColor(0x77, 0x77, 0x77);
+                    canvas.DrawText("Attachment: " + AttachName(box), Margin, y, ap);
+                    y += 22;
+                    continue;
+                }
 
                 int num = 0;
                 foreach (var p in box.Doc.Paragraphs)
@@ -478,8 +504,13 @@ public static class PageExport
         var body = new StringBuilder();
         body.Append(DocxParagraph(title, TextAlign.Left, 40, true, null));
         foreach (var box in Boxes(doc))
+        {
+            if (box.Divider is not null) { body.Append(DocxParagraph(new string('—', 12), TextAlign.Left, 22, false, null)); continue; }
+            if (box.AttachPath is { Length: > 0 }) { body.Append(DocxParagraph("Attachment: " + AttachName(box), TextAlign.Left, 22, false, null)); continue; }
+            if (box.ImagePath is not null) continue;
             foreach (var p in box.Doc.Paragraphs)
                 body.Append(DocxParagraphFrom(p));
+        }
 
         string document =
             "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
@@ -548,6 +579,10 @@ public static class PageExport
         var content = new StringBuilder();
         content.Append($"<text:h text:outline-level=\"1\">{Esc(title)}</text:h>");
         foreach (var box in Boxes(doc))
+        {
+            if (box.Divider is not null) { content.Append($"<text:p>{new string('—', 12)}</text:p>"); continue; }
+            if (box.AttachPath is { Length: > 0 }) { content.Append($"<text:p>Attachment: {Esc(AttachName(box))}</text:p>"); continue; }
+            if (box.ImagePath is not null) continue;
             foreach (var p in box.Doc.Paragraphs)
             {
                 bool heading = p.Style != ParaStyle.Body;
@@ -562,6 +597,7 @@ public static class PageExport
                 foreach (var r in p.Runs) runs.Append(OdtRun(r));
                 content.Append($"<{tag}{lvl}>{runs}</{tag.Split(' ')[0]}>");
             }
+        }
 
         string contentXml =
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +

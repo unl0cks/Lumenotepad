@@ -141,6 +141,28 @@ public class PageExportTests
         }
     }
 
+    [Theory]
+    [InlineData(ExportFormat.Txt, "Attachment: report.pdf")]
+    [InlineData(ExportFormat.Markdown, "**Attachment:** report.pdf")]
+    [InlineData(ExportFormat.Html, "<p class=\"attachment\">📎 report.pdf</p>")]
+    public void Attachments_exportAsNamedLines(ExportFormat fmt, string expected)
+    {
+        var canvas = Page();
+        var att = canvas.AddBox(0, 700);
+        att.AttachPath = "assets/report.pdf";
+        Assert.Contains(expected, Text(PageExport.Export(fmt, "T", canvas)));
+    }
+
+    [Fact]
+    public void Dividers_exportAsRules()
+    {
+        var canvas = Page();
+        var div = canvas.AddBox(0, 700);
+        div.Divider = "h";
+        Assert.Contains("---", Text(PageExport.Export(ExportFormat.Markdown, "T", canvas)));
+        Assert.Contains("<hr/>", Text(PageExport.Export(ExportFormat.Html, "T", canvas)));
+    }
+
     [Fact]
     public void Pdf_includesImagesAndDividers()
     {
