@@ -342,15 +342,15 @@ public partial class FontBrowserWindow : Window
         // ('.', 'i') and tall descenders ('g', 'y') all sit centered without clipping.
         var img = new Image
         {
-            Source = FontPreviewRenderer.RenderGlyph(bytes, ch, b, i, _textColorArgb, 40f),
+            Source = FontPreviewRenderer.RenderGlyph(bytes, ch, b, i, _textColorArgb, 34f),
             Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly,
-            MaxHeight = 40, MaxWidth = 44,
+            MaxHeight = 32, MaxWidth = 40,
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
         };
         return new Border
         {
-            Width = 60, Height = 66, Margin = new Thickness(0, 0, 8, 8),
+            Width = 52, Height = 54, Margin = new Thickness(0, 0, 7, 7),
             CornerRadius = new CornerRadius(8),
             Background = this.FindResource("ControlHoverBrush") as IBrush,
             BorderBrush = this.FindResource("FrameBorderBrush") as IBrush,

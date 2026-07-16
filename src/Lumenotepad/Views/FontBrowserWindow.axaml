@@ -152,13 +152,13 @@
                         Content="Install" FontSize="13" Padding="16,7" VerticalAlignment="Center"/>
             </Grid>
             <ScrollViewer x:Name="DetailScroll" VerticalScrollBarVisibility="Auto">
-                <StackPanel Spacing="16">
-                    <Border CornerRadius="10" Padding="18,16" Background="{DynamicResource ControlHoverBrush}"
+                <StackPanel Spacing="12">
+                    <Border CornerRadius="10" Padding="16,12" Background="{DynamicResource ControlHoverBrush}"
                             BorderBrush="{DynamicResource FrameBorderBrush}" BorderThickness="1">
-                        <Image x:Name="DetailBigPreview" Height="60" Stretch="Uniform"
+                        <Image x:Name="DetailBigPreview" Height="46" Stretch="Uniform"
                                HorizontalAlignment="Left"/>
                     </Border>
-                    <StackPanel x:Name="DetailCharGroups" Spacing="14"/>
+                    <StackPanel x:Name="DetailCharGroups" Spacing="8"/>
                 </StackPanel>
             </ScrollViewer>
         </DockPanel>
