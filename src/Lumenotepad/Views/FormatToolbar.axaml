@@ -130,6 +130,15 @@
                 </Button.Flyout>
             </Button>
 
+            <Button x:Name="TagBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
+                    FontFamily="{StaticResource IconFont}" Content="&#xE8EC;" ToolTip.Tip="Tag this line">
+                <Button.Flyout>
+                    <Flyout Placement="Bottom">
+                        <StackPanel x:Name="TagChoices" Width="168" Spacing="2"/>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
+
             <Border Classes="toolsep"/>
 
             <Button x:Name="HighlightBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"

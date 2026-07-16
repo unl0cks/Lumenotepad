@@ -152,6 +152,8 @@ public sealed class RichTextEditor : Control
 
     /// <summary>Base gutter width for bulleted/numbered/checkbox paragraphs (scales with the text size).</summary>
     private const double BulletIndent = 26;
+    /// <summary>Extra gutter a tagged paragraph adds LEFT of the bullet gutter (M11 tags).</summary>
+    private const double TagIndent = 22;
 
     /// <summary>How much bigger/smaller this paragraph's bullet should render, tracking its text size
     /// (taken from the first run) relative to the editor default.</summary>
@@ -161,7 +163,14 @@ public sealed class RichTextEditor : Control
         return Math.Clamp(eff / FontSize, 0.75, 2.5);
     }
 
-    private double IndentOf(Paragraph p) => p.Bullet is null ? 0 : BulletIndent * IndentScalePref * Math.Max(1, ScaleOf(p));
+    private double BulletIndentOf(Paragraph p) =>
+        p.Bullet is null ? 0 : BulletIndent * IndentScalePref * Math.Max(1, ScaleOf(p));
+    private double TagIndentOf(Paragraph p) =>
+        p.Tag is null ? 0 : TagIndent * Math.Max(1, ScaleOf(p));
+    /// <summary>The full text indent: tag gutter (left) + bullet gutter (right). Every consumer —
+    /// layout width, draw origin, caret, hit-testing — reads this one sum, so the gutters can never
+    /// drift apart.</summary>
+    private double IndentOf(Paragraph p) => TagIndentOf(p) + BulletIndentOf(p);
 
     private double IndentOf(int pi) =>
         pi >= 0 && pi < _doc.Paragraphs.Count ? IndentOf(_doc.Paragraphs[pi]) : 0;
@@ -194,7 +203,7 @@ public sealed class RichTextEditor : Control
 
     private TextLayout BuildLayout(Paragraph p, double width)
     {
-        if (p.Bullet is not null && double.IsFinite(width)) width -= IndentOf(p);
+        if ((p.Bullet is not null || p.Tag is not null) && double.IsFinite(width)) width -= IndentOf(p);
         double maxWidth = double.IsFinite(width) && width > 1 ? width : double.PositiveInfinity;
         double baseSize = p.Footnote ? Math.Max(9, FontSize * 0.82) : BaseSizeFor(p.Style, FontSize);
         var align = MapAlign(p.Align);
@@ -418,6 +427,8 @@ public sealed class RichTextEditor : Control
         ["spark"] = ("✦", "#FFD966"),
     };
 
+    // Tag glyphs live in TagStyles (RichModel.cs) — platform-free, shared with toolbar + exports.
+
     private static readonly FontFamily GlyphFont = new("Segoe UI Symbol, Segoe UI Emoji, Segoe UI");
 
     /// <summary>Per-glyph calibration, measured once: the nominal font size that yields 1px of ink
@@ -451,12 +462,29 @@ public sealed class RichTextEditor : Control
     private void DrawBullet(DrawingContext ctx, int pi, double top)
     {
         var p = _doc.Paragraphs[pi];
-        if (p.Bullet is null) return;
+        if (p.Bullet is null && p.Tag is null) return;
         double s = ScaleOf(p);                                // bullets track their paragraph's text size
-        double indent = IndentOf(p);
         double lineH = _layouts[pi].TextLines.Count > 0 ? _layouts[pi].TextLines[0].Height : FontSize * 1.35;
-        double cx = indent / 2 - 2 * s;
         double cy = top + lineH / 2;
+
+        // The tag marker sits in its own gutter LEFT of the bullet gutter, same ink-height
+        // calibration as the glyph bullets. "!"/"?" render bold so they read as markers, not text.
+        if (p.Tag is not null && TagStyles.Info(p.Tag) is { } tg)
+        {
+            double tInk = 8.8 * s;
+            var tCal = Calibrate(tg.Glyph);
+            double tSize = tCal.UnitSize * tInk;
+            var tf = new FormattedText(tg.Glyph, System.Globalization.CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight, new Typeface(GlyphFont, FontStyle.Normal, FontWeight.Bold),
+                tSize, BrushFor(tg.Color));
+            double tcx = TagIndentOf(p) / 2 - 1;
+            ctx.DrawText(tf, new Point(tcx - tCal.CenterXFrac * tSize, cy - tCal.CenterYFrac * tSize));
+        }
+
+        if (p.Bullet is null) return;
+        double indent = BulletIndentOf(p);                    // the bullet's own gutter…
+        double tagInd = TagIndentOf(p);                       // …starts after the tag gutter
+        double cx = tagInd + indent / 2 - 2 * s;
 
         if (p.Bullet == "check")
         {
@@ -497,7 +525,7 @@ public sealed class RichTextEditor : Control
                 new Typeface(FontFamily, italic ? FontStyle.Italic : FontStyle.Normal,
                              bold ? FontWeight.Bold : FontWeight.Normal),
                 12.5 * s, brush);
-            var origin = new Point(indent - 7 - ft.Width, cy - ft.Height / 2);
+            var origin = new Point(tagInd + indent - 7 - ft.Width, cy - ft.Height / 2);
             ctx.DrawText(ft, origin);
             var decoPen = new Pen(brush, Math.Max(1, s));
             if (under)
@@ -861,6 +889,16 @@ public sealed class RichTextEditor : Control
         PushUndo();
         var (a, b) = SelOrdered();
         _doc.SetAlign(a, b, align);
+        _typingBurst = false;
+        RaiseSelectionChanged();
+    }
+
+    /// <summary>Tag (or untag, with null) every paragraph the selection touches (M11).</summary>
+    public void SetTag(string? tag)
+    {
+        PushUndo();
+        var (a, b) = SelOrdered();
+        _doc.SetTag(a, b, tag);
         _typingBurst = false;
         RaiseSelectionChanged();
     }

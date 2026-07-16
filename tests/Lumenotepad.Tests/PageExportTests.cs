@@ -154,6 +154,20 @@ public class PageExportTests
     }
 
     [Fact]
+    public void Tags_exportAsMarkers()
+    {
+        var canvas = new CanvasDocument();
+        var box = canvas.AddBox(0, 0);
+        box.Doc.InsertText(new DocPos(0, 0), "urgent thing");
+        box.Doc.SetTag(new DocPos(0, 0), new DocPos(0, 0), "important");
+
+        Assert.Contains("[!] urgent thing", Text(PageExport.Export(ExportFormat.Txt, "T", canvas)));
+        Assert.Contains("[!] urgent thing", Text(PageExport.Export(ExportFormat.Markdown, "T", canvas)));
+        var html = Text(PageExport.Export(ExportFormat.Html, "T", canvas));
+        Assert.Contains("font-weight:bold\">!</span> urgent thing", html);
+    }
+
+    [Fact]
     public void Dividers_exportAsRules()
     {
         var canvas = Page();

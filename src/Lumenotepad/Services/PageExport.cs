@@ -59,6 +59,18 @@ public static class PageExport
 
     private static string AttachName(NoteBox b) => Path.GetFileName(b.AttachPath ?? "");
 
+    /// <summary>Plain-text marker for a tagged paragraph (TXT/MD; HTML gets the colored glyph).</summary>
+    private static string TagMark(Paragraph p) => p.Tag switch
+    {
+        "important" => "[!] ", "question" => "[?] ", "idea" => "[idea] ",
+        "star" => "[fav] ", "flag" => "[flag] ", _ => "",
+    };
+
+    private static string TagHtml(Paragraph p) =>
+        p.Tag is { } t && TagStyles.Info(t) is { } g
+            ? $"<span style=\"color:{g.Color};font-weight:bold\">{Esc(g.Glyph)}</span> "
+            : "";
+
     // ---- plain text ----
 
     public static string ToText(string title, CanvasDocument doc)
@@ -79,7 +91,7 @@ public static class PageExport
                     null => "", "num" => $"{num}. ",
                     "check" => p.Checked ? "[x] " : "[ ] ", _ => "• ",
                 };
-                sb.AppendLine(prefix + p.Text);
+                sb.AppendLine(prefix + TagMark(p) + p.Text);
             }
             sb.AppendLine();
         }
@@ -114,7 +126,7 @@ public static class PageExport
                     null => heading, "num" => $"{num}. ",
                     "check" => p.Checked ? "- [x] " : "- [ ] ", _ => "- ",
                 };
-                lines.Add(prefix + body);
+                lines.Add(prefix + TagMark(p) + body);      // tag AFTER the marker so "## " stays a heading
             }
             blocks.Add(string.Join("\n", lines));
         }
@@ -177,7 +189,7 @@ public static class PageExport
                 {
                     body.Append("<li><input type=\"checkbox\" disabled")
                         .Append(ps[i].Checked ? " checked" : "").Append("> ")
-                        .Append(InlineHtml(ps[i])).Append("</li>\n");
+                        .Append(TagHtml(ps[i])).Append(InlineHtml(ps[i])).Append("</li>\n");
                     i++;
                 }
                 body.Append("</ul>\n");
@@ -189,7 +201,7 @@ public static class PageExport
                 body.Append(ordered ? "<ol>\n" : "<ul>\n");
                 while (i < ps.Count && ps[i].Bullet == p.Bullet)
                 {
-                    body.Append("<li>").Append(InlineHtml(ps[i])).Append("</li>\n");
+                    body.Append("<li>").Append(TagHtml(ps[i])).Append(InlineHtml(ps[i])).Append("</li>\n");
                     i++;
                 }
                 body.Append(ordered ? "</ol>\n" : "</ul>\n");
@@ -210,7 +222,7 @@ public static class PageExport
                 _ => "",
             };
             body.Append('<').Append(tag).Append(align).Append('>')
-                .Append(InlineHtml(p)).Append("</").Append(tag).Append(">\n");
+                .Append(TagHtml(p)).Append(InlineHtml(p)).Append("</").Append(tag).Append(">\n");
             i++;
         }
     }

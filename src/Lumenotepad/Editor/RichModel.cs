@@ -58,6 +58,30 @@ public enum TextAlign { Left, Center, Right, Justify }
 public enum ParaStyle { Body, Title, Subtitle, Heading1, Heading2, Heading3 }
 
 /// <summary>A paragraph = an ordered list of runs (zero runs = an empty paragraph).</summary>
+/// <summary>The OneNote-style tag set (M11): key → glyph/color/name. Lives here — NOT on the
+/// editor control — so headless consumers (exports, tests) never touch Avalonia platform statics.
+/// Monochrome symbols only: color-emoji glyphs ignore the brush, so they could never tint.</summary>
+public static class TagStyles
+{
+    public static readonly IReadOnlyList<(string Key, string Glyph, string Color, string Name)> All =
+        new (string, string, string, string)[]
+    {
+        ("important", "!", "#FF6B6B", "Important"),
+        ("question", "?", "#4DA6FF", "Question"),
+        ("idea", "✶", "#FFD966", "Idea"),
+        ("star", "★", "#E9B865", "Favorite"),
+        ("flag", "⚑", "#F09B4C", "Follow up"),
+    };
+
+    /// <summary>Glyph + color for a tag key (toolbar, editor, and exports all read this), or null.</summary>
+    public static (string Glyph, string Color)? Info(string key)
+    {
+        foreach (var t in All)
+            if (t.Key == key) return (t.Glyph, t.Color);
+        return null;
+    }
+}
+
 public sealed class Paragraph
 {
     public List<RichRun> Runs = new();
@@ -72,6 +96,11 @@ public sealed class Paragraph
 
     /// <summary>Ticked state for "check" bullets.</summary>
     public bool Checked;
+
+    /// <summary>OneNote-style tag key (M11): null = none; "important" | "question" | "idea" |
+    /// "star" | "flag" — a colored marker glyph in the paragraph's left gutter that reads as
+    /// "come back to this". Does not carry across an Enter split.</summary>
+    public string? Tag;
 
     /// <summary>Style overrides for the NUMBER of a "num" paragraph. null = inherit the corresponding
     /// flag from the paragraph's first text run (numbers match their text by default; a future
@@ -97,6 +126,7 @@ public sealed class Paragraph
         Runs = Runs.Select(r => r.Clone()).ToList(),
         Bullet = Bullet,
         Checked = Checked,
+        Tag = Tag,
         NumBold = NumBold, NumItalic = NumItalic, NumUnderline = NumUnderline, NumStrike = NumStrike,
         Align = Align, Style = Style, Footnote = Footnote,
     };
@@ -231,8 +261,9 @@ public sealed class RichDocument
         Clamp(ref pos);
         var para = Paragraphs[pos.Para];
         int runIdx = para.SplitAt(pos.Off);
-        // The new paragraph continues the list + alignment; the tick state does not carry over, and a
-        // heading/title continues as Body (word-processor behavior: Enter after a heading starts body).
+        // The new paragraph continues the list + alignment; the tick state and TAG do not carry over
+        // (a tag marks that one thought), and a heading/title continues as Body (word-processor
+        // behavior: Enter after a heading starts body).
         var next = new Paragraph
         {
             Runs = para.Runs.Skip(runIdx).ToList(),
@@ -355,6 +386,19 @@ public sealed class RichDocument
             para.Bullet = style;
             if (style != "check") para.Checked = false;
             para.Version++;
+        }
+        OnChanged();
+    }
+
+    /// <summary>Set (or clear, with null) the tag on every paragraph the range touches (M11).</summary>
+    public void SetTag(DocPos a, DocPos b, string? tag)
+    {
+        Clamp(ref a); Clamp(ref b);
+        if (a > b) (a, b) = (b, a);
+        for (int pi = a.Para; pi <= b.Para; pi++)
+        {
+            Paragraphs[pi].Tag = tag;
+            Paragraphs[pi].Version++;
         }
         OnChanged();
     }

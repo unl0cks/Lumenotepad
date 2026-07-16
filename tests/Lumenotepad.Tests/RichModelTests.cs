@@ -126,6 +126,21 @@ public class RichModelTests
     }
 
     [Fact]
+    public void SetTag_appliesToRange_splitDoesNotCarryIt()
+    {
+        var d = Doc("flagged thought");
+        d.SetTag(new DocPos(0, 0), new DocPos(0, 0), "important");
+        Assert.Equal("important", d.Paragraphs[0].Tag);
+
+        d.SplitParagraph(d.End);                       // Enter: the tag marks that ONE thought
+        Assert.Equal("important", d.Paragraphs[0].Tag);
+        Assert.Null(d.Paragraphs[1].Tag);
+
+        d.SetTag(new DocPos(0, 0), new DocPos(0, 0), null);
+        Assert.Null(d.Paragraphs[0].Tag);
+    }
+
+    [Fact]
     public void SetBullet_awayFromCheck_resetsChecked()
     {
         var d = Doc("task");

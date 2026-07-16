@@ -28,6 +28,19 @@ public class RichDocJsonTests
     }
 
     [Fact]
+    public void RoundTrip_preservesTags()
+    {
+        var doc = new RichDocument();
+        doc.InsertText(new DocPos(0, 0), "urgent\nnormal");
+        doc.SetTag(new DocPos(0, 0), new DocPos(0, 0), "important");
+
+        var restored = RichDocJson.FromJson(RichDocJson.ToJson(doc));
+
+        Assert.Equal("important", restored.Paragraphs[0].Tag);
+        Assert.Null(restored.Paragraphs[1].Tag);
+    }
+
+    [Fact]
     public void RoundTrip_preservesBulletsAndCheckedState()
     {
         var doc = new RichDocument();

@@ -104,6 +104,7 @@ public partial class FormatToolbar : UserControl
         BuildAlignChoices();
         BuildTypeChoices();
         BuildDividerChoices();
+        BuildTagChoices();
         SizeMinus.Click += (_, _) => NudgeSize(-1);
         SizePlus.Click += (_, _) => NudgeSize(+1);
         SizeBox.KeyDown += (_, e) =>
@@ -153,7 +154,7 @@ public partial class FormatToolbar : UserControl
             Dock.Bottom => PlacementMode.Top,
             _ => PlacementMode.Bottom,
         };
-        foreach (var b in new[] { BulletBtn, HighlightBtn, ColorBtn, FontBtn, TypeBtn, AlignBtn, DividerBtn })
+        foreach (var b in new[] { BulletBtn, HighlightBtn, ColorBtn, FontBtn, TypeBtn, AlignBtn, DividerBtn, TagBtn })
             if (b.Flyout is PopupFlyoutBase pf) pf.Placement = placement;
         if (DockBtn.Flyout is PopupFlyoutBase df) df.Placement = placement;
 
@@ -335,6 +336,36 @@ public partial class FormatToolbar : UserControl
             };
             b.Click += (_, _) => { Do(e => e.SetAlignment(align)); AlignBtn.Flyout?.Hide(); };
             AlignChoices.Children.Add(b);
+        }
+    }
+
+    private void BuildTagChoices()
+    {
+        var symbolFont = new FontFamily("Segoe UI Symbol, Segoe UI Emoji, Segoe UI");
+        var rows = new System.Collections.Generic.List<(string? Key, string Glyph, string Color, string Name)>
+        { (null, "∅", "#808080", "No tag") };
+        foreach (var t in TagStyles.All)
+            rows.Add((t.Key, t.Glyph, t.Color, t.Name));
+        foreach (var (key, glyph, color, name) in rows)
+        {
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            row.Children.Add(new TextBlock
+            {
+                Text = glyph, FontSize = 13, FontFamily = symbolFont, FontWeight = FontWeight.Bold,
+                Foreground = new SolidColorBrush(Color.Parse(color)),
+                Width = 18, TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            });
+            row.Children.Add(new TextBlock { Text = name, FontSize = 13, VerticalAlignment = VerticalAlignment.Center });
+            var b = new Button
+            {
+                Theme = (Avalonia.Styling.ControlTheme)Application.Current!.FindResource("LumenButtonGray")!,
+                HorizontalContentAlignment = HorizontalAlignment.Left,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Padding = new Thickness(10, 5), Content = row,
+            };
+            b.Click += (_, _) => { Do(e => e.SetTag(key)); TagBtn.Flyout?.Hide(); };
+            TagChoices.Children.Add(b);
         }
     }
 

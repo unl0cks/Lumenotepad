@@ -31,6 +31,7 @@ public static class RichDocJson
         [JsonPropertyName("runs")] public List<RunDto> Runs { get; set; } = new();
         [JsonPropertyName("bul")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Bul { get; set; }
         [JsonPropertyName("chk")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Chk { get; set; }
+        [JsonPropertyName("tag")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Tag { get; set; }
         [JsonPropertyName("nb")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public bool? Nb { get; set; }
         [JsonPropertyName("ni")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public bool? Ni { get; set; }
         [JsonPropertyName("nu")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public bool? Nu { get; set; }
@@ -53,6 +54,7 @@ public static class RichDocJson
         {
             Bul = p.Bullet,
             Chk = p.Checked,
+            Tag = p.Tag,
             Nb = p.NumBold, Ni = p.NumItalic, Nu = p.NumUnderline, Ns = p.NumStrike,
             Al = (int)p.Align, Ps = (int)p.Style, Fn = p.Footnote,
             Runs = p.Runs.Select(r => new RunDto
@@ -73,7 +75,7 @@ public static class RichDocJson
         {
             var para = new Paragraph
             {
-                Bullet = p.Bul, Checked = p.Chk,
+                Bullet = p.Bul, Checked = p.Chk, Tag = p.Tag,
                 NumBold = p.Nb, NumItalic = p.Ni, NumUnderline = p.Nu, NumStrike = p.Ns,
                 Align = (TextAlign)p.Al, Style = (ParaStyle)p.Ps, Footnote = p.Fn,
             };
