@@ -403,6 +403,34 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public void CollectTaggedLines_findsTagsAcrossPages_inNotebookOrder()
+    {
+        var vm = NewVm(out var dir);
+        try
+        {
+            var sec = vm.SelectedSection!;
+            var pageA = vm.SelectedPage!;
+            var docA = vm.DocumentFor(pageA);
+            var boxA = docA.AddBox(0, 0);
+            boxA.Doc.InsertText(new Editor.DocPos(0, 0), "ask about this\nplain line");
+            boxA.Doc.SetTag(new Editor.DocPos(0, 0), new Editor.DocPos(0, 0), "question");
+
+            vm.AddPageCommand.Execute(null);
+            var pageB = vm.SelectedPage!;
+            var docB = vm.DocumentFor(pageB);
+            var boxB = docB.AddBox(0, 0);
+            boxB.Doc.InsertText(new Editor.DocPos(0, 0), "urgent!");
+            boxB.Doc.SetTag(new Editor.DocPos(0, 0), new Editor.DocPos(0, 0), "important");
+
+            var lines = vm.CollectTaggedLines();
+            Assert.Equal(2, lines.Count);
+            Assert.Contains(lines, l => l.Tag == "question" && l.Text == "ask about this" && l.Page == pageA && l.Section == sec);
+            Assert.Contains(lines, l => l.Tag == "important" && l.Text == "urgent!" && l.Page == pageB);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public void ExportAllNotebooks_writesMarkdownTree()
     {
         var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());

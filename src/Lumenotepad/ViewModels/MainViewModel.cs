@@ -912,6 +912,22 @@ public partial class MainViewModel : ObservableObject
         return doc;
     }
 
+    /// <summary>Every tagged line in the selected notebook (M11): tag key, the line's text, and
+    /// the section/page it lives on — the Tagged-notes panel lists these. Page docs load lazily
+    /// through <see cref="DocumentFor"/> (cached), so a big notebook pays its disk reads once.</summary>
+    public System.Collections.Generic.List<(string Tag, string Text, Section Section, Page Page)> CollectTaggedLines()
+    {
+        var result = new System.Collections.Generic.List<(string, string, Section, Page)>();
+        if (SelectedNotebook is not { } nb) return result;
+        foreach (var sec in nb.Sections)
+            foreach (var pg in sec.Pages)
+                foreach (var box in DocumentFor(pg).Boxes)
+                    foreach (var p in box.Doc.Paragraphs)
+                        if (p.Tag is { Length: > 0 } t)
+                            result.Add((t, p.Text, sec, pg));
+        return result;
+    }
+
     /// <summary>Write every dirty page document to disk.</summary>
     public void FlushDirtyDocs()
     {

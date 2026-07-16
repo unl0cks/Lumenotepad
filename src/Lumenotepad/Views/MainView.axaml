@@ -553,15 +553,19 @@
                 <!-- per-notebook paper tint: a translucent veil over the paper, under the content -->
                 <Border x:Name="PaperTintVeil" CornerRadius="{DynamicResource RadiusPageInner}" IsVisible="False" IsHitTestVisible="False"/>
                 <DockPanel x:Name="PageDock">
-                    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="26,22,26,0"
+                    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="26,22,26,0"
                           IsVisible="{Binding SelectedPage, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
                         <TextBox x:Name="PageTitle" Classes="rename"
                                  Theme="{StaticResource RoundedFieldTextBox}"
                                  Foreground="{DynamicResource PaperTextBrush}"
                                  FontSize="26" FontWeight="SemiBold" PlaceholderText="Page title"
                                  Text="{Binding SelectedPage.Title, Mode=TwoWay}"/>
-                        <Button x:Name="HistoryBtn" Grid.Column="1" Theme="{StaticResource IconButton}"
+                        <Button x:Name="TagsBtn" Grid.Column="1" Theme="{StaticResource IconButton}"
                                 Width="30" Height="30" FontSize="14" Margin="8,0,0,0" VerticalAlignment="Center"
+                                FontFamily="{StaticResource IconFont}" Content="&#xE8EC;"
+                                ToolTip.Tip="Tagged notes"/>
+                        <Button x:Name="HistoryBtn" Grid.Column="2" Theme="{StaticResource IconButton}"
+                                Width="30" Height="30" FontSize="14" Margin="4,0,0,0" VerticalAlignment="Center"
                                 FontFamily="{StaticResource IconFont}" Content="&#xE81C;"
                                 IsVisible="{Binding DeletedHistory}" ToolTip.Tip="Deleted containers"/>
                     </Grid>
@@ -574,6 +578,22 @@
                                 <editor:NoteCanvas x:Name="PageCanvas"/>
                             </LayoutTransformControl>
                         </ScrollViewer>
+                        <!-- Tagged notes (M11): every tagged line in the notebook, click to jump -->
+                        <Border x:Name="TagsPanel" IsVisible="False" Width="252"
+                                HorizontalAlignment="Right" VerticalAlignment="Stretch" Margin="0,10,12,12"
+                                CornerRadius="10" Background="#E8191B24"
+                                BorderBrush="#33FFFFFF" BorderThickness="1">
+                            <DockPanel Margin="12,10,12,12">
+                                <TextBlock DockPanel.Dock="Top" Text="Tagged notes"
+                                           FontSize="13" FontWeight="SemiBold"/>
+                                <TextBlock DockPanel.Dock="Top" Text="Everything tagged in this notebook. Click one to jump to its page."
+                                           FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
+                                           TextWrapping="Wrap" Margin="0,4,0,10"/>
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel x:Name="TagsList" Spacing="6"/>
+                                </ScrollViewer>
+                            </DockPanel>
+                        </Border>
                         <!-- Deleted-containers history: drag a card onto the page to bring it back -->
                         <Border x:Name="TrashPanel" IsVisible="False" Width="238"
                                 HorizontalAlignment="Right" VerticalAlignment="Stretch" Margin="0,10,12,12"

@@ -60,7 +60,13 @@ public partial class MainView : UserControl
         HistoryBtn.Click += (_, _) =>
         {
             TrashPanel.IsVisible = !TrashPanel.IsVisible;
-            if (TrashPanel.IsVisible) RefreshTrashPanel();
+            if (TrashPanel.IsVisible) { TagsPanel.IsVisible = false; RefreshTrashPanel(); }
+        };
+        // Tagged notes: the two side panels share the page's right edge — opening one closes the other.
+        TagsBtn.Click += (_, _) =>
+        {
+            TagsPanel.IsVisible = !TagsPanel.IsVisible;
+            if (TagsPanel.IsVisible) { TrashPanel.IsVisible = false; RefreshTagsPanel(); }
         };
         Toolbar.DockRequested += pos => { if (Vm is { } vm) vm.ToolbarPosition = pos; };
         Toolbar.ScopeRequested += scope => { if (Vm is { } vm) vm.ToolbarScope = scope; };
@@ -810,7 +816,8 @@ public partial class MainView : UserControl
             ReassertListSelection();
 
         // Re-point the add-animation hooks at the current section/page collections.
-        if (e.PropertyName == nameof(MainViewModel.SelectedNotebook)) { RehookSections(); ApplyPaperTint(); ApplyEditorPrefs(rebuild: true); }
+        if (e.PropertyName == nameof(MainViewModel.SelectedNotebook))
+        { RehookSections(); ApplyPaperTint(); ApplyEditorPrefs(rebuild: true); TagsPanel.IsVisible = false; }   // chips reference the OLD notebook's pages
         if (e.PropertyName == nameof(MainViewModel.SelectedSection)) RehookPages();
 
         // Section switch: the repopulated pages list rises in instead of popping.
@@ -943,6 +950,76 @@ public partial class MainView : UserControl
     }
 
     // ---- deleted-containers history panel ----
+
+    /// <summary>Rebuild the Tagged-notes list: tag-order groups (colored glyph header), then a chip
+    /// per tagged line with its section › page trail; clicking a chip jumps to that page.</summary>
+    private void RefreshTagsPanel()
+    {
+        TagsList.Children.Clear();
+        if (Vm is not { } vm) return;
+        var muted = (IBrush)this.FindResource("TextMutedBrush")!;
+        var lines = vm.CollectTaggedLines();
+        if (lines.Count == 0)
+        {
+            TagsList.Children.Add(new TextBlock
+            {
+                Text = "Nothing tagged yet. Use the tag button in the toolbar to mark a line.",
+                FontSize = 12, TextWrapping = TextWrapping.Wrap, Foreground = muted,
+            });
+            return;
+        }
+        foreach (var (key, glyph, color, name) in Editor.TagStyles.All)
+        {
+            var group = lines.Where(l => l.Tag == key).ToList();
+            if (group.Count == 0) continue;
+            var head = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 6, Margin = new Thickness(2, 4, 0, 0) };
+            head.Children.Add(new TextBlock
+            {
+                Text = glyph, FontSize = 12, FontWeight = FontWeight.Bold,
+                Foreground = new SolidColorBrush(Color.Parse(color)),
+            });
+            head.Children.Add(new TextBlock
+            {
+                Text = name.ToUpperInvariant(), FontSize = 10.5, FontWeight = FontWeight.SemiBold, Foreground = muted,
+                VerticalAlignment = VerticalAlignment.Center,
+            });
+            TagsList.Children.Add(head);
+            foreach (var l in group)
+                TagsList.Children.Add(BuildTagChip(l, muted));
+        }
+    }
+
+    private Control BuildTagChip((string Tag, string Text, Section Section, Models.Page Page) l, IBrush muted)
+    {
+        var preview = l.Text.Replace('\n', ' ').Trim();
+        if (preview.Length == 0) preview = "(empty line)";
+        else if (preview.Length > 60) preview = preview[..60] + "…";
+
+        var stack = new StackPanel { Spacing = 2 };
+        stack.Children.Add(new TextBlock
+        {
+            Text = preview, FontSize = 12, TextWrapping = TextWrapping.Wrap, MaxLines = 2,
+        });
+        stack.Children.Add(new TextBlock
+        {
+            Text = l.Section.Name + " › " + l.Page.Title, FontSize = 10.5, Foreground = muted,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        });
+        var chip = new Border
+        {
+            Background = new SolidColorBrush(Color.Parse("#14FFFFFF")),
+            CornerRadius = new CornerRadius(8), Padding = new Thickness(9, 7),
+            Cursor = new Cursor(StandardCursorType.Hand), Child = stack,
+        };
+        chip.PointerReleased += (_, e) =>
+        {
+            if (Vm is not { } vm) return;
+            vm.SelectedSection = l.Section;
+            vm.SelectedPage = l.Page;
+            e.Handled = true;
+        };
+        return chip;
+    }
 
     private void RefreshTrashPanel()
     {
