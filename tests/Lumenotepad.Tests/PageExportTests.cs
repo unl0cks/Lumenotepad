@@ -142,6 +142,40 @@ public class PageExportTests
     }
 
     [Fact]
+    public void Pdf_includesImagesAndDividers()
+    {
+        // A real PNG on disk so the embed path actually runs.
+        var root = Directory.CreateTempSubdirectory("lumexport").FullName;
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, "images"));
+            using (var bmp = new SkiaSharp.SKBitmap(40, 24))
+            using (var img = SkiaSharp.SKImage.FromBitmap(bmp))
+            using (var data = img.Encode(SkiaSharp.SKEncodedImageFormat.Png, 90))
+            using (var fs = File.Create(Path.Combine(root, "images", "pic.png")))
+                data.SaveTo(fs);
+
+            var canvas = Page();
+            var imgBox = canvas.AddBox(0, 500);
+            imgBox.ImagePath = "images/pic.png";
+            var div = canvas.AddBox(0, 600);
+            div.Divider = "h";
+            div.Width = 300;
+
+            var plain = PageExport.Export(ExportFormat.Pdf, "T", Page());
+            var rich = PageExport.Export(ExportFormat.Pdf, "T", canvas, root);
+            Assert.Equal((byte)'%', rich[0]);                 // still a valid PDF
+            Assert.True(rich.Length > plain.Length + 100);    // the picture bytes actually embedded
+
+            // A missing image file must not blow up the export.
+            imgBox.ImagePath = "images/gone.png";
+            var survived = PageExport.Export(ExportFormat.Pdf, "T", canvas, root);
+            Assert.Equal((byte)'%', survived[0]);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
     public void EmptyBoxes_skipped_titleFallsBack()
     {
         var canvas = new CanvasDocument();

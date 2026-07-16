@@ -14,7 +14,8 @@ public enum ExportFormat { Txt, Markdown, Html, Rtf, Pdf, Docx, Odt, Epub }
 /// <summary>Exports a page (title + its freeform canvas) to any of the supported document formats
 /// (M10). Boxes are emitted in reading order (top-to-bottom, then left-to-right); empty boxes are
 /// skipped. The plain-text family (TXT/MD/HTML/RTF) is pure and unit-tested; PDF is drawn with
-/// SkiaSharp; DOCX/ODT/EPUB are minimal-but-valid zip packages that honor headings, alignment,
+/// SkiaSharp and embeds image boxes, draws divider rules, and draws real vector checkboxes;
+/// DOCX/ODT/EPUB are minimal-but-valid zip packages that honor headings, alignment,
 /// bold/italic/underline/strike, text color, and links.</summary>
 public static class PageExport
 {
@@ -32,8 +33,9 @@ public static class PageExport
 
     public static string ExtensionFor(ExportFormat fmt) => Formats.First(f => f.Fmt == fmt).Ext;
 
-    /// <summary>Produce the file bytes for a page in the given format.</summary>
-    public static byte[] Export(ExportFormat fmt, string title, CanvasDocument doc)
+    /// <summary>Produce the file bytes for a page in the given format. <paramref name="imageRoot"/>
+    /// is the notebook folder image-box paths resolve against — only PDF embeds pictures.</summary>
+    public static byte[] Export(ExportFormat fmt, string title, CanvasDocument doc, string? imageRoot = null)
     {
         title = string.IsNullOrWhiteSpace(title) ? "Untitled" : title.Trim();
         return fmt switch
@@ -42,7 +44,7 @@ public static class PageExport
             ExportFormat.Markdown => Utf8(ToMarkdown(title, doc)),
             ExportFormat.Html => Utf8(ToHtml(title, doc, standalone: true)),
             ExportFormat.Rtf => Utf8(ToRtf(title, doc)),
-            ExportFormat.Pdf => ToPdf(title, doc),
+            ExportFormat.Pdf => ToPdf(title, doc, imageRoot),
             ExportFormat.Docx => ToDocx(title, doc),
             ExportFormat.Odt => ToOdt(title, doc),
             ExportFormat.Epub => ToEpub(title, doc),
@@ -285,9 +287,10 @@ public static class PageExport
 
     // ---- PDF (SkiaSharp) ----
 
-    private static byte[] ToPdf(string title, CanvasDocument doc)
+    private static byte[] ToPdf(string title, CanvasDocument doc, string? imageRoot)
     {
         const float W = 595, H = 842, Margin = 54;         // A4 points
+        const float MaxW = W - 2 * Margin;
         using var ms = new MemoryStream();
         using (var pdf = SkiaSharp.SKDocument.CreatePdf(ms))
         {
@@ -295,17 +298,18 @@ public static class PageExport
             float y = Margin;
 
             void NewPage() { pdf.EndPage(); canvas = pdf.BeginPage(W, H); y = Margin; }
+            void EnsureRoom(float need) { if (y + need > H - Margin) NewPage(); }
 
-            void DrawParagraph(IEnumerable<(string Word, SkiaSharp.SKPaint Paint)> words, float lineHeight)
+            void DrawParagraph(IEnumerable<(string Word, SkiaSharp.SKPaint Paint)> words, float lineHeight, float indent = 0)
             {
-                float x = Margin;
+                float x = Margin + indent;
                 float maxX = W - Margin;
                 foreach (var (word, paint) in words)
                 {
                     float w = paint.MeasureText(word + " ");
-                    if (x + w > maxX && x > Margin)
+                    if (x + w > maxX && x > Margin + indent)
                     {
-                        x = Margin; y += lineHeight;
+                        x = Margin + indent; y += lineHeight;
                         if (y > H - Margin) NewPage();
                     }
                     canvas.DrawText(word, x, y, paint);
@@ -313,6 +317,33 @@ public static class PageExport
                 }
                 y += lineHeight * 1.4f;
                 if (y > H - Margin) NewPage();
+            }
+
+            // A real drawn checkbox (no font glyph to go missing): a rounded square hugging the
+            // first line's baseline, with an accent tick when done.
+            void DrawCheckbox(bool ticked, float size)
+            {
+                float side = size * 0.85f;
+                float top = y - side + size * 0.12f;
+                var rect = new SkiaSharp.SKRect(Margin, top, Margin + side, top + side);
+                using var stroke = new SkiaSharp.SKPaint
+                {
+                    Style = SkiaSharp.SKPaintStyle.Stroke, StrokeWidth = 1.2f,
+                    Color = new SkiaSharp.SKColor(0x77, 0x77, 0x77), IsAntialias = true,
+                };
+                canvas.DrawRoundRect(rect, 2.5f, 2.5f, stroke);
+                if (!ticked) return;
+                using var tick = new SkiaSharp.SKPaint
+                {
+                    Style = SkiaSharp.SKPaintStyle.Stroke, StrokeWidth = 1.6f,
+                    Color = new SkiaSharp.SKColor(0x2F, 0x6F, 0xC4), IsAntialias = true,
+                    StrokeCap = SkiaSharp.SKStrokeCap.Round,
+                };
+                using var path = new SkiaSharp.SKPath();
+                path.MoveTo(rect.Left + side * 0.22f, rect.Top + side * 0.52f);
+                path.LineTo(rect.Left + side * 0.44f, rect.Top + side * 0.74f);
+                path.LineTo(rect.Left + side * 0.80f, rect.Top + side * 0.26f);
+                canvas.DrawPath(path, tick);
             }
 
             using var titlePaint = new SkiaSharp.SKPaint
@@ -326,13 +357,19 @@ public static class PageExport
 
             foreach (var box in Boxes(doc))
             {
+                if (box.Divider is not null) { DrawDivider(box); continue; }
+                if (box.ImagePath is { Length: > 0 }) { DrawImage(box); continue; }
+
+                int num = 0;
                 foreach (var p in box.Doc.Paragraphs)
                 {
+                    if (p.Bullet == "num") num++; else num = 0;
                     double size = RichTextEditor.BaseSizeFor(p.Style, 12);
                     bool headBold = RichTextEditor.BaseWeightFor(p.Style) >= Avalonia.Media.FontWeight.SemiBold;
+                    bool check = p.Bullet == "check";
                     string bullet = p.Bullet switch
                     {
-                        null => "", "num" => "• ", "check" => p.Checked ? "[x] " : "[ ] ", _ => "• ",
+                        null or "check" => "", "num" => $"{num}.", _ => "•",
                     };
                     var words = new List<(string, SkiaSharp.SKPaint)>();
                     var paints = new List<SkiaSharp.SKPaint>();
@@ -340,7 +377,7 @@ public static class PageExport
                     {
                         var bp = MakePaint(false, false, false, (float)size);
                         paints.Add(bp);
-                        words.Add((bullet.Trim(), bp));
+                        words.Add((bullet, bp));
                     }
                     foreach (var r in p.Runs)
                     {
@@ -350,13 +387,76 @@ public static class PageExport
                         foreach (var word in r.Text.Split(' ').Where(s => s.Length > 0))
                             words.Add((word, paint));
                     }
-                    if (words.Count == 0) { y += (float)size * 1.4f; continue; }
-                    DrawParagraph(words, (float)size * 1.3f);
+                    if (check)
+                    {
+                        EnsureRoom((float)size * 1.5f);
+                        DrawCheckbox(p.Checked, (float)size);
+                        if (words.Count == 0) { y += (float)size * 1.3f * 1.4f; continue; }
+                        DrawParagraph(words, (float)size * 1.3f, indent: (float)size * 0.85f + 7f);
+                    }
+                    else
+                    {
+                        if (words.Count == 0) { y += (float)size * 1.4f; continue; }
+                        DrawParagraph(words, (float)size * 1.3f);
+                    }
                     foreach (var pt in paints) pt.Dispose();
                 }
                 y += 8;
             }
             pdf.EndPage();
+
+            // A drawn rule matching the on-page divider: horizontal at its own length, vertical as
+            // a centered column stroke (reading order can't keep true side-by-side placement).
+            void DrawDivider(NoteBox box)
+            {
+                using var rule = new SkiaSharp.SKPaint
+                {
+                    Style = SkiaSharp.SKPaintStyle.Stroke, StrokeWidth = 1.4f,
+                    Color = new SkiaSharp.SKColor(0x9A, 0x9A, 0x9A), IsAntialias = true,
+                    StrokeCap = SkiaSharp.SKStrokeCap.Round,
+                };
+                if (box.Divider == "v")
+                {
+                    float len = Math.Clamp((float)box.H, 40, 260);
+                    EnsureRoom(len + 18);
+                    canvas.DrawLine(W / 2, y, W / 2, y + len, rule);
+                    y += len + 18;
+                }
+                else
+                {
+                    float len = Math.Clamp((float)box.Width, 40, MaxW);
+                    EnsureRoom(24);
+                    y += 4;
+                    canvas.DrawLine(Margin, y, Margin + len, y, rule);
+                    y += 18;
+                }
+            }
+
+            // The actual picture, embedded: fit to the box's on-page width, capped to the content
+            // column and one page tall. Missing/unreadable files are skipped, never fatal.
+            void DrawImage(NoteBox box)
+            {
+                SkiaSharp.SKBitmap? bmp = null;
+                try
+                {
+                    string full = imageRoot is { Length: > 0 }
+                        ? Path.Combine(imageRoot, box.ImagePath!) : box.ImagePath!;
+                    if (File.Exists(full)) bmp = SkiaSharp.SKBitmap.Decode(full);
+                }
+                catch { /* unreadable image → skip it */ }
+                if (bmp is null || bmp.Width <= 0 || bmp.Height <= 0) return;
+                using (bmp)
+                {
+                    float drawW = Math.Min((float)box.Width, MaxW);
+                    float drawH = bmp.Height * (drawW / bmp.Width);
+                    float maxH = H - 2 * Margin;
+                    if (drawH > maxH) { drawW *= maxH / drawH; drawH = maxH; }
+                    EnsureRoom(drawH);
+                    float top = y - 8;                      // y is a text baseline; hug the flow
+                    canvas.DrawBitmap(bmp, new SkiaSharp.SKRect(Margin, top, Margin + drawW, top + drawH));
+                    y = top + drawH + 24;
+                }
+            }
         }
         return ms.ToArray();
     }
@@ -408,9 +508,10 @@ public static class PageExport
     {
         int half = (int)Math.Round(RichTextEditor.BaseSizeFor(p.Style, 11) * 2);
         bool headBold = RichTextEditor.BaseWeightFor(p.Style) >= Avalonia.Media.FontWeight.SemiBold;
+        // Word does proper font fallback, so the real ballot glyphs render (only the drawn PDF lacked them).
         string bullet = p.Bullet switch
         {
-            null => "", "num" => "• ", "check" => p.Checked ? "[x] " : "[ ] ", _ => "• ",
+            null => "", "num" => "• ", "check" => p.Checked ? "☑ " : "☐ ", _ => "• ",
         };
         var runs = new StringBuilder();
         if (bullet.Length > 0) runs.Append(DocxRun(bullet, false, false, false, false, half, null));
@@ -453,9 +554,9 @@ public static class PageExport
                 string tag = heading ? "text:h" : "text:p";
                 string lvl = heading ? " text:outline-level=\"2\"" : "";
                 var runs = new StringBuilder();
-                string bullet = p.Bullet switch
+                string bullet = p.Bullet switch          // LibreOffice font-fallback renders the glyphs
                 {
-                    null => "", "num" => "• ", "check" => p.Checked ? "[x] " : "[ ] ", _ => "• ",
+                    null => "", "num" => "• ", "check" => p.Checked ? "☑ " : "☐ ", _ => "• ",
                 };
                 if (bullet.Length > 0) runs.Append(Esc(bullet));
                 foreach (var r in p.Runs) runs.Append(OdtRun(r));

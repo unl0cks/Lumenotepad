@@ -641,14 +641,34 @@ public partial class MainView : UserControl
 
     /// <summary>"Sections in their own sidebar" preference: when on, the sections list moves out of
     /// the pages panel into a dedicated column, and the pages panel's inline sections header + list
-    /// hide (SelectedSection binding still drives both — they share the VM).</summary>
-    private void ApplySectionsSidebar()
+    /// hide (SelectedSection binding still drives both — they share the VM). Toggling slides the
+    /// column open/closed (width tween — RenderTransform styles are dead in this build); the initial
+    /// apply on startup snaps so launch doesn't play a slide.</summary>
+    private void ApplySectionsSidebar(bool animate = false)
     {
         bool side = Vm?.SectionsSidebar ?? false;
-        SectionsSidebar.IsVisible = side;
-        SectionsSidebar.Width = side ? 152 : 0;
         SectionsHeader.IsVisible = !side;
         SectionsList.IsVisible = !side;
+        if (!animate)
+        {
+            SectionsSidebar.IsVisible = side;
+            SectionsSidebar.Width = side ? 152 : 0;
+            SectionsSidebar.Opacity = side ? 1 : 0;
+            return;
+        }
+        if (side)
+        {
+            // Coming from hidden: start collapsed so the slide grows from 0, not from a stale width.
+            if (!SectionsSidebar.IsVisible) { SectionsSidebar.Width = 0; SectionsSidebar.Opacity = 0; }
+            SectionsSidebar.IsVisible = true;
+            Motion.Reveal(SectionsSidebar, 152, show: true);
+            Motion.RiseIn(SectionsSidebarList);
+        }
+        else
+        {
+            Motion.Reveal(SectionsSidebar, 152, show: false);   // width 0 + clip = gone; stays laid out
+            Motion.RiseIn(SectionsList);                        // the inline list glides back in its place
+        }
     }
 
     /// <summary>Initial home/editor surface state (no animation); the switch zooms in code (their
@@ -821,7 +841,7 @@ public partial class MainView : UserControl
             ApplyEditorPrefs(rebuild: true);             // canvas rebuild re-reads NoteRadiusPref
         }
         else if (e.PropertyName == nameof(MainViewModel.SectionsSidebar))
-            ApplySectionsSidebar();
+            ApplySectionsSidebar(animate: true);
         else if (e.PropertyName == nameof(MainViewModel.FlatCovers))
             ApplyFlatCovers();
         else if (e.PropertyName == nameof(MainViewModel.GlossyAccents))
@@ -1318,7 +1338,7 @@ public partial class MainView : UserControl
         try
         {
             vm.FlushDirtyDocs();
-            var bytes = Services.PageExport.Export(fmt, pg.Title, vm.DocumentFor(pg));
+            var bytes = Services.PageExport.Export(fmt, pg.Title, vm.DocumentFor(pg), vm.SelectedNotebookDir);
             await System.IO.File.WriteAllBytesAsync(path, bytes);
         }
         catch (System.Exception ex)
