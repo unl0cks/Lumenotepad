@@ -157,6 +157,20 @@ public partial class PreferencesWindow : Window
         {
             if (e.Key == Key.Enter) { e.Handled = true; await RunFontSearch(); }
         };
+        // Clearing the box wipes the results (owner request) — no stale hits left hanging.
+        FontSearchBox.GetObservable(TextBox.TextProperty).Subscribe(new Avalonia.Reactive.AnonymousObserver<string?>(t =>
+        {
+            if (string.IsNullOrWhiteSpace(t))
+            {
+                FontResults.Children.Clear();
+                SetFontStatus(null);
+            }
+        }));
+        FontBrowseBtn.Click += (_, _) =>
+        {
+            var browser = new FontBrowserWindow();
+            browser.Show(this);
+        };
 
         OpenDataBtn.Click += (_, _) =>
         {

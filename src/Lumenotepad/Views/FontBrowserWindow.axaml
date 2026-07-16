@@ -1,0 +1,109 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Lumenotepad.Views.FontBrowserWindow"
+        Title="Browse fonts"
+        Width="760" Height="640" MinWidth="620" MinHeight="480"
+        WindowDecorations="None" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="{StaticResource UiFont}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
+        TextOptions.TextRenderingMode="Antialias"
+        Background="{DynamicResource WindowBackgroundBrush}">
+
+    <Window.Styles>
+        <Style Selector="TextBlock.section">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        </Style>
+        <!-- style toggle buttons (B / I / U / S) -->
+        <Style Selector="ToggleButton.style">
+            <Setter Property="Width" Value="32"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource FrameBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="7"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="ToggleButton.style:checked">
+            <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <!-- category chips -->
+        <Style Selector="ToggleButton.chip">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource FrameBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="ToggleButton.chip:checked">
+            <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+    </Window.Styles>
+
+    <Grid>
+    <DockPanel>
+        <Grid DockPanel.Dock="Top" Height="38" ColumnDefinitions="*,Auto" x:Name="BrowserTitleBar" Background="Transparent">
+            <TextBlock Text="Browse fonts" FontSize="13" FontWeight="SemiBold"
+                       VerticalAlignment="Center" Margin="16,0,0,0"/>
+            <Button x:Name="CloseBtn" Grid.Column="1" Theme="{StaticResource CloseCaptionButton}"
+                    Content="&#xE8BB;" VerticalAlignment="Center" Margin="0,0,3,0"/>
+        </Grid>
+
+        <!-- Controls header: search, preview text, style toggles, category chips -->
+        <StackPanel DockPanel.Dock="Top" Margin="20,4,20,10" Spacing="10">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                <TextBox x:Name="SearchBox" Grid.Column="0" MinHeight="34"
+                         Theme="{StaticResource RoundedFieldTextBox}" FontSize="13"
+                         PlaceholderText="Search fonts by name…"/>
+                <TextBlock x:Name="CountLabel" Grid.Column="1" Classes="section"
+                           VerticalAlignment="Center" Text=""/>
+            </Grid>
+
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                <TextBlock Grid.Column="0" Text="Preview" Classes="section" VerticalAlignment="Center"/>
+                <TextBox x:Name="PreviewBox" Grid.Column="1" MinHeight="34"
+                         Theme="{StaticResource RoundedFieldTextBox}" FontSize="13"/>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                    <ToggleButton x:Name="BoldToggle" Classes="style" ToolTip.Tip="Bold">
+                        <TextBlock Text="B" FontWeight="Bold"/>
+                    </ToggleButton>
+                    <ToggleButton x:Name="ItalicToggle" Classes="style" ToolTip.Tip="Italic">
+                        <TextBlock Text="I" FontStyle="Italic"/>
+                    </ToggleButton>
+                    <ToggleButton x:Name="UnderToggle" Classes="style" ToolTip.Tip="Underline">
+                        <TextBlock Text="U" TextDecorations="Underline"/>
+                    </ToggleButton>
+                    <ToggleButton x:Name="StrikeToggle" Classes="style" ToolTip.Tip="Strikethrough">
+                        <TextBlock Text="S" TextDecorations="Strikethrough"/>
+                    </ToggleButton>
+                </StackPanel>
+            </Grid>
+
+            <WrapPanel x:Name="CategoryChips" ItemWidth="0"/>
+        </StackPanel>
+
+        <!-- Status / empty message -->
+        <TextBlock x:Name="StatusLabel" DockPanel.Dock="Top" Margin="20,0,20,8"
+                   Classes="section" TextWrapping="Wrap" IsVisible="False"/>
+
+        <!-- The scrolling font list -->
+        <ListBox x:Name="FontList" Margin="12,0,12,12"
+                 Background="Transparent" BorderThickness="0"
+                 SelectionMode="Single" ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+    </DockPanel>
+    </Grid>
+</Window>
