@@ -53,14 +53,22 @@ public partial class FontBrowserWindow : Window
         foreach (var t in new[] { BoldToggle, ItalicToggle, UnderToggle, StrikeToggle })
             t.IsCheckedChanged += (_, _) => ReRenderVisible();
 
+        DetailBackBtn.Click += (_, _) => CloseDetail();
+        DetailInstallBtn.Click += async (_, _) =>
+        {
+            if (_detailRow is { } r) await InstallRow(r);
+        };
+
         Opened += async (_, _) =>
         {
             WinChrome.RoundCorners(this, true);
+            Services.ThemeManager.ApplyChildChrome(this);   // acrylic frost when the theme is glass (Lumen)
             if (Content is Control root) Motion.ScaleIn(root, 0.96, 180);
             // The ListBox's inner ScrollViewer only exists once templated — attach smooth scroll then.
             Dispatcher.UIThread.Post(() =>
             {
                 if (FontList.FindDescendantOfType<ScrollViewer>() is { } sv) SmoothScroll.Attach(sv);
+                if (DetailScroll is { } ds) SmoothScroll.Attach(ds);
             }, DispatcherPriority.Background);
             await LoadCatalog();
         };
@@ -181,12 +189,12 @@ public partial class FontBrowserWindow : Window
             header.Children.Add(name);
             header.Children.Add(category);
 
-            var preview = new Image { Height = 34, Stretch = Stretch.Uniform, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left };
+            var preview = new Image { Height = 30, Stretch = Stretch.Uniform, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left };
             preview.Bind(Image.SourceProperty, new Avalonia.Data.Binding(nameof(FontRow.Preview)));
             var loading = new TextBlock
             {
                 Text = "…", FontSize = 13, Foreground = this.FindResource("TextMutedBrush") as IBrush,
-                Height = 34, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                Height = 30, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
             };
             loading.Bind(Visual.IsVisibleProperty, new Avalonia.Data.Binding(nameof(FontRow.ShowFallback)));
 
@@ -204,20 +212,27 @@ public partial class FontBrowserWindow : Window
             };
             install.Bind(ContentControl.ContentProperty, new Avalonia.Data.Binding(nameof(FontRow.InstallLabel)));
             install.Bind(InputElement.IsEnabledProperty, new Avalonia.Data.Binding(nameof(FontRow.InstallEnabled)));
-            install.Click += async (_, _) => await InstallRow(row);
+            install.Click += async (_, e) => { e.Handled = true; await InstallRow(row); };   // don't open detail
 
             var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
             grid.Children.Add(left);
             Grid.SetColumn(install, 1);
             grid.Children.Add(install);
 
-            return new Border
+            var card = new Border
             {
-                Padding = new Thickness(12, 9), Margin = new Thickness(0, 0, 0, 6),
+                Padding = new Thickness(14, 10), Margin = new Thickness(0, 0, 0, 5),
                 CornerRadius = new CornerRadius(9),
                 Background = this.FindResource("ControlHoverBrush") as IBrush,
+                Cursor = new Cursor(StandardCursorType.Hand),
                 Child = grid,
             };
+            card.Classes.Add("fontcard");
+            card.PointerPressed += (_, e) =>
+            {
+                if (e.GetCurrentPoint(card).Properties.IsLeftButtonPressed) _ = OpenDetail(row);
+            };
+            return card;
         });
     }
 
@@ -226,17 +241,109 @@ public partial class FontBrowserWindow : Window
         if (!row.InstallEnabled) return;
         row.InstallLabel = "Installing…";
         row.InstallEnabled = false;
+        bool ok = await InstallFontFile(row.Font.Name);
+        if (ok) row.InstallLabel = "Installed";
+        else { row.InstallLabel = "Install"; row.InstallEnabled = true; }
+        if (_detailRow == row) SyncDetailInstallButton(row);
+    }
+
+    /// <summary>Download + register one Google family; true when a usable file landed. Shared by the
+    /// list row and the detail view.</summary>
+    private static async Task<bool> InstallFontFile(string family)
+    {
         try
         {
-            int files = await FontInstaller.InstallAsync(new FontInstaller.Hit(row.Font.Name, "Google Fonts", row.Font.Name));
-            if (files > 0)
-            {
-                AppFonts.RegisterInstalled();
-                row.InstallLabel = "Installed";
-            }
-            else { row.InstallLabel = "Install"; row.InstallEnabled = true; }
+            int files = await FontInstaller.InstallAsync(new FontInstaller.Hit(family, "Google Fonts", family));
+            if (files == 0) return false;
+            AppFonts.RegisterInstalled();
+            return true;
         }
-        catch { row.InstallLabel = "Install"; row.InstallEnabled = true; }
+        catch { return false; }
+    }
+
+    // ---- font detail view (a big sample + a full character map) ----
+
+    private FontRow? _detailRow;
+    private static readonly string[] CharGroups =
+    {
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+        "abcdefghijklmnopqrstuvwxyz",
+        "0123456789",
+        "!?.,;:'\"@#&*()[]{}/\\%+-=<>$€£¥",
+    };
+
+    private async Task OpenDetail(FontRow row)
+    {
+        _detailRow = row;
+        DetailName.Text = row.Font.Name;
+        DetailCategory.Text = string.IsNullOrEmpty(row.Font.Stroke)
+            ? row.Font.Category : $"{row.Font.Category} · {row.Font.Stroke}";
+        SyncDetailInstallButton(row);
+        DetailBigPreview.Source = null;
+        DetailCharGrid.Children.Clear();
+        DetailOverlay.IsVisible = true;
+        Motion.RiseIn(DetailOverlay, Motion.Fast);
+        DetailScroll.Offset = new Vector(0, 0);
+
+        // Make sure this font's bytes are loaded (reuses the row cache), then draw the samples.
+        if (row.Bytes is null && !row.Loading)
+        {
+            row.Loading = true;
+            row.Bytes = await FontPreviewRenderer.GetBytesAsync(row.Font.Name);
+            row.Loading = false;
+        }
+        if (_detailRow != row) return;                 // user backed out while it downloaded
+        if (row.Bytes is null)
+        {
+            DetailCharGrid.Children.Add(new TextBlock
+            {
+                Text = "Couldn't load this font for preview.", FontSize = 12.5,
+                Foreground = this.FindResource("TextMutedBrush") as IBrush,
+            });
+            return;
+        }
+
+        bool b = BoldToggle.IsChecked == true, i = ItalicToggle.IsChecked == true,
+             u = UnderToggle.IsChecked == true, s = StrikeToggle.IsChecked == true;
+        DetailBigPreview.Source = FontPreviewRenderer.Render(row.Bytes, PreviewText(), b, i, u, s, _textColorArgb, 48f);
+
+        foreach (var group in CharGroups)
+            foreach (var ch in group)
+                DetailCharGrid.Children.Add(BuildCharCell(row.Bytes, ch.ToString(), b, i, u, s));
+    }
+
+    private Control BuildCharCell(byte[] bytes, string ch, bool b, bool i, bool u, bool s)
+    {
+        var img = new Image
+        {
+            Source = FontPreviewRenderer.Render(bytes, ch, b, i, u, s, _textColorArgb, 34f),
+            Height = 34, Stretch = Stretch.Uniform,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+        };
+        return new Border
+        {
+            Width = 54, Height = 58, Margin = new Thickness(0, 0, 8, 8),
+            CornerRadius = new CornerRadius(8),
+            Background = this.FindResource("ControlHoverBrush") as IBrush,
+            BorderBrush = this.FindResource("FrameBorderBrush") as IBrush,
+            BorderThickness = new Thickness(1),
+            Child = img,
+        };
+    }
+
+    private void SyncDetailInstallButton(FontRow row)
+    {
+        bool installed = AppFonts.Installed.Contains(row.Font.Name, StringComparer.OrdinalIgnoreCase);
+        DetailInstallBtn.Content = installed ? "Installed" : row.InstallLabel;
+        DetailInstallBtn.IsEnabled = !installed && row.InstallEnabled;
+        DetailInstallBtn.Theme = this.FindResource(installed ? "LumenButtonGray" : "LumenButton") as Avalonia.Styling.ControlTheme;
+    }
+
+    private void CloseDetail()
+    {
+        _detailRow = null;
+        DetailOverlay.IsVisible = false;
     }
 
     private void SetStatus(string? text)

@@ -2,13 +2,14 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Lumenotepad.Views.FontBrowserWindow"
         Title="Browse fonts"
-        Width="760" Height="640" MinWidth="620" MinHeight="480"
+        Width="900" Height="730" MinWidth="660" MinHeight="520"
         WindowDecorations="None" ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         FontFamily="{StaticResource UiFont}"
         Foreground="{DynamicResource TextPrimaryBrush}"
         TextOptions.TextRenderingMode="Antialias"
-        Background="{DynamicResource WindowBackgroundBrush}">
+        Background="{DynamicResource WindowSurfaceBrush}"
+        TransparencyLevelHint="AcrylicBlur, Transparent, None">
 
     <Window.Styles>
         <Style Selector="TextBlock.section">
@@ -38,7 +39,7 @@
         <!-- category chips -->
         <Style Selector="ToggleButton.chip">
             <Setter Property="Height" Value="28"/>
-            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Padding" Value="13,0"/>
             <Setter Property="FontSize" Value="12.5"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
@@ -52,6 +53,30 @@
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
         </Style>
+        <!-- chromeless list rows: our own card Border is the visual, so no blue selection box -->
+        <Style Selector="ListBox#FontList ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="MinHeight" Value="0"/>
+        </Style>
+        <Style Selector="ListBox#FontList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="ListBox#FontList ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <!-- the row card: subtle accent edge on hover, telling you it opens -->
+        <Style Selector="Border.fontcard">
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Transitions">
+                <Transitions><BrushTransition Property="BorderBrush" Duration="0:0:0.14"/></Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.fontcard:pointerover">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+        </Style>
     </Window.Styles>
 
     <Grid>
@@ -64,8 +89,8 @@
         </Grid>
 
         <!-- Controls header: search, preview text, style toggles, category chips -->
-        <StackPanel DockPanel.Dock="Top" Margin="20,4,20,10" Spacing="10">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+        <StackPanel DockPanel.Dock="Top" Margin="22,4,22,10" Spacing="10">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                 <TextBox x:Name="SearchBox" Grid.Column="0" MinHeight="34"
                          Theme="{StaticResource RoundedFieldTextBox}" FontSize="13"
                          PlaceholderText="Search fonts by name…"/>
@@ -73,7 +98,7 @@
                            VerticalAlignment="Center" Text=""/>
             </Grid>
 
-            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                 <TextBlock Grid.Column="0" Text="Preview" Classes="section" VerticalAlignment="Center"/>
                 <TextBox x:Name="PreviewBox" Grid.Column="1" MinHeight="34"
                          Theme="{StaticResource RoundedFieldTextBox}" FontSize="13"/>
@@ -93,17 +118,45 @@
                 </StackPanel>
             </Grid>
 
-            <WrapPanel x:Name="CategoryChips" ItemWidth="0"/>
+            <WrapPanel x:Name="CategoryChips"/>
         </StackPanel>
 
         <!-- Status / empty message -->
-        <TextBlock x:Name="StatusLabel" DockPanel.Dock="Top" Margin="20,0,20,8"
+        <TextBlock x:Name="StatusLabel" DockPanel.Dock="Top" Margin="22,0,22,8"
                    Classes="section" TextWrapping="Wrap" IsVisible="False"/>
 
         <!-- The scrolling font list -->
-        <ListBox x:Name="FontList" Margin="12,0,12,12"
+        <ListBox x:Name="FontList" Margin="16,0,16,14"
                  Background="Transparent" BorderThickness="0"
                  SelectionMode="Single" ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
     </DockPanel>
+
+    <!-- Font detail overlay: opened by clicking a row; a big sample + a full character map -->
+    <Grid x:Name="DetailOverlay" Margin="0,38,0,0" IsVisible="False"
+          Background="{DynamicResource WindowSurfaceBrush}">
+        <DockPanel Margin="22,10,22,16">
+            <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,12">
+                <Button x:Name="DetailBackBtn" Theme="{StaticResource IconButton}" Width="34" Height="34"
+                        FontFamily="{StaticResource IconFont}" FontSize="15" Content="&#xE72B;"
+                        ToolTip.Tip="Back to the list" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Spacing="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                    <TextBlock x:Name="DetailName" FontSize="17" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="DetailCategory" FontSize="11.5" Foreground="{DynamicResource TextMutedBrush}"/>
+                </StackPanel>
+                <Button x:Name="DetailInstallBtn" Grid.Column="2" Theme="{StaticResource LumenButton}"
+                        Content="Install" FontSize="13" Padding="16,7" VerticalAlignment="Center"/>
+            </Grid>
+            <ScrollViewer x:Name="DetailScroll" VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="14">
+                    <Border CornerRadius="10" Padding="16,14" Background="{DynamicResource ControlHoverBrush}">
+                        <Image x:Name="DetailBigPreview" Height="52" Stretch="Uniform"
+                               HorizontalAlignment="Left"/>
+                    </Border>
+                    <TextBlock Text="CHARACTERS" Classes="section"/>
+                    <WrapPanel x:Name="DetailCharGrid"/>
+                </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
+    </Grid>
     </Grid>
 </Window>

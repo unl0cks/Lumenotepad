@@ -78,6 +78,18 @@ public class ThemePalettesTests
         Assert.Equal(t.TextPrimary, t.PaperText);      // one text family everywhere
     }
 
+    [Theory]
+    [InlineData("Lumen", false, true)]     // Lumen frame is always glass → child windows frost
+    [InlineData("Lumen", true, true)]
+    [InlineData("Dark", false, false)]     // solid frame (even with a glass page) → child windows opaque
+    [InlineData("Pink", false, false)]
+    [InlineData("Light", true, false)]
+    public void FrostedWindow_onlyWhenFrameItselfIsGlass(string theme, bool full, bool expected)
+    {
+        var t = ThemePalettes.Resolve(theme, fullTheme: full, paperLight: false);
+        Assert.Equal(expected, t.FrostedWindow);
+    }
+
     [Fact]
     public void ThemesCarryTheirOwnAccents()
     {

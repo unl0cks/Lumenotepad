@@ -67,6 +67,9 @@ public static class ThemeManager
         Brush("AccentSoftBrush", t.AccentSoft);
         Brush("AccentDeepBrush", t.AccentDeep);
         Brush("WindowBackgroundBrush", t.WindowBackground);
+        // Secondary-window surface: opaque normally, but a translucent tint when the theme is
+        // whole-window glass (Lumen) so the DWM acrylic behind child windows shows through as frost.
+        Brush("WindowSurfaceBrush", t.FrostedWindow ? "#D8" + t.WindowBackground[^6..] : t.WindowBackground);
         Brush("MenuBackgroundBrush", t.MenuBackground);
         Brush("MenuBorderBrush", t.MenuBorder);
 
@@ -102,5 +105,13 @@ public static class ThemeManager
     public static void ApplyChrome(Window window) =>
         Platform.DwmAcrylic.Apply(window,
             Current.GlassWindow ? Platform.DwmAcrylic.Backdrop.Acrylic : Platform.DwmAcrylic.Backdrop.None,
+            dark: Current.DarkChrome);
+
+    /// <summary>Chrome for secondary windows (preferences, notebook wizard, font browser): acrylic
+    /// frost ONLY when the theme is whole-window glass (Lumen), else a plain opaque window matching
+    /// the solid frame. Paired with a Background bound to WindowSurfaceBrush.</summary>
+    public static void ApplyChildChrome(Window window) =>
+        Platform.DwmAcrylic.Apply(window,
+            Current.FrostedWindow ? Platform.DwmAcrylic.Backdrop.Acrylic : Platform.DwmAcrylic.Backdrop.None,
             dark: Current.DarkChrome);
 }

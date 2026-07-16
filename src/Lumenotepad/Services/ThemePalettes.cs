@@ -22,7 +22,23 @@ public sealed record ThemeTokens(
     string WindowBackground,   // opaque frame-family fill for secondary windows (preferences)
     string MenuBackground, string MenuBorder,   // right-click/flyout menu material, themed per-theme
     bool DarkChrome,           // DWM immersive dark + Fluent Dark variant
-    bool GlassWindow);         // at least one region shows the acrylic backdrop
+    bool GlassWindow)          // at least one region shows the acrylic backdrop
+{
+    /// <summary>True when the WHOLE window is glass (the frame itself is translucent), not just the
+    /// page box — i.e. Lumen. Secondary windows (preferences, wizard, font browser) frost themselves
+    /// only in this case, so they match the main window instead of floating as opaque panels over it.
+    /// Solid themes keep an opaque frame, so their child windows stay opaque too.</summary>
+    public bool FrostedWindow => GlassWindow && FrameAlpha < 0x40;
+
+    private int FrameAlpha
+    {
+        get
+        {
+            var h = FrameBackground.TrimStart('#');
+            return h.Length == 8 ? Convert.ToInt32(h[..2], 16) : 0xFF;
+        }
+    }
+}
 
 /// <summary>The owner's theme matrix: <c>Theme</c> picks the FRAME material/palette; <c>Full theme</c>
 /// OFF (default) gives the paper the CONTRASTING material (glass paper under solid frames, solid

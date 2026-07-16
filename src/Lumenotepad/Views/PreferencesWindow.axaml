@@ -11,7 +11,8 @@
         FontFamily="{StaticResource UiFont}"
         Foreground="{DynamicResource TextPrimaryBrush}"
         TextOptions.TextRenderingMode="Antialias"
-        Background="{DynamicResource WindowBackgroundBrush}">
+        Background="{DynamicResource WindowSurfaceBrush}"
+        TransparencyLevelHint="AcrylicBlur, Transparent, None">
 
     <Window.Styles>
         <Style Selector="TextBlock.section">
