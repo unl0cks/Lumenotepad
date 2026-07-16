@@ -77,6 +77,21 @@ public static class FontInstaller
                 files++;
             }
         }
+        else if (hit.Source == "Fontsource")
+        {
+            // Direct jsdelivr TTFs — grab regular, bold, and italic when present (404s are skipped).
+            foreach (var (w, ital, tag) in new[] { (400, false, "r"), (700, false, "b"), (400, true, "i") })
+            {
+                try
+                {
+                    var bytes = await Http.GetByteArrayAsync(FontsourceTtfUrl(hit.Id, w, ital), ct);
+                    await File.WriteAllBytesAsync(
+                        Path.Combine(FontsDir, SafeName(hit.Name) + "-" + tag + ".ttf"), bytes, ct);
+                    files++;
+                }
+                catch { /* that weight/style isn't published — skip it */ }
+            }
+        }
         else
         {
             var zipBytes = await Http.GetByteArrayAsync(
@@ -104,6 +119,10 @@ public static class FontInstaller
     /// <summary>Pure: every font URL in a css2 stylesheet.</summary>
     public static List<string> ParseCssFontUrls(string css) =>
         Regex.Matches(css, @"url\((https://[^)]+)\)").Select(m => m.Groups[1].Value).Distinct().ToList();
+
+    /// <summary>Pure: the jsdelivr direct-TTF URL for a Fontsource family id (latin subset).</summary>
+    public static string FontsourceTtfUrl(string id, int weight, bool italic) =>
+        $"https://cdn.jsdelivr.net/fontsource/fonts/{id}@latest/latin-{weight}-{(italic ? "italic" : "normal")}.ttf";
 
     /// <summary>Pure: which entries of a Fontshare zip are worth extracting — desktop font files
     /// only (the WEB folder is browser formats), no variable fonts (the static weights are what a

@@ -28,7 +28,7 @@ public partial class FontBrowserWindow : Window
 
     private IReadOnlyList<FontCatalog.CatalogFont> _catalog = Array.Empty<FontCatalog.CatalogFont>();
     private List<FontRow> _rows = new();
-    private string _category = "all";
+    private readonly HashSet<string> _selectedCategories = new();   // empty = "All"; multi-select ANDs
     private DispatcherTimer? _searchDebounce, _previewDebounce;
     private uint _textColorArgb = 0xFFECECEC;
     private float _previewSize = 30f;
@@ -111,28 +111,36 @@ public partial class FontBrowserWindow : Window
     {
         foreach (var (key, label) in FontCatalog.Categories)
         {
-            var chip = new ToggleButton { Content = label, IsChecked = key == "all" };
+            var chip = new ToggleButton { Content = label, IsChecked = key == "all", Tag = key };
             chip.Classes.Add("chip");
             chip.Margin = new Thickness(0, 0, 8, 8);
-            chip.Click += (_, _) =>
-            {
-                _category = key;
-                foreach (var other in CategoryChips.Children.OfType<ToggleButton>())
-                    other.IsChecked = ReferenceEquals(other, chip);
-                ApplyFilter();
-            };
+            chip.Click += (_, _) => ToggleCategory(key);
             CategoryChips.Children.Add(chip);
         }
+    }
+
+    /// <summary>Multi-select: "All" clears every other chip; any specific chip toggles independently
+    /// and the results must match ALL that are lit. Clearing the last one falls back to "All".</summary>
+    private void ToggleCategory(string key)
+    {
+        if (key == "all") _selectedCategories.Clear();
+        else if (!_selectedCategories.Add(key)) _selectedCategories.Remove(key);
+
+        foreach (var chip in CategoryChips.Children.OfType<ToggleButton>())
+            chip.IsChecked = chip.Tag is string k &&
+                (k == "all" ? _selectedCategories.Count == 0 : _selectedCategories.Contains(k));
+        ApplyFilter();
     }
 
     private void ApplyFilter()
     {
         if (_catalog.Count == 0) return;
-        var filtered = FontCatalog.Filter(_catalog, _category, SearchBox.Text);
+        var keys = _selectedCategories.Count == 0 ? (IReadOnlyCollection<string>)new[] { "all" } : _selectedCategories;
+        var filtered = FontCatalog.Filter(_catalog, keys, SearchBox.Text);
         _rows = filtered.Select(f => new FontRow(f)).ToList();
         FontList.ItemsSource = _rows;
         CountLabel.Text = _rows.Count == 0 ? "" : $"{_rows.Count} fonts";
-        SetStatus(_rows.Count == 0 ? "No fonts match. Try another word or category." : null);
+        SetStatus(_rows.Count == 0 ? "No fonts match. Try another word or fewer categories." : null);
         // Scroll back to the top so a new filter starts at its first result.
         if (_rows.Count > 0) FontList.ScrollIntoView(0);
     }
@@ -154,7 +162,6 @@ public partial class FontBrowserWindow : Window
     private void RenderRow(FontRow row)
     {
         if (row.Bytes is null) return;
-        row.PreviewHeight = _previewSize;
         row.Preview = FontPreviewRenderer.Render(
             row.Bytes, PreviewText(), BoldToggle.IsChecked == true, ItalicToggle.IsChecked == true,
             UnderToggle.IsChecked == true, StrikeToggle.IsChecked == true, _textColorArgb, _previewSize);
@@ -196,9 +203,10 @@ public partial class FontBrowserWindow : Window
             header.Children.Add(name);
             header.Children.Add(category);
 
-            var preview = new Image { Stretch = Stretch.Uniform, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left };
+            // Stretch=None → the bitmap shows at its rendered size (which tracks the size slider) and
+            // is never squashed, so the metrics-correct bitmap keeps descenders intact.
+            var preview = new Image { Stretch = Stretch.None, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left };
             preview.Bind(Image.SourceProperty, new Avalonia.Data.Binding(nameof(FontRow.Preview)));
-            preview.Bind(Avalonia.Layout.Layoutable.HeightProperty, new Avalonia.Data.Binding(nameof(FontRow.PreviewHeight)));
             var loading = new TextBlock
             {
                 Text = "…", FontSize = 13, Foreground = this.FindResource("TextMutedBrush") as IBrush,
@@ -330,10 +338,13 @@ public partial class FontBrowserWindow : Window
 
     private Control BuildCharCell(byte[] bytes, string ch, bool b, bool i, bool u, bool s)
     {
+        // A tight-to-ink glyph bitmap, capped to fit the cell, centered both ways — narrow glyphs
+        // ('.', 'i') and tall descenders ('g', 'y') all sit centered without clipping.
         var img = new Image
         {
-            Source = FontPreviewRenderer.Render(bytes, ch, b, i, u, s, _textColorArgb, 38f),
-            Height = 38, Stretch = Stretch.Uniform,
+            Source = FontPreviewRenderer.RenderGlyph(bytes, ch, b, i, _textColorArgb, 40f),
+            Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly,
+            MaxHeight = 40, MaxWidth = 44,
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
         };
@@ -408,12 +419,6 @@ public partial class FontBrowserWindow : Window
         }
         public bool ShowFallback => _preview is null;
 
-        private double _previewHeight = 30;
-        public double PreviewHeight
-        {
-            get => _previewHeight;
-            set { _previewHeight = value; Raise(nameof(PreviewHeight)); }
-        }
 
         public void MarkPreviewFailed() { Raise(nameof(ShowFallback)); }
 

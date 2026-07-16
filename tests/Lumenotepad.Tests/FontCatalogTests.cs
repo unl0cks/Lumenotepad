@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Lumenotepad.Services;
 using Xunit;
@@ -88,7 +89,9 @@ public class FontCatalogTests
     [InlineData("Roboto", "Sans Serif", "sans", true)]
     [InlineData("UnifrakturCook", "Display", "gothic", true)]
     [InlineData("Fredoka", "Sans Serif", "cute", true)]
-    [InlineData("Anton", "Sans Serif", "blocky", true)]
+    [InlineData("Anton", "Sans Serif", "bold", true)]
+    [InlineData("Playfair Display", "Serif", "elegant", true)]
+    [InlineData("VT323", "Monospace", "pixel", true)]
     [InlineData("Roboto", "Sans Serif", "handwriting", false)]
     public void MatchesCategory_appliesHeuristics(string name, string category, string key, bool expected)
     {
@@ -97,22 +100,67 @@ public class FontCatalogTests
     }
 
     [Fact]
-    public void MatchesCategory_fontshareSlabIsBlocky_viaStroke()
+    public void MatchesCategory_slabViaStroke()
     {
         var slab = new FontCatalog.CatalogFont("Erode", FontCatalog.Fontshare, "erode", "Serif", "Slab Serif", 5);
-        Assert.True(FontCatalog.MatchesCategory(slab, "blocky"));
+        Assert.True(FontCatalog.MatchesCategory(slab, "slab"));
+        Assert.True(FontCatalog.MatchesCategory(slab, "serif"));
     }
 
     [Fact]
-    public void Filter_combinesCategoryAndCaseInsensitiveName()
+    public void ParseFontsource_keepsOnlyNonGoogle_normalizesCategory()
+    {
+        const string json = """
+        [
+          { "id": "roboto", "family": "Roboto", "category": "sans-serif", "type": "google", "subsets": ["latin"] },
+          { "id": "aileron", "family": "Aileron", "category": "sans-serif", "type": "other", "subsets": ["latin"] },
+          { "id": "bagnard", "family": "Bagnard", "category": "serif", "type": "other", "subsets": ["latin"] }
+        ]
+        """;
+        var fs = FontCatalog.ParseFontsource(json);
+        Assert.DoesNotContain(fs, f => f.Name == "Roboto");   // google ones dropped (the Google source has them)
+        Assert.Equal(2, fs.Count);
+        var aileron = fs.First(f => f.Name == "Aileron");
+        Assert.Equal(FontCatalog.Fontsource, aileron.Source);
+        Assert.Equal("aileron", aileron.Id);
+        Assert.Equal("Sans Serif", aileron.Category);
+    }
+
+    [Fact]
+    public void Merge_dropsExtrasThatDuplicateGoogleByName()
+    {
+        var g = FontCatalog.ParseGoogle(GoogleJson);
+        var dupe = new[] { new FontCatalog.CatalogFont("Roboto", FontCatalog.Fontsource, "roboto", "Sans Serif", "", 0) };
+        var merged = FontCatalog.Merge(g, dupe);
+        Assert.Single(merged, f => f.Name == "Roboto");                  // not duplicated
+        Assert.Equal(FontCatalog.Google, merged.First(f => f.Name == "Roboto").Source);  // Google wins
+    }
+
+    [Fact]
+    public void Filter_singleCategoryAndName()
     {
         var cat = FontCatalog.ParseGoogle(GoogleJson);
-        Assert.Contains(FontCatalog.Filter(cat, "sans", null), f => f.Name == "Roboto");
-        Assert.DoesNotContain(FontCatalog.Filter(cat, "sans", null), f => f.Name == "Lobster");
+        Assert.Contains(FontCatalog.Filter(cat, new[] { "sans" }, null), f => f.Name == "Roboto");
+        Assert.DoesNotContain(FontCatalog.Filter(cat, new[] { "sans" }, null), f => f.Name == "Lobster");
 
-        var q = FontCatalog.Filter(cat, "all", "script");
+        var q = FontCatalog.Filter(cat, new[] { "all" }, "script");
         Assert.Single(q);
         Assert.Equal("Dancing Script", q[0].Name);
+    }
+
+    [Fact]
+    public void Filter_multipleCategories_andNarrows()
+    {
+        var cat = new List<FontCatalog.CatalogFont>
+        {
+            new("Roboto Slab", FontCatalog.Google, "Roboto Slab", "Serif", "Slab Serif", 1),
+            new("Merriweather", FontCatalog.Google, "Merriweather", "Serif", "", 2),
+            new("Roboto", FontCatalog.Google, "Roboto", "Sans Serif", "", 3),
+        };
+        // Serif AND Slab → only the slab serif, not the plain serif or the sans.
+        var both = FontCatalog.Filter(cat, new[] { "serif", "slab" }, null);
+        Assert.Single(both);
+        Assert.Equal("Roboto Slab", both[0].Name);
     }
 
     [Fact]
