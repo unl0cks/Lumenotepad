@@ -418,19 +418,12 @@ public partial class MainView : UserControl
         double fx = Canvas.GetLeft(ghost), fy = Canvas.GetTop(ghost);
         if (double.IsNaN(fx)) fx = target.X;
         if (double.IsNaN(fy)) fy = target.Y;
-        int step = 0, steps = System.Math.Max(1, Motion.Ms(ms) / 15);
-        var timer = new DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(15) };
-        timer.Tick += (_, _) =>
+        _ghostTween = Motion.Clock(ms, p =>
         {
-            step++;
-            double p = System.Math.Min(1.0, step / (double)steps);
-            double ep = 1 - System.Math.Pow(1 - p, 3);
+            double ep = Motion.EaseOut(p);
             Canvas.SetLeft(ghost, fx + (target.X - fx) * ep);
             Canvas.SetTop(ghost, fy + (target.Y - fy) * ep);
-            if (step >= steps) { timer.Stop(); _ghostTween = null; onDone(); }
-        };
-        _ghostTween = timer;
-        timer.Start();
+        }, done: () => { _ghostTween = null; onDone(); });
     }
 
     private Point Center(Visual c) => c.TranslatePoint(new Point(c.Bounds.Width / 2, c.Bounds.Height / 2), HomeCards) ?? default;
@@ -1082,22 +1075,17 @@ public partial class MainView : UserControl
             return;
         }
         double from = _renameBlur.Radius;
-        int step = 0, steps = Motion.Steps(Motion.Ms(Motion.Fast));
-        var timer = new Avalonia.Threading.DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(15) };
-        timer.Tick += (_, _) =>
+        Avalonia.Threading.DispatcherTimer? timer = null;
+        timer = Motion.Clock(Motion.Fast, p =>
         {
-            step++;
-            double e = Motion.EaseOut(System.Math.Min(1.0, step / (double)steps));
+            double e = Motion.EaseOut(p);
             if (_renameBlur is { } b) b.Radius = System.Math.Max(0.01, Motion.Lerp(from, to, e));
-            if (step >= steps)
-            {
-                timer.Stop();
-                if (ReferenceEquals(_renameBlurTimer, timer)) _renameBlurTimer = null;
-                if (to <= 0) { AppRoot.Effect = null; _renameBlur = null; }
-            }
-        };
+        }, done: () =>
+        {
+            if (ReferenceEquals(_renameBlurTimer, timer)) _renameBlurTimer = null;
+            if (to <= 0) { AppRoot.Effect = null; _renameBlur = null; }
+        });
         _renameBlurTimer = timer;
-        timer.Start();
     }
 
     // ---- right-click delete menus (with confirm) for notebooks, sections, pages ----

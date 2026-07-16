@@ -28,13 +28,32 @@ public static class Motion
     public static double EaseOutSoft(double t) => 1 - Math.Pow(1 - t, 5);   // stronger deceleration — no hard stop
     public static double EaseIn(double t) => t * t * t;
     public static double Lerp(double a, double b, double t) => a + (b - a) * t;
-    public static int Steps(int ms) => Math.Max(1, ms / 15);
 
     private static readonly Dictionary<Visual, DispatcherTimer> Tweens = new();
 
     public static void Stop(Visual v)
     {
         if (Tweens.TryGetValue(v, out var t)) { t.Stop(); Tweens.Remove(v); }
+    }
+
+    /// <summary>The tween clock every frame loop here runs on: REAL-TIME progress (a Stopwatch, not
+    /// a tick count), so when a frame is expensive — the solid themes repaint an opaque plate with a
+    /// punched acrylic hole, which made step-counted tweens visibly stretch (owner report) — the
+    /// animation drops frames but keeps its duration. Render priority fires just before the frame
+    /// instead of queueing behind input/layout (the SmoothScroll lesson).</summary>
+    public static DispatcherTimer Clock(int ms, Action<double> frame, Action done)
+    {
+        double dur = Math.Max(1, Ms(ms));
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var timer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(10) };
+        timer.Tick += (_, _) =>
+        {
+            double p = Math.Min(1.0, sw.ElapsedMilliseconds / dur);
+            frame(p);
+            if (p >= 1) { timer.Stop(); done(); }
+        };
+        timer.Start();
+        return timer;
     }
 
     private static ITransform Make(double tx, double ty, double s)
@@ -63,29 +82,20 @@ public static class Motion
             onDone?.Invoke();
             return;
         }
-        int step = 0, steps = Steps(Ms(ms));
         void Frame(double e)
         {
             c.RenderTransform = Make(Lerp(fx, tx, e), Lerp(fy, ty, e), Lerp(fs, ts, e));
             if (fromOpacity is double o0 && toOpacity is double o1) c.Opacity = Lerp(o0, o1, e);
         }
         Frame(0);
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(15) };
-        timer.Tick += (_, _) =>
+        Tweens[c] = Clock(ms, p => Frame(ease(p)), done: () =>
         {
-            step++;
-            Frame(ease(Math.Min(1.0, step / (double)steps)));
-            if (step >= steps)
-            {
-                Stop(c);
-                bool rest = Math.Abs(ts - 1) < 1e-3 && Math.Abs(tx) < 1e-3 && Math.Abs(ty) < 1e-3;
-                if (rest) { c.ClearValue(Visual.RenderTransformProperty); c.ClearValue(Animatable.TransitionsProperty); }
-                if (toOpacity is double t1) c.Opacity = t1;
-                onDone?.Invoke();
-            }
-        };
-        Tweens[c] = timer;
-        timer.Start();
+            Tweens.Remove(c);
+            bool rest = Math.Abs(ts - 1) < 1e-3 && Math.Abs(tx) < 1e-3 && Math.Abs(ty) < 1e-3;
+            if (rest) { c.ClearValue(Visual.RenderTransformProperty); c.ClearValue(Animatable.TransitionsProperty); }
+            if (toOpacity is double t1) c.Opacity = t1;
+            onDone?.Invoke();
+        });
     }
 
     public static void FadeIn(Control c, int ms = Base)
@@ -112,17 +122,11 @@ public static class Motion
         double fromW = double.IsNaN(c.Width) ? c.Bounds.Width : c.Width;
         double toW = show ? fullWidth : 0, fromO = c.Opacity, toO = show ? 1 : 0;
         if (!Enabled) { c.Width = toW; c.Opacity = toO; return; }
-        int step = 0, steps = Steps(Ms(ms));
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(15) };
-        timer.Tick += (_, _) =>
+        Tweens[c] = Clock(ms, p =>
         {
-            step++;
-            double e = EaseOut(Math.Min(1.0, step / (double)steps));
+            double e = EaseOut(p);
             c.Width = Lerp(fromW, toW, e);
             c.Opacity = Lerp(fromO, toO, e);
-            if (step >= steps) { Stop(c); c.Width = toW; c.Opacity = toO; }
-        };
-        Tweens[c] = timer;
-        timer.Start();
+        }, done: () => { Tweens.Remove(c); c.Width = toW; c.Opacity = toO; });
     }
 }
