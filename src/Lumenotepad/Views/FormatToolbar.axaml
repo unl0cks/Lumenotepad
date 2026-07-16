@@ -3,6 +3,16 @@
              x:Class="Lumenotepad.Views.FormatToolbar">
 
     <UserControl.Styles>
+        <!-- Group divider between toolbar sections (flips to horizontal for a vertical dock in
+             SetPlacement). -->
+        <Style Selector="Border.toolsep">
+            <Setter Property="Width" Value="1"/>
+            <Setter Property="Height" Value="18"/>
+            <Setter Property="Margin" Value="4,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Background" Value="{DynamicResource FrameBorderBrush}"/>
+            <Setter Property="Opacity" Value="0.7"/>
+        </Style>
         <!-- Attached to the PAGE the strip sits on paper (dark glass on light themes!) — its
              icons must follow the paper region's text, not the frame's. -->
         <!-- :is() — a plain type selector matches the EXACT type only; FormatToolbar is a
@@ -64,6 +74,8 @@
             <Button x:Name="SubBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="13"
                     Content="x₂" ToolTip.Tip="Subscript"/>
 
+            <Border Classes="toolsep"/>
+
             <!-- Text type (Body / Title / Subtitle / Heading 1–3) -->
             <Button x:Name="TypeBtn" Theme="{StaticResource IconButton}" Width="34" Height="30" FontSize="13"
                     Content="&#xE8D2;" FontFamily="{StaticResource IconFont}" ToolTip.Tip="Text type">
@@ -84,12 +96,16 @@
                 </Button.Flyout>
             </Button>
 
+            <Border Classes="toolsep"/>
+
             <Button x:Name="LinkBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
                     FontFamily="{StaticResource IconFont}" Content="&#xE71B;" ToolTip.Tip="Add link"/>
             <Button x:Name="ImageBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
                     FontFamily="{StaticResource IconFont}" Content="&#xEB9F;" ToolTip.Tip="Insert image"/>
             <Button x:Name="FootnoteBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="15"
                     Content="†" ToolTip.Tip="Insert footnote"/>
+
+            <Border Classes="toolsep"/>
 
             <Button x:Name="BulletBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
                     FontFamily="{StaticResource IconFont}" Content="&#xE8FD;" ToolTip.Tip="Bullets &amp; lists (Ctrl+Shift+8)">
@@ -103,6 +119,8 @@
                     </Flyout>
                 </Button.Flyout>
             </Button>
+
+            <Border Classes="toolsep"/>
 
             <Button x:Name="HighlightBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
                     FontFamily="{StaticResource IconFont}" Content="&#xE7E6;" ToolTip.Tip="Highlight (Ctrl+Shift+H)">
@@ -122,6 +140,8 @@
                 </Button.Flyout>
             </Button>
 
+            <Border Classes="toolsep"/>
+
             <StackPanel x:Name="SizeGroup" Orientation="Horizontal" Spacing="0">
                 <Button x:Name="SizeMinus" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="11"
                         FontFamily="{StaticResource IconFont}" Content="&#xE949;" ToolTip.Tip="Smaller"/>
@@ -132,6 +152,8 @@
                 <Button x:Name="SizePlus" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="11"
                         FontFamily="{StaticResource IconFont}" Content="&#xE948;" ToolTip.Tip="Larger"/>
             </StackPanel>
+
+            <Border Classes="toolsep"/>
 
             <Button x:Name="FontBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="13"
                     Content="Aa" ToolTip.Tip="Font">

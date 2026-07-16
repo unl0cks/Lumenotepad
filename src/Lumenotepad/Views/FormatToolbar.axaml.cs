@@ -125,6 +125,14 @@ public partial class FormatToolbar : UserControl
         bool vertical = dock is Dock.Left or Dock.Right;
         Panel.Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;
         SizeGroup.Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;
+        // Group dividers follow the strip: vertical hairlines in a row, horizontal ones in a column.
+        foreach (var sep in Panel.Children.OfType<Border>().Where(b => b.Classes.Contains("toolsep")))
+        {
+            sep.Width = vertical ? 18 : 1;
+            sep.Height = vertical ? 1 : 18;
+            sep.Margin = vertical ? new Thickness(0, 4) : new Thickness(4, 0);
+            sep.HorizontalAlignment = vertical ? HorizontalAlignment.Center : HorizontalAlignment.Left;
+        }
         // Keep the "..." overflow + customize buttons at the opposite end of the strip for every dock.
         DockPanel.SetDock(DockBtn, vertical ? Dock.Bottom : Dock.Right);
         DockPanel.SetDock(CustomizeBtn, vertical ? Dock.Bottom : Dock.Right);
