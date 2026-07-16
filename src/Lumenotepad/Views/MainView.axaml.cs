@@ -47,6 +47,12 @@ public partial class MainView : UserControl
         // The toolbar follows whichever note container was focused last; dock menu re-docks it (persisted).
         PageCanvas.ActiveEditorChanged += ed => { if (ed is not null) Toolbar.Target = ed; };
 
+        // A freshly downloaded font (font installer) should appear in the toolbar menu right away.
+        Services.AppFonts.InstalledChanged += () =>
+        {
+            if (Vm is { } fvm) Toolbar.SetFontPrefs(fvm.ExtendedFonts, fvm.DisabledFontsList);
+        };
+
         // Deleting a container asks first; the deleted history panel lists what can come back.
         PageCanvas.ConfirmDelete = () =>
             Vm is { ConfirmDeleteContainer: false }

@@ -152,6 +152,12 @@ public partial class PreferencesWindow : Window
         _lastNav = NavList.SelectedItem;
         SetupSettingsSearch();
 
+        FontSearchBtn.Click += async (_, _) => await RunFontSearch();
+        FontSearchBox.KeyDown += async (_, e) =>
+        {
+            if (e.Key == Key.Enter) { e.Handled = true; await RunFontSearch(); }
+        };
+
         OpenDataBtn.Click += (_, _) =>
         {
             if (Vm?.SettingsDir is { } d)
@@ -775,6 +781,110 @@ public partial class PreferencesWindow : Window
 
     private bool _fontTemplateSet;
     private bool _fontsScrollSmoothed;
+
+    // ---- font installer (M11): search Google Fonts / Fontshare, download into userdata/fonts ----
+
+    private bool _fontSearchBusy;
+
+    private async System.Threading.Tasks.Task RunFontSearch()
+    {
+        if (_fontSearchBusy) return;
+        var query = FontSearchBox.Text?.Trim() ?? "";
+        if (query.Length == 0) return;
+        _fontSearchBusy = true;
+        FontSearchBtn.IsEnabled = false;
+        FontResults.Children.Clear();
+        SetFontStatus("Searching…");
+        try
+        {
+            var hits = await FontInstaller.SearchAsync(query);
+            FontResults.Children.Clear();
+            if (hits.Count == 0)
+            {
+                SetFontStatus("No matches. Check the spelling, or try another name.");
+                return;
+            }
+            SetFontStatus(null);
+            foreach (var hit in hits) FontResults.Children.Add(BuildFontResultRow(hit));
+        }
+        catch
+        {
+            SetFontStatus("Couldn't reach the font services. Check your connection and try again.");
+        }
+        finally
+        {
+            _fontSearchBusy = false;
+            FontSearchBtn.IsEnabled = true;
+        }
+    }
+
+    private Control BuildFontResultRow(FontInstaller.Hit hit)
+    {
+        bool already = AppFonts.Installed.Contains(hit.Name, StringComparer.OrdinalIgnoreCase);
+        var name = new TextBlock
+        {
+            Text = hit.Name, FontSize = 13, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+        };
+        var source = new TextBlock
+        {
+            Text = hit.Source, FontSize = 11, Foreground = (IBrush)this.FindResource("TextMutedBrush")!,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+        };
+        var labels = new StackPanel { Spacing = 1, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
+        labels.Children.Add(name);
+        labels.Children.Add(source);
+
+        var action = new Button
+        {
+            Theme = (Avalonia.Styling.ControlTheme)this.FindResource(already ? "LumenButtonGray" : "LumenButton")!,
+            Content = already ? "Installed" : "Install", FontSize = 12.5, Padding = new Thickness(12, 5),
+            IsEnabled = !already, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+        };
+        action.Click += async (_, _) =>
+        {
+            action.IsEnabled = false;
+            action.Content = "Installing…";
+            try
+            {
+                int files = await FontInstaller.InstallAsync(hit);
+                if (files > 0)
+                {
+                    AppFonts.RegisterInstalled();     // same-key re-register → usable now, no restart
+                    action.Content = "Installed";
+                    if (FontsPanel.IsVisible) RefreshFontChoices();
+                }
+                else
+                {
+                    action.Content = "Install";
+                    action.IsEnabled = true;
+                    SetFontStatus("That font had no usable files to install.");
+                }
+            }
+            catch
+            {
+                action.Content = "Install";
+                action.IsEnabled = true;
+                SetFontStatus("Download failed. Check your connection and try again.");
+            }
+        };
+
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        grid.Children.Add(labels);
+        Grid.SetColumn(action, 1);
+        grid.Children.Add(action);
+        return new Border
+        {
+            Background = (IBrush)this.FindResource("ControlHoverBrush")!,
+            CornerRadius = new CornerRadius(8), Padding = new Thickness(11, 8),
+            Child = grid,
+        };
+    }
+
+    private void SetFontStatus(string? text)
+    {
+        FontSearchStatus.Text = text ?? "";
+        FontSearchStatus.IsVisible = text is not null;
+    }
 
     /// <summary>(Re)build the fonts checklist: every candidate the menu COULD offer (current
     /// master-switch mode), bundled faces locked on. Lazy — runs when the panel shows, and again

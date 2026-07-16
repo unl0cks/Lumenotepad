@@ -14,7 +14,13 @@ public partial class App : Application
     {
         ToggleFx.Install();   // Motion-driven ToggleSwitch knob (one global hook pair)
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            desktop.MainWindow = new MainWindow { DataContext = new MainViewModel() };
+        {
+            // The MainViewModel ctor points FontInstaller.FontsDir at the real userdata folder;
+            // load whatever fonts the user has already downloaded so they appear in every menu.
+            var vm = new MainViewModel();
+            Services.AppFonts.RegisterInstalled();
+            desktop.MainWindow = new MainWindow { DataContext = vm };
+        }
         base.OnFrameworkInitializationCompleted();
     }
 }

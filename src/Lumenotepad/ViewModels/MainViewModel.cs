@@ -194,6 +194,8 @@ public partial class MainViewModel : ObservableObject
         _settingsDir = settingsDir;
         if (settingsDir is not null)
         {
+            // Downloaded fonts live beside the settings file so a moved userdata folder keeps them.
+            Services.FontInstaller.FontsDir = System.IO.Path.Combine(settingsDir, "fonts");
             _settings = AppSettings.Load(settingsDir);
             ToolbarPosition = _settings.ToolbarPosition;
             ToolbarScope = _settings.ToolbarScope;
