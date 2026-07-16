@@ -102,6 +102,14 @@
                     FontFamily="{StaticResource IconFont}" Content="&#xE71B;" ToolTip.Tip="Add link"/>
             <Button x:Name="ImageBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
                     FontFamily="{StaticResource IconFont}" Content="&#xEB9F;" ToolTip.Tip="Insert image"/>
+            <Button x:Name="DividerBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="15"
+                    Content="─" ToolTip.Tip="Insert line divider">
+                <Button.Flyout>
+                    <Flyout Placement="Bottom">
+                        <StackPanel x:Name="DividerChoices" Width="168" Spacing="2"/>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
             <Button x:Name="FootnoteBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="15"
                     Content="†" ToolTip.Tip="Insert footnote"/>
 

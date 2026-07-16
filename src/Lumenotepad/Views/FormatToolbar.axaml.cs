@@ -56,6 +56,9 @@ public partial class FormatToolbar : UserControl
     /// <summary>Raised by the image button — MainView picks a file and drops an image box on the page.</summary>
     public event Action? InsertImageRequested;
 
+    /// <summary>Raised by the divider button ("h"/"v") — MainView drops a line-divider box on the page.</summary>
+    public event Action<string>? InsertDividerRequested;
+
     public RichTextEditor? Target
     {
         get => _target;
@@ -96,6 +99,7 @@ public partial class FormatToolbar : UserControl
         FootnoteBtn.Click += async (_, _) => await AddFootnoteAsync();
         BuildAlignChoices();
         BuildTypeChoices();
+        BuildDividerChoices();
         SizeMinus.Click += (_, _) => NudgeSize(-1);
         SizePlus.Click += (_, _) => NudgeSize(+1);
         SizeBox.KeyDown += (_, e) =>
@@ -145,7 +149,7 @@ public partial class FormatToolbar : UserControl
             Dock.Bottom => PlacementMode.Top,
             _ => PlacementMode.Bottom,
         };
-        foreach (var b in new[] { BulletBtn, HighlightBtn, ColorBtn, FontBtn, TypeBtn, AlignBtn })
+        foreach (var b in new[] { BulletBtn, HighlightBtn, ColorBtn, FontBtn, TypeBtn, AlignBtn, DividerBtn })
             if (b.Flyout is PopupFlyoutBase pf) pf.Placement = placement;
         if (DockBtn.Flyout is PopupFlyoutBase df) df.Placement = placement;
 
@@ -327,6 +331,31 @@ public partial class FormatToolbar : UserControl
             };
             b.Click += (_, _) => { Do(e => e.SetAlignment(align)); AlignBtn.Flyout?.Hide(); };
             AlignChoices.Children.Add(b);
+        }
+    }
+
+    private void BuildDividerChoices()
+    {
+        var symbolFont = new FontFamily("Segoe UI Symbol, Segoe UI");
+        foreach (var (kind, glyph, name) in new[] { ("h", "─", "Horizontal line"), ("v", "│", "Vertical line") })
+        {
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            row.Children.Add(new TextBlock
+            {
+                Text = glyph, FontSize = 14, FontFamily = symbolFont,
+                Width = 18, TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            });
+            row.Children.Add(new TextBlock { Text = name, FontSize = 13, VerticalAlignment = VerticalAlignment.Center });
+            var b = new Button
+            {
+                Theme = (Avalonia.Styling.ControlTheme)Application.Current!.FindResource("LumenButtonGray")!,
+                HorizontalContentAlignment = HorizontalAlignment.Left,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Padding = new Thickness(10, 5), Content = row,
+            };
+            b.Click += (_, _) => { InsertDividerRequested?.Invoke(kind); DividerBtn.Flyout?.Hide(); };
+            DividerChoices.Children.Add(b);
         }
     }
 

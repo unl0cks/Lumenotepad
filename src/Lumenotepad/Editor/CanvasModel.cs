@@ -12,6 +12,8 @@ public sealed class NoteBox
     public const double DefaultWidth = 360;
     public const double MinWidth = 140;
     public const double MinHeight = 42;
+    /// <summary>Shortest a line-divider box can be stretched along its axis.</summary>
+    public const double MinDividerLength = 60;
 
     public double X { get; set; }
     public double Y { get; set; }
@@ -26,13 +28,19 @@ public sealed class NoteBox
     /// When set the box renders the image instead of a text editor. Persisted.</summary>
     public string? ImagePath { get; set; }
 
+    /// <summary>A LINE-DIVIDER box: "h" (horizontal rule) or "v" (vertical rule). When set the box
+    /// renders a draggable line instead of a text editor, and only the along-axis resize handle
+    /// shows — dragging it stretches the line. Persisted.</summary>
+    public string? Divider { get; set; }
+
     public RichDocument Doc { get; }
 
     public NoteBox(RichDocument? doc = null) => Doc = doc ?? new RichDocument();
 
     /// <summary>True while the box holds nothing but a single bare paragraph — such boxes
-    /// evaporate when focus settles elsewhere (OneNote behavior). Image boxes are never empty.</summary>
-    public bool IsEmpty => ImagePath is null && IsBlank(Doc);
+    /// evaporate when focus settles elsewhere (OneNote behavior). Image and divider boxes
+    /// are never empty.</summary>
+    public bool IsEmpty => ImagePath is null && Divider is null && IsBlank(Doc);
 
     public static bool IsBlank(RichDocument doc) =>
         doc.Paragraphs.Count == 1 && doc.Paragraphs[0].Runs.Count == 0 && doc.Paragraphs[0].Bullet is null;

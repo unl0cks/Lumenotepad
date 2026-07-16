@@ -66,6 +66,7 @@ public partial class MainView : UserControl
         Toolbar.ScopeRequested += scope => { if (Vm is { } vm) vm.ToolbarScope = scope; };
         Toolbar.CustomizeRequested += () => { if (Vm?.SelectedNotebook is { } nb) OpenNotebookWizard(nb); };
         Toolbar.InsertImageRequested += async () => await InsertImageAsync();
+        Toolbar.InsertDividerRequested += InsertDivider;
 
         // Section/page rename: double-click, the rename button, or right-click → Rename — all open
         // the zoomed rename overlay (the background blurs until the name is saved).
@@ -1285,6 +1286,15 @@ public partial class MainView : UserControl
         double y = CanvasScroll.Offset.Y / _canvasZoom + 40;
         PageCanvas.ImageRoot = vm.SelectedNotebookDir;
         PageCanvas.AddImage(rel, x, y);
+    }
+
+    /// <summary>Drop a line divider ("h"/"v") on the current page, near the top-left of the view.</summary>
+    private void InsertDivider(string orientation)
+    {
+        if (Vm is not { SelectedPage: not null }) return;
+        double x = CanvasScroll.Offset.X / _canvasZoom + 60;
+        double y = CanvasScroll.Offset.Y / _canvasZoom + 60;
+        PageCanvas.AddDivider(orientation, x, y);
     }
 
     /// <summary>Export one page to a file the user picks — the format follows the chosen file type

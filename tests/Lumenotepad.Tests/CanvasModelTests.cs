@@ -253,6 +253,23 @@ public class CanvasJsonTests
     }
 
     [Fact]
+    public void DividerBox_notEmpty_roundTripsUnderMinWidth()
+    {
+        var canvas = new CanvasDocument();
+        var div = canvas.AddBox(50, 80);
+        div.Divider = "v";
+        div.Width = 22;                                  // vertical strips sit under NoteBox.MinWidth
+        div.H = 240;
+        Assert.False(div.IsEmpty);                       // a divider box never evaporates
+
+        var reloaded = CanvasDocJson.FromJson(CanvasDocJson.ToJson(canvas));
+        var box = Assert.Single(reloaded.Boxes);
+        Assert.Equal("v", box.Divider);
+        Assert.Equal(22, box.Width);                     // load must not clamp back to MinWidth
+        Assert.Equal(240, box.H);
+    }
+
+    [Fact]
     public void Links_absentWhenNone_badPairsIgnored()
     {
         var canvas = new CanvasDocument();

@@ -64,6 +64,20 @@ public sealed class NoteCanvas : Panel
         _doc.CommitGeometry();                 // persist with the image path set
     }
 
+    /// <summary>Insert a line divider: "h" (horizontal rule) or "v" (vertical rule) — a movable
+    /// strip whose single resize handle stretches the line longer or shorter.</summary>
+    public void AddDivider(string orientation, double x, double y)
+    {
+        if (_doc is null) return;
+        if (SnapToGrid) { x = Math.Max(0, GridMath.Snap(x)); y = Math.Max(0, GridMath.Snap(y)); }
+        var box = _doc.AddBox(x, y);
+        box.Divider = orientation;
+        if (orientation == "v") { box.Width = 22; box.H = 240; }   // thin strip, line runs down it
+        else { box.Width = 320; box.H = 22; }                      // low strip, line runs across it
+        AddBoxView(box);
+        _doc.CommitGeometry();                 // persist with the divider kind set
+    }
+
     /// <summary>Asked before a container is deleted via its ✕ button / menu; null = no prompt.</summary>
     public Func<Task<bool>>? ConfirmDelete { get; set; }
 
@@ -384,11 +398,22 @@ internal sealed class NoteBoxView : Panel
         DockPanel.SetDock(_grip, Dock.Top);
 
         var body = new DockPanel();
-        body.Children.Add(_grip);
-        if (box.ImagePath is { Length: > 0 })
-            body.Children.Add(BuildImage(box.ImagePath));   // image box: picture instead of the editor
+        if (box.Divider is not null)
+        {
+            // Divider box: the whole strip is the grip — grab the line anywhere to move it.
+            _grip.Height = double.NaN;
+            _grip.CornerRadius = new CornerRadius(r);
+            _grip.Child = BuildDividerLine(box.Divider);
+            body.Children.Add(_grip);
+        }
         else
-            body.Children.Add(Editor);
+        {
+            body.Children.Add(_grip);
+            if (box.ImagePath is { Length: > 0 })
+                body.Children.Add(BuildImage(box.ImagePath));   // image box: picture instead of the editor
+            else
+                body.Children.Add(Editor);
+        }
 
         _chrome = new Border
         {
@@ -440,7 +465,7 @@ internal sealed class NoteBoxView : Panel
 
         PointerEntered += (_, _) => { _hover = true; RefreshChrome(); };
         PointerExited += (_, _) => { _hover = false; RefreshChrome(); };
-        if (box.ImagePath is null)      // image boxes have no editor to focus / evaporate
+        if (box.ImagePath is null && box.Divider is null)   // image/divider boxes have no editor to focus / evaporate
         {
             Editor.GotFocus += (_, _) => { _canvas.SetActive(Editor); RefreshChrome(); };
             Editor.LostFocus += (_, _) => { RefreshChrome(); _canvas.OnEditorLostFocus(this); };
@@ -454,7 +479,7 @@ internal sealed class NoteBoxView : Panel
         _grip.ContextRequested += (_, e) =>
         {
             var menu = new ContextMenu();
-            var del = new MenuItem { Header = "Delete container" };
+            var del = new MenuItem { Header = Box.Divider is null ? "Delete container" : "Delete divider" };
             del.Click += (_, _) => _canvas.RequestDelete(this);
             menu.Items.Add(del);
             Views.MenuFx.Attach(menu);     // rise-in + Lumen glass-variant popup acrylic
@@ -465,7 +490,7 @@ internal sealed class NoteBoxView : Panel
         RefreshChrome();
     }
 
-    internal void FocusEditor() { if (Box.ImagePath is null) Editor.Focus(); }
+    internal void FocusEditor() { if (Box.ImagePath is null && Box.Divider is null) Editor.Focus(); }
 
     /// <summary>The picture control for an image box, loaded from ImageRoot + the box's relative path.</summary>
     private Control BuildImage(string relPath)
@@ -484,6 +509,30 @@ internal sealed class NoteBoxView : Panel
         return img;
     }
 
+    /// <summary>The line visual for a divider box, tinted from the paper text so it themes.</summary>
+    private Control BuildDividerLine(string orientation)
+    {
+        var line = new Border
+        {
+            Background = new SolidColorBrush(Color.Parse(
+                Services.ThemePalettes.Alpha(Services.ThemeManager.Current.PaperText, 0x59))),
+            CornerRadius = new CornerRadius(1), IsHitTestVisible = false,
+        };
+        if (orientation == "v")
+        {
+            line.Width = 2;
+            line.HorizontalAlignment = HorizontalAlignment.Center;
+            line.Margin = new Thickness(0, 5);
+        }
+        else
+        {
+            line.Height = 2;
+            line.VerticalAlignment = VerticalAlignment.Center;
+            line.Margin = new Thickness(5, 0);
+        }
+        return line;
+    }
+
     internal void RefreshChrome()
     {
         bool focused = Editor.IsFocused;
@@ -495,8 +544,11 @@ internal sealed class NoteBoxView : Panel
         _gripBar.IsVisible = active;
         _close.IsVisible = active && !Box.Locked;
         // Hidden handles are also not hit-testable — the "Resizable pages" preference off = no resizing.
-        _resizeRight.IsVisible = _resizeBottom.IsVisible = _resizeCorner.IsVisible =
-            _canvas.CanResize && !Box.Locked;
+        // Dividers stretch along their axis only: the cross-axis and corner handles stay hidden.
+        bool resize = _canvas.CanResize && !Box.Locked;
+        _resizeRight.IsVisible = resize && Box.Divider != "v";
+        _resizeBottom.IsVisible = resize && Box.Divider != "h";
+        _resizeCorner.IsVisible = resize && Box.Divider is null;
     }
 
     private Point _dragStart;
@@ -533,13 +585,13 @@ internal sealed class NoteBoxView : Panel
             {
                 double nw = _dragOrigin.W + dx;
                 if (_canvas.SnapToGrid) nw = GridMath.Snap(nw);
-                Box.Width = Math.Clamp(nw, NoteBox.MinWidth, 1600);
+                Box.Width = Math.Clamp(nw, Box.Divider == "h" ? NoteBox.MinDividerLength : NoteBox.MinWidth, 1600);
             }
             if (mode is DragMode.Height or DragMode.Both)
             {
                 double nh = _dragOrigin.H + dy;
                 if (_canvas.SnapToGrid) nh = GridMath.Snap(nh);
-                Box.H = Math.Clamp(nh, NoteBox.MinHeight, 4000);
+                Box.H = Math.Clamp(nh, Box.Divider == "v" ? NoteBox.MinDividerLength : NoteBox.MinHeight, 4000);
             }
             _canvas.InvalidateMeasure();
             e.Handled = true;
