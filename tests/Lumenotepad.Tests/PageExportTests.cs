@@ -258,6 +258,16 @@ public class PageExportTests
     }
 
     [Fact]
+    public void ToPdfMulti_combinesPages_intoOneValidPdf()
+    {
+        var one = PageExport.ToPdfMulti(new[] { ("Page 1", Page()) });
+        var three = PageExport.ToPdfMulti(new[] { ("Page 1", Page()), ("Page 2", Page()), ("Page 3", Page()) });
+        Assert.Equal((byte)'%', three[0]);              // "%PDF"
+        Assert.Equal((byte)'P', three[1]);
+        Assert.True(three.Length > one.Length);         // more pages → more bytes
+    }
+
+    [Fact]
     public void EmptyBoxes_skipped_titleFallsBack()
     {
         var canvas = new CanvasDocument();

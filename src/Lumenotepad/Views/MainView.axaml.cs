@@ -68,6 +68,14 @@ public partial class MainView : UserControl
             var viewer = new PdfViewerWindow(path, Vm?.DoubleClickCreate ?? false);
             if (Window is { } w) viewer.Show(w); else viewer.Show();
         };
+
+        // The section/page "+" buttons open an Add / Rearrange / Open-as-PDF menu.
+        SectionsAddBtn.Click += (_, _) => OpenSectionsMenu(SectionsAddBtn);
+        SideSectionsAddBtn.Click += (_, _) => OpenSectionsMenu(SideSectionsAddBtn);
+        PagesAddBtn.Click += (_, _) => OpenPagesMenu(PagesAddBtn);
+        PdfTakeoverBack.Click += (_, _) => CloseTakeover();
+        PdfTakeoverZoomIn.Click += (_, _) => SetTakeoverZoom(_takeoverZoom * 1.2);
+        PdfTakeoverZoomOut.Click += (_, _) => SetTakeoverZoom(_takeoverZoom / 1.2);
         HistoryBtn.Click += (_, _) =>
         {
             TrashPanel.IsVisible = !TrashPanel.IsVisible;
@@ -1441,6 +1449,144 @@ public partial class MainView : UserControl
             var viewer = new PdfViewerWindow(full, vm.DoubleClickCreate);
             if (Window is { } w) viewer.Show(w); else viewer.Show();
         }
+    }
+
+    // ---- section / page "+" menus (add · rearrange · open as PDF) ----
+    private void OpenSectionsMenu(Control anchor)
+    {
+        if (Vm is not { SelectedNotebook: { } nb }) return;
+        var menu = new ContextMenu();
+        MenuItem Item(string h, System.Action a, bool on = true)
+        {
+            var m = new MenuItem { Header = h, IsEnabled = on };
+            m.Click += (_, _) => a();
+            menu.Items.Add(m);
+            return m;
+        }
+        Item("Add section", () => Vm.AddSectionCommand.Execute(null));
+        Item("Rearrange sections…", async () =>
+        {
+            if (Window is { } w)
+                await ReorderDialog.Show(w, "Rearrange sections",
+                    nb.Sections.Select(s => s.Name).ToList(), (f, t) => nb.Sections.Move(f, t));
+            Vm.Save();
+        }, nb.Sections.Count > 1);
+        menu.Items.Add(new Separator());
+        Item("Open section as PDF", () => { if (Vm.SelectedSection is { } sec) OpenSectionAsPdf(sec); },
+            Vm.SelectedSection is { Pages.Count: > 0 });
+        MenuFx.Attach(menu);
+        menu.Open(anchor);
+    }
+
+    private void OpenPagesMenu(Control anchor)
+    {
+        if (Vm is not { SelectedSection: { } sec }) return;
+        var menu = new ContextMenu();
+        MenuItem Item(string h, System.Action a, bool on = true)
+        {
+            var m = new MenuItem { Header = h, IsEnabled = on };
+            m.Click += (_, _) => a();
+            menu.Items.Add(m);
+            return m;
+        }
+        Item("Add page", () => Vm.AddPageCommand.Execute(null));
+        Item("Rearrange pages…", async () =>
+        {
+            if (Window is { } w)
+                await ReorderDialog.Show(w, "Rearrange pages",
+                    sec.Pages.Select(p => p.Title).ToList(), (f, t) => sec.Pages.Move(f, t));
+            Vm.Save();
+        }, sec.Pages.Count > 1);
+        menu.Items.Add(new Separator());
+        Item("Open page as PDF", () => { if (Vm.SelectedPage is { } pg) OpenPageAsPdf(pg); },
+            Vm.SelectedPage is not null);
+        MenuFx.Attach(menu);
+        menu.Open(anchor);
+    }
+
+    // ---- "Open as PDF" canvas takeover (view-only, rendered with PDFium) ----
+    private byte[]? _takeoverPdf;
+    private double _takeoverZoom = 1.0;
+    private readonly System.Collections.Generic.List<(Border Frame, double WPt, double HPt)> _takeoverPages = new();
+
+    private void OpenPageAsPdf(Models.Page pg)
+    {
+        if (Vm is not { } vm) return;
+        vm.FlushDirtyDocs();
+        var title = string.IsNullOrWhiteSpace(pg.Title) ? "Untitled" : pg.Title;
+        var pdf = Services.PageExport.ToPdfMulti(new[] { (title, vm.DocumentFor(pg)) }, vm.SelectedNotebookDir);
+        RenderTakeover(pdf, title);
+    }
+
+    private void OpenSectionAsPdf(Models.Section sec)
+    {
+        if (Vm is not { } vm) return;
+        vm.FlushDirtyDocs();
+        var items = sec.Pages
+            .Select(p => (string.IsNullOrWhiteSpace(p.Title) ? "Untitled" : p.Title, vm.DocumentFor(p)))
+            .ToList();
+        if (items.Count == 0) return;
+        var pdf = Services.PageExport.ToPdfMulti(items, vm.SelectedNotebookDir);
+        RenderTakeover(pdf, sec.Name);
+    }
+
+    private async void RenderTakeover(byte[] pdf, string title)
+    {
+        _takeoverPdf = pdf;
+        _takeoverZoom = 1.0;
+        _takeoverPages.Clear();
+        PdfTakeoverTitle.Text = title;
+        PdfTakeoverZoom.Text = "100%";
+        PdfTakeoverPages.Children.Clear();
+        PdfTakeover.IsVisible = true;
+        Motion.FadeIn(PdfTakeover, Motion.Fast);
+
+        int count = Services.PdfRenderer.PageCount(pdf);
+        var sizes = Services.PdfRenderer.PageSizes(pdf);
+        if (count == 0 || sizes.Count == 0) return;
+        const double pxPerPt = 130.0 / 72.0;
+        for (int i = 0; i < count; i++)
+        {
+            var (wpt, hpt) = sizes[i];
+            var img = new Image { Stretch = Stretch.Fill };
+            var frame = new Border
+            {
+                Background = Brushes.White, Child = img,
+                BoxShadow = BoxShadows.Parse("0 4 18 0 #55000000"),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Width = wpt * pxPerPt, Height = hpt * pxPerPt,
+            };
+            PdfTakeoverPages.Children.Add(frame);
+            _takeoverPages.Add((frame, wpt, hpt));
+        }
+        for (int i = 0; i < count; i++)
+        {
+            int page = i;
+            var bmp = await System.Threading.Tasks.Task.Run(() => Services.PdfRenderer.RenderPage(pdf, page, 130f));
+            if (bmp is not null && PdfTakeover.IsVisible && page < _takeoverPages.Count
+                && _takeoverPages[page].Frame.Child is Image im)
+                im.Source = bmp;
+        }
+    }
+
+    private void SetTakeoverZoom(double z)
+    {
+        _takeoverZoom = System.Math.Clamp(z, 0.4, 3.0);
+        PdfTakeoverZoom.Text = $"{System.Math.Round(_takeoverZoom * 100)}%";
+        const double pxPerPt = 130.0 / 72.0;
+        foreach (var (frame, wpt, hpt) in _takeoverPages)
+        {
+            frame.Width = wpt * pxPerPt * _takeoverZoom;
+            frame.Height = hpt * pxPerPt * _takeoverZoom;
+        }
+    }
+
+    private void CloseTakeover()
+    {
+        PdfTakeover.IsVisible = false;
+        PdfTakeoverPages.Children.Clear();
+        _takeoverPages.Clear();
+        _takeoverPdf = null;
     }
 
     /// <summary>Drop a line divider ("h"/"v") on the current page, near the top-left of the view.</summary>

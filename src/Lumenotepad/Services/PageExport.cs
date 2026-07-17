@@ -377,7 +377,12 @@ public static class PageExport
 
     // ---- PDF (SkiaSharp) ----
 
-    private static byte[] ToPdf(string title, CanvasDocument doc, string? imageRoot)
+    private static byte[] ToPdf(string title, CanvasDocument doc, string? imageRoot) =>
+        ToPdfMulti(new[] { (title, doc) }, imageRoot);
+
+    /// <summary>Render several pages into one PDF (each starts on a fresh page). Used both by the
+    /// single-page export and by "Open section as PDF".</summary>
+    public static byte[] ToPdfMulti(IReadOnlyList<(string Title, CanvasDocument Doc)> items, string? imageRoot = null)
     {
         const float W = 595, H = 842, Margin = 54;         // A4 points
         const float MaxW = W - 2 * Margin;
@@ -441,68 +446,72 @@ public static class PageExport
                 Color = SkiaSharp.SKColors.Black, TextSize = 26, IsAntialias = true,
                 Typeface = SkiaSharp.SKTypeface.FromFamilyName("Segoe UI", SkiaSharp.SKFontStyle.Bold),
             };
-            y += 26;
-            canvas.DrawText(title, Margin, y, titlePaint);
-            y += 30;
-
-            foreach (var box in Boxes(doc))
+            for (int it = 0; it < items.Count; it++)
             {
-                if (box.Divider is not null) { DrawDivider(box); continue; }
-                if (box.Table is { } tbl) { DrawTable(tbl); continue; }
-                if (box.ImagePath is { Length: > 0 }) { DrawImage(box); continue; }
-                if (box.AttachPath is { Length: > 0 })
-                {
-                    // The file itself can't ride inside the page — a quiet italic marker names it.
-                    EnsureRoom(20);
-                    using var ap = MakePaint(false, true, false, 12);
-                    ap.Color = new SkiaSharp.SKColor(0x77, 0x77, 0x77);
-                    canvas.DrawText("Attachment: " + AttachName(box), Margin, y, ap);
-                    y += 22;
-                    continue;
-                }
+                if (it > 0) NewPage();          // each page/section entry starts fresh
+                y += 26;
+                canvas.DrawText(items[it].Title, Margin, y, titlePaint);
+                y += 30;
 
-                int num = 0;
-                foreach (var p in box.Doc.Paragraphs)
+                foreach (var box in Boxes(items[it].Doc))
                 {
-                    if (p.Bullet == "num") num++; else num = 0;
-                    double size = RichTextEditor.BaseSizeFor(p.Style, 12);
-                    bool headBold = RichTextEditor.BaseWeightFor(p.Style) >= Avalonia.Media.FontWeight.SemiBold;
-                    bool check = p.Bullet == "check";
-                    string bullet = p.Bullet switch
+                    if (box.Divider is not null) { DrawDivider(box); continue; }
+                    if (box.Table is { } tbl) { DrawTable(tbl); continue; }
+                    if (box.ImagePath is { Length: > 0 }) { DrawImage(box); continue; }
+                    if (box.AttachPath is { Length: > 0 })
                     {
-                        null or "check" => "", "num" => $"{num}.", _ => "•",
-                    };
-                    var words = new List<(string, SkiaSharp.SKPaint)>();
-                    var paints = new List<SkiaSharp.SKPaint>();
-                    if (bullet.Length > 0)
-                    {
-                        var bp = MakePaint(false, false, false, (float)size);
-                        paints.Add(bp);
-                        words.Add((bullet, bp));
+                        // The file itself can't ride inside the page — a quiet italic marker names it.
+                        EnsureRoom(20);
+                        using var ap = MakePaint(false, true, false, 12);
+                        ap.Color = new SkiaSharp.SKColor(0x77, 0x77, 0x77);
+                        canvas.DrawText("Attachment: " + AttachName(box), Margin, y, ap);
+                        y += 22;
+                        continue;
                     }
-                    foreach (var r in p.Runs)
+
+                    int num = 0;
+                    foreach (var p in box.Doc.Paragraphs)
                     {
-                        if (r.Text.Length == 0) continue;
-                        var paint = MakePaint(r.Bold || headBold, r.Italic, r.Link is { Length: > 0 }, (float)size);
-                        paints.Add(paint);
-                        foreach (var word in r.Text.Split(' ').Where(s => s.Length > 0))
-                            words.Add((word, paint));
+                        if (p.Bullet == "num") num++; else num = 0;
+                        double size = RichTextEditor.BaseSizeFor(p.Style, 12);
+                        bool headBold = RichTextEditor.BaseWeightFor(p.Style) >= Avalonia.Media.FontWeight.SemiBold;
+                        bool check = p.Bullet == "check";
+                        string bullet = p.Bullet switch
+                        {
+                            null or "check" => "", "num" => $"{num}.", _ => "•",
+                        };
+                        var words = new List<(string, SkiaSharp.SKPaint)>();
+                        var paints = new List<SkiaSharp.SKPaint>();
+                        if (bullet.Length > 0)
+                        {
+                            var bp = MakePaint(false, false, false, (float)size);
+                            paints.Add(bp);
+                            words.Add((bullet, bp));
+                        }
+                        foreach (var r in p.Runs)
+                        {
+                            if (r.Text.Length == 0) continue;
+                            var paint = MakePaint(r.Bold || headBold, r.Italic, r.Link is { Length: > 0 }, (float)size);
+                            paints.Add(paint);
+                            foreach (var word in r.Text.Split(' ').Where(s => s.Length > 0))
+                                words.Add((word, paint));
+                        }
+                        if (check)
+                        {
+                            EnsureRoom((float)size * 1.5f);
+                            DrawCheckbox(p.Checked, (float)size);
+                            if (words.Count == 0) { y += (float)size * 1.3f * 1.4f; continue; }
+                            DrawParagraph(words, (float)size * 1.3f, indent: (float)size * 0.85f + 7f);
+                        }
+                        else
+                        {
+                            if (words.Count == 0) { y += (float)size * 1.4f; continue; }
+                            DrawParagraph(words, (float)size * 1.3f);
+                        }
+                        foreach (var pt in paints) pt.Dispose();
                     }
-                    if (check)
-                    {
-                        EnsureRoom((float)size * 1.5f);
-                        DrawCheckbox(p.Checked, (float)size);
-                        if (words.Count == 0) { y += (float)size * 1.3f * 1.4f; continue; }
-                        DrawParagraph(words, (float)size * 1.3f, indent: (float)size * 0.85f + 7f);
-                    }
-                    else
-                    {
-                        if (words.Count == 0) { y += (float)size * 1.4f; continue; }
-                        DrawParagraph(words, (float)size * 1.3f);
-                    }
-                    foreach (var pt in paints) pt.Dispose();
+                    y += 8;
                 }
-                y += 8;
             }
             pdf.EndPage();
 
