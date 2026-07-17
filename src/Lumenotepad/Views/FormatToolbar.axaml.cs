@@ -66,6 +66,10 @@ public partial class FormatToolbar : UserControl
     /// <summary>Raised by the table size picker (rows, cols) — MainView drops a table box on the page.</summary>
     public event Action<int, int>? InsertTableRequested;
 
+    /// <summary>Raised by the Insert menu's PDF entry — MainView picks a PDF, attaches it, and opens
+    /// the in-app viewer/annotator in one step.</summary>
+    public event Action? InsertPdfRequested;
+
     public RichTextEditor? Target
     {
         get => _target;
@@ -101,13 +105,9 @@ public partial class FormatToolbar : UserControl
         StrikeBtn.Click += (_, _) => Do(e => e.ToggleStrike());
         SuperBtn.Click += (_, _) => Do(e => e.ToggleSuper());
         SubBtn.Click += (_, _) => Do(e => e.ToggleSub());
-        LinkBtn.Click += async (_, _) => await AddLinkAsync();
-        ImageBtn.Click += (_, _) => InsertImageRequested?.Invoke();
-        AttachBtn.Click += (_, _) => InsertAttachmentRequested?.Invoke();
-        FootnoteBtn.Click += async (_, _) => await AddFootnoteAsync();
         BuildAlignChoices();
         BuildTypeChoices();
-        BuildDividerChoices();
+        BuildInsertChoices();
         BuildTagChoices();
         BuildTableSizePicker();
         SizeMinus.Click += (_, _) => NudgeSize(-1);
@@ -159,7 +159,7 @@ public partial class FormatToolbar : UserControl
             Dock.Bottom => PlacementMode.Top,
             _ => PlacementMode.Bottom,
         };
-        foreach (var b in new[] { BulletBtn, HighlightBtn, ColorBtn, FontBtn, TypeBtn, AlignBtn, DividerBtn, TagBtn, TableBtn })
+        foreach (var b in new[] { BulletBtn, HighlightBtn, ColorBtn, FontBtn, TypeBtn, AlignBtn, InsertBtn, TagBtn, TableBtn })
             if (b.Flyout is PopupFlyoutBase pf) pf.Placement = placement;
         if (DockBtn.Flyout is PopupFlyoutBase df) df.Placement = placement;
 
@@ -413,29 +413,38 @@ public partial class FormatToolbar : UserControl
         TableSizeLabel.Text = $"{r + 1} × {c + 1}";
     }
 
-    private void BuildDividerChoices()
+    /// <summary>The Insert menu: link, image, file, PDF, footnote, and line dividers in one flyout
+    /// so the toolbar strip stays short.</summary>
+    private void BuildInsertChoices()
     {
+        var iconFont = (FontFamily)Application.Current!.FindResource("IconFont")!;
         var symbolFont = new FontFamily("Segoe UI Symbol, Segoe UI");
-        foreach (var (kind, glyph, name) in new[] { ("h", "─", "Horizontal line"), ("v", "│", "Vertical line") })
+        void Add(string glyph, bool icon, string label, Action act)
         {
-            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 11 };
             row.Children.Add(new TextBlock
             {
-                Text = glyph, FontSize = 14, FontFamily = symbolFont,
-                Width = 18, TextAlignment = TextAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
+                Text = glyph, FontFamily = icon ? iconFont : symbolFont, FontSize = 14,
+                Width = 20, TextAlignment = TextAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
             });
-            row.Children.Add(new TextBlock { Text = name, FontSize = 13, VerticalAlignment = VerticalAlignment.Center });
+            row.Children.Add(new TextBlock { Text = label, FontSize = 13, VerticalAlignment = VerticalAlignment.Center });
             var b = new Button
             {
                 Theme = (Avalonia.Styling.ControlTheme)Application.Current!.FindResource("LumenButtonGray")!,
                 HorizontalContentAlignment = HorizontalAlignment.Left,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                Padding = new Thickness(10, 5), Content = row,
+                Padding = new Thickness(10, 6), Content = row,
             };
-            b.Click += (_, _) => { InsertDividerRequested?.Invoke(kind); DividerBtn.Flyout?.Hide(); };
-            DividerChoices.Children.Add(b);
+            b.Click += (_, _) => { act(); InsertBtn.Flyout?.Hide(); };
+            InsertChoices.Children.Add(b);
         }
+        Add("", true, "Link", () => _ = AddLinkAsync());
+        Add("", true, "Image", () => InsertImageRequested?.Invoke());
+        Add("", true, "File attachment", () => InsertAttachmentRequested?.Invoke());
+        Add("", true, "PDF — view & annotate", () => InsertPdfRequested?.Invoke());
+        Add("†", false, "Footnote", () => _ = AddFootnoteAsync());
+        Add("─", false, "Horizontal line", () => InsertDividerRequested?.Invoke("h"));
+        Add("│", false, "Vertical line", () => InsertDividerRequested?.Invoke("v"));
     }
 
     private static readonly (ParaStyle Style, string Name)[] TextTypes =
@@ -635,7 +644,6 @@ public partial class FormatToolbar : UserControl
             ColorBtn.Classes.Set("on", f.Color is not null);
             SuperBtn.Classes.Set("on", f.Baseline == Baseline.Super);
             SubBtn.Classes.Set("on", f.Baseline == Baseline.Sub);
-            LinkBtn.Classes.Set("on", f.Link is not null);
             AlignBtn.Classes.Set("on", _target.CurrentAlign != TextAlign.Left);
             TypeBtn.Classes.Set("on", _target.CurrentTextType != ParaStyle.Body);
             BulletBtn.Classes.Set("on", _target.CurrentBullet is not null);

@@ -98,12 +98,16 @@
 
             <Border Classes="toolsep"/>
 
-            <Button x:Name="LinkBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
-                    FontFamily="{StaticResource IconFont}" Content="&#xE71B;" ToolTip.Tip="Add link"/>
-            <Button x:Name="ImageBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
-                    FontFamily="{StaticResource IconFont}" Content="&#xEB9F;" ToolTip.Tip="Insert image"/>
-            <Button x:Name="AttachBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
-                    FontFamily="{StaticResource IconFont}" Content="&#xE723;" ToolTip.Tip="Attach file"/>
+            <!-- One Insert menu gathers the occasional inserts (link, image, file, PDF, footnote,
+                 dividers) so the strip stays short. Table keeps its own button for the size picker. -->
+            <Button x:Name="InsertBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="15"
+                    FontFamily="{StaticResource IconFont}" Content="&#xE710;" ToolTip.Tip="Insert (link, image, file, PDF, footnote, divider)">
+                <Button.Flyout>
+                    <Flyout Placement="Bottom">
+                        <StackPanel x:Name="InsertChoices" Width="220" Spacing="2"/>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
             <Button x:Name="TableBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
                     FontFamily="{StaticResource IconFont}" Content="&#xE80A;" ToolTip.Tip="Insert table">
                 <Button.Flyout>
@@ -116,16 +120,6 @@
                     </Flyout>
                 </Button.Flyout>
             </Button>
-            <Button x:Name="DividerBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="15"
-                    Content="─" ToolTip.Tip="Insert line divider">
-                <Button.Flyout>
-                    <Flyout Placement="Bottom">
-                        <StackPanel x:Name="DividerChoices" Width="168" Spacing="2"/>
-                    </Flyout>
-                </Button.Flyout>
-            </Button>
-            <Button x:Name="FootnoteBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="15"
-                    Content="†" ToolTip.Tip="Insert footnote"/>
 
             <Border Classes="toolsep"/>
 
@@ -177,7 +171,7 @@
                 <Button x:Name="SizeMinus" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="11"
                         FontFamily="{StaticResource IconFont}" Content="&#xE949;" ToolTip.Tip="Smaller"/>
                 <TextBox x:Name="SizeBox" Theme="{StaticResource RoundedFieldTextBox}"
-                         Width="30" Height="26" FontSize="12" Text="15"
+                         Width="30" Height="30" FontSize="12" Text="15"
                          VerticalAlignment="Center" VerticalContentAlignment="Center"
                          TextAlignment="Center" ToolTip.Tip="Font size — type a number and press Enter"/>
                 <Button x:Name="SizePlus" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="11"

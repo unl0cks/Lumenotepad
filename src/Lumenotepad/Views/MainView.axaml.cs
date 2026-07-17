@@ -86,6 +86,7 @@ public partial class MainView : UserControl
         Toolbar.InsertDividerRequested += InsertDivider;
         Toolbar.InsertAttachmentRequested += async () => await InsertAttachmentAsync();
         Toolbar.InsertTableRequested += InsertTable;
+        Toolbar.InsertPdfRequested += async () => await InsertPdfAsync();
 
         // Section/page rename: double-click, the rename button, or right-click → Rename — all open
         // the zoomed rename overlay (the background blurs until the name is saved).
@@ -1401,6 +1402,34 @@ public partial class MainView : UserControl
         double y = CanvasScroll.Offset.Y / _canvasZoom + 40;
         PageCanvas.ImageRoot = vm.SelectedNotebookDir;
         PageCanvas.AddAttachment(rel, x, y);
+    }
+
+    /// <summary>Pick a PDF, attach it to the page (copied into the notebook), and open it straight
+    /// away in the in-app viewer/annotator — the discoverable one-step "open a PDF" path.</summary>
+    private async System.Threading.Tasks.Task InsertPdfAsync()
+    {
+        if (Vm is not { SelectedPage: not null } vm || TopLevel.GetTopLevel(this)?.StorageProvider is not { } sp) return;
+        var files = await sp.OpenFilePickerAsync(new Avalonia.Platform.Storage.FilePickerOpenOptions
+        {
+            Title = "Open a PDF", AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new Avalonia.Platform.Storage.FilePickerFileType("PDF") { Patterns = new[] { "*.pdf" } },
+            },
+        });
+        if (files.Count == 0 || files[0].TryGetLocalPath() is not { } path) return;
+        if (vm.ImportPageAsset(path) is not { } rel) return;
+        double x = CanvasScroll.Offset.X / _canvasZoom + 40;
+        double y = CanvasScroll.Offset.Y / _canvasZoom + 40;
+        PageCanvas.ImageRoot = vm.SelectedNotebookDir;
+        PageCanvas.AddAttachment(rel, x, y);
+        // Open it right away so the user sees the viewer without hunting for the double-click.
+        if (vm.SelectedNotebookDir is { } dir)
+        {
+            var full = System.IO.Path.Combine(dir, rel);
+            var viewer = new PdfViewerWindow(full);
+            if (Window is { } w) viewer.Show(w); else viewer.Show();
+        }
     }
 
     /// <summary>Drop a line divider ("h"/"v") on the current page, near the top-left of the view.</summary>
