@@ -1208,6 +1208,7 @@ public sealed class RichTextEditor : Control
     // =========================== mouse ===========================
 
     private bool _dragging;
+    private Point _pressPoint;      // where the last press landed — a near-still release on a link = "open it"
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
@@ -1215,6 +1216,7 @@ public sealed class RichTextEditor : Control
         var pt = e.GetPosition(this);
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         Focus();
+        _pressPoint = pt;
         var pos = PosFromPoint(pt);
 
         // Click on a checkbox in the gutter toggles it — ANY click count: rapid re-clicks arrive
@@ -1319,14 +1321,22 @@ public sealed class RichTextEditor : Control
             InvalidateVisual();
             return;
         }
-        // Checkboxes are clickable — show a pointing hand over them, the I-beam everywhere else.
-        Cursor = IsOverCheckbox(pt, out _) ? HandCursor : IbeamCursor;
+        // Checkboxes AND links are clickable — show a pointing hand over them, the I-beam elsewhere.
+        Cursor = IsOverCheckbox(pt, out _) || LinkAt(PosFromPoint(pt)) is not null ? HandCursor : IbeamCursor;
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
         if (_dragging) { _dragging = false; e.Pointer.Capture(null); }
+
+        // A clean click (no drag-select) on a link opens it — the discoverable path most note apps use;
+        // Ctrl+click already handled it on press, so skip when a modifier is down to avoid double-opening.
+        var pt = e.GetPosition(this);
+        if (!HasSelection && !e.KeyModifiers.HasFlag(KeyModifiers.Control) &&
+            Math.Abs(pt.X - _pressPoint.X) < 4 && Math.Abs(pt.Y - _pressPoint.Y) < 4 &&
+            LinkAt(PosFromPoint(pt)) is { } url)
+            OpenLink(url);
     }
 
     private static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c == '_';

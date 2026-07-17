@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Animation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
@@ -44,6 +45,8 @@ public partial class PdfViewer : UserControl
     // Move/resize drag state (Select tool): which annotation, which handle (0=whole, 1=start, 2=end),
     // the pointer origin and the annotation's original geometry.
     private PdfAnnotation? _drag;
+    private PdfAnnotation? _justAdded;      // set on create so its box pops in once
+    private PdfAnnotation? _editing;        // which note/text is in edit mode (TextBox) vs display (TextBlock)
     private int _dragHandle;
     private Point _dragStartPt;
     private (double X, double Y, double W, double H, double X2, double Y2) _dragOrig;
@@ -66,6 +69,11 @@ public partial class PdfViewer : UserControl
         ArrowTool.Click += (_, _) => SetTool(Tool.Arrow);
         ZoomIn.Click += (_, _) => SetZoom(_zoom * 1.2);
         ZoomOut.Click += (_, _) => SetZoom(_zoom / 1.2);
+        FmtBold.Click += (_, _) => ApplyFmt(a => a.Bold = FmtBold.IsChecked == true);
+        FmtItalic.Click += (_, _) => ApplyFmt(a => a.Italic = FmtItalic.IsChecked == true);
+        FmtUnder.Click += (_, _) => ApplyFmt(a => a.Underline = FmtUnder.IsChecked == true);
+        FmtStrike.Click += (_, _) => ApplyFmt(a => a.Strike = FmtStrike.IsChecked == true);
+        FmtBullet.Click += (_, _) => ApplyFmt(a => a.Text = ToggleBullets(a.Text));
         AddHandler(KeyDownEvent, OnKey, Avalonia.Interactivity.RoutingStrategies.Bubble);
     }
 
@@ -334,6 +342,8 @@ public partial class PdfViewer : UserControl
             Color = kind == PdfAnnotation.Note ? "#F2FFE9A8" : "#00000000",
         };
         _annos.Items.Add(a);
+        _justAdded = a;                  // makes DrawTextAnno pop it in
+        _editing = a;                    // fresh note/text opens ready to type
         Select(a);
         SaveNow();
         Dispatcher.UIThread.Post(() => FocusTextAnno(pv, a), DispatcherPriority.Background);
@@ -405,45 +415,90 @@ public partial class PdfViewer : UserControl
     private void DrawTextAnno(PageView pv, PdfAnnotation a, bool sel, bool sticky)
     {
         double w = pv.Overlay.Width, h = pv.Overlay.Height;
-        var tb = new TextBox
-        {
-            Text = a.Text ?? "", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
-            FontSize = 12.5 * _zoom, Background = Brushes.Transparent, BorderThickness = new Thickness(0),
-            Foreground = new SolidColorBrush(Color.Parse(sticky ? "#22160A" : "#111318")),
-            MinHeight = 0, Padding = new Thickness(6, 3), IsHitTestVisible = sel,
-        };
-        if (!sticky) tb.FontWeight = FontWeight.SemiBold;   // free text reads over the page
-        tb.TextChanged += (_, _) => { a.Text = tb.Text; SaveDebounced(); };
+        bool selected = ReferenceEquals(a, _selected);
+        var fg = new SolidColorBrush(Color.Parse(sticky ? "#22160A" : "#141821"));
+        var weight = a.Bold ? FontWeight.Bold : (sticky ? FontWeight.Normal : FontWeight.SemiBold);
+        var style = a.Italic ? FontStyle.Italic : FontStyle.Normal;
+        double fs = 12.5 * _zoom;
 
-        // A slim grip strip is the move handle; the text area below stays free for typing.
+        // Edit mode uses a TextBox (bold/italic show live); otherwise a TextBlock, which is the only
+        // control that renders underline/strikethrough. Clicking the box switches into edit mode.
+        Control content;
+        if (ReferenceEquals(a, _editing) && sel)
+        {
+            var tb = new TextBox
+            {
+                Text = a.Text ?? "", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
+                FontSize = fs, Background = Brushes.Transparent, BorderThickness = new Thickness(0),
+                Foreground = fg, MinHeight = 0, Padding = new Thickness(9, 5),
+                FontWeight = weight, FontStyle = style,
+            };
+            tb.TextChanged += (_, _) => { a.Text = tb.Text; SaveDebounced(); };
+            tb.LostFocus += (_, _) => { if (ReferenceEquals(_editing, a)) { _editing = null; RedrawPage(pv); } };
+            content = tb;
+        }
+        else
+        {
+            content = new TextBlock
+            {
+                Text = string.IsNullOrEmpty(a.Text) ? " " : a.Text, TextWrapping = TextWrapping.Wrap,
+                FontSize = fs, Foreground = fg, FontWeight = weight, FontStyle = style,
+                TextDecorations = TextDecorationsFor(a), Padding = new Thickness(9, 5),
+            };
+        }
+
+        // A slim grip strip up top is the move handle; the text area below stays free for typing.
         var grip = new Border
         {
-            Height = 12, Background = new SolidColorBrush(SolidColor(sticky ? "#66000000" : (ReferenceEquals(a, _selected) ? "#33000000" : "#00000000"))),
+            Height = 13, CornerRadius = new CornerRadius(9, 9, 0, 0),
+            Background = new SolidColorBrush(SolidColor(sticky ? "#40000000" : (selected ? "#26FFFFFF" : "#12FFFFFF"))),
             Cursor = new Cursor(StandardCursorType.SizeAll), IsHitTestVisible = sel,
         };
         DockPanel.SetDock(grip, Dock.Top);
         var stack = new DockPanel();
         stack.Children.Add(grip);
-        stack.Children.Add(tb);
+        stack.Children.Add(content);
 
         var box = new Border
         {
             Width = a.W * w, MinHeight = a.H * h,
-            Background = sticky ? new SolidColorBrush(Color.Parse(a.Color)) : new SolidColorBrush(SolidColor("#14FFFFFF")),
-            CornerRadius = new CornerRadius(sticky ? 6 : 4), Child = stack,
-            IsHitTestVisible = sel,
-            BoxShadow = sticky ? BoxShadows.Parse("0 2 8 0 #40000000") : default,
-            BorderThickness = new Thickness(ReferenceEquals(a, _selected) ? 2 : (sticky ? 0 : 1)),
-            BorderBrush = ReferenceEquals(a, _selected)
+            Background = sticky ? new SolidColorBrush(Color.Parse(a.Color)) : new SolidColorBrush(SolidColor("#F2FBFCFF")),
+            CornerRadius = new CornerRadius(9), Child = stack, IsHitTestVisible = sel,
+            BoxShadow = BoxShadows.Parse(selected ? "0 6 20 0 #66000000" : "0 3 12 0 #45000000"),
+            BorderThickness = new Thickness(selected ? 2 : 1),
+            BorderBrush = selected
                 ? this.FindResource("AccentBrush") as IBrush
-                : new SolidColorBrush(SolidColor("#33FFFFFF")),
+                : new SolidColorBrush(SolidColor(sticky ? "#33000000" : "#22000000")),
             Tag = a,
+            Transitions = new Transitions
+            {
+                new BoxShadowsTransition { Property = Border.BoxShadowProperty, Duration = TimeSpan.FromMilliseconds(140) },
+            },
         };
         Canvas.SetLeft(box, a.X * w); Canvas.SetTop(box, a.Y * h);
         grip.PointerPressed += (_, e) => { if (sel && Left(e, pv)) StartDrag(pv, a, 0, e); };
-        box.PointerPressed += (_, e) => { Select(a); e.Handled = true; };   // select; keep overlay from clearing it
+        box.PointerPressed += (_, e) =>
+        {
+            if (sel && !ReferenceEquals(_editing, a))   // first click: select + enter edit mode
+            {
+                _editing = a;
+                Select(a);
+                Dispatcher.UIThread.Post(() => FocusTextAnno(pv, a), DispatcherPriority.Background);
+            }
+            e.Handled = true;                           // stop the overlay from clearing the selection
+        };
         pv.Overlay.Children.Add(box);
-        if (ReferenceEquals(a, _selected) && sel) AddDeleteButton(pv, a, a.X * w + a.W * w, a.Y * h);
+        if (a == _justAdded) { _justAdded = null; Motion.ScaleIn(box, 0.9, Motion.Fast); }   // pop-in on create
+        if (selected && sel) AddDeleteButton(pv, a, a.X * w + a.W * w, a.Y * h);
+    }
+
+    private static TextDecorationCollection? TextDecorationsFor(PdfAnnotation a)
+    {
+        if (!a.Underline && !a.Strike) return null;
+        var d = new TextDecorationCollection();
+        if (a.Underline) d.Add(new TextDecoration { Location = TextDecorationLocation.Underline });
+        if (a.Strike) d.Add(new TextDecoration { Location = TextDecorationLocation.Strikethrough });
+        return d;
     }
 
     private void DrawArrow(PageView pv, PdfAnnotation a, bool sel)
@@ -537,7 +592,55 @@ public partial class PdfViewer : UserControl
     private void Select(PdfAnnotation? a)
     {
         _selected = a;
+        if (!ReferenceEquals(a, _editing)) _editing = null;   // selecting elsewhere leaves edit mode
+        UpdateFmtButtons();
         foreach (var pv in _pages) RedrawPage(pv);
+    }
+
+    // ---- whole-box text formatting for the selected note/text annotation ----
+    private void ApplyFmt(Action<PdfAnnotation> set)
+    {
+        if (_selected is not { } a || (a.Kind != PdfAnnotation.Note && a.Kind != PdfAnnotation.TextBox)) return;
+        set(a);
+        foreach (var pv in _pages) RedrawPage(pv);
+        UpdateFmtButtons();
+        SaveNow();
+    }
+
+    private void UpdateFmtButtons()
+    {
+        bool texty = _selected is { Kind: PdfAnnotation.Note or PdfAnnotation.TextBox };
+        FmtGroup.IsEnabled = texty;
+        var a = _selected;
+        FmtBold.IsChecked = texty && a!.Bold;
+        FmtItalic.IsChecked = texty && a!.Italic;
+        FmtUnder.IsChecked = texty && a!.Underline;
+        FmtStrike.IsChecked = texty && a!.Strike;
+        FmtBullet.IsChecked = texty && IsBulleted(a!.Text);
+    }
+
+    private static bool IsBulleted(string? text)
+    {
+        var lines = (text ?? "").Split('\n');
+        bool any = false;
+        foreach (var l in lines)
+            if (l.Trim().Length > 0) { any = true; if (!l.TrimStart().StartsWith("• ")) return false; }
+        return any;
+    }
+
+    /// <summary>Add "• " to every non-blank line, or strip it if all lines already have it.</summary>
+    private static string ToggleBullets(string? text)
+    {
+        var lines = (text ?? "").Split('\n');
+        bool bulleted = IsBulleted(text);
+        for (int i = 0; i < lines.Length; i++)
+        {
+            if (lines[i].Trim().Length == 0) continue;
+            lines[i] = bulleted
+                ? lines[i].Replace("• ", "", StringComparison.Ordinal)
+                : "• " + lines[i];
+        }
+        return string.Join('\n', lines);
     }
 
     private void OnKey(object? sender, KeyEventArgs e)

@@ -59,6 +59,22 @@ public class PdfAnnotationTests
     }
 
     [Fact]
+    public void RoundTrip_preservesTextFormattingFlags()
+    {
+        var doc = new PdfAnnotationDoc();
+        doc.Items.Add(new PdfAnnotation
+        {
+            Page = 0, Kind = PdfAnnotation.TextBox, X = 0.1, Y = 0.1, W = 0.3, H = 0.05,
+            Text = "styled", Bold = true, Italic = true, Underline = true, Strike = true,
+        });
+        var restored = PdfAnnotationDoc.FromJson(doc.ToJson()).Items[0];
+        Assert.True(restored.Bold);
+        Assert.True(restored.Italic);
+        Assert.True(restored.Underline);
+        Assert.True(restored.Strike);
+    }
+
+    [Fact]
     public void FromJson_blankOrCorrupt_yieldsEmpty_neverThrows()
     {
         Assert.Empty(PdfAnnotationDoc.FromJson(null).Items);

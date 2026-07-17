@@ -25,6 +25,11 @@ public sealed class PdfAnnotation
     [JsonPropertyName("y2")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double Y2 { get; set; }  // arrow end y
     [JsonPropertyName("color")] public string Color { get; set; } = "#66FFD54A";
     [JsonPropertyName("text")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Text { get; set; }
+    // Whole-box formatting for note / text annotations (M11).
+    [JsonPropertyName("b")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Bold { get; set; }
+    [JsonPropertyName("it")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Italic { get; set; }
+    [JsonPropertyName("u")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Underline { get; set; }
+    [JsonPropertyName("st")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Strike { get; set; }
 }
 
 /// <summary>The full set of a PDF's annotations, persisted as its sidecar (<c>&lt;name&gt;.lumenotes.json</c>).</summary>
