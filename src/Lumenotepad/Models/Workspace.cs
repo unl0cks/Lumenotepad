@@ -60,4 +60,7 @@ public sealed partial class Page : ObservableObject
     [ObservableProperty] private string? _gridStyle;
     [ObservableProperty] private string? _pageStyle;
     [ObservableProperty] private int _pageStyleMode;
+    /// <summary>When set (a path relative to the notebook folder, e.g. "assets/report.pdf"), this
+    /// page IS a PDF: the canvas embeds the PDF viewer/annotator instead of the note surface (M11).</summary>
+    [ObservableProperty] private string? _pdfPath;
 }

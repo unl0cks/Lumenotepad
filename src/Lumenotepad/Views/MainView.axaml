@@ -609,38 +609,13 @@
                         </Border>
                     </Panel>
                 </DockPanel>
+                <!-- PDF page: the viewer/annotator embeds right in the page box, replacing the note surface -->
+                <v:PdfViewer x:Name="PagePdfViewer" IsVisible="False" ClipToBounds="True"/>
                 </Panel>
             </Border>
             </Panel>
         </Grid>
         </DockPanel>
-
-        <!-- "Open as PDF" canvas takeover: renders the page/section as a PDF over the whole editor -->
-        <Border x:Name="PdfTakeover" IsVisible="False" Background="{DynamicResource CanvasBackgroundBrush}">
-            <DockPanel>
-                <Border DockPanel.Dock="Top" Background="{DynamicResource FrameBackgroundBrush}"
-                        BorderBrush="{DynamicResource FrameBorderBrush}" BorderThickness="0,0,0,1" Padding="12,8">
-                    <Grid ColumnDefinitions="Auto,*,Auto">
-                        <Button x:Name="PdfTakeoverBack" Theme="{StaticResource IconButton}" Width="32" Height="32"
-                                FontFamily="{StaticResource IconFont}" FontSize="15" Content="&#xE72B;"
-                                ToolTip.Tip="Back to editing"/>
-                        <TextBlock x:Name="PdfTakeoverTitle" Grid.Column="1" FontSize="13" FontWeight="SemiBold"
-                                   VerticalAlignment="Center" Margin="12,0,0,0" TextTrimming="CharacterEllipsis"/>
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                            <Button x:Name="PdfTakeoverZoomOut" Theme="{StaticResource IconButton}" Width="30" Height="30"
-                                    FontSize="15" Content="&#x2212;" ToolTip.Tip="Zoom out"/>
-                            <TextBlock x:Name="PdfTakeoverZoom" Text="100%" FontSize="12" Width="42" TextAlignment="Center"
-                                       VerticalAlignment="Center"/>
-                            <Button x:Name="PdfTakeoverZoomIn" Theme="{StaticResource IconButton}" Width="30" Height="30"
-                                    FontSize="15" Content="+" ToolTip.Tip="Zoom in"/>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-                <ScrollViewer x:Name="PdfTakeoverScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-                    <StackPanel x:Name="PdfTakeoverPages" Spacing="16" Margin="16" HorizontalAlignment="Center"/>
-                </ScrollViewer>
-            </DockPanel>
-        </Border>
 
         </Panel>
     </Grid>

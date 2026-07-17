@@ -73,9 +73,6 @@ public partial class MainView : UserControl
         SectionsAddBtn.Click += (_, _) => OpenSectionsMenu(SectionsAddBtn);
         SideSectionsAddBtn.Click += (_, _) => OpenSectionsMenu(SideSectionsAddBtn);
         PagesAddBtn.Click += (_, _) => OpenPagesMenu(PagesAddBtn);
-        PdfTakeoverBack.Click += (_, _) => CloseTakeover();
-        PdfTakeoverZoomIn.Click += (_, _) => SetTakeoverZoom(_takeoverZoom * 1.2);
-        PdfTakeoverZoomOut.Click += (_, _) => SetTakeoverZoom(_takeoverZoom / 1.2);
         HistoryBtn.Click += (_, _) =>
         {
             TrashPanel.IsVisible = !TrashPanel.IsVisible;
@@ -530,6 +527,7 @@ public partial class MainView : UserControl
             ApplyBulletPrefs(rebuild: false);
             ApplyEditorPrefs(rebuild: false);
             SyncEditorDocument();
+            ApplyPdfPage();     // show the embedded viewer if the startup page is a PDF
             ApplyToolbarPlacement();
             ApplyCanvasPrefs();
             ApplyPaperTint();
@@ -856,9 +854,13 @@ public partial class MainView : UserControl
 
         if (e.PropertyName == nameof(MainViewModel.SelectedPage))
         {
-            // Fade the current page out, THEN swap + rise the new one in (SyncEditorDocument does the swap).
-            if (PageCanvas.Document is not null) Motion.FadeOut(PageDock, Motion.Fast, SyncEditorDocument);
-            else SyncEditorDocument();
+            ApplyPdfPage();     // PDF page → embedded viewer; note page → the canvas below
+            if (string.IsNullOrEmpty(Vm?.SelectedPage?.PdfPath))
+            {
+                // Fade the current page out, THEN swap + rise the new one in (SyncEditorDocument does the swap).
+                if (PageCanvas.Document is not null) Motion.FadeOut(PageDock, Motion.Fast, SyncEditorDocument);
+                else SyncEditorDocument();
+            }
         }
         else if (e.PropertyName is nameof(MainViewModel.ToolbarPosition) or nameof(MainViewModel.ToolbarScope))
             ApplyToolbarPlacement();
@@ -1451,7 +1453,7 @@ public partial class MainView : UserControl
         }
     }
 
-    // ---- section / page "+" menus (add · rearrange · open as PDF) ----
+    // ---- section / page "+" menus (add · rearrange · open a PDF as page/section) ----
     private void OpenSectionsMenu(Control anchor)
     {
         if (Vm is not { SelectedNotebook: { } nb }) return;
@@ -1472,8 +1474,7 @@ public partial class MainView : UserControl
             Vm.Save();
         }, nb.Sections.Count > 1);
         menu.Items.Add(new Separator());
-        Item("Open section as PDF", () => { if (Vm.SelectedSection is { } sec) OpenSectionAsPdf(sec); },
-            Vm.SelectedSection is { Pages.Count: > 0 });
+        Item("Open a PDF as a section…", async () => await OpenPdfAsSection());
         MenuFx.Attach(menu);
         menu.Open(anchor);
     }
@@ -1498,95 +1499,61 @@ public partial class MainView : UserControl
             Vm.Save();
         }, sec.Pages.Count > 1);
         menu.Items.Add(new Separator());
-        Item("Open page as PDF", () => { if (Vm.SelectedPage is { } pg) OpenPageAsPdf(pg); },
-            Vm.SelectedPage is not null);
+        Item("Open a PDF as a page…", async () => await OpenPdfAsPage());
         MenuFx.Attach(menu);
         menu.Open(anchor);
     }
 
-    // ---- "Open as PDF" canvas takeover (view-only, rendered with PDFium) ----
-    private byte[]? _takeoverPdf;
-    private double _takeoverZoom = 1.0;
-    private readonly System.Collections.Generic.List<(Border Frame, double WPt, double HPt)> _takeoverPages = new();
-
-    private void OpenPageAsPdf(Models.Page pg)
+    // ---- open a PDF file as a dedicated page/section (the page IS the PDF, edited inline) ----
+    private async System.Threading.Tasks.Task<string?> PickAndImportPdf()
     {
-        if (Vm is not { } vm) return;
-        vm.FlushDirtyDocs();
-        var title = string.IsNullOrWhiteSpace(pg.Title) ? "Untitled" : pg.Title;
-        var pdf = Services.PageExport.ToPdfMulti(new[] { (title, vm.DocumentFor(pg)) }, vm.SelectedNotebookDir);
-        RenderTakeover(pdf, title);
-    }
-
-    private void OpenSectionAsPdf(Models.Section sec)
-    {
-        if (Vm is not { } vm) return;
-        vm.FlushDirtyDocs();
-        var items = sec.Pages
-            .Select(p => (string.IsNullOrWhiteSpace(p.Title) ? "Untitled" : p.Title, vm.DocumentFor(p)))
-            .ToList();
-        if (items.Count == 0) return;
-        var pdf = Services.PageExport.ToPdfMulti(items, vm.SelectedNotebookDir);
-        RenderTakeover(pdf, sec.Name);
-    }
-
-    private async void RenderTakeover(byte[] pdf, string title)
-    {
-        _takeoverPdf = pdf;
-        _takeoverZoom = 1.0;
-        _takeoverPages.Clear();
-        PdfTakeoverTitle.Text = title;
-        PdfTakeoverZoom.Text = "100%";
-        PdfTakeoverPages.Children.Clear();
-        PdfTakeover.IsVisible = true;
-        Motion.FadeIn(PdfTakeover, Motion.Fast);
-
-        int count = Services.PdfRenderer.PageCount(pdf);
-        var sizes = Services.PdfRenderer.PageSizes(pdf);
-        if (count == 0 || sizes.Count == 0) return;
-        const double pxPerPt = 130.0 / 72.0;
-        for (int i = 0; i < count; i++)
+        if (Vm is not { } vm || TopLevel.GetTopLevel(this)?.StorageProvider is not { } sp) return null;
+        var files = await sp.OpenFilePickerAsync(new Avalonia.Platform.Storage.FilePickerOpenOptions
         {
-            var (wpt, hpt) = sizes[i];
-            var img = new Image { Stretch = Stretch.Fill };
-            var frame = new Border
-            {
-                Background = Brushes.White, Child = img,
-                BoxShadow = BoxShadows.Parse("0 4 18 0 #55000000"),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Width = wpt * pxPerPt, Height = hpt * pxPerPt,
-            };
-            PdfTakeoverPages.Children.Add(frame);
-            _takeoverPages.Add((frame, wpt, hpt));
-        }
-        for (int i = 0; i < count; i++)
-        {
-            int page = i;
-            var bmp = await System.Threading.Tasks.Task.Run(() => Services.PdfRenderer.RenderPage(pdf, page, 130f));
-            if (bmp is not null && PdfTakeover.IsVisible && page < _takeoverPages.Count
-                && _takeoverPages[page].Frame.Child is Image im)
-                im.Source = bmp;
-        }
+            Title = "Open a PDF", AllowMultiple = false,
+            FileTypeFilter = new[] { new Avalonia.Platform.Storage.FilePickerFileType("PDF") { Patterns = new[] { "*.pdf" } } },
+        });
+        if (files.Count == 0 || files[0].TryGetLocalPath() is not { } path) return null;
+        return vm.ImportPageAsset(path);        // copies into the notebook's assets, returns the relative path
     }
 
-    private void SetTakeoverZoom(double z)
+    private async System.Threading.Tasks.Task OpenPdfAsPage()
     {
-        _takeoverZoom = System.Math.Clamp(z, 0.4, 3.0);
-        PdfTakeoverZoom.Text = $"{System.Math.Round(_takeoverZoom * 100)}%";
-        const double pxPerPt = 130.0 / 72.0;
-        foreach (var (frame, wpt, hpt) in _takeoverPages)
-        {
-            frame.Width = wpt * pxPerPt * _takeoverZoom;
-            frame.Height = hpt * pxPerPt * _takeoverZoom;
-        }
+        if (Vm is not { SelectedSection: { } sec } vm) return;
+        if (await PickAndImportPdf() is not { } rel) return;
+        var pg = new Models.Page { Title = System.IO.Path.GetFileNameWithoutExtension(rel), PdfPath = rel };
+        sec.Pages.Add(pg);
+        vm.SelectedPage = pg;
+        vm.Save();
     }
 
-    private void CloseTakeover()
+    private async System.Threading.Tasks.Task OpenPdfAsSection()
     {
-        PdfTakeover.IsVisible = false;
-        PdfTakeoverPages.Children.Clear();
-        _takeoverPages.Clear();
-        _takeoverPdf = null;
+        if (Vm is not { SelectedNotebook: { } nb } vm) return;
+        if (await PickAndImportPdf() is not { } rel) return;
+        var name = System.IO.Path.GetFileNameWithoutExtension(rel);
+        var sec = new Models.Section { Name = name };
+        sec.Pages.Add(new Models.Page { Title = name, PdfPath = rel });
+        nb.Sections.Add(sec);
+        vm.SelectedSection = sec;
+        vm.SelectedPage = sec.Pages[0];
+        vm.Save();
+    }
+
+    /// <summary>Show the embedded PDF viewer in the page box when the selected page is a PDF, else the
+    /// note canvas. Called whenever the selected page changes.</summary>
+    private void ApplyPdfPage()
+    {
+        PagePdfViewer.Flush();      // persist any annotations from the outgoing PDF page
+        var rel = Vm?.SelectedPage?.PdfPath;
+        bool isPdf = !string.IsNullOrEmpty(rel) && Vm?.SelectedNotebookDir is { };
+        PageDock.IsVisible = !isPdf;
+        PagePdfViewer.IsVisible = isPdf;
+        if (isPdf)
+        {
+            var full = System.IO.Path.Combine(Vm!.SelectedNotebookDir!, rel!);
+            PagePdfViewer.Load(full, Vm!.DoubleClickCreate);
+        }
     }
 
     /// <summary>Drop a line divider ("h"/"v") on the current page, near the top-left of the view.</summary>

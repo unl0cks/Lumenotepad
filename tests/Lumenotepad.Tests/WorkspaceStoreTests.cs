@@ -42,6 +42,28 @@ public class WorkspaceStoreTests
     }
 
     [Fact]
+    public void PdfPage_pathRoundTrips()
+    {
+        var dir = TempDir();
+        try
+        {
+            var store = new WorkspaceStore(dir);
+            var ws = new Workspace();
+            var nb = new Notebook { Name = "N" };
+            var sec = new Section { Name = "S" };
+            sec.Pages.Add(new Page { Title = "report", PdfPath = "assets/report.pdf" });
+            nb.Sections.Add(sec);
+            ws.Notebooks.Add(nb);
+
+            store.Save(ws);
+            var loaded = new WorkspaceStore(dir).Load();
+
+            Assert.Equal("assets/report.pdf", loaded.Notebooks[0].Sections[0].Pages[0].PdfPath);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public void LoadOrSeed_onEmpty_createsDefault_andPersists()
     {
         var dir = TempDir();
