@@ -78,6 +78,17 @@ public sealed class NoteCanvas : Panel
         _doc.CommitGeometry();                 // persist with the attachment path set
     }
 
+    /// <summary>Insert a table box (M11): a rows×cols grid of rich-text cells, focused on the first cell.</summary>
+    public void AddTable(int rows, int cols, double x, double y)
+    {
+        if (_doc is null) return;
+        if (SnapToGrid) { x = Math.Max(0, GridMath.Snap(x)); y = Math.Max(0, GridMath.Snap(y)); }
+        double width = Math.Clamp(cols * 130, NoteBox.MinWidth, 940);
+        var view = AddBoxView(_doc.AddTableBox(x, y, rows, cols, width));
+        Dispatcher.UIThread.Post(view.FocusEditor, DispatcherPriority.Background);
+        _doc.CommitGeometry();
+    }
+
     /// <summary>Insert a line divider: "h" (horizontal rule) or "v" (vertical rule) — a movable
     /// strip whose single resize handle stretches the line longer or shorter.</summary>
     public void AddDivider(string orientation, double x, double y)
@@ -371,6 +382,10 @@ internal sealed class NoteBoxView : Panel
     private readonly Border _resizeCorner;
     private bool _hover;
 
+    // Table box (M11): the grid host + its cell editors in row-major order (rebuilt on structural edits).
+    private Border? _tableHost;
+    private readonly System.Collections.Generic.List<RichTextEditor> _cellEditors = new();
+
     public NoteBoxView(NoteCanvas canvas, NoteBox box)
     {
         _canvas = canvas;
@@ -384,17 +399,7 @@ internal sealed class NoteBoxView : Panel
         GripBarFill = B(t.NoteGripBar);
         CloseFg = B(Services.ThemePalettes.Alpha(t.PaperText, 0x8C));
 
-        Editor = new RichTextEditor
-        {
-            Document = box.Doc, Margin = new Thickness(10, 3, 10, 9),
-            Foreground = B(t.PaperText),
-            CaretBrush = B(RichTextEditor.CaretColorOverride ?? t.Accent),
-            LinkBrush = B(t.Accent),
-            SelectionBrush = B(t.FieldSelection),
-            FontFamily = Services.AppFonts.Family(RichTextEditor.EditorFontPref),
-            FontSize = Math.Clamp(RichTextEditor.EditorFontSizePref, 11, 24),
-            ParagraphSpacing = 4 * Math.Clamp(RichTextEditor.ParagraphSpacingScalePref, 0.5, 3),
-        };
+        Editor = MakeEditor(box.Doc, new Thickness(10, 3, 10, 9));
 
         _gripBar = new Border
         {
@@ -427,6 +432,11 @@ internal sealed class NoteBoxView : Panel
                 body.Children.Add(BuildImage(box.ImagePath));   // image box: picture instead of the editor
             else if (box.AttachPath is { Length: > 0 })
                 body.Children.Add(BuildAttachment(box.AttachPath));   // attachment box: file chip
+            else if (box.Table is not null)
+            {
+                _tableHost = new Border { Child = BuildTableGrid() };   // table box: grid of cell editors
+                body.Children.Add(_tableHost);
+            }
             else
                 body.Children.Add(Editor);
         }
@@ -481,8 +491,8 @@ internal sealed class NoteBoxView : Panel
 
         PointerEntered += (_, _) => { _hover = true; RefreshChrome(); };
         PointerExited += (_, _) => { _hover = false; RefreshChrome(); };
-        // Image/divider/attachment boxes have no editor to focus / evaporate.
-        if (box.ImagePath is null && box.Divider is null && box.AttachPath is null)
+        // Image/divider/attachment/table boxes don't use the single main editor to focus / evaporate.
+        if (box.ImagePath is null && box.Divider is null && box.AttachPath is null && box.Table is null)
         {
             Editor.GotFocus += (_, _) => { _canvas.SetActive(Editor); RefreshChrome(); };
             Editor.LostFocus += (_, _) => { RefreshChrome(); _canvas.OnEditorLostFocus(this); };
@@ -514,7 +524,120 @@ internal sealed class NoteBoxView : Panel
     }
 
     internal void FocusEditor()
-    { if (Box.ImagePath is null && Box.Divider is null && Box.AttachPath is null) Editor.Focus(); }
+    {
+        if (Box.Table is not null) { if (_cellEditors.Count > 0) _cellEditors[0].Focus(); return; }
+        if (Box.ImagePath is null && Box.Divider is null && Box.AttachPath is null) Editor.Focus();
+    }
+
+    /// <summary>Build a note editor (main box or a table cell) with the paper-region theme brushes
+    /// and the user's font/spacing prefs.</summary>
+    private RichTextEditor MakeEditor(RichDocument doc, Thickness margin)
+    {
+        var t = Services.ThemeManager.Current;
+        static IBrush B(string hex) => new SolidColorBrush(Color.Parse(hex));
+        return new RichTextEditor
+        {
+            Document = doc, Margin = margin,
+            Foreground = B(t.PaperText),
+            CaretBrush = B(RichTextEditor.CaretColorOverride ?? t.Accent),
+            LinkBrush = B(t.Accent),
+            SelectionBrush = B(t.FieldSelection),
+            FontFamily = Services.AppFonts.Family(RichTextEditor.EditorFontPref),
+            FontSize = Math.Clamp(RichTextEditor.EditorFontSizePref, 11, 24),
+            ParagraphSpacing = 4 * Math.Clamp(RichTextEditor.ParagraphSpacingScalePref, 0.5, 3),
+        };
+    }
+
+    /// <summary>Build the table's cell grid: equal-width columns, auto-height rows, hairline gridlines,
+    /// a rich-text editor per cell. Rebuilt whenever rows/columns are added or removed.</summary>
+    private Control BuildTableGrid()
+    {
+        _cellEditors.Clear();
+        var table = Box.Table!;
+        var line = new SolidColorBrush(Color.Parse(Services.ThemePalettes.Alpha(
+            Services.ThemeManager.Current.PaperText, 0x30)));
+
+        var grid = new Grid();
+        for (int c = 0; c < table.ColCount; c++)
+            grid.ColumnDefinitions.Add(new ColumnDefinition(1, GridUnitType.Star));
+        for (int r = 0; r < table.RowCount; r++)
+            grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+
+        for (int r = 0; r < table.RowCount; r++)
+            for (int c = 0; c < table.ColCount; c++)
+            {
+                var ed = MakeEditor(table.Rows[r][c], new Thickness(7, 5, 7, 5));
+                int rr = r, cc = c;
+                ed.GotFocus += (_, _) => { _canvas.SetActive(ed); RefreshChrome(); };
+                ed.AddHandler(InputElement.KeyDownEvent, (_, e) => OnCellKey(e, rr, cc), Avalonia.Interactivity.RoutingStrategies.Tunnel);
+                _cellEditors.Add(ed);
+
+                var cell = new Border
+                {
+                    BorderBrush = line, BorderThickness = new Thickness(0, 0, 1, 1), Child = ed,
+                };
+                cell.ContextRequested += (_, e) => { OpenCellMenu(cell, rr, cc); e.Handled = true; };
+                Grid.SetRow(cell, r);
+                Grid.SetColumn(cell, c);
+                grid.Children.Add(cell);
+            }
+
+        // Outer border closes the top + left edges the per-cell borders leave open.
+        return new Border
+        {
+            BorderBrush = line, BorderThickness = new Thickness(1, 1, 0, 0),
+            Child = grid, Margin = new Thickness(8, 3, 8, 9),
+        };
+    }
+
+    private void RebuildTable()
+    {
+        if (_tableHost is null) return;
+        _tableHost.Child = BuildTableGrid();
+        _canvas.InvalidateMeasure();
+    }
+
+    /// <summary>Tab / Shift+Tab walk the cells in reading order; Tab off the last cell grows a new row.</summary>
+    private void OnCellKey(Avalonia.Input.KeyEventArgs e, int r, int c)
+    {
+        if (e.Key != Key.Tab || Box.Table is null) return;
+        int idx = r * Box.Table.ColCount + c;
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+        {
+            if (idx > 0) { _cellEditors[idx - 1].Focus(); e.Handled = true; }
+        }
+        else if (idx < _cellEditors.Count - 1)
+        {
+            _cellEditors[idx + 1].Focus(); e.Handled = true;
+        }
+        else
+        {
+            _canvas.Document?.TableInsertRow(Box, -1);
+            RebuildTable();
+            if (idx + 1 < _cellEditors.Count) _cellEditors[idx + 1].Focus();
+            e.Handled = true;
+        }
+    }
+
+    private void OpenCellMenu(Control target, int r, int c)
+    {
+        var menu = new ContextMenu();
+        void Item(string header, Action act)
+        {
+            var m = new MenuItem { Header = header };
+            m.Click += (_, _) => act();
+            menu.Items.Add(m);
+        }
+        Item("Insert row above", () => { _canvas.Document?.TableInsertRow(Box, r); RebuildTable(); });
+        Item("Insert row below", () => { _canvas.Document?.TableInsertRow(Box, r + 1); RebuildTable(); });
+        Item("Insert column left", () => { _canvas.Document?.TableInsertColumn(Box, c); RebuildTable(); });
+        Item("Insert column right", () => { _canvas.Document?.TableInsertColumn(Box, c + 1); RebuildTable(); });
+        menu.Items.Add(new Separator());
+        Item("Delete row", () => { _canvas.Document?.TableRemoveRow(Box, r); RebuildTable(); });
+        Item("Delete column", () => { _canvas.Document?.TableRemoveColumn(Box, c); RebuildTable(); });
+        Views.MenuFx.Attach(menu);
+        menu.Open(target);
+    }
 
     /// <summary>The picture control for an image box, loaded from ImageRoot + the box's relative path.</summary>
     private Control BuildImage(string relPath)

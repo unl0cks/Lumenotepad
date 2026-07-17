@@ -59,6 +59,57 @@ public static class PageExport
 
     private static string AttachName(NoteBox b) => Path.GetFileName(b.AttachPath ?? "");
 
+    /// <summary>A table cell's plain text (newlines flattened to spaces) for the text-family exports.</summary>
+    private static string CellText(RichDocument cell) => cell.GetText().Replace('\n', ' ').Trim();
+
+    /// <summary>A GitHub-style Markdown table (first row treated as the header).</summary>
+    private static string MarkdownTable(NoteTable t)
+    {
+        string Row(IEnumerable<string> cells) => "| " + string.Join(" | ", cells) + " |";
+        var lines = new List<string>();
+        lines.Add(Row(t.Rows[0].Select(c => CellText(c).Replace("|", "\\|"))));
+        lines.Add("| " + string.Join(" | ", Enumerable.Repeat("---", t.ColCount)) + " |");
+        foreach (var row in t.Rows.Skip(1))
+            lines.Add(Row(row.Select(c => CellText(c).Replace("|", "\\|"))));
+        return string.Join("\n", lines);
+    }
+
+    /// <summary>A monospaced plain-text table with padded columns (TXT export).</summary>
+    private static string TextTable(NoteTable t)
+    {
+        var cells = t.Rows.Select(r => r.Select(CellText).ToList()).ToList();
+        var widths = new int[t.ColCount];
+        for (int c = 0; c < t.ColCount; c++)
+            widths[c] = Math.Max(1, cells.Max(r => r[c].Length));
+        var sb = new StringBuilder();
+        void Line() => sb.Append('+').Append(string.Join("+", widths.Select(w => new string('-', w + 2)))).Append('+').Append('\n');
+        Line();
+        foreach (var row in cells)
+        {
+            sb.Append("| ");
+            for (int c = 0; c < t.ColCount; c++) sb.Append(row[c].PadRight(widths[c])).Append(" | ");
+            sb.Append('\n');
+            Line();
+        }
+        return sb.ToString();
+    }
+
+    private static string HtmlTable(NoteTable t)
+    {
+        var sb = new StringBuilder("<table class=\"grid\">\n");
+        foreach (var row in t.Rows)
+        {
+            sb.Append("<tr>");
+            foreach (var cell in row) sb.Append("<td>").Append(InlineHtmlCell(cell)).Append("</td>");
+            sb.Append("</tr>\n");
+        }
+        return sb.Append("</table>\n").ToString();
+    }
+
+    /// <summary>A table cell's rich inline HTML (its paragraphs joined by &lt;br&gt;).</summary>
+    private static string InlineHtmlCell(RichDocument cell) =>
+        string.Join("<br>", cell.Paragraphs.Select(InlineHtml));
+
     /// <summary>Plain-text marker for a tagged paragraph (TXT/MD; HTML gets the colored glyph).</summary>
     private static string TagMark(Paragraph p) => p.Tag switch
     {
@@ -80,6 +131,7 @@ public static class PageExport
         foreach (var box in Boxes(doc))
         {
             if (box.Divider is not null) { sb.AppendLine(new string('-', 24)).AppendLine(); continue; }
+            if (box.Table is { } tt) { sb.Append(TextTable(tt)).AppendLine(); continue; }
             if (box.AttachPath is { Length: > 0 }) { sb.AppendLine("Attachment: " + AttachName(box)).AppendLine(); continue; }
             if (box.ImagePath is not null) continue;   // pictures can't ride along in plain text
             int num = 0;
@@ -106,6 +158,7 @@ public static class PageExport
         foreach (var box in Boxes(doc))
         {
             if (box.Divider is not null) { blocks.Add("---"); continue; }
+            if (box.Table is { } tt) { blocks.Add(MarkdownTable(tt)); continue; }
             if (box.AttachPath is { Length: > 0 }) { blocks.Add("**Attachment:** " + AttachName(box)); continue; }
             if (box.ImagePath is not null) continue;   // the .md leaves the notebook — no path survives
             var lines = new List<string>();
@@ -158,6 +211,7 @@ public static class PageExport
         foreach (var box in Boxes(doc))
         {
             if (box.Divider is not null) { body.Append("<hr/>\n"); continue; }   // self-closed: EPUB is XHTML
+            if (box.Table is { } tt) { body.Append(HtmlTable(tt)); continue; }
             if (box.AttachPath is { Length: > 0 })
             { body.Append("<p class=\"attachment\">📎 ").Append(Esc(AttachName(box))).Append("</p>\n"); continue; }
             if (box.ImagePath is not null) continue;
@@ -173,7 +227,8 @@ public static class PageExport
 
     private const string HtmlCss =
         "body{font-family:Segoe UI,system-ui,sans-serif;max-width:820px;margin:40px auto;padding:0 24px;line-height:1.5;}" +
-        "ul{list-style:disc;}ul.tasklist{list-style:none;padding-left:1em;}li{margin:2px 0;}a{color:#2f6fc4;}";
+        "ul{list-style:disc;}ul.tasklist{list-style:none;padding-left:1em;}li{margin:2px 0;}a{color:#2f6fc4;}" +
+        "table.grid{border-collapse:collapse;margin:12px 0;}table.grid td{border:1px solid #bbb;padding:5px 9px;vertical-align:top;}";
 
     private static void AppendHtmlParagraphs(StringBuilder body, RichDocument d)
     {
@@ -262,6 +317,13 @@ public static class PageExport
         foreach (var box in Boxes(doc))
         {
             if (box.Divider is not null) { sb.Append(@"\ql ").Append(new string('_', 32)).Append(@"\par\par"); continue; }
+            if (box.Table is { } tt)
+            {
+                foreach (var row in tt.Rows)
+                    sb.Append(@"\ql ").Append(RtfEsc(string.Join("   |   ", row.Select(CellText)))).Append(@"\par");
+                sb.Append(@"\par");
+                continue;
+            }
             if (box.AttachPath is { Length: > 0 })
             { sb.Append(@"\ql\i Attachment: ").Append(RtfEsc(AttachName(box))).Append(@"\i0\par\par"); continue; }
             if (box.ImagePath is not null) continue;
@@ -386,6 +448,7 @@ public static class PageExport
             foreach (var box in Boxes(doc))
             {
                 if (box.Divider is not null) { DrawDivider(box); continue; }
+                if (box.Table is { } tbl) { DrawTable(tbl); continue; }
                 if (box.ImagePath is { Length: > 0 }) { DrawImage(box); continue; }
                 if (box.AttachPath is { Length: > 0 })
                 {
@@ -442,6 +505,41 @@ public static class PageExport
                 y += 8;
             }
             pdf.EndPage();
+
+            // A drawn table grid: equal columns across the content width, one line per cell (trimmed
+            // with an ellipsis if it overflows), hairline borders.
+            void DrawTable(NoteTable t)
+            {
+                float colW = MaxW / t.ColCount;
+                const float rowH = 22f, pad = 5f;
+                using var cellPaint = MakePaint(false, false, false, 11);
+                using var grid = new SkiaSharp.SKPaint
+                {
+                    Style = SkiaSharp.SKPaintStyle.Stroke, StrokeWidth = 0.8f,
+                    Color = new SkiaSharp.SKColor(0x99, 0x99, 0x99), IsAntialias = true,
+                };
+                foreach (var row in t.Rows)
+                {
+                    EnsureRoom(rowH + 2);
+                    float top = y - 12;
+                    for (int c = 0; c < t.ColCount; c++)
+                    {
+                        float cx = Margin + c * colW;
+                        canvas.DrawRect(new SkiaSharp.SKRect(cx, top, cx + colW, top + rowH), grid);
+                        canvas.DrawText(TrimToWidth(CellText(row[c]), cellPaint, colW - pad * 2),
+                                        cx + pad, top + rowH - 7, cellPaint);
+                    }
+                    y += rowH;
+                }
+                y += 12;
+            }
+
+            static string TrimToWidth(string s, SkiaSharp.SKPaint p, float maxW)
+            {
+                if (p.MeasureText(s) <= maxW) return s;
+                while (s.Length > 1 && p.MeasureText(s + "…") > maxW) s = s[..^1];
+                return s + "…";
+            }
 
             // A drawn rule matching the on-page divider: horizontal at its own length, vertical as
             // a centered column stroke (reading order can't keep true side-by-side placement).
@@ -518,6 +616,12 @@ public static class PageExport
         foreach (var box in Boxes(doc))
         {
             if (box.Divider is not null) { body.Append(DocxParagraph(new string('—', 12), TextAlign.Left, 22, false, null)); continue; }
+            if (box.Table is { } tt)
+            {
+                foreach (var row in tt.Rows)
+                    body.Append(DocxParagraph(string.Join("   |   ", row.Select(CellText)), TextAlign.Left, 22, false, null));
+                continue;
+            }
             if (box.AttachPath is { Length: > 0 }) { body.Append(DocxParagraph("Attachment: " + AttachName(box), TextAlign.Left, 22, false, null)); continue; }
             if (box.ImagePath is not null) continue;
             foreach (var p in box.Doc.Paragraphs)
@@ -593,6 +697,12 @@ public static class PageExport
         foreach (var box in Boxes(doc))
         {
             if (box.Divider is not null) { content.Append($"<text:p>{new string('—', 12)}</text:p>"); continue; }
+            if (box.Table is { } tt)
+            {
+                foreach (var row in tt.Rows)
+                    content.Append($"<text:p>{Esc(string.Join("   |   ", row.Select(CellText)))}</text:p>");
+                continue;
+            }
             if (box.AttachPath is { Length: > 0 }) { content.Append($"<text:p>Attachment: {Esc(AttachName(box))}</text:p>"); continue; }
             if (box.ImagePath is not null) continue;
             foreach (var p in box.Doc.Paragraphs)

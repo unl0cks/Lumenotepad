@@ -3,6 +3,7 @@ using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.VisualTree;
@@ -62,6 +63,9 @@ public partial class FormatToolbar : UserControl
     /// <summary>Raised by the attach button — MainView picks a file and drops an attachment chip on the page.</summary>
     public event Action? InsertAttachmentRequested;
 
+    /// <summary>Raised by the table size picker (rows, cols) — MainView drops a table box on the page.</summary>
+    public event Action<int, int>? InsertTableRequested;
+
     public RichTextEditor? Target
     {
         get => _target;
@@ -105,6 +109,7 @@ public partial class FormatToolbar : UserControl
         BuildTypeChoices();
         BuildDividerChoices();
         BuildTagChoices();
+        BuildTableSizePicker();
         SizeMinus.Click += (_, _) => NudgeSize(-1);
         SizePlus.Click += (_, _) => NudgeSize(+1);
         SizeBox.KeyDown += (_, e) =>
@@ -154,7 +159,7 @@ public partial class FormatToolbar : UserControl
             Dock.Bottom => PlacementMode.Top,
             _ => PlacementMode.Bottom,
         };
-        foreach (var b in new[] { BulletBtn, HighlightBtn, ColorBtn, FontBtn, TypeBtn, AlignBtn, DividerBtn, TagBtn })
+        foreach (var b in new[] { BulletBtn, HighlightBtn, ColorBtn, FontBtn, TypeBtn, AlignBtn, DividerBtn, TagBtn, TableBtn })
             if (b.Flyout is PopupFlyoutBase pf) pf.Placement = placement;
         if (DockBtn.Flyout is PopupFlyoutBase df) df.Placement = placement;
 
@@ -367,6 +372,45 @@ public partial class FormatToolbar : UserControl
             b.Click += (_, _) => { Do(e => e.SetTag(key)); TagBtn.Flyout?.Hide(); };
             TagChoices.Children.Add(b);
         }
+    }
+
+    // ---- table insert: a hover-to-size grid picker (rows × cols) ----
+    private const int TblMaxRows = 6, TblMaxCols = 8;
+    private Border[,]? _tblCells;
+
+    private void BuildTableSizePicker()
+    {
+        for (int c = 0; c < TblMaxCols; c++) TableSizeGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+        for (int r = 0; r < TblMaxRows; r++) TableSizeGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        _tblCells = new Border[TblMaxRows, TblMaxCols];
+        var frame = (IBrush)Application.Current!.FindResource("FrameBorderBrush")!;
+        for (int r = 0; r < TblMaxRows; r++)
+            for (int c = 0; c < TblMaxCols; c++)
+            {
+                var cell = new Border
+                {
+                    Width = 18, Height = 18, Margin = new Thickness(1),
+                    BorderBrush = frame, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(3),
+                    Background = Brushes.Transparent, Cursor = new Cursor(StandardCursorType.Hand),
+                };
+                int rr = r, cc = c;
+                cell.PointerEntered += (_, _) => HighlightTableSize(rr, cc);
+                cell.PointerPressed += (_, _) => { InsertTableRequested?.Invoke(rr + 1, cc + 1); TableBtn.Flyout?.Hide(); };
+                Grid.SetRow(cell, r);
+                Grid.SetColumn(cell, c);
+                TableSizeGrid.Children.Add(cell);
+                _tblCells[r, c] = cell;
+            }
+    }
+
+    private void HighlightTableSize(int r, int c)
+    {
+        if (_tblCells is null) return;
+        var accent = (IBrush)Application.Current!.FindResource("AccentSoftBrush")!;
+        for (int i = 0; i < TblMaxRows; i++)
+            for (int j = 0; j < TblMaxCols; j++)
+                _tblCells[i, j].Background = i <= r && j <= c ? accent : Brushes.Transparent;
+        TableSizeLabel.Text = $"{r + 1} × {c + 1}";
     }
 
     private void BuildDividerChoices()

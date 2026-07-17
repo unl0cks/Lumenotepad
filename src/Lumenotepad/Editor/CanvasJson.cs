@@ -23,6 +23,8 @@ public static class CanvasDocJson
         [JsonPropertyName("img")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Img { get; set; }
         [JsonPropertyName("div")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Div { get; set; }
         [JsonPropertyName("att")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Att { get; set; }
+        /// <summary>Table cells, row-major: <c>Tbl[row][col]</c> is a cell's paragraphs.</summary>
+        [JsonPropertyName("tbl")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<List<List<RichDocJson.ParaDto>>>? Tbl { get; set; }
         [JsonPropertyName("paras")] public List<RichDocJson.ParaDto> Paras { get; set; } = new();
     }
 
@@ -39,14 +41,26 @@ public static class CanvasDocJson
     {
         X = b.X, Y = b.Y, W = b.Width, H = b.H, Locked = b.Locked,
         Img = b.ImagePath, Div = b.Divider, Att = b.AttachPath,
+        Tbl = b.Table?.Rows.Select(row => row.Select(RichDocJson.ToDtos).ToList()).ToList(),
         Paras = RichDocJson.ToDtos(b.Doc),
     };
 
-    private static NoteBox FromDto(BoxDto b) => new(RichDocJson.FromDtos(b.Paras))
+    private static NoteBox FromDto(BoxDto b)
     {
-        X = b.X, Y = b.Y, Width = b.W, H = b.H, Locked = b.Locked,
-        ImagePath = b.Img, Divider = b.Div, AttachPath = b.Att,
-    };
+        var box = new NoteBox(RichDocJson.FromDtos(b.Paras))
+        {
+            X = b.X, Y = b.Y, Width = b.W, H = b.H, Locked = b.Locked,
+            ImagePath = b.Img, Divider = b.Div, AttachPath = b.Att,
+        };
+        if (b.Tbl is { Count: > 0 })
+        {
+            var table = new NoteTable();
+            foreach (var rowDto in b.Tbl)
+                table.Rows.Add(rowDto.Select(RichDocJson.FromDtos).ToList());
+            box.Table = table;
+        }
+        return box;
+    }
 
     public static string ToJson(CanvasDocument canvas)
     {
@@ -79,15 +93,7 @@ public static class CanvasDocJson
                 if (dto is not null)
                 {
                     foreach (var b in dto.Boxes)
-                    {
-                        var box = canvas.AddBox(b.X, b.Y, b.W, RichDocJson.FromDtos(b.Paras));
-                        box.H = b.H;
-                        box.Locked = b.Locked;
-                        box.ImagePath = b.Img;
-                        box.Divider = b.Div;
-                        box.AttachPath = b.Att;
-                        if (box.Divider is not null) box.Width = b.W;   // divider strips sit under MinWidth — undo AddBox's clamp
-                    }
+                        canvas.Adopt(FromDto(b));       // full box incl. table; subscribes every cell doc
                     if (dto.Trash is not null)                       // trash docs hook on restore, not here
                         foreach (var b in dto.Trash)
                             canvas.Trash.Add(FromDto(b));

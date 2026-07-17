@@ -167,6 +167,52 @@ public class PageExportTests
         Assert.Contains("font-weight:bold\">!</span> urgent thing", html);
     }
 
+    private static CanvasDocument TablePage()
+    {
+        var canvas = new CanvasDocument();
+        var box = canvas.AddTableBox(0, 0, 2, 2);
+        box.Table!.Rows[0][0].InsertText(new DocPos(0, 0), "Name");
+        box.Table.Rows[0][1].InsertText(new DocPos(0, 0), "Score");
+        box.Table.Rows[1][0].InsertText(new DocPos(0, 0), "Ann");
+        box.Table.Rows[1][1].InsertText(new DocPos(0, 0), "42");
+        return canvas;
+    }
+
+    [Fact]
+    public void Tables_exportAsMarkdownGrid()
+    {
+        var s = Text(PageExport.Export(ExportFormat.Markdown, "T", TablePage()));
+        Assert.Contains("| Name | Score |", s);
+        Assert.Contains("| --- | --- |", s);       // header separator row
+        Assert.Contains("| Ann | 42 |", s);
+    }
+
+    [Fact]
+    public void Tables_exportAsHtmlTable()
+    {
+        var s = Text(PageExport.Export(ExportFormat.Html, "T", TablePage()));
+        Assert.Contains("<table class=\"grid\">", s);
+        Assert.Contains("<td>Name</td>", s);
+        Assert.Contains("<td>42</td>", s);
+    }
+
+    [Fact]
+    public void Tables_exportAsTextGrid()
+    {
+        var s = Text(PageExport.Export(ExportFormat.Txt, "T", TablePage()));
+        Assert.Contains("Name", s);
+        Assert.Contains("Score", s);
+        Assert.Contains("|", s);                    // pipe-bordered cells
+    }
+
+    [Fact]
+    public void Tables_pdfStaysValid()
+    {
+        var b = PageExport.Export(ExportFormat.Pdf, "T", TablePage());
+        Assert.Equal((byte)'%', b[0]);              // still a valid PDF with a drawn grid
+        Assert.True(b.Length > 400);
+    }
+
     [Fact]
     public void Dividers_exportAsRules()
     {

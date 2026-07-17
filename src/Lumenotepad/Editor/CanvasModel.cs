@@ -1,7 +1,67 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Lumenotepad.Editor;
+
+/// <summary>A grid of rich-text cells (M11 tables). Row-major: <c>Rows[r][c]</c> is one cell's
+/// document. Pure model — the view builds a mini editor per cell. Structural edits go through the
+/// owning <see cref="CanvasDocument"/> so cell-document change subscriptions stay in sync.</summary>
+public sealed class NoteTable
+{
+    public const int MaxRows = 40, MaxCols = 12;
+
+    public List<List<RichDocument>> Rows { get; } = new();
+
+    public int RowCount => Rows.Count;
+    public int ColCount => Rows.Count == 0 ? 0 : Rows[0].Count;
+
+    /// <summary>Every cell document, row-major (what the canvas subscribes for autosave).</summary>
+    public IEnumerable<RichDocument> AllCells => Rows.SelectMany(r => r);
+
+    public static NoteTable Create(int rows, int cols)
+    {
+        var t = new NoteTable();
+        for (int r = 0; r < Math.Clamp(rows, 1, MaxRows); r++)
+        {
+            var row = new List<RichDocument>();
+            for (int c = 0; c < Math.Clamp(cols, 1, MaxCols); c++) row.Add(new RichDocument());
+            t.Rows.Add(row);
+        }
+        return t;
+    }
+
+    /// <summary>Insert a blank row at <paramref name="at"/> (clamped; -1 = append).</summary>
+    public void InsertRow(int at)
+    {
+        if (RowCount >= MaxRows) return;
+        int cols = Math.Max(1, ColCount);
+        at = at < 0 || at > RowCount ? RowCount : at;
+        Rows.Insert(at, Enumerable.Range(0, cols).Select(_ => new RichDocument()).ToList());
+    }
+
+    /// <summary>Insert a blank column at <paramref name="at"/> (clamped; -1 = append).</summary>
+    public void InsertColumn(int at)
+    {
+        if (ColCount >= MaxCols) return;
+        int c = at < 0 || at > ColCount ? ColCount : at;
+        foreach (var row in Rows) row.Insert(c, new RichDocument());
+    }
+
+    /// <summary>Remove a row (no-op if it would empty the table).</summary>
+    public void RemoveRow(int r)
+    {
+        if (RowCount <= 1 || r < 0 || r >= RowCount) return;
+        Rows.RemoveAt(r);
+    }
+
+    /// <summary>Remove a column (no-op if it would empty the table).</summary>
+    public void RemoveColumn(int c)
+    {
+        if (ColCount <= 1 || c < 0 || c >= ColCount) return;
+        foreach (var row in Rows) row.RemoveAt(c);
+    }
+}
 
 /// <summary>One movable note container on a page canvas: a rich document with a position, a width,
 /// and an optional height floor (<see cref="H"/> = 0 means the height simply follows content;
@@ -38,14 +98,22 @@ public sealed class NoteBox
     /// double-click opens the file with its default app. Persisted.</summary>
     public string? AttachPath { get; set; }
 
+    /// <summary>A TABLE box (M11): a grid of rich-text cells rendered instead of the editor. Persisted.</summary>
+    public NoteTable? Table { get; set; }
+
     public RichDocument Doc { get; }
 
     public NoteBox(RichDocument? doc = null) => Doc = doc ?? new RichDocument();
 
+    /// <summary>Every editable document this box owns — the single Doc, or all table cells.
+    /// The canvas subscribes these for autosave and evaporation logic.</summary>
+    public IEnumerable<RichDocument> AllDocs => Table is null ? new[] { Doc } : Table.AllCells;
+
     /// <summary>True while the box holds nothing but a single bare paragraph — such boxes
-    /// evaporate when focus settles elsewhere (OneNote behavior). Image, divider, and
-    /// attachment boxes are never empty.</summary>
-    public bool IsEmpty => ImagePath is null && Divider is null && AttachPath is null && IsBlank(Doc);
+    /// evaporate when focus settles elsewhere (OneNote behavior). Image, divider, attachment,
+    /// and table boxes are never empty.</summary>
+    public bool IsEmpty =>
+        ImagePath is null && Divider is null && AttachPath is null && Table is null && IsBlank(Doc);
 
     public static bool IsBlank(RichDocument doc) =>
         doc.Paragraphs.Count == 1 && doc.Paragraphs[0].Runs.Count == 0 && doc.Paragraphs[0].Bullet is null;
@@ -97,10 +165,60 @@ public sealed class CanvasDocument
             Y = Math.Max(0, y),
             Width = Math.Max(NoteBox.MinWidth, width),
         };
-        box.Doc.Changed += OnBoxDocChanged;
+        Subscribe(box);
         Boxes.Add(box);
         Changed?.Invoke();
         return box;
+    }
+
+    /// <summary>Add a TABLE box (M11): a rows×cols grid of rich-text cells. All cell documents are
+    /// subscribed for autosave.</summary>
+    public NoteBox AddTableBox(double x, double y, int rows, int cols, double width = NoteBox.DefaultWidth)
+    {
+        var box = new NoteBox
+        {
+            X = Math.Max(0, x), Y = Math.Max(0, y), Width = Math.Max(NoteBox.MinWidth, width),
+            Table = NoteTable.Create(rows, cols),
+        };
+        Subscribe(box);
+        Boxes.Add(box);
+        Changed?.Invoke();
+        return box;
+    }
+
+    /// <summary>Add an already-built box (used by the loader): subscribe its documents and place it.
+    /// Preserves its exact geometry/kind rather than clamping like <see cref="AddBox"/>.</summary>
+    public NoteBox Adopt(NoteBox box)
+    {
+        Subscribe(box);
+        Boxes.Add(box);
+        Changed?.Invoke();
+        return box;
+    }
+
+    // ---- table structural edits (re-sync cell subscriptions, then persist) ----
+    public void TableInsertRow(NoteBox box, int at) => MutateTable(box, t => t.InsertRow(at));
+    public void TableInsertColumn(NoteBox box, int at) => MutateTable(box, t => t.InsertColumn(at));
+    public void TableRemoveRow(NoteBox box, int r) => MutateTable(box, t => t.RemoveRow(r));
+    public void TableRemoveColumn(NoteBox box, int c) => MutateTable(box, t => t.RemoveColumn(c));
+
+    private void MutateTable(NoteBox box, Action<NoteTable> op)
+    {
+        if (box.Table is null) return;
+        Unsubscribe(box);            // drop the old cell set…
+        op(box.Table);
+        Subscribe(box);              // …and re-hook the new one
+        Changed?.Invoke();
+    }
+
+    private void Subscribe(NoteBox box)
+    {
+        foreach (var d in box.AllDocs) d.Changed += OnBoxDocChanged;
+    }
+
+    private void Unsubscribe(NoteBox box)
+    {
+        foreach (var d in box.AllDocs) d.Changed -= OnBoxDocChanged;
     }
 
     /// <summary>Permanently remove a box (empty-box evaporation, or deletion with history disabled).</summary>
@@ -108,7 +226,7 @@ public sealed class CanvasDocument
     {
         if (!Boxes.Remove(box)) return;
         DropLinks(box);
-        box.Doc.Changed -= OnBoxDocChanged;
+        Unsubscribe(box);
         Changed?.Invoke();
     }
 
@@ -117,7 +235,7 @@ public sealed class CanvasDocument
     {
         if (!Boxes.Remove(box)) return;
         DropLinks(box);
-        box.Doc.Changed -= OnBoxDocChanged;
+        Unsubscribe(box);
         Trash.Insert(0, box);
         Changed?.Invoke();
     }
@@ -128,7 +246,7 @@ public sealed class CanvasDocument
         if (!Trash.Remove(box)) return;
         if (x is not null) box.X = Math.Max(0, x.Value);
         if (y is not null) box.Y = Math.Max(0, y.Value);
-        box.Doc.Changed += OnBoxDocChanged;
+        Subscribe(box);
         Boxes.Add(box);
         Changed?.Invoke();
     }

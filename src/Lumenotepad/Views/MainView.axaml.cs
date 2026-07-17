@@ -80,6 +80,7 @@ public partial class MainView : UserControl
         Toolbar.InsertImageRequested += async () => await InsertImageAsync();
         Toolbar.InsertDividerRequested += InsertDivider;
         Toolbar.InsertAttachmentRequested += async () => await InsertAttachmentAsync();
+        Toolbar.InsertTableRequested += InsertTable;
 
         // Section/page rename: double-click, the rename button, or right-click → Rename — all open
         // the zoomed rename overlay (the background blurs until the name is saved).
@@ -1404,6 +1405,15 @@ public partial class MainView : UserControl
         double x = CanvasScroll.Offset.X / _canvasZoom + 60;
         double y = CanvasScroll.Offset.Y / _canvasZoom + 60;
         PageCanvas.AddDivider(orientation, x, y);
+    }
+
+    /// <summary>Drop a rows×cols table on the current page, near the top-left of the view.</summary>
+    private void InsertTable(int rows, int cols)
+    {
+        if (Vm is not { SelectedPage: not null }) return;
+        double x = CanvasScroll.Offset.X / _canvasZoom + 50;
+        double y = CanvasScroll.Offset.Y / _canvasZoom + 50;
+        PageCanvas.AddTable(rows, cols, x, y);
     }
 
     /// <summary>Export one page to a file the user picks — the format follows the chosen file type

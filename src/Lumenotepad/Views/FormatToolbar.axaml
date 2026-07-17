@@ -104,6 +104,18 @@
                     FontFamily="{StaticResource IconFont}" Content="&#xEB9F;" ToolTip.Tip="Insert image"/>
             <Button x:Name="AttachBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
                     FontFamily="{StaticResource IconFont}" Content="&#xE723;" ToolTip.Tip="Attach file"/>
+            <Button x:Name="TableBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="14"
+                    FontFamily="{StaticResource IconFont}" Content="&#xE80A;" ToolTip.Tip="Insert table">
+                <Button.Flyout>
+                    <Flyout Placement="Bottom">
+                        <StackPanel Spacing="7" Margin="4">
+                            <TextBlock x:Name="TableSizeLabel" Text="Insert table" FontSize="12"
+                                       FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                            <Grid x:Name="TableSizeGrid"/>
+                        </StackPanel>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
             <Button x:Name="DividerBtn" Theme="{StaticResource IconButton}" Width="30" Height="30" FontSize="15"
                     Content="─" ToolTip.Tip="Insert line divider">
                 <Button.Flyout>

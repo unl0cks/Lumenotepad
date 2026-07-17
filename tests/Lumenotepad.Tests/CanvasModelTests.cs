@@ -283,6 +283,77 @@ public class CanvasJsonTests
     }
 
     [Fact]
+    public void Table_create_insertRemove_respectsBounds()
+    {
+        var t = NoteTable.Create(2, 3);
+        Assert.Equal(2, t.RowCount);
+        Assert.Equal(3, t.ColCount);
+
+        t.InsertRow(-1);
+        Assert.Equal(3, t.RowCount);
+        Assert.Equal(3, t.Rows[2].Count);       // new row matches column count
+
+        t.InsertColumn(0);
+        Assert.Equal(4, t.ColCount);
+        Assert.All(t.Rows, r => Assert.Equal(4, r.Count));
+
+        t.RemoveColumn(0);
+        Assert.Equal(3, t.ColCount);
+
+        // Can't empty the table.
+        var single = NoteTable.Create(1, 1);
+        single.RemoveRow(0);
+        single.RemoveColumn(0);
+        Assert.Equal(1, single.RowCount);
+        Assert.Equal(1, single.ColCount);
+    }
+
+    [Fact]
+    public void TableBox_cellEdit_andStructuralChange_fireCanvasChanged()
+    {
+        var canvas = new CanvasDocument();
+        var box = canvas.AddTableBox(0, 0, 2, 2);
+        int changes = 0;
+        canvas.Changed += () => changes++;
+
+        box.Table!.Rows[0][0].InsertText(new DocPos(0, 0), "hi");   // a cell edit
+        Assert.True(changes >= 1);
+
+        int before = changes;
+        canvas.TableInsertRow(box, -1);                            // a structural edit
+        Assert.True(changes > before);
+
+        // A cell in the newly added row is also wired.
+        int mid = changes;
+        box.Table.Rows[2][0].InsertText(new DocPos(0, 0), "x");
+        Assert.True(changes > mid);
+    }
+
+    [Fact]
+    public void TableBox_notEmpty_roundTripsThroughJson()
+    {
+        var canvas = new CanvasDocument();
+        var box = canvas.AddTableBox(30, 40, 2, 2, 300);
+        box.Table!.Rows[0][0].InsertText(new DocPos(0, 0), "A1");
+        box.Table.Rows[1][1].InsertText(new DocPos(0, 0), "B2");
+        Assert.False(box.IsEmpty);
+
+        var reloaded = CanvasDocJson.FromJson(CanvasDocJson.ToJson(canvas));
+        var r = Assert.Single(reloaded.Boxes);
+        Assert.NotNull(r.Table);
+        Assert.Equal(2, r.Table!.RowCount);
+        Assert.Equal(2, r.Table.ColCount);
+        Assert.Equal("A1", r.Table.Rows[0][0].GetText());
+        Assert.Equal("B2", r.Table.Rows[1][1].GetText());
+
+        // The reloaded table's cells must be wired for autosave too.
+        int changes = 0;
+        reloaded.Changed += () => changes++;
+        r.Table.Rows[0][1].InsertText(new DocPos(0, 0), "edit");
+        Assert.True(changes >= 1);
+    }
+
+    [Fact]
     public void Links_absentWhenNone_badPairsIgnored()
     {
         var canvas = new CanvasDocument();
