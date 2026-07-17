@@ -1,0 +1,85 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Lumenotepad.Views.PdfViewerWindow"
+        Title="PDF"
+        Width="1040" Height="860" MinWidth="640" MinHeight="480"
+        WindowDecorations="None" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="{StaticResource UiFont}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
+        TextOptions.TextRenderingMode="Antialias"
+        Background="{DynamicResource WindowSurfaceBrush}"
+        TransparencyLevelHint="AcrylicBlur, Transparent, None">
+
+    <Window.Styles>
+        <Style Selector="ToggleButton.tool">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="11,0"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource FrameBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="7"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="ToggleButton.tool:checked">
+            <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="Border.sep">
+            <Setter Property="Width" Value="1"/>
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="Margin" Value="4,0"/>
+            <Setter Property="Background" Value="{DynamicResource FrameBorderBrush}"/>
+            <Setter Property="Opacity" Value="0.7"/>
+        </Style>
+        <Style Selector="Button.mini">
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource FrameBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="7"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+    </Window.Styles>
+
+    <Grid>
+    <DockPanel>
+        <Grid DockPanel.Dock="Top" Height="38" ColumnDefinitions="*,Auto" x:Name="PdfTitleBar" Background="Transparent">
+            <TextBlock x:Name="PdfTitle" Text="PDF" FontSize="13" FontWeight="SemiBold"
+                       VerticalAlignment="Center" Margin="16,0,0,0" TextTrimming="CharacterEllipsis"/>
+            <Button x:Name="CloseBtn" Grid.Column="1" Theme="{StaticResource CloseCaptionButton}"
+                    Content="&#xE8BB;" VerticalAlignment="Center" Margin="0,0,3,0"/>
+        </Grid>
+
+        <Border DockPanel.Dock="Top" Padding="16,6,16,8" Background="Transparent">
+            <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                <ToggleButton x:Name="SelectTool" Classes="tool" Content="Select" ToolTip.Tip="Select / delete annotations"/>
+                <ToggleButton x:Name="HighlightTool" Classes="tool" Content="Highlight" ToolTip.Tip="Drag over the page to highlight"/>
+                <ToggleButton x:Name="NoteTool" Classes="tool" Content="Note" ToolTip.Tip="Click the page to add a note"/>
+                <Border Classes="sep"/>
+                <StackPanel x:Name="ColorSwatches" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"/>
+                <Border Classes="sep"/>
+                <Button x:Name="ZoomOut" Classes="mini" Content="&#x2212;" ToolTip.Tip="Zoom out"/>
+                <TextBlock x:Name="ZoomLabel" Text="100%" FontSize="12" Width="42" TextAlignment="Center"
+                           VerticalAlignment="Center"/>
+                <Button x:Name="ZoomIn" Classes="mini" Content="+" ToolTip.Tip="Zoom in"/>
+                <Border Classes="sep"/>
+                <TextBlock x:Name="StatusLabel" FontSize="12" Foreground="{DynamicResource TextMutedBrush}"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer x:Name="PagesScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="PagesHost" Spacing="16" Margin="16" HorizontalAlignment="Center"/>
+        </ScrollViewer>
+    </DockPanel>
+    </Grid>
+</Window>

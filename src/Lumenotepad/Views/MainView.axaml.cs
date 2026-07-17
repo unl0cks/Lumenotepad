@@ -63,6 +63,11 @@ public partial class MainView : UserControl
                         ? "It will move to this page's deleted history — you can drag it back onto the page anytime."
                         : "The deleted history is turned off, so this can't be undone.");
         PageCanvas.TrashChanged += () => { if (TrashPanel.IsVisible) RefreshTrashPanel(); };
+        PageCanvas.OpenPdfRequested = path =>   // PDF attachments open in the in-app viewer/annotator
+        {
+            var viewer = new PdfViewerWindow(path);
+            if (Window is { } w) viewer.Show(w); else viewer.Show();
+        };
         HistoryBtn.Click += (_, _) =>
         {
             TrashPanel.IsVisible = !TrashPanel.IsVisible;

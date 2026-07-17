@@ -53,6 +53,10 @@ public sealed class NoteCanvas : Panel
     /// MainView when the page loads (M10).</summary>
     public string? ImageRoot { get; set; }
 
+    /// <summary>Opens a PDF attachment in the in-app viewer/annotator (MainView wires this). Null ⇒
+    /// PDFs fall back to the OS default app like any other attachment.</summary>
+    public Action<string>? OpenPdfRequested { get; set; }
+
     /// <summary>Insert an image box (M10): a movable/resizable container showing the picture at
     /// <paramref name="relPath"/> (relative to <see cref="ImageRoot"/>).</summary>
     public void AddImage(string relPath, double x, double y, double width = 340)
@@ -697,7 +701,11 @@ internal sealed class NoteBoxView : Panel
             var root = _canvas.ImageRoot;
             var full = root is { Length: > 0 }
                 ? System.IO.Path.Combine(root, Box.AttachPath!) : Box.AttachPath!;
-            if (System.IO.File.Exists(full))
+            if (!System.IO.File.Exists(full)) return;
+            // PDFs open in the in-app viewer/annotator; everything else goes to its default app.
+            if (full.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) && _canvas.OpenPdfRequested is { } openPdf)
+                openPdf(full);
+            else
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 { FileName = full, UseShellExecute = true });
         }
