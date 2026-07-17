@@ -47,4 +47,17 @@ public static class PdfRenderer
         }
         catch { return null; }
     }
+
+    /// <summary>Render one page (0-based) at the given DPI straight to a SkiaSharp bitmap — for the
+    /// flatten/export path, which draws the page + baked annotations into a fresh SkiaSharp PDF. The
+    /// caller owns (and disposes) the returned bitmap; null on failure.</summary>
+    public static SkiaSharp.SKBitmap? RenderPageSk(byte[] pdf, int page, float dpi = 150f)
+    {
+        try
+        {
+            return PDFtoImage.Conversion.ToImage(
+                pdf, page: page, options: new PDFtoImage.RenderOptions(Dpi: (int)dpi));
+        }
+        catch { return null; }
+    }
 }

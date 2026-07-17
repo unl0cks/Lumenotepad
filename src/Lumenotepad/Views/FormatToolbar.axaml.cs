@@ -447,6 +447,17 @@ public partial class FormatToolbar : UserControl
         Add("│", false, "Vertical line", () => InsertDividerRequested?.Invoke("v"));
     }
 
+    /// <summary>Trim the strip for the PDF annotator (M11). Hides the canvas-only furniture — the
+    /// whole Insert menu (image/file/PDF/dividers/link/footnote all resolve against the note page),
+    /// tables, per-line tags, the dock menu, and the customize button — leaving the character/paragraph
+    /// formatting a PDF note actually uses: B/I/U/S, super/subscript, text type, alignment, bullets,
+    /// highlight, color, size, and font. Call once, right after construction.</summary>
+    public void SetCompact()
+    {
+        foreach (var c in new Control[] { InsertBtn, TableBtn, TagBtn, DockBtn, CustomizeBtn })
+            c.IsVisible = false;
+    }
+
     private static readonly (ParaStyle Style, string Name)[] TextTypes =
     {
         (ParaStyle.Body, "Body"), (ParaStyle.Title, "Title"), (ParaStyle.Subtitle, "Subtitle"),

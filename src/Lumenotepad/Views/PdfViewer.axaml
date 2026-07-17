@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:v="using:Lumenotepad.Views"
              x:Class="Lumenotepad.Views.PdfViewer">
 
     <UserControl.Styles>
@@ -39,24 +40,20 @@
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
-        <!-- whole-box text formatting (applies to the selected note/text) -->
-        <Style Selector="ToggleButton.fmt">
-            <Setter Property="Width" Value="30"/>
+        <Style Selector="Button.pill">
             <Setter Property="Height" Value="30"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="FontSize" Value="12.5"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource FrameBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="7"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
-        <Style Selector="ToggleButton.fmt:checked">
+        <Style Selector="Button.pill:pointerover">
             <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
         </Style>
     </UserControl.Styles>
 
@@ -71,23 +68,22 @@
                 <Border Classes="sep"/>
                 <StackPanel x:Name="ColorSwatches" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"/>
                 <Border Classes="sep"/>
-                <StackPanel x:Name="FmtGroup" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" IsEnabled="False">
-                    <ToggleButton x:Name="FmtBold" Classes="fmt" ToolTip.Tip="Bold"><TextBlock Text="B" FontWeight="Bold"/></ToggleButton>
-                    <ToggleButton x:Name="FmtItalic" Classes="fmt" ToolTip.Tip="Italic"><TextBlock Text="I" FontStyle="Italic"/></ToggleButton>
-                    <ToggleButton x:Name="FmtUnder" Classes="fmt" ToolTip.Tip="Underline"><TextBlock Text="U" TextDecorations="Underline"/></ToggleButton>
-                    <ToggleButton x:Name="FmtStrike" Classes="fmt" ToolTip.Tip="Strikethrough"><TextBlock Text="S" TextDecorations="Strikethrough"/></ToggleButton>
-                    <ToggleButton x:Name="FmtBullet" Classes="fmt" ToolTip.Tip="Bullet list"><TextBlock Text="&#8226;"/></ToggleButton>
-                </StackPanel>
-                <Border Classes="sep"/>
                 <Button x:Name="ZoomOut" Classes="mini" Content="&#x2212;" ToolTip.Tip="Zoom out"/>
                 <TextBlock x:Name="ZoomLabel" Text="100%" FontSize="12" Width="42" TextAlignment="Center"
                            VerticalAlignment="Center"/>
                 <Button x:Name="ZoomIn" Classes="mini" Content="+" ToolTip.Tip="Zoom in"/>
                 <Border Classes="sep"/>
+                <Button x:Name="ExportBtn" Classes="pill" Content="Save a copy…"
+                        ToolTip.Tip="Save a new PDF with your highlights, notes, text, and arrows baked in"/>
+                <Border Classes="sep"/>
                 <TextBlock x:Name="StatusLabel" FontSize="12" Foreground="{DynamicResource TextMutedBrush}"
                            VerticalAlignment="Center"/>
             </StackPanel>
         </Border>
+
+        <!-- The full canvas formatting toolbar (compact), shown only while a note/text box is selected.
+             Drives that box's embedded rich-text editor — same fonts/super-sub/align/color/etc. -->
+        <v:FormatToolbar x:Name="FmtBar" DockPanel.Dock="Top" IsVisible="False"/>
 
         <ScrollViewer x:Name="PagesScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
             <StackPanel x:Name="PagesHost" Spacing="16" Margin="16" HorizontalAlignment="Center"/>

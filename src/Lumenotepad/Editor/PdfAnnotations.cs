@@ -25,7 +25,15 @@ public sealed class PdfAnnotation
     [JsonPropertyName("y2")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double Y2 { get; set; }  // arrow end y
     [JsonPropertyName("color")] public string Color { get; set; } = "#66FFD54A";
     [JsonPropertyName("text")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Text { get; set; }
-    // Whole-box formatting for note / text annotations (M11).
+    /// <summary>Full rich content for note / text annotations (M11): a serialized
+    /// <see cref="RichDocument"/> (see <see cref="RichDocJson"/>) so notes carry the SAME formatting as
+    /// the note canvas — fonts, sizes, colors, super/subscript, alignment, bullets, links. When present
+    /// this is the source of truth; <see cref="Text"/> is kept as a plain-text mirror for exports and
+    /// back-compat. Older sidecars that only have <see cref="Text"/> + the whole-box flags below still
+    /// load (they're migrated to a rich document on first edit).</summary>
+    [JsonPropertyName("rich")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Rich { get; set; }
+    // Legacy whole-box formatting for note / text annotations (superseded by Rich; kept so old
+    // sidecars keep rendering and migrate cleanly).
     [JsonPropertyName("b")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Bold { get; set; }
     [JsonPropertyName("it")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Italic { get; set; }
     [JsonPropertyName("u")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Underline { get; set; }

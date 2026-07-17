@@ -75,6 +75,29 @@ public class PdfAnnotationTests
     }
 
     [Fact]
+    public void RoundTrip_preservesRichNoteContent()
+    {
+        var rich = new RichDocument();
+        rich.InsertText(new DocPos(0, 0), "hi",
+            new RunFormat(true, false, false, false, null, null, null, null, Baseline.Super, null));
+        var json = RichDocJson.ToJson(rich);
+
+        var doc = new PdfAnnotationDoc();
+        doc.Items.Add(new PdfAnnotation
+        {
+            Page = 0, Kind = PdfAnnotation.Note, X = 0.1, Y = 0.1, W = 0.2, H = 0.05, Rich = json,
+        });
+
+        var restored = PdfAnnotationDoc.FromJson(doc.ToJson()).Items[0];
+        Assert.Equal(json, restored.Rich);
+        var back = RichDocJson.FromJson(restored.Rich);
+        var run = back.Paragraphs[0].Runs[0];
+        Assert.Equal("hi", run.Text);
+        Assert.True(run.Bold);
+        Assert.Equal(Baseline.Super, run.Baseline);
+    }
+
+    [Fact]
     public void FromJson_blankOrCorrupt_yieldsEmpty_neverThrows()
     {
         Assert.Empty(PdfAnnotationDoc.FromJson(null).Items);
