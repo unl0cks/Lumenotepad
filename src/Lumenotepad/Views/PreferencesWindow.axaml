@@ -506,6 +506,15 @@
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding SectionsSidebar, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Classes="label" Text="Single mode (pages only, no sections)"/>
+                                    <Border Classes="qmark" ToolTip.Tip="Turns off sections so a notebook is just a flat list of pages. Turning this on gathers all of a notebook's pages together; turning it back off gives every page its own section again."><TextBlock/></Border>
+                                </StackPanel>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding SingleMode, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
                     </StackPanel>
 
                     <StackPanel x:Name="CanvasPanel" Spacing="6" IsVisible="False">

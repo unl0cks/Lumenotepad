@@ -403,6 +403,33 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public void SingleMode_flattensToOneSection_thenGivesEachPageItsOwn()
+    {
+        var vm = NewVm(out var dir);
+        try
+        {
+            var nb = vm.SelectedNotebook!;
+            nb.Sections.Clear();
+            var s1 = new Lumenotepad.Models.Section { Name = "A" };
+            s1.Pages.Add(new Lumenotepad.Models.Page { Title = "p1" });
+            s1.Pages.Add(new Lumenotepad.Models.Page { Title = "p2" });
+            var s2 = new Lumenotepad.Models.Section { Name = "B" };
+            s2.Pages.Add(new Lumenotepad.Models.Page { Title = "p3" });
+            nb.Sections.Add(s1); nb.Sections.Add(s2);
+            vm.SelectedSection = s1;
+
+            vm.SingleMode = true;
+            Assert.Single(nb.Sections);                         // one section holds everything
+            Assert.Equal(3, nb.Sections[0].Pages.Count);
+
+            vm.SingleMode = false;
+            Assert.Equal(3, nb.Sections.Count);                 // one section per page
+            Assert.All(nb.Sections, s => Assert.Single(s.Pages));
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public void CollectTaggedLines_findsTagsAcrossPages_inNotebookOrder()
     {
         var vm = NewVm(out var dir);

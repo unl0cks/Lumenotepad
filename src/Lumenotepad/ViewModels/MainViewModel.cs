@@ -72,6 +72,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double _glassTint;                 // prefs: -1..1 glass veil; 0 = off
     [ObservableProperty] private double _cornerRoundness = 1.0;     // prefs: 0.5..1.5 corner-radius scale
     [ObservableProperty] private bool _sectionsSidebar;             // prefs: sections as their own sidebar
+    [ObservableProperty] private bool _singleMode;                  // prefs: notebooks hold pages directly (no sections)
     [ObservableProperty] private bool _reduceMotion;                // prefs: skip animations
     [ObservableProperty] private string _motionSpeed = "Normal";    // prefs: Calm | Normal | Snappy
     [ObservableProperty] private bool? _numBoldDefault;             // prefs: number-style defaults;
@@ -214,6 +215,7 @@ public partial class MainViewModel : ObservableObject
             GlassTint = _settings.GlassTint;
             CornerRoundness = _settings.CornerRoundness;
             SectionsSidebar = _settings.SectionsSidebar;
+            _singleMode = _settings.SingleMode;   // field, not property: the saved tree is already in this shape — don't restructure on load
             Services.Keymap.SetOverrides(_settings.KeyOverrides);
             ReduceMotion = _settings.ReduceMotion;
             MotionSpeed = _settings.MotionSpeed;
@@ -398,6 +400,55 @@ public partial class MainViewModel : ObservableObject
         if (_settings is null || _settingsDir is null) return;
         _settings.SectionsSidebar = value;
         _settings.Save(_settingsDir);
+    }
+
+    /// <summary>Single mode toggle (a user action, never the ctor load — that sets the backing field).
+    /// Turning it ON flattens every notebook to one section; turning it OFF gives each page its own
+    /// section, as the owner requested. Page content files are keyed by page id, so re-sectioning
+    /// only moves the Page objects — nothing on disk moves.</summary>
+    partial void OnSingleModeChanged(bool value)
+    {
+        if (_settings is not null) _settings.SingleMode = value;
+        RestructureForSingleMode(value);        // structural, always runs on a real toggle (not ctor load)
+        if (_settingsDir is not null) Save();
+    }
+
+    private void RestructureForSingleMode(bool single)
+    {
+        foreach (var nb in Notebooks)
+        {
+            if (single)
+            {
+                if (nb.Sections.Count == 0) { nb.Sections.Add(new Section { Name = "Pages" }); }
+                var first = nb.Sections[0];
+                for (int i = nb.Sections.Count - 1; i >= 1; i--)   // fold every later section's pages into the first
+                {
+                    foreach (var p in nb.Sections[i].Pages.ToList()) first.Pages.Add(p);
+                    nb.Sections.RemoveAt(i);
+                }
+                if (first.Pages.Count == 0) first.Pages.Add(new Page { Title = "Untitled page" });
+            }
+            else
+            {
+                var pages = nb.Sections.SelectMany(s => s.Pages).ToList();   // one section per page
+                nb.Sections.Clear();
+                if (pages.Count == 0)
+                {
+                    var s = new Section { Name = "New section" };
+                    s.Pages.Add(new Page { Title = "Untitled page" });
+                    nb.Sections.Add(s);
+                }
+                else
+                    foreach (var p in pages)
+                    {
+                        var s = new Section { Name = string.IsNullOrWhiteSpace(p.Title) ? "New section" : p.Title };
+                        s.Pages.Add(p);
+                        nb.Sections.Add(s);
+                    }
+            }
+        }
+        SelectedSection = SelectedNotebook?.Sections.FirstOrDefault();
+        SelectedPage = SelectedSection?.Pages.FirstOrDefault();
     }
 
     partial void OnCornerRoundnessChanged(double value)

@@ -659,6 +659,15 @@ public partial class MainView : UserControl
     /// apply on startup snaps so launch doesn't play a slide.</summary>
     private void ApplySectionsSidebar(bool animate = false)
     {
+        if (Vm?.SingleMode == true)
+        {
+            // Single mode: no sections anywhere — the notebook is just pages.
+            SectionsHeader.IsVisible = false;
+            SectionsList.IsVisible = false;
+            SectionsSidebar.IsVisible = false;
+            SectionsSidebar.Width = 0; SectionsSidebar.Opacity = 0;
+            return;
+        }
         bool side = Vm?.SectionsSidebar ?? false;
         SectionsHeader.IsVisible = !side;
         SectionsList.IsVisible = !side;
@@ -856,6 +865,8 @@ public partial class MainView : UserControl
         }
         else if (e.PropertyName == nameof(MainViewModel.SectionsSidebar))
             ApplySectionsSidebar(animate: true);
+        else if (e.PropertyName == nameof(MainViewModel.SingleMode))
+            ApplySectionsSidebar();   // show/hide all section UI (the VM already restructured the tree)
         else if (e.PropertyName == nameof(MainViewModel.FlatCovers))
             ApplyFlatCovers();
         else if (e.PropertyName == nameof(MainViewModel.GlossyAccents))
