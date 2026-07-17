@@ -61,9 +61,11 @@
 
         <Border DockPanel.Dock="Top" Padding="16,6,16,8" Background="Transparent">
             <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
-                <ToggleButton x:Name="SelectTool" Classes="tool" Content="Select" ToolTip.Tip="Select / delete annotations"/>
+                <ToggleButton x:Name="SelectTool" Classes="tool" Content="Select" ToolTip.Tip="Select, move, or delete annotations"/>
                 <ToggleButton x:Name="HighlightTool" Classes="tool" Content="Highlight" ToolTip.Tip="Drag over the page to highlight"/>
-                <ToggleButton x:Name="NoteTool" Classes="tool" Content="Note" ToolTip.Tip="Click the page to add a note"/>
+                <ToggleButton x:Name="NoteTool" Classes="tool" Content="Note" ToolTip.Tip="Add a sticky note"/>
+                <ToggleButton x:Name="TextTool" Classes="tool" Content="Text" ToolTip.Tip="Write text over the page"/>
+                <ToggleButton x:Name="ArrowTool" Classes="tool" Content="Arrow" ToolTip.Tip="Drag to draw an arrow"/>
                 <Border Classes="sep"/>
                 <StackPanel x:Name="ColorSwatches" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"/>
                 <Border Classes="sep"/>

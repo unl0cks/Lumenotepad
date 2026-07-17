@@ -65,7 +65,7 @@ public partial class MainView : UserControl
         PageCanvas.TrashChanged += () => { if (TrashPanel.IsVisible) RefreshTrashPanel(); };
         PageCanvas.OpenPdfRequested = path =>   // PDF attachments open in the in-app viewer/annotator
         {
-            var viewer = new PdfViewerWindow(path);
+            var viewer = new PdfViewerWindow(path, Vm?.DoubleClickCreate ?? false);
             if (Window is { } w) viewer.Show(w); else viewer.Show();
         };
         HistoryBtn.Click += (_, _) =>
@@ -1427,7 +1427,7 @@ public partial class MainView : UserControl
         if (vm.SelectedNotebookDir is { } dir)
         {
             var full = System.IO.Path.Combine(dir, rel);
-            var viewer = new PdfViewerWindow(full);
+            var viewer = new PdfViewerWindow(full, vm.DoubleClickCreate);
             if (Window is { } w) viewer.Show(w); else viewer.Show();
         }
     }

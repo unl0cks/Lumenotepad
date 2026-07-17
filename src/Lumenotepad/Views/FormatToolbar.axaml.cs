@@ -86,8 +86,8 @@ public partial class FormatToolbar : UserControl
     {
         InitializeComponent();
 
-        // Picker flyouts (bullets, highlight, color, font, text type, alignment) rise in like the menus do.
-        foreach (var btn in new[] { BulletBtn, HighlightBtn, ColorBtn, FontBtn, TypeBtn, AlignBtn })
+        // Picker flyouts rise in and wear the frosted-glass popup backdrop like the menus do.
+        foreach (var btn in new[] { BulletBtn, HighlightBtn, ColorBtn, FontBtn, TypeBtn, AlignBtn, InsertBtn, TableBtn, TagBtn })
             if (btn.Flyout is { } f) MenuFx.AttachFlyout(f);
 
         // The font list glides like every other list (its ScrollViewer only exists once opened).

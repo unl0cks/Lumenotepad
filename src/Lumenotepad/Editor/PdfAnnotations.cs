@@ -12,13 +12,17 @@ public sealed class PdfAnnotation
 {
     public const string Highlight = "highlight";
     public const string Note = "note";
+    public const string TextBox = "text";      // free text written over the page
+    public const string Arrow = "arrow";        // a line with an arrowhead; X,Y = start, X2,Y2 = end
 
     [JsonPropertyName("pg")] public int Page { get; set; }
     [JsonPropertyName("kind")] public string Kind { get; set; } = Highlight;
-    [JsonPropertyName("x")] public double X { get; set; }        // normalized left
-    [JsonPropertyName("y")] public double Y { get; set; }        // normalized top
+    [JsonPropertyName("x")] public double X { get; set; }        // normalized left / arrow start x
+    [JsonPropertyName("y")] public double Y { get; set; }        // normalized top / arrow start y
     [JsonPropertyName("w")] public double W { get; set; }        // normalized width
     [JsonPropertyName("h")] public double H { get; set; }        // normalized height
+    [JsonPropertyName("x2")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double X2 { get; set; }  // arrow end x
+    [JsonPropertyName("y2")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double Y2 { get; set; }  // arrow end y
     [JsonPropertyName("color")] public string Color { get; set; } = "#66FFD54A";
     [JsonPropertyName("text")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Text { get; set; }
 }
