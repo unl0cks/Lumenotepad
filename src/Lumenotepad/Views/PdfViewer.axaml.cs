@@ -449,7 +449,11 @@ public partial class PdfViewer : UserControl
         SaveNow();
     }
 
-    /// <summary>Move (handle 0) or drag an arrow endpoint (1 = start, 2 = end); geometry clamped to the page.</summary>
+    // Normalized floors so a resize can't collapse a mark into nothing.
+    private const double MinW = 0.03, MinH = 0.012;
+
+    /// <summary>Move (handle 0), drag an arrow endpoint (1 = start, 2 = end), or resize (3 = width,
+    /// 4 = height, 5 = both, from the right/bottom/corner); geometry clamped to the page.</summary>
     private void ApplyDrag(PdfAnnotation a, int handle, double dx, double dy)
     {
         double C(double v) => Math.Clamp(v, 0, 1);
@@ -457,10 +461,23 @@ public partial class PdfViewer : UserControl
         {
             if (handle is 0 or 1) { a.X = C(_dragOrig.X + dx); a.Y = C(_dragOrig.Y + dy); }
             if (handle is 0 or 2) { a.X2 = C(_dragOrig.X2 + dx); a.Y2 = C(_dragOrig.Y2 + dy); }
+            return;
         }
-        else
+        switch (handle)
         {
-            a.X = C(_dragOrig.X + dx); a.Y = C(_dragOrig.Y + dy);
+            case 0:
+                a.X = C(_dragOrig.X + dx); a.Y = C(_dragOrig.Y + dy);
+                break;
+            case 3:
+                a.W = Math.Clamp(_dragOrig.W + dx, MinW, 1 - a.X);
+                break;
+            case 4:
+                a.H = Math.Clamp(_dragOrig.H + dy, MinH, 1 - a.Y);
+                break;
+            case 5:
+                a.W = Math.Clamp(_dragOrig.W + dx, MinW, 1 - a.X);
+                a.H = Math.Clamp(_dragOrig.H + dy, MinH, 1 - a.Y);
+                break;
         }
     }
 
@@ -502,15 +519,28 @@ public partial class PdfViewer : UserControl
         {
             Background = new SolidColorBrush(Color.Parse(a.Color)),
             IsHitTestVisible = true, Cursor = new Cursor(StandardCursorType.SizeAll),
-            CornerRadius = new CornerRadius(2),
+            CornerRadius = new CornerRadius(5),
             BorderThickness = new Thickness(selected ? 2 : 0),
-            BorderBrush = AccentBrush,
+            BorderBrush = NoteFocusBrush,
         };
         Canvas.SetLeft(rect, a.X * w); Canvas.SetTop(rect, a.Y * h);
         rect.Width = a.W * w; rect.Height = a.H * h;
         rect.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, 0, e); };
         pv.Overlay.Children.Add(rect);
-        if (selected) AddDeleteButton(pv, a.X * w + a.W * w, a.Y * h, a);
+        if (selected)
+        {
+            AddDeleteButton(pv, a.X * w + a.W * w, a.Y * h, a);
+            // bottom-right resize dot (same look as the arrow endpoint handles)
+            var dot = new Avalonia.Controls.Shapes.Ellipse
+            {
+                Width = 12, Height = 12, Fill = AccentBrush,
+                Stroke = Brushes.White, StrokeThickness = 1.5,
+                Cursor = new Cursor(StandardCursorType.BottomRightCorner),
+            };
+            Canvas.SetLeft(dot, a.X * w + a.W * w - 6); Canvas.SetTop(dot, a.Y * h + a.H * h - 6);
+            dot.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, 5, e); };
+            pv.Overlay.Children.Add(dot);
+        }
     }
 
     /// <summary>A note/text annotation. NOTES are Lumen frosted-glass cards: the backdrop samples the
@@ -573,6 +603,27 @@ public partial class PdfViewer : UserControl
         close.PointerPressed += (_, e) => e.Handled = true;      // don't fall through to select/drag
         close.PointerReleased += (_, e) => { Delete(a); e.Handled = true; };
 
+        // Invisible resize strips along the right/bottom edges + corner — the canvas note-box pattern.
+        var resizeRight = new Border
+        {
+            Width = 8, HorizontalAlignment = HorizontalAlignment.Right,
+            Background = Brushes.Transparent, Cursor = new Cursor(StandardCursorType.SizeWestEast),
+        };
+        resizeRight.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, 3, e); };
+        var resizeBottom = new Border
+        {
+            Height = 8, VerticalAlignment = VerticalAlignment.Bottom,
+            Background = Brushes.Transparent, Cursor = new Cursor(StandardCursorType.SizeNorthSouth),
+        };
+        resizeBottom.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, 4, e); };
+        var resizeCorner = new Border
+        {
+            Width = 15, Height = 15,
+            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom,
+            Background = Brushes.Transparent, Cursor = new Cursor(StandardCursorType.BottomRightCorner),
+        };
+        resizeCorner.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, 5, e); };
+
         ImageBrush? backdropBrush = null;
         Border box;
         if (sticky)
@@ -603,7 +654,10 @@ public partial class PdfViewer : UserControl
                 IsHitTestVisible = false,
             });
             layers.Children.Add(content);
-            layers.Children.Add(close);
+            layers.Children.Add(resizeRight);
+            layers.Children.Add(resizeBottom);
+            layers.Children.Add(resizeCorner);
+            layers.Children.Add(close);        // close stays on top where the right strip overlaps it
             // The clip lives on an INNER border so the outer border's drop shadow isn't clipped away.
             var clip = new Border { CornerRadius = new CornerRadius(10), ClipToBounds = true, Child = layers };
             box = new Border
@@ -611,7 +665,7 @@ public partial class PdfViewer : UserControl
                 Width = a.W * w0, MinHeight = a.H * h0,
                 CornerRadius = new CornerRadius(10), Child = clip,
                 BoxShadow = BoxShadows.Parse(selected ? "0 9 28 0 #80000000" : "0 4 16 0 #59000000"),
-                BorderThickness = new Thickness(1),
+                BorderThickness = new Thickness(selected ? 2 : 1),
                 BorderBrush = selected ? NoteFocusBrush : new SolidColorBrush(Color.Parse("#33FFFFFF")),
                 Transitions = new Transitions
                 {
@@ -625,13 +679,16 @@ public partial class PdfViewer : UserControl
             // outline while selected (faint on hover) keeps it findable without dressing it up.
             var layers = new Panel();
             layers.Children.Add(content);
+            layers.Children.Add(resizeRight);
+            layers.Children.Add(resizeBottom);
+            layers.Children.Add(resizeCorner);
             layers.Children.Add(close);
             box = new Border
             {
                 Width = a.W * w0, MinHeight = a.H * h0,
                 CornerRadius = new CornerRadius(8), Child = layers,
                 Background = Brushes.Transparent,
-                BorderThickness = new Thickness(1),
+                BorderThickness = new Thickness(selected ? 2 : 1),
                 BorderBrush = selected ? NoteFocusBrush : Brushes.Transparent,
             };
         }
@@ -942,7 +999,7 @@ public partial class PdfViewer : UserControl
     {
         using var p = new SkiaSharp.SKPaint { Color = SkColor(a.Color), IsAntialias = true, Style = SkiaSharp.SKPaintStyle.Fill };
         var r = new SkiaSharp.SKRect((float)a.X * wpt, (float)a.Y * hpt, (float)(a.X + a.W) * wpt, (float)(a.Y + a.H) * hpt);
-        c.DrawRoundRect(r, 2, 2, p);
+        c.DrawRoundRect(r, 3.5f, 3.5f, p);   // ~the on-screen 5px corner at page scale
     }
 
     private static void FlattenArrow(SkiaSharp.SKCanvas c, PdfAnnotation a, float wpt, float hpt)
