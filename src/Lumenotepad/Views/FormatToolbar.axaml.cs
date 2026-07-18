@@ -447,15 +447,18 @@ public partial class FormatToolbar : UserControl
         Add("│", false, "Vertical line", () => InsertDividerRequested?.Invoke("v"));
     }
 
-    /// <summary>Trim the strip for the PDF annotator (M11). Hides the canvas-only furniture — the
-    /// whole Insert menu (image/file/PDF/dividers/link/footnote all resolve against the note page),
-    /// tables, per-line tags, the dock menu, and the customize button — leaving the character/paragraph
-    /// formatting a PDF note actually uses: B/I/U/S, super/subscript, text type, alignment, bullets,
-    /// highlight, color, size, and font. Call once, right after construction.</summary>
+    /// <summary>Trim the strip for the PDF annotator (M11). Hides the canvas-only furniture —
+    /// tables, per-line tags, the dock menu, the customize button — and thins the Insert menu down
+    /// to Link + Footnote (its other entries drop boxes onto the note CANVAS, which has no meaning
+    /// inside a PDF note). Everything else stays: B/I/U/S, super/subscript, text type, alignment,
+    /// bullets, highlight, color, size, and font. Call once, right after construction.</summary>
     public void SetCompact()
     {
-        foreach (var c in new Control[] { InsertBtn, TableBtn, TagBtn, DockBtn, CustomizeBtn })
+        foreach (var c in new Control[] { TableBtn, TagBtn, DockBtn, CustomizeBtn })
             c.IsVisible = false;
+        // Indices follow BuildInsertChoices' Add order: Link, Image, File, PDF, Footnote, H, V.
+        for (int i = InsertChoices.Children.Count - 1; i >= 0; i--)
+            if (i is not (0 or 4)) InsertChoices.Children.RemoveAt(i);
     }
 
     private static readonly (ParaStyle Style, string Name)[] TextTypes =

@@ -111,4 +111,27 @@ public class PdfAnnotationTests
         Assert.Equal(@"C:\notes\report.pdf.lumenotes.json",
             PdfAnnotationDoc.SidecarPath(@"C:\notes\report.pdf"));
     }
+
+    [Fact]
+    public void Hub_sharesOneDocPerPath_seedsFromDiskOnlyOnce()
+    {
+        PdfAnnotationHub.Reset();
+        try
+        {
+            var seed = new PdfAnnotationDoc();
+            seed.Items.Add(new PdfAnnotation { Page = 0, Kind = PdfAnnotation.Note, X = 0.1, Y = 0.1, Text = "hi" });
+
+            var a = PdfAnnotationHub.Get(@"C:\x\a.pdf", seed.ToJson());
+            Assert.Single(a.Items);
+
+            // Same path (any case), even with different disk json → the SAME cached instance.
+            var again = PdfAnnotationHub.Get(@"C:\X\A.PDF", null);
+            Assert.Same(a, again);
+
+            var other = PdfAnnotationHub.Get(@"C:\x\b.pdf", null);
+            Assert.NotSame(a, other);
+            Assert.Empty(other.Items);
+        }
+        finally { PdfAnnotationHub.Reset(); }
+    }
 }

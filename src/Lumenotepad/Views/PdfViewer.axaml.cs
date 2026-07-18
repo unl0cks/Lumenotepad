@@ -136,10 +136,29 @@ public partial class PdfViewer : UserControl
     /// <summary>Persist any pending annotation edits now (host calls this before the view goes away).</summary>
     public void Flush() => SaveNow();
 
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        PdfAnnotationHub.Changed += OnHubChanged;
+    }
+
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
+        PdfAnnotationHub.Changed -= OnHubChanged;
         SaveNow();      // window closing / view swapped out — never lose the last debounced edit
+    }
+
+    /// <summary>Another viewer saved changes to the same PDF (e.g. the attachment popup while this
+    /// page shows it embedded): drop the per-annotation caches and repaint so both stay in step.</summary>
+    private void OnHubChanged(string path, object? sender)
+    {
+        if (ReferenceEquals(sender, this) || !_loaded) return;
+        if (!string.Equals(path, _pdfPath, StringComparison.OrdinalIgnoreCase)) return;
+        _docs.Clear();
+        _editors.Clear();
+        if (_selected is { } sel && !_annos.Items.Contains(sel)) { _selected = null; HideFmtBar(); }
+        foreach (var pv in _pages) RedrawPage(pv);
     }
 
     private async Task LoadAsync(int gen)
@@ -151,14 +170,16 @@ public partial class PdfViewer : UserControl
         if (gen != _loadGen) return;                     // superseded mid-await
         _pdfBytes = bytes;
 
+        string? sidecarJson = null;
         if (File.Exists(_sidecarPath))
         {
-            PdfAnnotationDoc annos;
-            try { annos = PdfAnnotationDoc.FromJson(await File.ReadAllTextAsync(_sidecarPath)); }
-            catch { annos = new PdfAnnotationDoc(); }
+            try { sidecarJson = await File.ReadAllTextAsync(_sidecarPath); }
+            catch { /* unreadable sidecar → start empty */ }
             if (gen != _loadGen) return;
-            _annos = annos;
         }
+        // Through the hub: if another viewer already has this PDF open, we get ITS doc — both
+        // viewers mutate the same instance, so neither can overwrite the other's marks on save.
+        _annos = PdfAnnotationHub.Get(_pdfPath, sidecarJson);
 
         int count = PdfRenderer.PageCount(bytes);
         var sizes = PdfRenderer.PageSizes(bytes);
@@ -1012,7 +1033,11 @@ public partial class PdfViewer : UserControl
 
     private void RestoreSnapshot(string json)
     {
-        _annos = PdfAnnotationDoc.FromJson(json);
+        // Mutate IN PLACE — _annos is the hub-shared instance; replacing it would silently fork
+        // this viewer away from any other viewer showing the same PDF.
+        var restored = PdfAnnotationDoc.FromJson(json);
+        _annos.Items.Clear();
+        _annos.Items.AddRange(restored.Items);
         _docs.Clear();                  // the caches point at the replaced annotation objects
         _editors.Clear();
         _selected = null;
@@ -1250,5 +1275,6 @@ public partial class PdfViewer : UserControl
         if (!_loaded || _sidecarPath.Length == 0) return;   // never save before the sidecar was read
         try { File.WriteAllText(_sidecarPath, _annos.ToJson()); }
         catch { /* read-only location → annotations just aren't persisted */ }
+        PdfAnnotationHub.NotifyChanged(_pdfPath, this);     // other viewers on this PDF repaint
     }
 }

@@ -61,3 +61,29 @@ public sealed class PdfAnnotationDoc
     /// <summary>The sidecar path for a PDF (same folder, name + ".lumenotes.json").</summary>
     public static string SidecarPath(string pdfPath) => pdfPath + ".lumenotes.json";
 }
+
+/// <summary>One SHARED in-memory annotation doc per PDF path. The same file can be open in two
+/// viewers at once (the embedded PDF page and the attachment popup window) — if each held its own
+/// copy, whichever saved last would silently overwrite the other's marks. Sharing the instance makes
+/// that impossible, and <see cref="Changed"/> (raised by a viewer after it saves) lets the other
+/// viewers repaint live. In-process only — sidecars are still read once and written on save.</summary>
+public static class PdfAnnotationHub
+{
+    private static readonly Dictionary<string, PdfAnnotationDoc> Docs = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Raised after a viewer saves changes to a path's doc; sender = that viewer.</summary>
+    public static event Action<string, object?>? Changed;
+
+    /// <summary>The shared doc for a PDF. <paramref name="sidecarJson"/> seeds it on FIRST open only —
+    /// once cached, the in-memory doc is the newest state and disk is ignored.</summary>
+    public static PdfAnnotationDoc Get(string pdfPath, string? sidecarJson)
+    {
+        if (Docs.TryGetValue(pdfPath, out var d)) return d;
+        return Docs[pdfPath] = PdfAnnotationDoc.FromJson(sidecarJson);
+    }
+
+    public static void NotifyChanged(string pdfPath, object? sender) => Changed?.Invoke(pdfPath, sender);
+
+    /// <summary>Tests only — forget every cached doc.</summary>
+    public static void Reset() => Docs.Clear();
+}
