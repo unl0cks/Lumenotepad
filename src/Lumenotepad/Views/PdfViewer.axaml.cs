@@ -90,22 +90,32 @@ public partial class PdfViewer : UserControl
 
     private IBrush AccentBrush => this.FindResource("AccentBrush") as IBrush ?? Brushes.DodgerBlue;
 
+    /// <summary>The soft selection border the canvas note boxes use (the theme accent at ~30%
+    /// alpha) — a gentle tint that sits with the glass, not a hard accent wire around it.</summary>
+    private IBrush NoteFocusBrush => this.FindResource("NoteChromeFocusBrush") as IBrush ?? AccentBrush;
+
     // Bumped on every Load; the async pipeline checks it after each await so a superseded load can
     // never keep adding page frames. Without this, rapid page switches (or a double-fired selection
     // event) interleaved two/three loads: each cleared the host, then EACH appended its own set of
     // frames — the same page stacked multiple times, "1 page" in the status but three on screen, and
     // every annotation seemingly on all of them.
     private int _loadGen;
+    // True only once LoadAsync has the sidecar in memory. EVERY save is gated on it: between "viewer
+    // cleared for a new file" and "sidecar read", _annos is an empty list, and a save fired in that
+    // window (a re-entrant Load's Flush, a detach, a stray debounce tick) would overwrite the user's
+    // saved marks with nothing — which is exactly the data loss the owner hit.
+    private bool _loaded;
 
     /// <summary>Load a PDF (and its sidecar annotations) and render it. Flushes any previous edits.
-    /// Re-entrancy-safe: a newer call supersedes an in-flight one, and loading the already-shown
-    /// file is a no-op.</summary>
+    /// Re-entrancy-safe: a newer call supersedes an in-flight one, and loading the already-shown OR
+    /// already-loading file is a no-op.</summary>
     public async void Load(string pdfPath, bool doubleClickCreate)
     {
         _doubleClickCreate = doubleClickCreate;
-        if (pdfPath == _pdfPath && _pages.Count > 0) return;   // already showing this PDF
-        Flush();
+        if (pdfPath == _pdfPath) return;   // already showing (or mid-loading) this PDF
+        Flush();                           // persist the outgoing document's marks
         int gen = ++_loadGen;
+        _loaded = false;                   // block every save until THIS load has read the sidecar
         _pdfPath = pdfPath;
         _sidecarPath = PdfAnnotationDoc.SidecarPath(pdfPath);
         _pages.Clear();
@@ -157,6 +167,7 @@ public partial class PdfViewer : UserControl
             return;
         }
         StatusLabel.Text = count == 1 ? "1 page" : $"{count} pages";
+        _loaded = true;                    // sidecar is in memory — saving is safe from here on
 
         // Build every page frame first (so scrolling/layout is immediate), then fill in the bitmaps.
         for (int i = 0; i < count; i++)
@@ -600,8 +611,8 @@ public partial class PdfViewer : UserControl
                 Width = a.W * w0, MinHeight = a.H * h0,
                 CornerRadius = new CornerRadius(10), Child = clip,
                 BoxShadow = BoxShadows.Parse(selected ? "0 9 28 0 #80000000" : "0 4 16 0 #59000000"),
-                BorderThickness = new Thickness(selected ? 1.5 : 1),
-                BorderBrush = selected ? AccentBrush : new SolidColorBrush(Color.Parse("#33FFFFFF")),
+                BorderThickness = new Thickness(1),
+                BorderBrush = selected ? NoteFocusBrush : new SolidColorBrush(Color.Parse("#33FFFFFF")),
                 Transitions = new Transitions
                 {
                     new BoxShadowsTransition { Property = Border.BoxShadowProperty, Duration = TimeSpan.FromMilliseconds(140) },
@@ -621,7 +632,7 @@ public partial class PdfViewer : UserControl
                 CornerRadius = new CornerRadius(8), Child = layers,
                 Background = Brushes.Transparent,
                 BorderThickness = new Thickness(1),
-                BorderBrush = selected ? AccentBrush : Brushes.Transparent,
+                BorderBrush = selected ? NoteFocusBrush : Brushes.Transparent,
             };
         }
         box.Tag = a;
@@ -1086,7 +1097,7 @@ public partial class PdfViewer : UserControl
     private void SaveNow()
     {
         _saveDebounce?.Stop();
-        if (_sidecarPath.Length == 0) return;
+        if (!_loaded || _sidecarPath.Length == 0) return;   // never save before the sidecar was read
         try { File.WriteAllText(_sidecarPath, _annos.ToJson()); }
         catch { /* read-only location → annotations just aren't persisted */ }
     }
