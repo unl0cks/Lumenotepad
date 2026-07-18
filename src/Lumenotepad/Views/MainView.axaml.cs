@@ -555,6 +555,8 @@ public partial class MainView : UserControl
         ApplyPageStyles();             // per-page effective styles (falls back to the global grid pref)
         PageCanvas.SnapToGrid = vm.GridSnap;
         PageCanvas.CreateOnDoubleClick = vm.DoubleClickCreate;
+        PdfViewer.RoundedPagePref = vm.RoundedPdfCorners;
+        PagePdfViewer.RefreshChrome();                 // re-round (or square) an already-open PDF
         if (!vm.DeletedHistory) TrashPanel.IsVisible = false;
         ApplyFlatCovers();
     }
@@ -866,7 +868,7 @@ public partial class MainView : UserControl
             ApplyToolbarPlacement();
         else if (e.PropertyName is nameof(MainViewModel.ResizablePages) or nameof(MainViewModel.DeletedHistory)
                  or nameof(MainViewModel.PageGrid) or nameof(MainViewModel.GridSnap)
-                 or nameof(MainViewModel.DoubleClickCreate))
+                 or nameof(MainViewModel.DoubleClickCreate) or nameof(MainViewModel.RoundedPdfCorners))
             ApplyCanvasPrefs();
         else if (e.PropertyName == nameof(MainViewModel.CornerRoundness))
         {

@@ -575,6 +575,15 @@
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding DoubleClickCreate, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Classes="label" Text="Rounded PDF corners"/>
+                                    <Border Classes="qmark" ToolTip.Tip="When a page shows a PDF, the sheet's corners are gently rounded to match the rest of the app. Turn this off if you prefer sharp, square corners."><TextBlock/></Border>
+                                </StackPanel>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding RoundedPdfCorners, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
                     </StackPanel>
 
                     <StackPanel x:Name="EditorPanel" Spacing="6" IsVisible="False">

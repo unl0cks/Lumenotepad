@@ -90,13 +90,24 @@ public partial class PdfViewer : UserControl
 
     private IBrush AccentBrush => this.FindResource("AccentBrush") as IBrush ?? Brushes.DodgerBlue;
 
-    /// <summary>Load a PDF (and its sidecar annotations) and render it. Flushes any previous edits.</summary>
+    // Bumped on every Load; the async pipeline checks it after each await so a superseded load can
+    // never keep adding page frames. Without this, rapid page switches (or a double-fired selection
+    // event) interleaved two/three loads: each cleared the host, then EACH appended its own set of
+    // frames — the same page stacked multiple times, "1 page" in the status but three on screen, and
+    // every annotation seemingly on all of them.
+    private int _loadGen;
+
+    /// <summary>Load a PDF (and its sidecar annotations) and render it. Flushes any previous edits.
+    /// Re-entrancy-safe: a newer call supersedes an in-flight one, and loading the already-shown
+    /// file is a no-op.</summary>
     public async void Load(string pdfPath, bool doubleClickCreate)
     {
+        _doubleClickCreate = doubleClickCreate;
+        if (pdfPath == _pdfPath && _pages.Count > 0) return;   // already showing this PDF
         Flush();
+        int gen = ++_loadGen;
         _pdfPath = pdfPath;
         _sidecarPath = PdfAnnotationDoc.SidecarPath(pdfPath);
-        _doubleClickCreate = doubleClickCreate;
         _pages.Clear();
         PagesHost.Children.Clear();
         _annos = new PdfAnnotationDoc();
@@ -108,25 +119,38 @@ public partial class PdfViewer : UserControl
         {
             if (PagesScroll is { } sv) SmoothScroll.Attach(sv);
         }, DispatcherPriority.Background);
-        await LoadAsync();
+        await LoadAsync(gen);
     }
 
     /// <summary>Persist any pending annotation edits now (host calls this before the view goes away).</summary>
     public void Flush() => SaveNow();
 
-    private async Task LoadAsync()
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        SaveNow();      // window closing / view swapped out — never lose the last debounced edit
+    }
+
+    private async Task LoadAsync(int gen)
     {
         StatusLabel.Text = "Opening…";
-        try { _pdfBytes = await File.ReadAllBytesAsync(_pdfPath); }
-        catch { StatusLabel.Text = "Couldn't read this file."; return; }
+        byte[] bytes;
+        try { bytes = await File.ReadAllBytesAsync(_pdfPath); }
+        catch { if (gen == _loadGen) StatusLabel.Text = "Couldn't read this file."; return; }
+        if (gen != _loadGen) return;                     // superseded mid-await
+        _pdfBytes = bytes;
+
         if (File.Exists(_sidecarPath))
         {
-            try { _annos = PdfAnnotationDoc.FromJson(await File.ReadAllTextAsync(_sidecarPath)); }
-            catch { _annos = new PdfAnnotationDoc(); }
+            PdfAnnotationDoc annos;
+            try { annos = PdfAnnotationDoc.FromJson(await File.ReadAllTextAsync(_sidecarPath)); }
+            catch { annos = new PdfAnnotationDoc(); }
+            if (gen != _loadGen) return;
+            _annos = annos;
         }
 
-        int count = PdfRenderer.PageCount(_pdfBytes);
-        var sizes = PdfRenderer.PageSizes(_pdfBytes);
+        int count = PdfRenderer.PageCount(bytes);
+        var sizes = PdfRenderer.PageSizes(bytes);
         if (count == 0 || sizes.Count == 0)
         {
             StatusLabel.Text = "This file isn't a readable PDF.";
@@ -145,7 +169,8 @@ public partial class PdfViewer : UserControl
         for (int i = 0; i < count; i++)
         {
             int page = i;
-            var bmp = await Task.Run(() => PdfRenderer.RenderPage(_pdfBytes, page, BaseDpi));
+            var bmp = await Task.Run(() => PdfRenderer.RenderPage(bytes, page, BaseDpi));
+            if (gen != _loadGen) return;                 // switched PDFs while a page was rendering
             if (bmp is not null) _pages[page].Img.Source = bmp;
             RedrawPage(_pages[page]);
         }
@@ -173,15 +198,48 @@ public partial class PdfViewer : UserControl
         return pv;
     }
 
+    /// <summary>"Rounded PDF corners" preference (on by default) — pushed by MainView's prefs apply.</summary>
+    public static bool RoundedPagePref = true;
+
     private void LayoutPages()
     {
+        double rad = RoundedPagePref ? 12 : 0;
         foreach (var pv in _pages)
         {
             double w = pv.WPt * PxPerPoint * _zoom;
             double h = pv.HPt * PxPerPoint * _zoom;
             pv.Frame.Width = w; pv.Frame.Height = h;
             pv.Overlay.Width = w; pv.Overlay.Height = h;
+            pv.Frame.CornerRadius = new CornerRadius(rad);
+            // Border only rounds its own background — the rendered page Image needs a matching clip.
+            if (pv.Frame.Child is Control inner)
+                inner.Clip = rad > 0 ? RoundedRect(w, h, rad) : null;
         }
+    }
+
+    /// <summary>Re-apply chrome preferences (page corner rounding) to an already-open PDF.</summary>
+    public void RefreshChrome()
+    {
+        LayoutPages();
+        foreach (var pv in _pages) RedrawPage(pv);
+    }
+
+    private static StreamGeometry RoundedRect(double w, double h, double r)
+    {
+        r = Math.Min(r, Math.Min(w, h) / 2);
+        var g = new StreamGeometry();
+        using var c = g.Open();
+        c.BeginFigure(new Point(r, 0), true);
+        c.LineTo(new Point(w - r, 0));
+        c.ArcTo(new Point(w, r), new Size(r, r), 0, false, SweepDirection.Clockwise);
+        c.LineTo(new Point(w, h - r));
+        c.ArcTo(new Point(w - r, h), new Size(r, r), 0, false, SweepDirection.Clockwise);
+        c.LineTo(new Point(r, h));
+        c.ArcTo(new Point(0, h - r), new Size(r, r), 0, false, SweepDirection.Clockwise);
+        c.LineTo(new Point(0, r));
+        c.ArcTo(new Point(r, 0), new Size(r, r), 0, false, SweepDirection.Clockwise);
+        c.EndFigure(true);
+        return g;
     }
 
     // ---- tools ----
@@ -469,24 +527,51 @@ public partial class PdfViewer : UserControl
             Effect = new BlurEffect { Radius = 16 },
             IsHitTestVisible = false,
         };
-        var smoke = new Border      // the dark Lumen glass tint white text sits on
+        var smoke = new Border      // the dark BLUISH Lumen glass the white text sits on
         {
             CornerRadius = new CornerRadius(10),
-            Background = new SolidColorBrush(Color.Parse("#9412171F")),
+            Background = new SolidColorBrush(Color.Parse("#D4131A29")),
             IsHitTestVisible = false,
         };
 
-        // A slim grip strip up top is the move handle; the editor below stays free for typing.
+        // Grip strip: transparent with the Lumen pill bar centered — same furniture as canvas notes.
+        var gripBar = new Border
+        {
+            Width = 38, Height = 4, CornerRadius = new CornerRadius(2),
+            Background = new SolidColorBrush(Color.Parse(selected ? "#52FFFFFF" : "#30FFFFFF")),
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+        };
         var grip = new Border
         {
-            Height = 14, CornerRadius = new CornerRadius(10, 10, 0, 0),
-            Background = new SolidColorBrush(Color.Parse(selected ? "#30FFFFFF" : "#1AFFFFFF")),
+            Height = 16, CornerRadius = new CornerRadius(10, 10, 0, 0),
+            Background = new SolidColorBrush(Color.Parse("#12FFFFFF")), Child = gripBar,
             Cursor = new Cursor(StandardCursorType.SizeAll),
         };
         DockPanel.SetDock(grip, Dock.Top);
         var content = new DockPanel();
         content.Children.Add(grip);
         content.Children.Add(editor);
+
+        // ✕ lives INSIDE the card's top-right corner (the canvas note-box pattern): quiet until
+        // hovered, then the familiar red. Drawn strokes — no icon font to fall back badly.
+        var closeGlyph = new Avalonia.Controls.Shapes.Path
+        {
+            Data = Geometry.Parse("M0,0 L7,7 M7,0 L0,7"),
+            Stroke = new SolidColorBrush(Color.Parse("#8CFFFFFF")), StrokeThickness = 1.4,
+            StrokeLineCap = PenLineCap.Round, IsHitTestVisible = false,
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+        };
+        var close = new Border
+        {
+            Width = 19, Height = 19, CornerRadius = new CornerRadius(0, 10, 0, 7),
+            Background = Brushes.Transparent, Child = closeGlyph, IsVisible = selected,
+            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top,
+            Cursor = new Cursor(StandardCursorType.Hand),
+        };
+        close.PointerEntered += (_, _) => { close.Background = new SolidColorBrush(Color.Parse("#66E81123")); closeGlyph.Stroke = Brushes.White; };
+        close.PointerExited += (_, _) => { close.Background = Brushes.Transparent; closeGlyph.Stroke = new SolidColorBrush(Color.Parse("#8CFFFFFF")); };
+        close.PointerPressed += (_, e) => e.Handled = true;      // don't fall through to select/drag
+        close.PointerReleased += (_, e) => { Delete(a); e.Handled = true; };
 
         var layers = new Panel();
         layers.Children.Add(backdrop);
@@ -495,18 +580,25 @@ public partial class PdfViewer : UserControl
             layers.Children.Add(new Border
             {
                 CornerRadius = new CornerRadius(10),
-                Background = new SolidColorBrush(Color.Parse("#40" + SolidHex(a.Color)[3..])),
+                Background = new SolidColorBrush(Color.Parse("#30" + SolidHex(a.Color)[3..])),
                 IsHitTestVisible = false,
             });
         layers.Children.Add(content);
+        layers.Children.Add(new Border      // vignette: soft dark falloff hugging the card's edges
+        {
+            CornerRadius = new CornerRadius(10),
+            BoxShadow = BoxShadows.Parse("inset 0 0 22 3 #59000000"),
+            IsHitTestVisible = false,
+        });
+        layers.Children.Add(close);
 
         var box = new Border
         {
             Width = a.W * w0, MinHeight = a.H * h0,
             CornerRadius = new CornerRadius(10), Child = layers, ClipToBounds = true,
-            BoxShadow = BoxShadows.Parse(selected ? "0 7 24 0 #73000000" : "0 3 14 0 #4D000000"),
+            BoxShadow = BoxShadows.Parse(selected ? "0 9 28 0 #80000000" : "0 4 16 0 #59000000"),
             BorderThickness = new Thickness(selected ? 1.5 : 1),
-            BorderBrush = selected ? AccentBrush : new SolidColorBrush(Color.Parse("#3DFFFFFF")),
+            BorderBrush = selected ? AccentBrush : new SolidColorBrush(Color.Parse("#33FFFFFF")),
             Tag = a,
             RenderTransform = new ScaleTransform(_zoom, _zoom),
             RenderTransformOrigin = RelativePoint.TopLeft,
@@ -517,6 +609,8 @@ public partial class PdfViewer : UserControl
         };
         Canvas.SetLeft(box, a.X * w); Canvas.SetTop(box, a.Y * h);
         grip.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, 0, e); };
+        box.PointerEntered += (_, _) => close.IsVisible = true;
+        box.PointerExited += (_, _) => close.IsVisible = ReferenceEquals(_selected, a);
         box.PointerPressed += (_, e) =>
         {
             // Click anywhere on the card selects it — and stops the press falling through to the
@@ -542,7 +636,6 @@ public partial class PdfViewer : UserControl
 
         pv.Overlay.Children.Add(box);
         if (a == _justAdded) { _justAdded = null; Motion.ScaleIn(box, 0.9, Motion.Fast); }   // pop-in on create
-        if (selected) AddDeleteButton(pv, a.X * w + a.W * w, a.Y * h, a);
     }
 
     private void DrawArrow(PageView pv, PdfAnnotation a)
@@ -605,27 +698,27 @@ public partial class PdfViewer : UserControl
         return new Avalonia.Collections.AvaloniaList<Point> { to, p1, p2 };
     }
 
-    /// <summary>The delete chip, in Lumen's own language: a small dark-glass circle with a hairline
-    /// edge and a quiet drawn ✕ that only turns red when you hover it — the exact pattern the canvas
-    /// note boxes use for their close button (no icon font involved, so it can't render as a box).</summary>
+    /// <summary>Delete chip for highlights and arrows (notes carry their ✕ inside the card instead):
+    /// a small rounded-square of dark Lumen glass — the app's icon-button shape — with a quiet drawn ✕
+    /// that turns red only on hover, a hairline edge, vignette, and drop shadow.</summary>
     private void AddDeleteButton(PageView pv, double x, double y, PdfAnnotation a)
     {
         const double d = 22;
-        var restBg = new SolidColorBrush(Color.Parse("#B31A2030"));
-        var restFg = new SolidColorBrush(Color.Parse("#D9FFFFFF"));
+        var restBg = new SolidColorBrush(Color.Parse("#CC141A26"));
+        var restFg = new SolidColorBrush(Color.Parse("#A6FFFFFF"));
         var glyph = new Avalonia.Controls.Shapes.Path
         {
-            Data = Geometry.Parse("M0,0 L8,8 M8,0 L0,8"),
-            Stroke = restFg, StrokeThickness = 1.6, StrokeLineCap = PenLineCap.Round,
+            Data = Geometry.Parse("M0,0 L7,7 M7,0 L0,7"),
+            Stroke = restFg, StrokeThickness = 1.4, StrokeLineCap = PenLineCap.Round,
             IsHitTestVisible = false,
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
         };
         var btn = new Border
         {
-            Width = d, Height = d, CornerRadius = new CornerRadius(d / 2),
+            Width = d, Height = d, CornerRadius = new CornerRadius(7),
             Background = restBg,
-            BorderBrush = new SolidColorBrush(Color.Parse("#38FFFFFF")), BorderThickness = new Thickness(1),
-            BoxShadow = BoxShadows.Parse("0 2 8 0 #59000000"),
+            BorderBrush = new SolidColorBrush(Color.Parse("#33FFFFFF")), BorderThickness = new Thickness(1),
+            BoxShadow = BoxShadows.Parse("0 3 10 0 #66000000, inset 0 0 8 1 #40000000"),
             Cursor = new Cursor(StandardCursorType.Hand), Child = glyph,
         };
         btn.PointerEntered += (_, _) => { btn.Background = new SolidColorBrush(Color.Parse("#E6E5484D")); glyph.Stroke = Brushes.White; };
@@ -870,34 +963,45 @@ public partial class PdfViewer : UserControl
         var editor = NewNoteEditor(doc);
 
         var layers = new Panel();
-        layers.Children.Add(new Border   // dark smoke tint (translucent — the blurred page shows through)
+        layers.Children.Add(new Border   // dark bluish smoke (translucent — the blurred page shows through)
         {
             CornerRadius = new CornerRadius(10),
-            Background = new SolidColorBrush(Color.Parse("#9412171F")),
+            Background = new SolidColorBrush(Color.Parse("#D4131A29")),
         });
         if (sticky)
             layers.Children.Add(new Border
             {
                 CornerRadius = new CornerRadius(10),
-                Background = new SolidColorBrush(Color.Parse("#40" + SolidHex(a.Color)[3..])),
+                Background = new SolidColorBrush(Color.Parse("#30" + SolidHex(a.Color)[3..])),
             });
+        var gripBar = new Border
+        {
+            Width = 38, Height = 4, CornerRadius = new CornerRadius(2),
+            Background = new SolidColorBrush(Color.Parse("#30FFFFFF")),
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+        };
         var grip = new Border
         {
-            Height = 14, CornerRadius = new CornerRadius(10, 10, 0, 0),
-            Background = new SolidColorBrush(Color.Parse("#1AFFFFFF")),
+            Height = 16, CornerRadius = new CornerRadius(10, 10, 0, 0),
+            Background = new SolidColorBrush(Color.Parse("#12FFFFFF")), Child = gripBar,
         };
         DockPanel.SetDock(grip, Dock.Top);
         var content = new DockPanel();
         content.Children.Add(grip);
         content.Children.Add(editor);
         layers.Children.Add(content);
+        layers.Children.Add(new Border   // vignette, matching the on-screen card
+        {
+            CornerRadius = new CornerRadius(10),
+            BoxShadow = BoxShadows.Parse("inset 0 0 22 3 #59000000"),
+        });
 
         var box = new Border
         {
             Width = pxW,
             CornerRadius = new CornerRadius(10),
             BorderThickness = new Thickness(1),
-            BorderBrush = new SolidColorBrush(Color.Parse("#3DFFFFFF")),
+            BorderBrush = new SolidColorBrush(Color.Parse("#33FFFFFF")),
             Child = layers,
         };
         box.Measure(new Size(pxW, double.PositiveInfinity));

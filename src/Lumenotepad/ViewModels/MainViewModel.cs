@@ -119,6 +119,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _summonHotkey;       // prefs: global Ctrl+Alt+N
     [ObservableProperty] private double _pagesPanelWidth = 224; // pages side panel width; drag-resizable
     [ObservableProperty] private bool _doubleClickCreate;  // prefs: require a double-click to start a note
+    [ObservableProperty] private bool _roundedPdfCorners = true;  // prefs: PDF pages get rounded corners
     /// <summary>Bumped whenever a toolbar palette changes — the toolbar rebuilds its swatches.</summary>
     [ObservableProperty] private int _palettePrefsVersion;
 
@@ -259,6 +260,7 @@ public partial class MainViewModel : ObservableObject
             SummonHotkey = _settings.SummonHotkey;
             PagesPanelWidth = _settings.PagesPanelWidth;
             DoubleClickCreate = _settings.DoubleClickCreate;
+            RoundedPdfCorners = _settings.RoundedPdfCorners;
         }
         _workspace = store.LoadOrSeed();
         // Capture BEFORE the default selection below — its cascade re-tracks LastPageId.
@@ -767,6 +769,13 @@ public partial class MainViewModel : ObservableObject
         _settings.Save(_settingsDir);
     }
 
+    partial void OnRoundedPdfCornersChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.RoundedPdfCorners = value;
+        _settings.Save(_settingsDir);
+    }
+
     // ---- gallery ordering (the order persists via order.json) ----
 
     public void SortNotebooksByName() =>
@@ -923,6 +932,7 @@ public partial class MainViewModel : ObservableObject
         BackupFolder = d.BackupFolder; BackupEveryDays = d.BackupEveryDays; BackupKeep = d.BackupKeep;
         CloseToTray = d.CloseToTray; MinimizeToTray = d.MinimizeToTray; SummonHotkey = d.SummonHotkey;
         PagesPanelWidth = d.PagesPanelWidth; DoubleClickCreate = d.DoubleClickCreate;
+        RoundedPdfCorners = d.RoundedPdfCorners;
         if (_settings is not null && _settingsDir is not null && _settings.BulletColors.Count > 0)
         {
             _settings.BulletColors.Clear();
