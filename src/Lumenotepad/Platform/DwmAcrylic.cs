@@ -43,20 +43,27 @@ public static class DwmAcrylic
     private static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref CompositionData data);
 
     private const int WCA_ACCENT_POLICY = 19;
-    private const int ACCENT_ENABLE_ACRYLICBLURBEHIND = 4;
+    private const int ACCENT_DISABLED = 0;
+    private const int ACCENT_ENABLE_BLURBEHIND = 3;          // soft plain gaussian
+    private const int ACCENT_ENABLE_ACRYLICBLURBEHIND = 4;   // full acrylic
 
-    /// <summary>Acrylic blur-behind on any HWND — popups included. <paramref name="tintAbgr"/> is
-    /// AABBGGRR, the tint mixed into the blur itself (keep its alpha LOW — the popup content's own
-    /// translucent brush supplies the visible tint).</summary>
-    public static void BlurBehind(IntPtr hwnd, uint tintAbgr = 0x2E1C1614)
+    /// <summary>Blur-behind on any HWND — popups included. <paramref name="soft"/> picks the plain
+    /// gaussian blur (gentler) instead of full acrylic. <paramref name="tintAbgr"/> is AABBGGRR, the
+    /// tint mixed into the blur itself (keep its alpha LOW — the popup content's own translucent
+    /// brush supplies the visible tint).</summary>
+    public static void BlurBehind(IntPtr hwnd, uint tintAbgr = 0x2E1C1614, bool soft = false)
+        => SetAccent(hwnd, soft ? ACCENT_ENABLE_BLURBEHIND : ACCENT_ENABLE_ACRYLICBLURBEHIND, tintAbgr);
+
+    /// <summary>Remove any accent blur from the HWND (the "clear" blur tier, or before switching a
+    /// window over to the system backdrop).</summary>
+    public static void DisableBlurBehind(IntPtr hwnd) => SetAccent(hwnd, ACCENT_DISABLED, 0);
+
+    private static void SetAccent(IntPtr hwnd, int state, uint tintAbgr)
     {
         if (!OperatingSystem.IsWindows() || hwnd == IntPtr.Zero) return;
         try
         {
-            var accent = new AccentPolicy
-            {
-                State = ACCENT_ENABLE_ACRYLICBLURBEHIND, Flags = 2, GradientColor = tintAbgr,
-            };
+            var accent = new AccentPolicy { State = state, Flags = 2, GradientColor = tintAbgr };
             int size = Marshal.SizeOf<AccentPolicy>();
             IntPtr ptr = Marshal.AllocHGlobal(size);
             try

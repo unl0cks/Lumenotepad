@@ -120,6 +120,10 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double _pagesPanelWidth = 224; // pages side panel width; drag-resizable
     [ObservableProperty] private bool _doubleClickCreate;  // prefs: require a double-click to start a note
     [ObservableProperty] private bool _roundedPdfCorners = true;  // prefs: PDF pages get rounded corners
+    // prefs: glass blur strength per surface (0 clear … 100 full frost); pushed to BlurPrefs statics
+    [ObservableProperty] private int _blurMain = 100;
+    [ObservableProperty] private int _blurWindows = 100;
+    [ObservableProperty] private int _blurMenus = 100;
     /// <summary>Bumped whenever a toolbar palette changes — the toolbar rebuilds its swatches.</summary>
     [ObservableProperty] private int _palettePrefsVersion;
 
@@ -261,7 +265,14 @@ public partial class MainViewModel : ObservableObject
             PagesPanelWidth = _settings.PagesPanelWidth;
             DoubleClickCreate = _settings.DoubleClickCreate;
             RoundedPdfCorners = _settings.RoundedPdfCorners;
+            BlurMain = _settings.BlurMain;
+            BlurWindows = _settings.BlurWindows;
+            BlurMenus = _settings.BlurMenus;
         }
+        // Property setters only push on CHANGE — assert the statics so defaults land too.
+        BlurPrefs.MainPct = BlurMain;
+        BlurPrefs.WindowsPct = BlurWindows;
+        BlurPrefs.MenusPct = BlurMenus;
         _workspace = store.LoadOrSeed();
         // Capture BEFORE the default selection below — its cascade re-tracks LastPageId.
         var lastPageId = _settings is { LaunchTarget: "LastPage" } ? _settings.LastPageId : null;
@@ -776,6 +787,30 @@ public partial class MainViewModel : ObservableObject
         _settings.Save(_settingsDir);
     }
 
+    partial void OnBlurMainChanged(int value)
+    {
+        BlurPrefs.MainPct = value;
+        if (_settings is null || _settingsDir is null) return;
+        _settings.BlurMain = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnBlurWindowsChanged(int value)
+    {
+        BlurPrefs.WindowsPct = value;
+        if (_settings is null || _settingsDir is null) return;
+        _settings.BlurWindows = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnBlurMenusChanged(int value)
+    {
+        BlurPrefs.MenusPct = value;
+        if (_settings is null || _settingsDir is null) return;
+        _settings.BlurMenus = value;
+        _settings.Save(_settingsDir);
+    }
+
     // ---- gallery ordering (the order persists via order.json) ----
 
     public void SortNotebooksByName() =>
@@ -933,6 +968,7 @@ public partial class MainViewModel : ObservableObject
         CloseToTray = d.CloseToTray; MinimizeToTray = d.MinimizeToTray; SummonHotkey = d.SummonHotkey;
         PagesPanelWidth = d.PagesPanelWidth; DoubleClickCreate = d.DoubleClickCreate;
         RoundedPdfCorners = d.RoundedPdfCorners;
+        BlurMain = d.BlurMain; BlurWindows = d.BlurWindows; BlurMenus = d.BlurMenus;
         if (_settings is not null && _settingsDir is not null && _settings.BulletColors.Count > 0)
         {
             _settings.BulletColors.Clear();

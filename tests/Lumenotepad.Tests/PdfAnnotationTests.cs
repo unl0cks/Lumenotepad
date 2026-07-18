@@ -113,6 +113,16 @@ public class PdfAnnotationTests
     }
 
     [Fact]
+    public void BlurTiers_mapPercentagesOntoTheRealWindowsLevels()
+    {
+        Assert.Equal(Services.BlurPrefs.Tier.Clear, Services.BlurPrefs.TierOf(0));
+        Assert.Equal(Services.BlurPrefs.Tier.Soft, Services.BlurPrefs.TierOf(1));
+        Assert.Equal(Services.BlurPrefs.Tier.Soft, Services.BlurPrefs.TierOf(50));
+        Assert.Equal(Services.BlurPrefs.Tier.Strong, Services.BlurPrefs.TierOf(51));
+        Assert.Equal(Services.BlurPrefs.Tier.Strong, Services.BlurPrefs.TierOf(100));
+    }
+
+    [Fact]
     public void Hub_sharesOneDocPerPath_seedsFromDiskOnlyOnce()
     {
         PdfAnnotationHub.Reset();

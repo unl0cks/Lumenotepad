@@ -100,18 +100,44 @@ public static class ThemeManager
     }
 
     /// <summary>Re-tint a window's native chrome for the active theme: immersive dark, and the
-    /// acrylic backdrop ONLY when the theme actually shows glass — solid themes are fully painted,
-    /// and skipping the backdrop there avoids DWM's maximize/snap artifacts.</summary>
+    /// glass backdrop ONLY when the theme actually shows glass — solid themes are fully painted,
+    /// and skipping the backdrop there avoids DWM's maximize/snap artifacts. The blur strength
+    /// follows the "Main window" preference.</summary>
     public static void ApplyChrome(Window window) =>
-        Platform.DwmAcrylic.Apply(window,
-            Current.GlassWindow ? Platform.DwmAcrylic.Backdrop.Acrylic : Platform.DwmAcrylic.Backdrop.None,
-            dark: Current.DarkChrome);
+        ApplyWindowBlur(window, Current.GlassWindow, BlurPrefs.MainPct);
 
-    /// <summary>Chrome for secondary windows (preferences, notebook wizard, font browser): acrylic
-    /// frost ONLY when the theme is whole-window glass (Lumen), else a plain opaque window matching
-    /// the solid frame. Paired with a Background bound to WindowSurfaceBrush.</summary>
+    /// <summary>Chrome for secondary windows (preferences, notebook wizard, font browser): glass
+    /// ONLY when the theme is whole-window glass (Lumen), else a plain opaque window matching the
+    /// solid frame. Paired with a Background bound to WindowSurfaceBrush. The blur strength follows
+    /// the "Other windows" preference.</summary>
     public static void ApplyChildChrome(Window window) =>
-        Platform.DwmAcrylic.Apply(window,
-            Current.FrostedWindow ? Platform.DwmAcrylic.Backdrop.Acrylic : Platform.DwmAcrylic.Backdrop.None,
-            dark: Current.DarkChrome);
+        ApplyWindowBlur(window, Current.FrostedWindow, BlurPrefs.WindowsPct);
+
+    /// <summary>The user's blur tier on a window: Clear = transparent with NO blur, Soft = the
+    /// plain gaussian blur-behind, Strong = the full DWM acrylic backdrop.</summary>
+    private static void ApplyWindowBlur(Window window, bool glass, int pct)
+    {
+        bool dark = Current.DarkChrome;
+        var hwnd = window.TryGetPlatformHandle()?.Handle ?? System.IntPtr.Zero;
+        if (!glass)
+        {
+            Platform.DwmAcrylic.Apply(window, Platform.DwmAcrylic.Backdrop.None, dark);
+            return;
+        }
+        switch (BlurPrefs.TierOf(pct))
+        {
+            case BlurPrefs.Tier.Clear:
+                Platform.DwmAcrylic.DisableBlurBehind(hwnd);
+                Platform.DwmAcrylic.Apply(window, Platform.DwmAcrylic.Backdrop.None, dark);
+                break;
+            case BlurPrefs.Tier.Soft:
+                Platform.DwmAcrylic.Apply(window, Platform.DwmAcrylic.Backdrop.None, dark);
+                Platform.DwmAcrylic.BlurBehind(hwnd, soft: true);
+                break;
+            default:
+                Platform.DwmAcrylic.DisableBlurBehind(hwnd);
+                Platform.DwmAcrylic.Apply(window, Platform.DwmAcrylic.Backdrop.Acrylic, dark);
+                break;
+        }
+    }
 }

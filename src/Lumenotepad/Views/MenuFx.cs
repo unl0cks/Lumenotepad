@@ -94,13 +94,23 @@ public static class MenuFx
                 WindowTransparencyLevel.AcrylicBlur,
                 WindowTransparencyLevel.Transparent,
             };
-            // Two blur mechanisms, oldest first: the legacy composition-attribute blur-behind
-            // (works on popup windows on older builds, but the undocumented API is dying off in
-            // newer Windows 11 builds), then the MODERN DWM system backdrop — historically ignored
-            // on popup-class windows, but newer builds honor it there. Whichever the OS accepts wins;
-            // the other is a harmless no-op.
-            Platform.DwmAcrylic.BlurBehind(hwnd);
-            Platform.DwmAcrylic.Apply(hwnd, Platform.DwmAcrylic.Backdrop.Acrylic, dark: true);
+            // Blur strength per the "Menus" preference: Clear = transparent with no blur at all,
+            // Soft = the plain gaussian blur-behind, Strong = both acrylic mechanisms (the legacy
+            // composition attribute plus the modern DWM backdrop — whichever the build accepts
+            // wins, the other is a harmless no-op).
+            switch (BlurPrefs.TierOf(BlurPrefs.MenusPct))
+            {
+                case BlurPrefs.Tier.Clear:
+                    Platform.DwmAcrylic.DisableBlurBehind(hwnd);
+                    break;
+                case BlurPrefs.Tier.Soft:
+                    Platform.DwmAcrylic.BlurBehind(hwnd, soft: true);
+                    break;
+                default:
+                    Platform.DwmAcrylic.BlurBehind(hwnd);
+                    Platform.DwmAcrylic.Apply(hwnd, Platform.DwmAcrylic.Backdrop.Acrylic, dark: true);
+                    break;
+            }
         }
         catch { /* popups that reject the backdrop keep the translucent fallback */ }
     }
