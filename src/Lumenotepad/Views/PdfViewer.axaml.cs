@@ -73,6 +73,7 @@ public partial class PdfViewer : UserControl
     public PdfViewer()
     {
         InitializeComponent();
+        Focusable = true;               // Delete / Ctrl+Z land here when no note editor has focus
         BuildSwatches();
         FmtBar.SetCompact();                            // hide the canvas-only furniture
         FmtBar.SetPlacement(Dock.Top, pageScope: false);
@@ -90,9 +91,11 @@ public partial class PdfViewer : UserControl
 
     private IBrush AccentBrush => this.FindResource("AccentBrush") as IBrush ?? Brushes.DodgerBlue;
 
-    /// <summary>The soft selection border the canvas note boxes use (the theme accent at ~30%
-    /// alpha) — a gentle tint that sits with the glass, not a hard accent wire around it.</summary>
-    private IBrush NoteFocusBrush => this.FindResource("NoteChromeFocusBrush") as IBrush ?? AccentBrush;
+    /// <summary>Selection ring for marks: the theme accent at ~55% alpha. The canvas note boxes use
+    /// a 30% tint, but over a white PDF page that washed out to near-invisible — this stays soft
+    /// (no hard accent wire) while actually reading as "selected".</summary>
+    private IBrush NoteFocusBrush => new SolidColorBrush(Color.Parse(
+        Services.ThemePalettes.Alpha(Services.ThemeManager.Current.Accent, 0x8C)));
 
     // Bumped on every Load; the async pipeline checks it after each await so a superseded load can
     // never keep adding page frames. Without this, rapid page switches (or a double-fired selection
@@ -124,6 +127,8 @@ public partial class PdfViewer : UserControl
         _docs.Clear();
         _editors.Clear();
         _selected = null;
+        _undoStack.Clear();
+        _redoStack.Clear();
         HideFmtBar();
         Dispatcher.UIThread.Post(() =>
         {
@@ -303,6 +308,7 @@ public partial class PdfViewer : UserControl
                 // mark — and recolors whatever is currently selected, which is what the click usually means.
                 if (_selected is { } cur)
                 {
+                    PushUndo();
                     cur.Color = cur.Kind switch
                     {
                         PdfAnnotation.Arrow => SolidHex(hex),
@@ -393,7 +399,14 @@ public partial class PdfViewer : UserControl
         double w = pv.Overlay.Width, h = pv.Overlay.Height;
         if (_drag is not null)
         {
-            _drag = null; e.Pointer.Capture(null); SaveNow();
+            _drag = null; e.Pointer.Capture(null);
+            if (_dragUndoSnap is { } snap && snap != _annos.ToJson())
+            {
+                _undoStack.Push(snap);     // a real move/resize — undoable
+                _redoStack.Clear();
+            }
+            _dragUndoSnap = null;
+            SaveNow();
             return;
         }
         if (_dragPreview is not null)
@@ -404,6 +417,7 @@ public partial class PdfViewer : UserControl
             e.Pointer.Capture(null);
             if (pw > 5 && ph > 5 && w > 0 && h > 0)
             {
+                PushUndo();
                 _annos.Items.Add(new PdfAnnotation
                 {
                     Page = pv.Index, Kind = PdfAnnotation.Highlight, Color = _color,
@@ -419,6 +433,7 @@ public partial class PdfViewer : UserControl
             e.Pointer.Capture(null);
             if (w > 0 && h > 0 && Dist(s, en) > 8)
             {
+                PushUndo();
                 _annos.Items.Add(new PdfAnnotation
                 {
                     Page = pv.Index, Kind = PdfAnnotation.Arrow, Color = SolidHex(_color),
@@ -440,6 +455,7 @@ public partial class PdfViewer : UserControl
             W = 200 / w0, H = 54 / h0, Text = "",
             Color = kind == PdfAnnotation.Note ? "#F2FFE9A8" : "#00000000",
         };
+        PushUndo();
         _annos.Items.Add(a);
         _justAdded = a;                  // makes DrawTextAnno pop it in
         // One-shot: drop back to Select right away. With the tool left armed, EVERY later click
@@ -484,6 +500,7 @@ public partial class PdfViewer : UserControl
     private void StartDrag(PageView pv, PdfAnnotation a, int handle, PointerPressedEventArgs e)
     {
         Select(a, focusEditor: false);
+        _dragUndoSnap = _annos.ToJson();   // pushed on release, and only if the drag actually moved it
         _drag = a; _dragHandle = handle;
         _dragStartPt = e.GetPosition(pv.Overlay);
         _dragOrig = (a.X, a.Y, a.W, a.H, a.X2, a.Y2);
@@ -520,7 +537,7 @@ public partial class PdfViewer : UserControl
             Background = new SolidColorBrush(Color.Parse(a.Color)),
             IsHitTestVisible = true, Cursor = new Cursor(StandardCursorType.SizeAll),
             CornerRadius = new CornerRadius(5),
-            BorderThickness = new Thickness(selected ? 2 : 0),
+            BorderThickness = new Thickness(selected ? 2.5 : 0),
             BorderBrush = NoteFocusBrush,
         };
         Canvas.SetLeft(rect, a.X * w); Canvas.SetTop(rect, a.Y * h);
@@ -665,7 +682,7 @@ public partial class PdfViewer : UserControl
                 Width = a.W * w0, MinHeight = a.H * h0,
                 CornerRadius = new CornerRadius(10), Child = clip,
                 BoxShadow = BoxShadows.Parse(selected ? "0 9 28 0 #80000000" : "0 4 16 0 #59000000"),
-                BorderThickness = new Thickness(selected ? 2 : 1),
+                BorderThickness = new Thickness(selected ? 2.5 : 1),
                 BorderBrush = selected ? NoteFocusBrush : new SolidColorBrush(Color.Parse("#33FFFFFF")),
                 Transitions = new Transitions
                 {
@@ -688,7 +705,7 @@ public partial class PdfViewer : UserControl
                 Width = a.W * w0, MinHeight = a.H * h0,
                 CornerRadius = new CornerRadius(8), Child = layers,
                 Background = Brushes.Transparent,
-                BorderThickness = new Thickness(selected ? 2 : 1),
+                BorderThickness = new Thickness(selected ? 2.5 : 1),
                 BorderBrush = selected ? NoteFocusBrush : Brushes.Transparent,
             };
         }
@@ -899,6 +916,7 @@ public partial class PdfViewer : UserControl
 
     private void Delete(PdfAnnotation a)
     {
+        PushUndo();
         _annos.Items.Remove(a);
         _docs.Remove(a);
         _editors.Remove(a);
@@ -916,17 +934,64 @@ public partial class PdfViewer : UserControl
             ShowFmtBar(ed);
             if (focusEditor) Dispatcher.UIThread.Post(() => ed.Focus(), DispatcherPriority.Background);
         }
-        else HideFmtBar();
+        else
+        {
+            HideFmtBar();
+            if (a is not null) Focus();   // highlights/arrows: keyboard (Delete, Ctrl+Z) targets the viewer
+        }
     }
 
     private void OnKey(object? sender, KeyEventArgs e)
     {
+        if (e.Source is TextBox or RichTextEditor) return;   // typing in a note: the editor owns its keys
+        bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        bool shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        if (ctrl && e.Key == Key.Z && !shift) { Undo(); e.Handled = true; return; }
+        if (ctrl && (e.Key == Key.Y || (e.Key == Key.Z && shift))) { Redo(); e.Handled = true; return; }
         if (_selected is { } a && (e.Key == Key.Delete || e.Key == Key.Back))
         {
-            if (e.Source is TextBox or RichTextEditor) return;   // don't steal keys while typing in a note
             Delete(a);
             e.Handled = true;
         }
+    }
+
+    // ---- annotation-level undo/redo (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z) ----
+    // Snapshot-based over the whole annotation set (create/move/resize/recolor/delete). Text typed
+    // INSIDE a note keeps the rich editor's own finer-grained undo while the note has focus.
+    private readonly Stack<string> _undoStack = new();
+    private readonly Stack<string> _redoStack = new();
+    private string? _dragUndoSnap;      // the pre-drag state; pushed on release only if something moved
+
+    private void PushUndo()
+    {
+        _undoStack.Push(_annos.ToJson());
+        _redoStack.Clear();
+    }
+
+    private void Undo()
+    {
+        if (_undoStack.Count == 0) return;
+        _redoStack.Push(_annos.ToJson());
+        RestoreSnapshot(_undoStack.Pop());
+    }
+
+    private void Redo()
+    {
+        if (_redoStack.Count == 0) return;
+        _undoStack.Push(_annos.ToJson());
+        RestoreSnapshot(_redoStack.Pop());
+    }
+
+    private void RestoreSnapshot(string json)
+    {
+        _annos = PdfAnnotationDoc.FromJson(json);
+        _docs.Clear();                  // the caches point at the replaced annotation objects
+        _editors.Clear();
+        _selected = null;
+        _drag = null;
+        HideFmtBar();
+        foreach (var pv in _pages) RedrawPage(pv);
+        SaveNow();
     }
 
     // ---- flatten / export: a NEW pdf with every mark baked in ----
