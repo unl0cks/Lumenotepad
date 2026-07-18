@@ -2,6 +2,8 @@ using System;
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Media;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Lumenotepad.Services;
 
@@ -64,6 +66,15 @@ public static class MenuFx
 
     private static void ApplyPopupFx(Control anyInPopup)
     {
+        ApplyPopupFxCore(anyInPopup);
+        // Re-assert once the popup has fully materialized: on some opens the composition-attribute
+        // blur lands before the popup surface is ready and silently does nothing — the menu then
+        // shows the translucent tint with NO blur behind it (flat gray, owner report).
+        Dispatcher.UIThread.Post(() => ApplyPopupFxCore(anyInPopup), DispatcherPriority.Loaded);
+    }
+
+    private static void ApplyPopupFxCore(Control anyInPopup)
+    {
         try
         {
             if (TopLevel.GetTopLevel(anyInPopup) is not { } tl) return;
@@ -74,6 +85,10 @@ public static class MenuFx
 
             var bg = ThemeManager.Current.MenuBackground;                 // "#AARRGGBB"
             if (bg.Length != 9 || Convert.ToInt32(bg.Substring(1, 2), 16) >= 0xF0) return;
+            // Text on a per-pixel-alpha surface must NOT use subpixel (ClearType) smoothing: its
+            // RGB fringes composite against transparency and every glyph grows red/blue "glitchy"
+            // edges (owner report — visible in every menu list). Grayscale AA renders clean on glass.
+            RenderOptions.SetTextRenderingMode(tl, TextRenderingMode.Antialias);
             tl.TransparencyLevelHint = new[]
             {
                 WindowTransparencyLevel.AcrylicBlur,
