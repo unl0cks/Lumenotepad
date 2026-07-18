@@ -100,7 +100,9 @@ public sealed class ReorderDialog : Window
         {
             Theme = this.FindResource("IconButton") as Avalonia.Styling.ControlTheme,
             Width = 28, Height = 28, FontSize = 12, IsEnabled = enabled,
-            FontFamily = Application.Current?.FindResource("IconFont") as FontFamily, Content = glyph,
+            FontFamily = Application.Current?.FindResource("IconFont") as FontFamily
+                         ?? new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
+            Content = glyph,
         };
         b.Click += (_, _) => act();
         return b;

@@ -230,7 +230,19 @@ public partial class PdfViewer : UserControl
                         b.BorderThickness = new Thickness(on ? 2 : 1);
                         b.BorderBrush = (on ? this.FindResource("AccentBrush") : this.FindResource("FrameBorderBrush")) as IBrush;
                     }
-                if (HighlightTool.IsChecked != true) SetTool(Tool.Highlight);
+                // Picking a color NEVER switches tools (owner request). It sets the color for the next
+                // mark — and recolors whatever is currently selected, which is what the click usually means.
+                if (_selected is { } cur)
+                {
+                    cur.Color = cur.Kind switch
+                    {
+                        PdfAnnotation.Arrow => SolidHex(hex),
+                        PdfAnnotation.Highlight => hex,
+                        _ => "#F2" + SolidHex(hex)[3..],           // note/text glass tint
+                    };
+                    foreach (var pv in _pages) RedrawPage(pv);
+                    SaveNow();
+                }
             };
             ColorSwatches.Children.Add(sw);
         }
@@ -277,6 +289,7 @@ public partial class PdfViewer : UserControl
     private void OnOverlayDoubleTapped(PageView pv, TappedEventArgs e)
     {
         if (!_doubleClickCreate) return;                 // otherwise single-click already created it
+        if (!ReferenceEquals(e.Source, pv.Overlay)) return;   // double-click ON a mark must not spawn another
         var p = e.GetPosition(pv.Overlay);
         if (_tool == Tool.Note) { CreateTextAnno(pv, p, PdfAnnotation.Note); e.Handled = true; }
         else if (_tool == Tool.Text) { CreateTextAnno(pv, p, PdfAnnotation.TextBox); e.Handled = true; }
@@ -360,6 +373,9 @@ public partial class PdfViewer : UserControl
         };
         _annos.Items.Add(a);
         _justAdded = a;                  // makes DrawTextAnno pop it in
+        // One-shot: drop back to Select right away. With the tool left armed, EVERY later click
+        // (deselecting, clicking another page…) silently spawned another box — boxes everywhere.
+        SetTool(Tool.Select);
         Select(a, focusEditor: true);    // rebuilds, then focuses the fresh editor
         SaveNow();
     }
@@ -428,41 +444,69 @@ public partial class PdfViewer : UserControl
         if (selected) AddDeleteButton(pv, a.X * w + a.W * w, a.Y * h, a);
     }
 
-    /// <summary>A note/text box: the full rich-text editor from the note canvas, wrapped in a rounded
-    /// card with a slim grip strip for dragging. The card is laid out at page-native pixels and scaled
-    /// by the current zoom, so every bit of formatting (fonts, sizes, super/subscript) scales together.</summary>
+    /// <summary>A note/text box: the full rich-text editor from the note canvas, wrapped in a Lumen
+    /// frosted-glass card. The frost is real: the card's backdrop is the page's OWN pixels for the
+    /// region it covers, blurred, under a dark smoke tint (plus a veil of the note's color for sticky
+    /// notes) — so the note reads as smoked glass over the document, exactly like the app's chrome.
+    /// Laid out at page-native pixels and scaled by the current zoom, so formatting scales together.</summary>
     private void DrawTextAnno(PageView pv, PdfAnnotation a, bool sticky)
     {
         double w = pv.Overlay.Width, h = pv.Overlay.Height;
         double w0 = pv.WPt * PxPerPoint, h0 = pv.HPt * PxPerPoint;   // unzoomed page pixels
         bool selected = ReferenceEquals(a, _selected);
 
-        var editor = BuildNoteEditor(a, sticky);
+        var editor = BuildNoteEditor(a);
         if (_editors.TryGetValue(a, out var stale)) stale.Document = new RichDocument();  // unbind the old instance from the shared doc
         _editors[a] = editor;
+
+        // frosted backdrop: the page region under the card, blurred (falls back to plain glass
+        // while the page bitmap is still rendering)
+        ImageBrush? backdropBrush = pv.Img.Source is Bitmap bmp ? new ImageBrush(bmp) { Stretch = Stretch.Fill } : null;
+        var backdrop = new Border
+        {
+            CornerRadius = new CornerRadius(10),
+            Background = (IBrush?)backdropBrush ?? new SolidColorBrush(Color.Parse("#301A2030")),
+            Effect = new BlurEffect { Radius = 16 },
+            IsHitTestVisible = false,
+        };
+        var smoke = new Border      // the dark Lumen glass tint white text sits on
+        {
+            CornerRadius = new CornerRadius(10),
+            Background = new SolidColorBrush(Color.Parse("#9412171F")),
+            IsHitTestVisible = false,
+        };
 
         // A slim grip strip up top is the move handle; the editor below stays free for typing.
         var grip = new Border
         {
             Height = 14, CornerRadius = new CornerRadius(10, 10, 0, 0),
-            Background = new SolidColorBrush(Color.Parse(sticky ? "#3C000000" : (selected ? "#26FFFFFF" : "#14FFFFFF"))),
+            Background = new SolidColorBrush(Color.Parse(selected ? "#30FFFFFF" : "#1AFFFFFF")),
             Cursor = new Cursor(StandardCursorType.SizeAll),
         };
         DockPanel.SetDock(grip, Dock.Top);
-        var stack = new DockPanel();
-        stack.Children.Add(grip);
-        stack.Children.Add(editor);
+        var content = new DockPanel();
+        content.Children.Add(grip);
+        content.Children.Add(editor);
+
+        var layers = new Panel();
+        layers.Children.Add(backdrop);
+        layers.Children.Add(smoke);
+        if (sticky)                 // sticky notes: a soft veil of their own color over the glass
+            layers.Children.Add(new Border
+            {
+                CornerRadius = new CornerRadius(10),
+                Background = new SolidColorBrush(Color.Parse("#40" + SolidHex(a.Color)[3..])),
+                IsHitTestVisible = false,
+            });
+        layers.Children.Add(content);
 
         var box = new Border
         {
             Width = a.W * w0, MinHeight = a.H * h0,
-            Background = sticky ? new SolidColorBrush(Color.Parse(a.Color)) : new SolidColorBrush(Color.Parse("#F2FBFCFF")),
-            CornerRadius = new CornerRadius(10), Child = stack,
-            BoxShadow = BoxShadows.Parse(selected ? "0 6 22 0 #66000000" : "0 3 13 0 #44000000"),
-            BorderThickness = new Thickness(selected ? 2 : 1),
-            BorderBrush = selected
-                ? AccentBrush
-                : new SolidColorBrush(Color.Parse(sticky ? "#33000000" : "#22000000")),
+            CornerRadius = new CornerRadius(10), Child = layers, ClipToBounds = true,
+            BoxShadow = BoxShadows.Parse(selected ? "0 7 24 0 #73000000" : "0 3 14 0 #4D000000"),
+            BorderThickness = new Thickness(selected ? 1.5 : 1),
+            BorderBrush = selected ? AccentBrush : new SolidColorBrush(Color.Parse("#3DFFFFFF")),
             Tag = a,
             RenderTransform = new ScaleTransform(_zoom, _zoom),
             RenderTransformOrigin = RelativePoint.TopLeft,
@@ -473,6 +517,29 @@ public partial class PdfViewer : UserControl
         };
         Canvas.SetLeft(box, a.X * w); Canvas.SetTop(box, a.Y * h);
         grip.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, 0, e); };
+        box.PointerPressed += (_, e) =>
+        {
+            // Click anywhere on the card selects it — and stops the press falling through to the
+            // overlay (where an armed Note/Text tool would spawn ANOTHER box on top of this one).
+            if (!ReferenceEquals(_selected, a)) Select(a, focusEditor: false);
+            e.Handled = true;
+        };
+
+        // The frost must sample exactly the page region under the card; the card's height depends on
+        // its content, so sync the brush's source rect after each layout pass.
+        if (backdropBrush is not null)
+        {
+            double lastH = -1;
+            box.LayoutUpdated += (_, _) =>
+            {
+                double bh = box.Bounds.Height;
+                if (Math.Abs(bh - lastH) < 0.5 || bh <= 0 || h0 <= 0) return;
+                lastH = bh;
+                backdropBrush.SourceRect = new RelativeRect(
+                    a.X, a.Y, a.W, Math.Min(Math.Max(0.001, 1 - a.Y), bh / h0), RelativeUnit.Relative);
+            };
+        }
+
         pv.Overlay.Children.Add(box);
         if (a == _justAdded) { _justAdded = null; Motion.ScaleIn(box, 0.9, Motion.Fast); }   // pop-in on create
         if (selected) AddDeleteButton(pv, a.X * w + a.W * w, a.Y * h, a);
@@ -538,26 +605,31 @@ public partial class PdfViewer : UserControl
         return new Avalonia.Collections.AvaloniaList<Point> { to, p1, p2 };
     }
 
-    /// <summary>A round delete chip with a crisply DRAWN ✕ (no icon font to go missing — the old glyph
-    /// rendered as an unreadable box on some systems).</summary>
+    /// <summary>The delete chip, in Lumen's own language: a small dark-glass circle with a hairline
+    /// edge and a quiet drawn ✕ that only turns red when you hover it — the exact pattern the canvas
+    /// note boxes use for their close button (no icon font involved, so it can't render as a box).</summary>
     private void AddDeleteButton(PageView pv, double x, double y, PdfAnnotation a)
     {
         const double d = 22;
+        var restBg = new SolidColorBrush(Color.Parse("#B31A2030"));
+        var restFg = new SolidColorBrush(Color.Parse("#D9FFFFFF"));
         var glyph = new Avalonia.Controls.Shapes.Path
         {
             Data = Geometry.Parse("M0,0 L8,8 M8,0 L0,8"),
-            Stroke = Brushes.White, StrokeThickness = 1.8, StrokeLineCap = PenLineCap.Round,
+            Stroke = restFg, StrokeThickness = 1.6, StrokeLineCap = PenLineCap.Round,
             IsHitTestVisible = false,
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
         };
         var btn = new Border
         {
             Width = d, Height = d, CornerRadius = new CornerRadius(d / 2),
-            Background = new SolidColorBrush(Color.Parse("#E6E5484D")),
-            BorderBrush = new SolidColorBrush(Color.Parse("#40FFFFFF")), BorderThickness = new Thickness(1),
-            BoxShadow = BoxShadows.Parse("0 2 6 0 #55000000"),
+            Background = restBg,
+            BorderBrush = new SolidColorBrush(Color.Parse("#38FFFFFF")), BorderThickness = new Thickness(1),
+            BoxShadow = BoxShadows.Parse("0 2 8 0 #59000000"),
             Cursor = new Cursor(StandardCursorType.Hand), Child = glyph,
         };
+        btn.PointerEntered += (_, _) => { btn.Background = new SolidColorBrush(Color.Parse("#E6E5484D")); glyph.Stroke = Brushes.White; };
+        btn.PointerExited += (_, _) => { btn.Background = restBg; glyph.Stroke = restFg; };
         ToolTip.SetTip(btn, "Delete");
         Canvas.SetLeft(btn, x - d / 2); Canvas.SetTop(btn, y - d / 2);
         btn.PointerPressed += (_, e) => { Delete(a); e.Handled = true; };
@@ -568,9 +640,9 @@ public partial class PdfViewer : UserControl
 
     /// <summary>Build (and wire) the rich editor for a note/text annotation. Focus selects the
     /// annotation and points the format toolbar at this editor.</summary>
-    private RichTextEditor BuildNoteEditor(PdfAnnotation a, bool sticky)
+    private RichTextEditor BuildNoteEditor(PdfAnnotation a)
     {
-        var editor = NewNoteEditor(DocFor(a), sticky);
+        var editor = NewNoteEditor(DocFor(a));
         editor.GotFocus += (_, _) =>
         {
             if (!ReferenceEquals(_selected, a)) Select(a, focusEditor: true);
@@ -579,11 +651,11 @@ public partial class PdfViewer : UserControl
         return editor;
     }
 
-    private RichTextEditor NewNoteEditor(RichDocument doc, bool sticky) => new()
+    private RichTextEditor NewNoteEditor(RichDocument doc) => new()
     {
         Document = doc,
         Margin = new Thickness(10, 4, 10, 8),
-        Foreground = new SolidColorBrush(Color.Parse(sticky ? "#22160A" : "#141821")),
+        Foreground = new SolidColorBrush(Color.Parse("#F0FFFFFF")),   // white text on the dark glass
         CaretBrush = AccentBrush,
         LinkBrush = AccentBrush,
         SelectionBrush = new SolidColorBrush(Color.Parse("#554DA6FF")),
@@ -704,18 +776,20 @@ public partial class PdfViewer : UserControl
                 float wpt = (float)pv.WPt, hpt = (float)pv.HPt;
                 var canvas = pdf.BeginPage(wpt, hpt);
                 using (var page = PdfRenderer.RenderPageSk(_pdfBytes, i, ExportDpi))
+                {
                     if (page is not null)
                         canvas.DrawBitmap(page, new SkiaSharp.SKRect(0, 0, wpt, hpt));
 
-                foreach (var a in _annos.Items)
-                {
-                    if (a.Page != i) continue;
-                    switch (a.Kind)
+                    foreach (var a in _annos.Items)
                     {
-                        case PdfAnnotation.Highlight: FlattenHighlight(canvas, a, wpt, hpt); break;
-                        case PdfAnnotation.Arrow: FlattenArrow(canvas, a, wpt, hpt); break;
-                        case PdfAnnotation.Note: FlattenNote(canvas, a, wpt, hpt, sticky: true); break;
-                        case PdfAnnotation.TextBox: FlattenNote(canvas, a, wpt, hpt, sticky: false); break;
+                        if (a.Page != i) continue;
+                        switch (a.Kind)
+                        {
+                            case PdfAnnotation.Highlight: FlattenHighlight(canvas, a, wpt, hpt); break;
+                            case PdfAnnotation.Arrow: FlattenArrow(canvas, a, wpt, hpt); break;
+                            case PdfAnnotation.Note: FlattenNote(canvas, a, wpt, hpt, sticky: true, page); break;
+                            case PdfAnnotation.TextBox: FlattenNote(canvas, a, wpt, hpt, sticky: false, page); break;
+                        }
                     }
                 }
                 pdf.EndPage();
@@ -752,7 +826,8 @@ public partial class PdfViewer : UserControl
         c.DrawPath(path, fill);
     }
 
-    private void FlattenNote(SkiaSharp.SKCanvas c, PdfAnnotation a, float wpt, float hpt, bool sticky)
+    private void FlattenNote(SkiaSharp.SKCanvas c, PdfAnnotation a, float wpt, float hpt, bool sticky,
+                             SkiaSharp.SKBitmap? pageBmp)
     {
         double widthPts = a.W * wpt;
         if (widthPts < 4) return;
@@ -763,12 +838,27 @@ public partial class PdfViewer : UserControl
         if (img is null) return;
         float heightPts = (float)(pxH * (widthPts / pxW));
         float left = (float)a.X * wpt, top = (float)a.Y * hpt;
-        c.DrawImage(img, new SkiaSharp.SKRect(left, top, left + (float)widthPts, top + heightPts));
+        var rect = new SkiaSharp.SKRect(left, top, left + (float)widthPts, top + heightPts);
+
+        // Bake the frosted-glass backdrop: re-draw the page region under the card blurred, clipped to
+        // the card's rounded rect, then lay the (translucent) card image over it.
+        if (pageBmp is not null)
+        {
+            c.Save();
+            using var rr = new SkiaSharp.SKRoundRect(rect, 6.5f, 6.5f);
+            c.ClipRoundRect(rr, antialias: true);
+            using var blur = new SkiaSharp.SKPaint { ImageFilter = SkiaSharp.SKImageFilter.CreateBlur(5, 5) };
+            c.DrawBitmap(pageBmp, new SkiaSharp.SKRect(0, 0, wpt, hpt), blur);
+            c.Restore();
+        }
+        c.DrawImage(img, rect);
     }
 
-    /// <summary>Render a note/text card to a PNG (its exact on-screen look) at page-native pixels, so
-    /// the flattened copy carries the same fonts, colors, and layout. Independent doc — never touches
-    /// the live editor. Returns null if the page went away.</summary>
+    /// <summary>Render a note/text card to a PNG (its exact on-screen glass look, minus the live
+    /// frost — the flatten path blurs the page beneath instead) at page-native pixels, so the
+    /// flattened copy carries the same fonts, colors, and layout. The PNG keeps its alpha: the glass
+    /// tints stay translucent so the blurred page shows through in the export. Independent doc —
+    /// never touches the live editor. Returns null if the page went away.</summary>
     private byte[]? RenderNoteImage(PdfAnnotation a, bool sticky, out double pxW, out double pxH)
     {
         pxW = pxH = 0;
@@ -777,15 +867,38 @@ public partial class PdfViewer : UserControl
         double w0 = page.WPt * PxPerPoint;
         pxW = Math.Max(8, a.W * w0);
         var doc = !string.IsNullOrEmpty(a.Rich) ? RichDocJson.FromJson(a.Rich) : LegacyDoc(a);
-        var editor = NewNoteEditor(doc, sticky);
+        var editor = NewNoteEditor(doc);
+
+        var layers = new Panel();
+        layers.Children.Add(new Border   // dark smoke tint (translucent — the blurred page shows through)
+        {
+            CornerRadius = new CornerRadius(10),
+            Background = new SolidColorBrush(Color.Parse("#9412171F")),
+        });
+        if (sticky)
+            layers.Children.Add(new Border
+            {
+                CornerRadius = new CornerRadius(10),
+                Background = new SolidColorBrush(Color.Parse("#40" + SolidHex(a.Color)[3..])),
+            });
+        var grip = new Border
+        {
+            Height = 14, CornerRadius = new CornerRadius(10, 10, 0, 0),
+            Background = new SolidColorBrush(Color.Parse("#1AFFFFFF")),
+        };
+        DockPanel.SetDock(grip, Dock.Top);
+        var content = new DockPanel();
+        content.Children.Add(grip);
+        content.Children.Add(editor);
+        layers.Children.Add(content);
+
         var box = new Border
         {
             Width = pxW,
-            Background = sticky ? new SolidColorBrush(Color.Parse(a.Color)) : new SolidColorBrush(Color.Parse("#F2FBFCFF")),
             CornerRadius = new CornerRadius(10),
             BorderThickness = new Thickness(1),
-            BorderBrush = new SolidColorBrush(Color.Parse(sticky ? "#33000000" : "#22000000")),
-            Child = editor,
+            BorderBrush = new SolidColorBrush(Color.Parse("#3DFFFFFF")),
+            Child = layers,
         };
         box.Measure(new Size(pxW, double.PositiveInfinity));
         pxH = Math.Max(8, Math.Ceiling(box.DesiredSize.Height));

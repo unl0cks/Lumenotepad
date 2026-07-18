@@ -395,19 +395,19 @@ public static class PageExport
             void NewPage() { pdf.EndPage(); canvas = pdf.BeginPage(W, H); y = Margin; }
             void EnsureRoom(float need) { if (y + need > H - Margin) NewPage(); }
 
-            void DrawParagraph(IEnumerable<(string Word, SkiaSharp.SKPaint Paint)> words, float lineHeight, float indent = 0)
+            void DrawParagraph(IEnumerable<(string Word, TextPaint Paint)> words, float lineHeight, float indent = 0)
             {
                 float x = Margin + indent;
                 float maxX = W - Margin;
                 foreach (var (word, paint) in words)
                 {
-                    float w = paint.MeasureText(word + " ");
+                    float w = paint.Measure(word + " ");
                     if (x + w > maxX && x > Margin + indent)
                     {
                         x = Margin + indent; y += lineHeight;
                         if (y > H - Margin) NewPage();
                     }
-                    canvas.DrawText(word, x, y, paint);
+                    canvas.DrawText(word, x, y, SkiaSharp.SKTextAlign.Left, paint.Font, paint.Paint);
                     x += w;
                 }
                 y += lineHeight * 1.4f;
@@ -441,16 +441,12 @@ public static class PageExport
                 canvas.DrawPath(path, tick);
             }
 
-            using var titlePaint = new SkiaSharp.SKPaint
-            {
-                Color = SkiaSharp.SKColors.Black, TextSize = 26, IsAntialias = true,
-                Typeface = SkiaSharp.SKTypeface.FromFamilyName("Segoe UI", SkiaSharp.SKFontStyle.Bold),
-            };
+            using var titlePaint = MakePaint(bold: true, italic: false, link: false, 26);
             for (int it = 0; it < items.Count; it++)
             {
                 if (it > 0) NewPage();          // each page/section entry starts fresh
                 y += 26;
-                canvas.DrawText(items[it].Title, Margin, y, titlePaint);
+                canvas.DrawText(items[it].Title, Margin, y, SkiaSharp.SKTextAlign.Left, titlePaint.Font, titlePaint.Paint);
                 y += 30;
 
                 foreach (var box in Boxes(items[it].Doc))
@@ -463,8 +459,8 @@ public static class PageExport
                         // The file itself can't ride inside the page — a quiet italic marker names it.
                         EnsureRoom(20);
                         using var ap = MakePaint(false, true, false, 12);
-                        ap.Color = new SkiaSharp.SKColor(0x77, 0x77, 0x77);
-                        canvas.DrawText("Attachment: " + AttachName(box), Margin, y, ap);
+                        ap.Paint.Color = new SkiaSharp.SKColor(0x77, 0x77, 0x77);
+                        canvas.DrawText("Attachment: " + AttachName(box), Margin, y, SkiaSharp.SKTextAlign.Left, ap.Font, ap.Paint);
                         y += 22;
                         continue;
                     }
@@ -480,8 +476,8 @@ public static class PageExport
                         {
                             null or "check" => "", "num" => $"{num}.", _ => "•",
                         };
-                        var words = new List<(string, SkiaSharp.SKPaint)>();
-                        var paints = new List<SkiaSharp.SKPaint>();
+                        var words = new List<(string, TextPaint)>();
+                        var paints = new List<TextPaint>();
                         if (bullet.Length > 0)
                         {
                             var bp = MakePaint(false, false, false, (float)size);
@@ -536,17 +532,17 @@ public static class PageExport
                         float cx = Margin + c * colW;
                         canvas.DrawRect(new SkiaSharp.SKRect(cx, top, cx + colW, top + rowH), grid);
                         canvas.DrawText(TrimToWidth(CellText(row[c]), cellPaint, colW - pad * 2),
-                                        cx + pad, top + rowH - 7, cellPaint);
+                                        cx + pad, top + rowH - 7, SkiaSharp.SKTextAlign.Left, cellPaint.Font, cellPaint.Paint);
                     }
                     y += rowH;
                 }
                 y += 12;
             }
 
-            static string TrimToWidth(string s, SkiaSharp.SKPaint p, float maxW)
+            static string TrimToWidth(string s, TextPaint p, float maxW)
             {
-                if (p.MeasureText(s) <= maxW) return s;
-                while (s.Length > 1 && p.MeasureText(s + "…") > maxW) s = s[..^1];
+                if (p.Measure(s) <= maxW) return s;
+                while (s.Length > 1 && p.Measure(s + "…") > maxW) s = s[..^1];
                 return s + "…";
             }
 
@@ -606,15 +602,24 @@ public static class PageExport
         return ms.ToArray();
     }
 
-    private static SkiaSharp.SKPaint MakePaint(bool bold, bool italic, bool link, float size) => new()
+    /// <summary>An SKPaint + SKFont pair — SkiaSharp 3 moved text styling (size/typeface/measure)
+    /// off SKPaint onto SKFont, so the drawn-PDF path carries both around together.</summary>
+    private sealed record TextPaint(SkiaSharp.SKPaint Paint, SkiaSharp.SKFont Font) : IDisposable
     {
-        TextSize = size, IsAntialias = true,
-        Color = link ? new SkiaSharp.SKColor(0x2F, 0x6F, 0xC4) : SkiaSharp.SKColors.Black,
-        Typeface = SkiaSharp.SKTypeface.FromFamilyName("Segoe UI",
+        public float Measure(string s) => Font.MeasureText(s);
+        public void Dispose() { Paint.Dispose(); Font.Dispose(); }
+    }
+
+    private static TextPaint MakePaint(bool bold, bool italic, bool link, float size) => new(
+        new SkiaSharp.SKPaint
+        {
+            IsAntialias = true,
+            Color = link ? new SkiaSharp.SKColor(0x2F, 0x6F, 0xC4) : SkiaSharp.SKColors.Black,
+        },
+        new SkiaSharp.SKFont(SkiaSharp.SKTypeface.FromFamilyName("Segoe UI",
             new SkiaSharp.SKFontStyle(bold ? SkiaSharp.SKFontStyleWeight.Bold : SkiaSharp.SKFontStyleWeight.Normal,
                 SkiaSharp.SKFontStyleWidth.Normal,
-                italic ? SkiaSharp.SKFontStyleSlant.Italic : SkiaSharp.SKFontStyleSlant.Upright)),
-    };
+                italic ? SkiaSharp.SKFontStyleSlant.Italic : SkiaSharp.SKFontStyleSlant.Upright)), size));
 
     // ---- DOCX (minimal OOXML) ----
 

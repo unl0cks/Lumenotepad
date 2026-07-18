@@ -9,6 +9,10 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\lumenotepad.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <!-- CA1416: this is a Windows-only app (DWM acrylic interop, WinExe) — the "reachable on all
+         platforms" analyzer noise for PDFium calls doesn't apply. AVLN3001: chromeless windows with
+         parameterized ctors are never loaded via the runtime XAML loader; the warning is benign. -->
+    <NoWarn>$(NoWarn);CA1416;AVLN3001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
