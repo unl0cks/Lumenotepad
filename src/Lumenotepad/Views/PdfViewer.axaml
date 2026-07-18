@@ -81,9 +81,10 @@
             </StackPanel>
         </Border>
 
-        <!-- The full canvas formatting toolbar (compact), shown only while a note/text box is selected.
-             Drives that box's embedded rich-text editor — same fonts/super-sub/align/color/etc. -->
-        <v:FormatToolbar x:Name="FmtBar" DockPanel.Dock="Top" IsVisible="False"/>
+        <!-- The full canvas formatting toolbar (compact). ALWAYS visible so the layout never jumps;
+             it just disables until a note/text box is selected. Drives that box's embedded
+             rich-text editor — same fonts/super-sub/align/color/etc. -->
+        <v:FormatToolbar x:Name="FmtBar" DockPanel.Dock="Top" IsEnabled="False" Opacity="0.45"/>
 
         <ScrollViewer x:Name="PagesScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
             <StackPanel x:Name="PagesHost" Spacing="16" Margin="16" HorizontalAlignment="Center"/>

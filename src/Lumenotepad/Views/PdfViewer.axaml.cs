@@ -502,49 +502,38 @@ public partial class PdfViewer : UserControl
         if (selected) AddDeleteButton(pv, a.X * w + a.W * w, a.Y * h, a);
     }
 
-    /// <summary>A note/text box: the full rich-text editor from the note canvas, wrapped in a Lumen
-    /// frosted-glass card. The frost is real: the card's backdrop is the page's OWN pixels for the
-    /// region it covers, blurred, under a dark smoke tint (plus a veil of the note's color for sticky
-    /// notes) — so the note reads as smoked glass over the document, exactly like the app's chrome.
-    /// Laid out at page-native pixels and scaled by the current zoom, so formatting scales together.</summary>
+    /// <summary>A note/text annotation. NOTES are Lumen frosted-glass cards: the backdrop samples the
+    /// page's OWN pixels for the region the card covers, blurred, under a dark bluish smoke tint plus
+    /// a veil of the note's color — with a real drop shadow and a hairline edge (the clip lives on an
+    /// inner border precisely so the shadow survives). TEXT is bare: rich text written straight onto
+    /// the page — dark ink, no card, no shadow — with a quiet outline + grip only while selected or
+    /// hovered. Both embed the full canvas rich-text editor, laid out at page-native pixels and scaled
+    /// by the current zoom so formatting scales together.</summary>
     private void DrawTextAnno(PageView pv, PdfAnnotation a, bool sticky)
     {
         double w = pv.Overlay.Width, h = pv.Overlay.Height;
         double w0 = pv.WPt * PxPerPoint, h0 = pv.HPt * PxPerPoint;   // unzoomed page pixels
         bool selected = ReferenceEquals(a, _selected);
 
-        var editor = BuildNoteEditor(a);
+        var editor = BuildNoteEditor(a, onGlass: sticky);
         if (_editors.TryGetValue(a, out var stale)) stale.Document = new RichDocument();  // unbind the old instance from the shared doc
         _editors[a] = editor;
 
-        // frosted backdrop: the page region under the card, blurred (falls back to plain glass
-        // while the page bitmap is still rendering)
-        ImageBrush? backdropBrush = pv.Img.Source is Bitmap bmp ? new ImageBrush(bmp) { Stretch = Stretch.Fill } : null;
-        var backdrop = new Border
-        {
-            CornerRadius = new CornerRadius(10),
-            Background = (IBrush?)backdropBrush ?? new SolidColorBrush(Color.Parse("#301A2030")),
-            Effect = new BlurEffect { Radius = 16 },
-            IsHitTestVisible = false,
-        };
-        var smoke = new Border      // the dark BLUISH Lumen glass the white text sits on
-        {
-            CornerRadius = new CornerRadius(10),
-            Background = new SolidColorBrush(Color.Parse("#D4131A29")),
-            IsHitTestVisible = false,
-        };
-
-        // Grip strip: transparent with the Lumen pill bar centered — same furniture as canvas notes.
+        // Grip strip: the Lumen pill bar, same furniture as canvas notes. On bare text everything is
+        // invisible until the box is selected/hovered so the page stays clean.
+        string pillHex = sticky ? (selected ? "#52FFFFFF" : "#30FFFFFF") : "#4D10151E";
         var gripBar = new Border
         {
             Width = 38, Height = 4, CornerRadius = new CornerRadius(2),
-            Background = new SolidColorBrush(Color.Parse(selected ? "#52FFFFFF" : "#30FFFFFF")),
+            Background = new SolidColorBrush(Color.Parse(pillHex)),
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            IsVisible = sticky || selected,
         };
         var grip = new Border
         {
             Height = 16, CornerRadius = new CornerRadius(10, 10, 0, 0),
-            Background = new SolidColorBrush(Color.Parse("#12FFFFFF")), Child = gripBar,
+            Background = sticky ? new SolidColorBrush(Color.Parse("#12FFFFFF")) : Brushes.Transparent,
+            Child = gripBar,
             Cursor = new Cursor(StandardCursorType.SizeAll),
         };
         DockPanel.SetDock(grip, Dock.Top);
@@ -552,12 +541,12 @@ public partial class PdfViewer : UserControl
         content.Children.Add(grip);
         content.Children.Add(editor);
 
-        // ✕ lives INSIDE the card's top-right corner (the canvas note-box pattern): quiet until
-        // hovered, then the familiar red. Drawn strokes — no icon font to fall back badly.
+        // ✕ in the top-right corner (the canvas note-box pattern): quiet until hovered, then red.
+        string closeHex = sticky ? "#8CFFFFFF" : "#8C10151E";
         var closeGlyph = new Avalonia.Controls.Shapes.Path
         {
             Data = Geometry.Parse("M0,0 L7,7 M7,0 L0,7"),
-            Stroke = new SolidColorBrush(Color.Parse("#8CFFFFFF")), StrokeThickness = 1.4,
+            Stroke = new SolidColorBrush(Color.Parse(closeHex)), StrokeThickness = 1.4,
             StrokeLineCap = PenLineCap.Round, IsHitTestVisible = false,
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
         };
@@ -569,48 +558,91 @@ public partial class PdfViewer : UserControl
             Cursor = new Cursor(StandardCursorType.Hand),
         };
         close.PointerEntered += (_, _) => { close.Background = new SolidColorBrush(Color.Parse("#66E81123")); closeGlyph.Stroke = Brushes.White; };
-        close.PointerExited += (_, _) => { close.Background = Brushes.Transparent; closeGlyph.Stroke = new SolidColorBrush(Color.Parse("#8CFFFFFF")); };
+        close.PointerExited += (_, _) => { close.Background = Brushes.Transparent; closeGlyph.Stroke = new SolidColorBrush(Color.Parse(closeHex)); };
         close.PointerPressed += (_, e) => e.Handled = true;      // don't fall through to select/drag
         close.PointerReleased += (_, e) => { Delete(a); e.Handled = true; };
 
-        var layers = new Panel();
-        layers.Children.Add(backdrop);
-        layers.Children.Add(smoke);
-        if (sticky)                 // sticky notes: a soft veil of their own color over the glass
-            layers.Children.Add(new Border
+        ImageBrush? backdropBrush = null;
+        Border box;
+        if (sticky)
+        {
+            // frosted backdrop: the page region under the card, blurred (falls back to plain glass
+            // while the page bitmap is still rendering)
+            backdropBrush = pv.Img.Source is Bitmap bmp ? new ImageBrush(bmp) { Stretch = Stretch.Fill } : null;
+            var backdrop = new Border
+            {
+                CornerRadius = new CornerRadius(10),
+                Background = (IBrush?)backdropBrush ?? new SolidColorBrush(Color.Parse("#301A2030")),
+                Effect = new BlurEffect { Radius = 16 },
+                IsHitTestVisible = false,
+            };
+            var smoke = new Border      // the dark BLUISH Lumen glass the white text sits on
+            {
+                CornerRadius = new CornerRadius(10),
+                Background = new SolidColorBrush(Color.Parse("#D4131A29")),
+                IsHitTestVisible = false,
+            };
+            var layers = new Panel();
+            layers.Children.Add(backdrop);
+            layers.Children.Add(smoke);
+            layers.Children.Add(new Border      // a soft veil of the note's own color over the glass
             {
                 CornerRadius = new CornerRadius(10),
                 Background = new SolidColorBrush(Color.Parse("#30" + SolidHex(a.Color)[3..])),
                 IsHitTestVisible = false,
             });
-        layers.Children.Add(content);
-        layers.Children.Add(new Border      // vignette: soft dark falloff hugging the card's edges
-        {
-            CornerRadius = new CornerRadius(10),
-            BoxShadow = BoxShadows.Parse("inset 0 0 22 3 #59000000"),
-            IsHitTestVisible = false,
-        });
-        layers.Children.Add(close);
-
-        var box = new Border
-        {
-            Width = a.W * w0, MinHeight = a.H * h0,
-            CornerRadius = new CornerRadius(10), Child = layers, ClipToBounds = true,
-            BoxShadow = BoxShadows.Parse(selected ? "0 9 28 0 #80000000" : "0 4 16 0 #59000000"),
-            BorderThickness = new Thickness(selected ? 1.5 : 1),
-            BorderBrush = selected ? AccentBrush : new SolidColorBrush(Color.Parse("#33FFFFFF")),
-            Tag = a,
-            RenderTransform = new ScaleTransform(_zoom, _zoom),
-            RenderTransformOrigin = RelativePoint.TopLeft,
-            Transitions = new Transitions
+            layers.Children.Add(content);
+            layers.Children.Add(close);
+            // The clip lives on an INNER border so the outer border's drop shadow isn't clipped away.
+            var clip = new Border { CornerRadius = new CornerRadius(10), ClipToBounds = true, Child = layers };
+            box = new Border
             {
-                new BoxShadowsTransition { Property = Border.BoxShadowProperty, Duration = TimeSpan.FromMilliseconds(140) },
-            },
-        };
+                Width = a.W * w0, MinHeight = a.H * h0,
+                CornerRadius = new CornerRadius(10), Child = clip,
+                BoxShadow = BoxShadows.Parse(selected ? "0 9 28 0 #80000000" : "0 4 16 0 #59000000"),
+                BorderThickness = new Thickness(selected ? 1.5 : 1),
+                BorderBrush = selected ? AccentBrush : new SolidColorBrush(Color.Parse("#33FFFFFF")),
+                Transitions = new Transitions
+                {
+                    new BoxShadowsTransition { Property = Border.BoxShadowProperty, Duration = TimeSpan.FromMilliseconds(140) },
+                },
+            };
+        }
+        else
+        {
+            // Bare text: ink straight on the page — no card, no shadow, no chrome. A slim accent
+            // outline while selected (faint on hover) keeps it findable without dressing it up.
+            var layers = new Panel();
+            layers.Children.Add(content);
+            layers.Children.Add(close);
+            box = new Border
+            {
+                Width = a.W * w0, MinHeight = a.H * h0,
+                CornerRadius = new CornerRadius(8), Child = layers,
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(1),
+                BorderBrush = selected ? AccentBrush : Brushes.Transparent,
+            };
+        }
+        box.Tag = a;
+        box.RenderTransform = new ScaleTransform(_zoom, _zoom);
+        box.RenderTransformOrigin = RelativePoint.TopLeft;
         Canvas.SetLeft(box, a.X * w); Canvas.SetTop(box, a.Y * h);
         grip.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, 0, e); };
-        box.PointerEntered += (_, _) => close.IsVisible = true;
-        box.PointerExited += (_, _) => close.IsVisible = ReferenceEquals(_selected, a);
+        box.PointerEntered += (_, _) =>
+        {
+            close.IsVisible = true;
+            gripBar.IsVisible = true;
+            if (!sticky && !ReferenceEquals(_selected, a))
+                box.BorderBrush = new SolidColorBrush(Color.Parse("#3310151E"));
+        };
+        box.PointerExited += (_, _) =>
+        {
+            bool sel = ReferenceEquals(_selected, a);
+            close.IsVisible = sel;
+            gripBar.IsVisible = sticky || sel;
+            if (!sticky && !sel) box.BorderBrush = Brushes.Transparent;
+        };
         box.PointerPressed += (_, e) =>
         {
             // Click anywhere on the card selects it — and stops the press falling through to the
@@ -623,13 +655,14 @@ public partial class PdfViewer : UserControl
         // its content, so sync the brush's source rect after each layout pass.
         if (backdropBrush is not null)
         {
+            var bb = backdropBrush;
             double lastH = -1;
             box.LayoutUpdated += (_, _) =>
             {
                 double bh = box.Bounds.Height;
                 if (Math.Abs(bh - lastH) < 0.5 || bh <= 0 || h0 <= 0) return;
                 lastH = bh;
-                backdropBrush.SourceRect = new RelativeRect(
+                bb.SourceRect = new RelativeRect(
                     a.X, a.Y, a.W, Math.Min(Math.Max(0.001, 1 - a.Y), bh / h0), RelativeUnit.Relative);
             };
         }
@@ -733,9 +766,9 @@ public partial class PdfViewer : UserControl
 
     /// <summary>Build (and wire) the rich editor for a note/text annotation. Focus selects the
     /// annotation and points the format toolbar at this editor.</summary>
-    private RichTextEditor BuildNoteEditor(PdfAnnotation a)
+    private RichTextEditor BuildNoteEditor(PdfAnnotation a, bool onGlass)
     {
-        var editor = NewNoteEditor(DocFor(a));
+        var editor = NewNoteEditor(DocFor(a), onGlass);
         editor.GotFocus += (_, _) =>
         {
             if (!ReferenceEquals(_selected, a)) Select(a, focusEditor: true);
@@ -744,11 +777,12 @@ public partial class PdfViewer : UserControl
         return editor;
     }
 
-    private RichTextEditor NewNoteEditor(RichDocument doc) => new()
+    private RichTextEditor NewNoteEditor(RichDocument doc, bool onGlass) => new()
     {
         Document = doc,
         Margin = new Thickness(10, 4, 10, 8),
-        Foreground = new SolidColorBrush(Color.Parse("#F0FFFFFF")),   // white text on the dark glass
+        // White text on a note's dark glass; dark ink when written straight onto the page.
+        Foreground = new SolidColorBrush(Color.Parse(onGlass ? "#F0FFFFFF" : "#E610151E")),
         CaretBrush = AccentBrush,
         LinkBrush = AccentBrush,
         SelectionBrush = new SolidColorBrush(Color.Parse("#554DA6FF")),
@@ -790,8 +824,10 @@ public partial class PdfViewer : UserControl
         return doc;
     }
 
-    private void ShowFmtBar(RichTextEditor editor) { FmtBar.Target = editor; FmtBar.IsVisible = true; }
-    private void HideFmtBar() { FmtBar.Target = null; FmtBar.IsVisible = false; }
+    // The strip stays in the layout permanently (no show/hide jumping) — it just dims and disables
+    // while nothing text-like is selected.
+    private void ShowFmtBar(RichTextEditor editor) { FmtBar.Target = editor; FmtBar.IsEnabled = true; FmtBar.Opacity = 1; }
+    private void HideFmtBar() { FmtBar.Target = null; FmtBar.IsEnabled = false; FmtBar.Opacity = 0.45; }
 
     private void Delete(PdfAnnotation a)
     {
@@ -933,9 +969,9 @@ public partial class PdfViewer : UserControl
         float left = (float)a.X * wpt, top = (float)a.Y * hpt;
         var rect = new SkiaSharp.SKRect(left, top, left + (float)widthPts, top + heightPts);
 
-        // Bake the frosted-glass backdrop: re-draw the page region under the card blurred, clipped to
-        // the card's rounded rect, then lay the (translucent) card image over it.
-        if (pageBmp is not null)
+        // Bake the frosted-glass backdrop (notes only — bare text has no card): re-draw the page
+        // region under the card blurred, clipped to its rounded rect, then lay the card image over it.
+        if (sticky && pageBmp is not null)
         {
             c.Save();
             using var rr = new SkiaSharp.SKRoundRect(rect, 6.5f, 6.5f);
@@ -960,50 +996,56 @@ public partial class PdfViewer : UserControl
         double w0 = page.WPt * PxPerPoint;
         pxW = Math.Max(8, a.W * w0);
         var doc = !string.IsNullOrEmpty(a.Rich) ? RichDocJson.FromJson(a.Rich) : LegacyDoc(a);
-        var editor = NewNoteEditor(doc);
+        var editor = NewNoteEditor(doc, onGlass: sticky);
 
-        var layers = new Panel();
-        layers.Children.Add(new Border   // dark bluish smoke (translucent — the blurred page shows through)
-        {
-            CornerRadius = new CornerRadius(10),
-            Background = new SolidColorBrush(Color.Parse("#D4131A29")),
-        });
-        if (sticky)
-            layers.Children.Add(new Border
-            {
-                CornerRadius = new CornerRadius(10),
-                Background = new SolidColorBrush(Color.Parse("#30" + SolidHex(a.Color)[3..])),
-            });
-        var gripBar = new Border
-        {
-            Width = 38, Height = 4, CornerRadius = new CornerRadius(2),
-            Background = new SolidColorBrush(Color.Parse("#30FFFFFF")),
-            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-        };
+        // Same 16px grip band as on screen (transparent for bare text) so the text lands identically.
         var grip = new Border
         {
             Height = 16, CornerRadius = new CornerRadius(10, 10, 0, 0),
-            Background = new SolidColorBrush(Color.Parse("#12FFFFFF")), Child = gripBar,
+            Background = sticky ? new SolidColorBrush(Color.Parse("#12FFFFFF")) : Brushes.Transparent,
+            Child = sticky
+                ? new Border
+                {
+                    Width = 38, Height = 4, CornerRadius = new CornerRadius(2),
+                    Background = new SolidColorBrush(Color.Parse("#30FFFFFF")),
+                    HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+                }
+                : null,
         };
         DockPanel.SetDock(grip, Dock.Top);
         var content = new DockPanel();
         content.Children.Add(grip);
         content.Children.Add(editor);
-        layers.Children.Add(content);
-        layers.Children.Add(new Border   // vignette, matching the on-screen card
-        {
-            CornerRadius = new CornerRadius(10),
-            BoxShadow = BoxShadows.Parse("inset 0 0 22 3 #59000000"),
-        });
 
-        var box = new Border
+        Border box;
+        if (sticky)
         {
-            Width = pxW,
-            CornerRadius = new CornerRadius(10),
-            BorderThickness = new Thickness(1),
-            BorderBrush = new SolidColorBrush(Color.Parse("#33FFFFFF")),
-            Child = layers,
-        };
+            var layers = new Panel();
+            layers.Children.Add(new Border   // dark bluish smoke (translucent — the blurred page shows through)
+            {
+                CornerRadius = new CornerRadius(10),
+                Background = new SolidColorBrush(Color.Parse("#D4131A29")),
+            });
+            layers.Children.Add(new Border
+            {
+                CornerRadius = new CornerRadius(10),
+                Background = new SolidColorBrush(Color.Parse("#30" + SolidHex(a.Color)[3..])),
+            });
+            layers.Children.Add(content);
+            box = new Border
+            {
+                Width = pxW,
+                CornerRadius = new CornerRadius(10),
+                BorderThickness = new Thickness(1),
+                BorderBrush = new SolidColorBrush(Color.Parse("#33FFFFFF")),
+                Child = layers,
+            };
+        }
+        else
+        {
+            // Bare text: just the ink, fully transparent around it — exactly like on screen.
+            box = new Border { Width = pxW, Child = content };
+        }
         box.Measure(new Size(pxW, double.PositiveInfinity));
         pxH = Math.Max(8, Math.Ceiling(box.DesiredSize.Height));
         box.Arrange(new Rect(0, 0, pxW, pxH));
