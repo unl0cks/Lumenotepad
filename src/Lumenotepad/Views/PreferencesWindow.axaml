@@ -379,7 +379,7 @@
 
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Classes="section" Text="GLASS BLUR" Margin="0,10,0,2"/>
-                            <Border Classes="qmark" Margin="6,8,0,0" ToolTip.Tip="How strongly the see-through parts of the app blur whatever is behind them. Windows only offers a few fixed blur levels, so each slider snaps between clear glass, a soft blur, and full frosted glass. Only matters on themes that show glass."><TextBlock/></Border>
+                            <Border Classes="qmark" Margin="6,8,0,0" ToolTip.Tip="How strongly the see-through parts of the app blur whatever is behind them. The Menus slider is fully smooth — menus paint their own frosted backdrop at any strength. For the windows themselves the blur comes from Windows, which only offers a few fixed levels, so those two sliders snap between clear glass, a soft blur, and full frosted glass. Only matters on themes that show glass."><TextBlock/></Border>
                         </StackPanel>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Orientation="Horizontal">
@@ -400,7 +400,7 @@
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Classes="label" Text="Menus"/>
-                                <Border Classes="qmark" ToolTip.Tip="Right-click menus and the little panels that open from toolbar buttons."><TextBlock/></Border>
+                                <Border Classes="qmark" ToolTip.Tip="Right-click menus and the little panels that open from toolbar buttons. Fully smooth — any strength from clear glass to heavy frost."><TextBlock/></Border>
                             </StackPanel>
                             <TextBlock x:Name="BlurMenusValue" Grid.Column="1" Classes="hint" Text="Frosted"/>
                         </Grid>
