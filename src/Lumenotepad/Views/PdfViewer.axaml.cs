@@ -538,6 +538,7 @@ public partial class PdfViewer : UserControl
             CornerRadius = new CornerRadius(5),
             BorderThickness = new Thickness(selected ? 2.5 : 0),
             BorderBrush = NoteFocusBrush,
+            Tag = a,
         };
         Canvas.SetLeft(rect, a.X * w); Canvas.SetTop(rect, a.Y * h);
         rect.Width = a.W * w; rect.Height = a.H * h;
@@ -552,6 +553,7 @@ public partial class PdfViewer : UserControl
                 Width = 12, Height = 12, Fill = AccentBrush,
                 Stroke = Brushes.White, StrokeThickness = 1.5,
                 Cursor = new Cursor(StandardCursorType.BottomRightCorner),
+                Tag = a,
             };
             Canvas.SetLeft(dot, a.X * w + a.W * w - 6); Canvas.SetTop(dot, a.Y * h + a.H * h - 6);
             dot.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, 5, e); };
@@ -695,7 +697,9 @@ public partial class PdfViewer : UserControl
                 CornerRadius = new CornerRadius(10), Child = clip,
                 BoxShadow = BoxShadows.Parse(selected ? "0 9 28 0 #80000000" : "0 4 16 0 #59000000"),
                 BorderThickness = new Thickness(1),
-                BorderBrush = new SolidColorBrush(Color.Parse("#33FFFFFF")),
+                // The hairline yields to the ring while selected — otherwise it reads as a white
+                // line just outside the blue (owner report).
+                BorderBrush = selected ? Brushes.Transparent : new SolidColorBrush(Color.Parse("#33FFFFFF")),
                 Transitions = new Transitions
                 {
                     new BoxShadowsTransition { Property = Border.BoxShadowProperty, Duration = TimeSpan.FromMilliseconds(140) },
@@ -782,15 +786,15 @@ public partial class PdfViewer : UserControl
         var hit = new Avalonia.Controls.Shapes.Line
         {
             StartPoint = s, EndPoint = en, Stroke = Brushes.Transparent, StrokeThickness = Math.Max(14, thick * 4),
-            IsHitTestVisible = true, Cursor = new Cursor(StandardCursorType.SizeAll),
+            IsHitTestVisible = true, Cursor = new Cursor(StandardCursorType.SizeAll), Tag = a,
         };
         hit.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, 0, e); };
         var shaft = new Avalonia.Controls.Shapes.Line
         {
             StartPoint = s, EndPoint = en, Stroke = brush, StrokeThickness = thick,
-            StrokeLineCap = PenLineCap.Round, IsHitTestVisible = false,
+            StrokeLineCap = PenLineCap.Round, IsHitTestVisible = false, Tag = a,
         };
-        var head = new Avalonia.Controls.Shapes.Polygon { Fill = brush, Points = ArrowHead(s, en, ArrowHeadLen), IsHitTestVisible = false };
+        var head = new Avalonia.Controls.Shapes.Polygon { Fill = brush, Points = ArrowHead(s, en, ArrowHeadLen), IsHitTestVisible = false, Tag = a };
         pv.Overlay.Children.Add(hit);
         pv.Overlay.Children.Add(shaft);
         pv.Overlay.Children.Add(head);
@@ -814,6 +818,7 @@ public partial class PdfViewer : UserControl
         {
             Width = 12, Height = 12, Fill = AccentBrush,
             Stroke = Brushes.White, StrokeThickness = 1.5, Cursor = new Cursor(StandardCursorType.Cross),
+            Tag = a,
         };
         Canvas.SetLeft(dot, at.X - 6); Canvas.SetTop(dot, at.Y - 6);
         dot.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, handle, e); };
@@ -850,7 +855,7 @@ public partial class PdfViewer : UserControl
             Background = restBg,
             BorderBrush = new SolidColorBrush(Color.Parse("#33FFFFFF")), BorderThickness = new Thickness(1),
             BoxShadow = BoxShadows.Parse("0 3 10 0 #66000000, inset 0 0 8 1 #40000000"),
-            Cursor = new Cursor(StandardCursorType.Hand), Child = glyph,
+            Cursor = new Cursor(StandardCursorType.Hand), Child = glyph, Tag = a,
         };
         btn.PointerEntered += (_, _) => { btn.Background = new SolidColorBrush(Color.Parse("#E6E5484D")); glyph.Stroke = Brushes.White; };
         btn.PointerExited += (_, _) => { btn.Background = restBg; glyph.Stroke = restFg; };
@@ -927,6 +932,8 @@ public partial class PdfViewer : UserControl
     private void ShowFmtBar(RichTextEditor editor) { FmtBar.Target = editor; FmtBar.IsEnabled = true; FmtBar.Opacity = 1; }
     private void HideFmtBar() { FmtBar.Target = null; FmtBar.IsEnabled = false; FmtBar.Opacity = 0.45; }
 
+    /// <summary>Delete a mark: the model + sidecar update immediately (data-safe), while its visuals
+    /// collapse out (the same scale+fade family as the create pop-in) before the page redraws.</summary>
     private void Delete(PdfAnnotation a)
     {
         PushUndo();
@@ -934,8 +941,28 @@ public partial class PdfViewer : UserControl
         _docs.Remove(a);
         _editors.Remove(a);
         if (ReferenceEquals(_selected, a)) { _selected = null; HideFmtBar(); }
-        foreach (var pv in _pages) RedrawPage(pv);
         SaveNow();
+
+        var pv = _pages.FirstOrDefault(p => p.Index == a.Page);
+        var targets = pv?.Overlay.Children.OfType<Control>().Where(c => ReferenceEquals(c.Tag, a)).ToList();
+        if (pv is null || targets is null || targets.Count == 0)
+        {
+            foreach (var p in _pages) RedrawPage(p);
+            return;
+        }
+        foreach (var t in targets)
+        {
+            if (t is Border { Child: Control inner } card && card.RenderTransform is not null)
+            {
+                // A zoomed note card: collapse its INNER content so the zoom transform stays put,
+                // and drop the shadow/edge up front so they don't linger at full strength.
+                card.BoxShadow = default;
+                card.BorderBrush = Brushes.Transparent;
+                Motion.CollapseOut(inner, 150);
+            }
+            else Motion.CollapseOut(t, 150);
+        }
+        DispatcherTimer.RunOnce(() => { foreach (var p in _pages) RedrawPage(p); }, TimeSpan.FromMilliseconds(170));
     }
 
     private void Select(PdfAnnotation? a, bool focusEditor)
