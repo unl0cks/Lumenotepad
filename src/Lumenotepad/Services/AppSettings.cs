@@ -63,10 +63,6 @@ public sealed class AppSettings
     public double PagesPanelWidth { get; set; } = 224;      // pages side panel width; drag-resizable
     public bool DoubleClickCreate { get; set; }              // require a double-click to start a note
     public bool RoundedPdfCorners { get; set; } = true;      // PDF pages render with gently rounded corners
-    // Glass blur strength per surface, 0–100 (0 = clear, ≤50 = soft blur, else full frosted acrylic).
-    public int BlurMain { get; set; } = 100;
-    public int BlurWindows { get; set; } = 100;
-    public int BlurMenus { get; set; } = 100;
     public string ToolbarPosition { get; set; } = "Top";    // "Top" | "Left" | "Right" | "Bottom"
     public string ToolbarScope { get; set; } = "Window";    // "Window" (window edge) | "Page" (inside the page box)
     public bool ResizablePages { get; set; } = true;        // note containers show resize handles

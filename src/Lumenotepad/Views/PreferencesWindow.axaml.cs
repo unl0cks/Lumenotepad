@@ -333,27 +333,6 @@ public partial class PreferencesWindow : Window
             if (Vm is { } vm && Math.Abs(vm.CaretWidth - v) > 1e-6) vm.CaretWidth = v;
             CaretWidthValue.Text = $"{v:0.0}";
         };
-        // Glass blur strength per surface. The VM setter pushes the BlurPrefs statics; this window
-        // re-applies its OWN chrome right away so dragging the sliders previews live, and menus/main
-        // window pick the new tier up on their next open / via MainView's property hook.
-        void WireBlur(Slider s, TextBlock label, bool smooth, Func<ViewModels.MainViewModel, int> get,
-                      Action<ViewModels.MainViewModel, int> set)
-        {
-            s.ValueChanged += (_, e) =>
-            {
-                int v = (int)Math.Round(e.NewValue);
-                if (Vm is { } vm && get(vm) != v) set(vm, v);
-                // Menus paint their own frost (any strength); the window sliders snap to the
-                // real levels Windows offers, so their label names the tier.
-                label.Text = smooth
-                    ? v <= 0 ? "Clear · 0%" : $"{v}%"
-                    : $"{BlurPrefs.TierName(v)} · {v}%";
-                ThemeManager.ApplyChildChrome(this);
-            };
-        }
-        WireBlur(BlurMainSlider, BlurMainValue, smooth: false, vm => vm.BlurMain, (vm, v) => vm.BlurMain = v);
-        WireBlur(BlurWindowsSlider, BlurWindowsValue, smooth: false, vm => vm.BlurWindows, (vm, v) => vm.BlurWindows = v);
-        WireBlur(BlurMenusSlider, BlurMenusValue, smooth: true, vm => vm.BlurMenus, (vm, v) => vm.BlurMenus = v);
         BuildHighlightChoices();
         DateFormatBox.ItemsSource = DateFormats.Select(f => DateTime.Now.ToString(f)).ToArray();
         DateFormatBox.SelectionChanged += (_, _) =>
@@ -1153,12 +1132,6 @@ public partial class PreferencesWindow : Window
         CaretColorBox.Text = vm.CaretColor ?? "";
         CaretWidthSlider.Value = vm.CaretWidth;
         CaretWidthValue.Text = $"{vm.CaretWidth:0.0}";
-        BlurMainSlider.Value = vm.BlurMain;
-        BlurMainValue.Text = $"{BlurPrefs.TierName(vm.BlurMain)} · {vm.BlurMain}%";
-        BlurWindowsSlider.Value = vm.BlurWindows;
-        BlurWindowsValue.Text = $"{BlurPrefs.TierName(vm.BlurWindows)} · {vm.BlurWindows}%";
-        BlurMenusSlider.Value = vm.BlurMenus;
-        BlurMenusValue.Text = vm.BlurMenus <= 0 ? "Clear · 0%" : $"{vm.BlurMenus}%";
         DateFormatBox.SelectedIndex = Math.Max(0, Array.IndexOf(DateFormats, vm.DateFormat));
         UserNameBox.Text = vm.UserName;
         CardSizeBox.SelectedItem = vm.CardSize;

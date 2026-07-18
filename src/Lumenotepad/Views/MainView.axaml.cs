@@ -870,10 +870,6 @@ public partial class MainView : UserControl
                  or nameof(MainViewModel.PageGrid) or nameof(MainViewModel.GridSnap)
                  or nameof(MainViewModel.DoubleClickCreate) or nameof(MainViewModel.RoundedPdfCorners))
             ApplyCanvasPrefs();
-        else if (e.PropertyName == nameof(MainViewModel.BlurMain))
-        {
-            if (Window is { } w) Services.ThemeManager.ApplyChrome(w);   // main-window blur, live
-        }
         else if (e.PropertyName == nameof(MainViewModel.CornerRoundness))
         {
             UpdateCanvasPlateClip();                     // the punched hole follows the page radius

@@ -670,16 +670,12 @@ public partial class PdfViewer : UserControl
         Border box;
         if (sticky)
         {
-            // frosted backdrop: the page region under the card, blurred (falls back to plain glass
-            // while the page bitmap is still rendering)
-            backdropBrush = pv.Img.Source is Bitmap bmp ? new ImageBrush(bmp) { Stretch = Stretch.Fill } : null;
-            var backdrop = new Border
-            {
-                CornerRadius = new CornerRadius(10),
-                Background = (IBrush?)backdropBrush ?? new SolidColorBrush(Color.Parse("#301A2030")),
-                Effect = new BlurEffect { Radius = 16 },
-                IsHitTestVisible = false,
-            };
+            // Frosted backdrop — the page region under the card, blurred — ONLY on the Lumen
+            // (glass) theme. Solid themes get the same smoked card but the page shows through it
+            // SHARP: no blur outside Lumen (owner request).
+            bool glassTheme = Services.ThemeManager.Current.GlassWindow;
+            backdropBrush = glassTheme && pv.Img.Source is Bitmap bmp
+                ? new ImageBrush(bmp) { Stretch = Stretch.Fill } : null;
             var smoke = new Border      // the dark BLUISH Lumen glass the white text sits on
             {
                 CornerRadius = new CornerRadius(10),
@@ -687,7 +683,14 @@ public partial class PdfViewer : UserControl
                 IsHitTestVisible = false,
             };
             var layers = new Panel();
-            layers.Children.Add(backdrop);
+            if (glassTheme)
+                layers.Children.Add(new Border
+                {
+                    CornerRadius = new CornerRadius(10),
+                    Background = (IBrush?)backdropBrush ?? new SolidColorBrush(Color.Parse("#301A2030")),
+                    Effect = new BlurEffect { Radius = 16 },
+                    IsHitTestVisible = false,
+                });
             layers.Children.Add(smoke);
             layers.Children.Add(new Border      // a soft veil of the note's own color over the glass
             {
@@ -1155,9 +1158,10 @@ public partial class PdfViewer : UserControl
         float left = (float)a.X * wpt, top = (float)a.Y * hpt;
         var rect = new SkiaSharp.SKRect(left, top, left + (float)widthPts, top + heightPts);
 
-        // Bake the frosted-glass backdrop (notes only — bare text has no card): re-draw the page
-        // region under the card blurred, clipped to its rounded rect, then lay the card image over it.
-        if (sticky && pageBmp is not null)
+        // Bake the frosted-glass backdrop (notes only — bare text has no card, and the frost is a
+        // Lumen-theme look): re-draw the page region under the card blurred, clipped to its rounded
+        // rect, then lay the card image over it. On solid themes the translucent card bakes as-is.
+        if (sticky && pageBmp is not null && Services.ThemeManager.Current.GlassWindow)
         {
             c.Save();
             using var rr = new SkiaSharp.SKRoundRect(rect, 6.5f, 6.5f);
