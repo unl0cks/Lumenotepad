@@ -94,9 +94,13 @@ public static class MenuFx
                 WindowTransparencyLevel.AcrylicBlur,
                 WindowTransparencyLevel.Transparent,
             };
-            // Composition-attribute blur-behind: the system-backdrop attribute never engages on
-            // popup-class windows, this one does (blurs directly behind the hwnd).
+            // Two blur mechanisms, oldest first: the legacy composition-attribute blur-behind
+            // (works on popup windows on older builds, but the undocumented API is dying off in
+            // newer Windows 11 builds), then the MODERN DWM system backdrop — historically ignored
+            // on popup-class windows, but newer builds honor it there. Whichever the OS accepts wins;
+            // the other is a harmless no-op.
             Platform.DwmAcrylic.BlurBehind(hwnd);
+            Platform.DwmAcrylic.Apply(hwnd, Platform.DwmAcrylic.Backdrop.Acrylic, dark: true);
         }
         catch { /* popups that reject the backdrop keep the translucent fallback */ }
     }
