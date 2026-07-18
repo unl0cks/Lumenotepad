@@ -113,8 +113,11 @@ public static class ThemeManager
     public static void ApplyChildChrome(Window window) =>
         ApplyWindowBlur(window, Current.FrostedWindow, BlurPrefs.WindowsPct);
 
-    /// <summary>The user's blur tier on a window: Clear = transparent with NO blur, Soft = the
-    /// plain gaussian blur-behind, Strong = the full DWM acrylic backdrop.</summary>
+    /// <summary>The user's blur tier on a window: Clear = a TRANSPARENT surface with no blur at
+    /// all (what's behind shows through sharp), Soft = transparent + the plain gaussian
+    /// blur-behind, Strong = the full DWM acrylic backdrop. The transparency hint must be driven
+    /// here too — just removing the backdrop leaves an OPAQUE window (the "0% turned my window
+    /// black" bug), because the surface itself has to go transparent for anything to show through.</summary>
     private static void ApplyWindowBlur(Window window, bool glass, int pct)
     {
         bool dark = Current.DarkChrome;
@@ -127,14 +130,21 @@ public static class ThemeManager
         switch (BlurPrefs.TierOf(pct))
         {
             case BlurPrefs.Tier.Clear:
+                window.TransparencyLevelHint = new[] { WindowTransparencyLevel.Transparent };
                 Platform.DwmAcrylic.DisableBlurBehind(hwnd);
                 Platform.DwmAcrylic.Apply(window, Platform.DwmAcrylic.Backdrop.None, dark);
                 break;
             case BlurPrefs.Tier.Soft:
+                window.TransparencyLevelHint = new[] { WindowTransparencyLevel.Transparent };
                 Platform.DwmAcrylic.Apply(window, Platform.DwmAcrylic.Backdrop.None, dark);
                 Platform.DwmAcrylic.BlurBehind(hwnd, soft: true);
                 break;
             default:
+                window.TransparencyLevelHint = new[]
+                {
+                    WindowTransparencyLevel.AcrylicBlur,
+                    WindowTransparencyLevel.Transparent,
+                };
                 Platform.DwmAcrylic.DisableBlurBehind(hwnd);
                 Platform.DwmAcrylic.Apply(window, Platform.DwmAcrylic.Backdrop.Acrylic, dark);
                 break;
