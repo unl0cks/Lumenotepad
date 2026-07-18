@@ -91,11 +91,10 @@ public partial class PdfViewer : UserControl
 
     private IBrush AccentBrush => this.FindResource("AccentBrush") as IBrush ?? Brushes.DodgerBlue;
 
-    /// <summary>Selection ring for marks: the theme accent at ~55% alpha. The canvas note boxes use
-    /// a 30% tint, but over a white PDF page that washed out to near-invisible — this stays soft
-    /// (no hard accent wire) while actually reading as "selected".</summary>
+    /// <summary>Selection ring for marks: the theme accent at ~70% alpha — clearly visible over a
+    /// white page while still softer than a raw accent wire.</summary>
     private IBrush NoteFocusBrush => new SolidColorBrush(Color.Parse(
-        Services.ThemePalettes.Alpha(Services.ThemeManager.Current.Accent, 0x8C)));
+        Services.ThemePalettes.Alpha(Services.ThemeManager.Current.Accent, 0xB3)));
 
     // Bumped on every Load; the async pipeline checks it after each await so a superseded load can
     // never keep adding page frames. Without this, rapid page switches (or a double-fired selection
@@ -641,6 +640,18 @@ public partial class PdfViewer : UserControl
         };
         resizeCorner.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, 5, e); };
 
+        // The selection ring is drawn INSIDE the card as an overlay sharing its exact corner radius.
+        // On the outer border it rendered with a visible gap and squarer corners than the card
+        // (owner report) — and flipping the outer thickness also nudged the content on every select.
+        Border MakeRing(double radius) => new()
+        {
+            CornerRadius = new CornerRadius(radius),
+            BorderThickness = new Thickness(2.5),
+            BorderBrush = NoteFocusBrush,
+            IsHitTestVisible = false,
+            IsVisible = selected,
+        };
+
         ImageBrush? backdropBrush = null;
         Border box;
         if (sticky)
@@ -674,6 +685,7 @@ public partial class PdfViewer : UserControl
             layers.Children.Add(resizeRight);
             layers.Children.Add(resizeBottom);
             layers.Children.Add(resizeCorner);
+            layers.Children.Add(MakeRing(10)); // ring inside the card — flush, corners match exactly
             layers.Children.Add(close);        // close stays on top where the right strip overlaps it
             // The clip lives on an INNER border so the outer border's drop shadow isn't clipped away.
             var clip = new Border { CornerRadius = new CornerRadius(10), ClipToBounds = true, Child = layers };
@@ -682,8 +694,8 @@ public partial class PdfViewer : UserControl
                 Width = a.W * w0, MinHeight = a.H * h0,
                 CornerRadius = new CornerRadius(10), Child = clip,
                 BoxShadow = BoxShadows.Parse(selected ? "0 9 28 0 #80000000" : "0 4 16 0 #59000000"),
-                BorderThickness = new Thickness(selected ? 2.5 : 1),
-                BorderBrush = selected ? NoteFocusBrush : new SolidColorBrush(Color.Parse("#33FFFFFF")),
+                BorderThickness = new Thickness(1),
+                BorderBrush = new SolidColorBrush(Color.Parse("#33FFFFFF")),
                 Transitions = new Transitions
                 {
                     new BoxShadowsTransition { Property = Border.BoxShadowProperty, Duration = TimeSpan.FromMilliseconds(140) },
@@ -699,14 +711,15 @@ public partial class PdfViewer : UserControl
             layers.Children.Add(resizeRight);
             layers.Children.Add(resizeBottom);
             layers.Children.Add(resizeCorner);
+            layers.Children.Add(MakeRing(8));
             layers.Children.Add(close);
             box = new Border
             {
                 Width = a.W * w0, MinHeight = a.H * h0,
                 CornerRadius = new CornerRadius(8), Child = layers,
                 Background = Brushes.Transparent,
-                BorderThickness = new Thickness(selected ? 2.5 : 1),
-                BorderBrush = selected ? NoteFocusBrush : Brushes.Transparent,
+                BorderThickness = new Thickness(1),
+                BorderBrush = Brushes.Transparent,
             };
         }
         box.Tag = a;
