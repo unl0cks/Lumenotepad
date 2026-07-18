@@ -48,7 +48,6 @@ public partial class PdfViewer : UserControl
     private readonly List<PageView> _pages = new();
     private PdfAnnotation? _selected;
     private DispatcherTimer? _saveDebounce;
-    private bool _doubleClickCreate;
 
     // Live rich content per note/text annotation: one RichDocument (source of truth, serialized into
     // the annotation's sidecar on change) and the editor control currently showing it (rebuilt on each
@@ -77,8 +76,6 @@ public partial class PdfViewer : UserControl
         BuildSwatches();
         FmtBar.SetCompact();                            // hide the canvas-only furniture
         FmtBar.SetPlacement(Dock.Top, pageScope: false);
-        SelectTool.IsChecked = true;
-        SelectTool.Click += (_, _) => SetTool(Tool.Select);
         HighlightTool.Click += (_, _) => SetTool(Tool.Highlight);
         NoteTool.Click += (_, _) => SetTool(Tool.Note);
         TextTool.Click += (_, _) => SetTool(Tool.Text);
@@ -113,7 +110,7 @@ public partial class PdfViewer : UserControl
     /// already-loading file is a no-op.</summary>
     public async void Load(string pdfPath, bool doubleClickCreate)
     {
-        _doubleClickCreate = doubleClickCreate;
+        _ = doubleClickCreate;             // PDF notes/text are ALWAYS double-click-create now
         if (pdfPath == _pdfPath) return;   // already showing (or mid-loading) this PDF
         Flush();                           // persist the outgoing document's marks
         int gen = ++_loadGen;
@@ -258,16 +255,16 @@ public partial class PdfViewer : UserControl
     }
 
     // ---- tools ----
+    // There is NO Select tool: a single click always selects/moves, whatever is armed. The buttons
+    // arm gestures on top of that (drag = highlight/arrow, double-click = note/text), and clicking
+    // the armed tool again disarms it back to plain clicking (Tool.Select is that internal none-state).
     private void SetTool(Tool t)
     {
-        _tool = t;
-        SelectTool.IsChecked = t == Tool.Select;
-        HighlightTool.IsChecked = t == Tool.Highlight;
-        NoteTool.IsChecked = t == Tool.Note;
-        TextTool.IsChecked = t == Tool.Text;
-        ArrowTool.IsChecked = t == Tool.Arrow;
-        // Annotations stay grabbable in EVERY tool now, so switching tools keeps the current selection —
-        // no more hopping back to "Select" just to nudge a mark.
+        _tool = _tool == t ? Tool.Select : t;
+        HighlightTool.IsChecked = _tool == Tool.Highlight;
+        NoteTool.IsChecked = _tool == Tool.Note;
+        TextTool.IsChecked = _tool == Tool.Text;
+        ArrowTool.IsChecked = _tool == Tool.Arrow;
     }
 
     private void SetZoom(double z)
@@ -350,19 +347,14 @@ public partial class PdfViewer : UserControl
                 pv.Overlay.Children.Add(_arrowPreview);
                 e.Pointer.Capture(pv.Overlay); e.Handled = true;
                 break;
-            case Tool.Note when !_doubleClickCreate:
-                CreateTextAnno(pv, p, PdfAnnotation.Note); e.Handled = true; break;
-            case Tool.Text when !_doubleClickCreate:
-                CreateTextAnno(pv, p, PdfAnnotation.TextBox); e.Handled = true; break;
-            case Tool.Select:
-                Select(null, focusEditor: false);   // clicking bare page clears selection
+            default:
+                Select(null, focusEditor: false);   // a plain click on bare page clears the selection
                 break;
         }
     }
 
     private void OnOverlayDoubleTapped(PageView pv, TappedEventArgs e)
     {
-        if (!_doubleClickCreate) return;                 // otherwise single-click already created it
         if (!ReferenceEquals(e.Source, pv.Overlay)) return;   // double-click ON a mark must not spawn another
         var p = e.GetPosition(pv.Overlay);
         if (_tool == Tool.Note) { CreateTextAnno(pv, p, PdfAnnotation.Note); e.Handled = true; }
@@ -457,9 +449,7 @@ public partial class PdfViewer : UserControl
         PushUndo();
         _annos.Items.Add(a);
         _justAdded = a;                  // makes DrawTextAnno pop it in
-        // One-shot: drop back to Select right away. With the tool left armed, EVERY later click
-        // (deselecting, clicking another page…) silently spawned another box — boxes everywhere.
-        SetTool(Tool.Select);
+        // The tool stays armed — creation needs a DOUBLE-click, so plain clicks can't spawn boxes.
         Select(a, focusEditor: true);    // rebuilds, then focuses the fresh editor
         SaveNow();
     }
@@ -642,16 +632,17 @@ public partial class PdfViewer : UserControl
         };
         resizeCorner.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, 5, e); };
 
-        // The selection ring is drawn INSIDE the card as an overlay sharing its exact corner radius.
-        // On the outer border it rendered with a visible gap and squarer corners than the card
-        // (owner report) — and flipping the outer thickness also nudged the content on every select.
-        Border MakeRing(double radius) => new()
+        // The card's ONLY edge, drawn INSIDE the clip at the card's exact corner radius: a quiet
+        // hairline at rest (notes), the accent ring when selected. The outer border is GONE entirely,
+        // so nothing — no white line, no gap — can ever sit outside the ring (owner report).
+        Border MakeRing(double radius, bool hairlineAtRest) => new()
         {
             CornerRadius = new CornerRadius(radius),
-            BorderThickness = new Thickness(2.5),
-            BorderBrush = NoteFocusBrush,
+            BorderThickness = new Thickness(selected ? 2.5 : 1),
+            BorderBrush = selected
+                ? NoteFocusBrush
+                : hairlineAtRest ? new SolidColorBrush(Color.Parse("#33FFFFFF")) : Brushes.Transparent,
             IsHitTestVisible = false,
-            IsVisible = selected,
         };
 
         ImageBrush? backdropBrush = null;
@@ -687,19 +678,16 @@ public partial class PdfViewer : UserControl
             layers.Children.Add(resizeRight);
             layers.Children.Add(resizeBottom);
             layers.Children.Add(resizeCorner);
-            layers.Children.Add(MakeRing(10)); // ring inside the card — flush, corners match exactly
+            layers.Children.Add(MakeRing(10, hairlineAtRest: true));
             layers.Children.Add(close);        // close stays on top where the right strip overlaps it
-            // The clip lives on an INNER border so the outer border's drop shadow isn't clipped away.
+            // The clip lives on an INNER border so the outer shadow isn't clipped away.
             var clip = new Border { CornerRadius = new CornerRadius(10), ClipToBounds = true, Child = layers };
             box = new Border
             {
                 Width = a.W * w0, MinHeight = a.H * h0,
                 CornerRadius = new CornerRadius(10), Child = clip,
                 BoxShadow = BoxShadows.Parse(selected ? "0 9 28 0 #80000000" : "0 4 16 0 #59000000"),
-                BorderThickness = new Thickness(1),
-                // The hairline yields to the ring while selected — otherwise it reads as a white
-                // line just outside the blue (owner report).
-                BorderBrush = selected ? Brushes.Transparent : new SolidColorBrush(Color.Parse("#33FFFFFF")),
+                BorderThickness = new Thickness(0),   // no outer stroke ever — the edge lives inside
                 Transitions = new Transitions
                 {
                     new BoxShadowsTransition { Property = Border.BoxShadowProperty, Duration = TimeSpan.FromMilliseconds(140) },
@@ -715,7 +703,7 @@ public partial class PdfViewer : UserControl
             layers.Children.Add(resizeRight);
             layers.Children.Add(resizeBottom);
             layers.Children.Add(resizeCorner);
-            layers.Children.Add(MakeRing(8));
+            layers.Children.Add(MakeRing(8, hairlineAtRest: false));
             layers.Children.Add(close);
             box = new Border
             {
