@@ -758,7 +758,7 @@ public partial class PdfViewer : UserControl
         }
 
         pv.Overlay.Children.Add(box);
-        if (a == _justAdded) { _justAdded = null; Motion.ScaleIn(box, 0.9, Motion.Fast); }   // pop-in on create
+        if (a == _justAdded) { _justAdded = null; Motion.ScaleIn(box, 0.9, 100); }   // quick pop-in on create
     }
 
     private void DrawArrow(PageView pv, PdfAnnotation a)
@@ -946,11 +946,11 @@ public partial class PdfViewer : UserControl
                 // and drop the shadow/edge up front so they don't linger at full strength.
                 card.BoxShadow = default;
                 card.BorderBrush = Brushes.Transparent;
-                Motion.CollapseOut(inner, 150);
+                Motion.CollapseOut(inner, 90);
             }
-            else Motion.CollapseOut(t, 150);
+            else Motion.CollapseOut(t, 90);
         }
-        DispatcherTimer.RunOnce(() => { foreach (var p in _pages) RedrawPage(p); }, TimeSpan.FromMilliseconds(170));
+        DispatcherTimer.RunOnce(() => { foreach (var p in _pages) RedrawPage(p); }, TimeSpan.FromMilliseconds(100));
     }
 
     private void Select(PdfAnnotation? a, bool focusEditor)
