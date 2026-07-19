@@ -46,9 +46,10 @@ public static class DwmAcrylic
     private const int ACCENT_ENABLE_ACRYLICBLURBEHIND = 4;
 
     /// <summary>Acrylic blur-behind on any HWND — popups included. <paramref name="tintAbgr"/> is
-    /// AABBGGRR, the tint mixed into the blur itself (keep its alpha LOW — the popup content's own
-    /// translucent brush supplies the visible tint).</summary>
-    public static void BlurBehind(IntPtr hwnd, uint tintAbgr = 0x2E1C1614)
+    /// AABBGGRR, the tint mixed into the blur itself. Kept VERY low: the popup content's own
+    /// translucent brush supplies the visible tint, and a heavier blur tint stacked on top of it,
+    /// darkening the frost into a dull gray over a white PDF page (owner report).</summary>
+    public static void BlurBehind(IntPtr hwnd, uint tintAbgr = 0x0A1C1614)
     {
         if (!OperatingSystem.IsWindows() || hwnd == IntPtr.Zero) return;
         try

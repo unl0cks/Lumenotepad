@@ -668,9 +668,17 @@ public partial class PdfViewer : UserControl
             }
             if (handle == 1) { a.X = CX(_dragOrig.X + dx); a.Y = CY(_dragOrig.Y + dy); }
             if (handle == 2) { a.X2 = CX(_dragOrig.X2 + dx); a.Y2 = CY(_dragOrig.Y2 + dy); }
-            if (handle == 6) { a.C1x = CX(_dragOrigC.C1x + dx); a.C1y = CY(_dragOrigC.C1y + dy); }
-            if (handle == 7) { a.C2x = CX(_dragOrigC.C2x + dx); a.C2y = CY(_dragOrigC.C2y + dy); }
-            if (handle == 8) { a.C3x = CX(_dragOrigC.C3x + dx); a.C3y = CY(_dragOrigC.C3y + dy); }
+            if (handle is 6 or 7 or 8)
+            {
+                // The three control dots work TOGETHER (owner request): dragging one pulls the others
+                // along by a smooth falloff of their distance in t, so the shaft bends as ONE curve
+                // instead of kinking at a single dot. The dragged dot (t == tH) gets the full delta.
+                double tH = handle == 6 ? 0.25 : handle == 7 ? 0.50 : 0.75;
+                double Wt(double tk) => Math.Exp(-Math.Pow((tk - tH) / 0.34, 2));
+                a.C1x = CX(_dragOrigC.C1x + dx * Wt(0.25)); a.C1y = CY(_dragOrigC.C1y + dy * Wt(0.25));
+                a.C2x = CX(_dragOrigC.C2x + dx * Wt(0.50)); a.C2y = CY(_dragOrigC.C2y + dy * Wt(0.50));
+                a.C3x = CX(_dragOrigC.C3x + dx * Wt(0.75)); a.C3y = CY(_dragOrigC.C3y + dy * Wt(0.75));
+            }
             return;
         }
         switch (handle)
