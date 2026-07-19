@@ -497,6 +497,16 @@ public partial class PdfViewer : UserControl
         return 0.299 * c.R + 0.587 * c.G + 0.114 * c.B > 150;
     }
 
+    /// <summary>Whether a note of this colour needs DARK ink (bright colours ⇒ black text). Applies
+    /// under glass too — a bright colour veiling the frosted page is still bright — but with a higher
+    /// threshold there, since the veil darkens mid colours enough that white ink still reads on them.</summary>
+    private static bool DarkNoteInk(string noteRgb, bool glassTheme)
+    {
+        var c = Color.Parse("#FF" + noteRgb);
+        double lum = 0.299 * c.R + 0.587 * c.G + 0.114 * c.B;
+        return lum > (glassTheme ? 183 : 150);
+    }
+
     // ---- overlay pointer interaction ----
     private Point _dragStart;
     private Border? _dragPreview;                 // highlight rubber-band
@@ -799,8 +809,8 @@ public partial class PdfViewer : UserControl
         // page under Lumen. Ink (text + chrome) flips to dark on light colors so it stays readable;
         // under glass the frost keeps things dark, so white ink is used there. Text boxes are bare.
         string noteRgb = sticky ? Rgb(a.Color) : "10151E";
-        bool darkInk = sticky && !glassTheme && IsLight(noteRgb);       // dark ink on a light solid note
-        bool whiteChrome = sticky && !darkInk;                          // white furniture (glass/dark notes)
+        bool darkInk = sticky && DarkNoteInk(noteRgb, glassTheme);      // dark ink on a bright note
+        bool whiteChrome = sticky && !darkInk;                          // white furniture (dark notes)
         var inkBrush = new SolidColorBrush(Color.Parse(
             sticky ? (darkInk ? "#1A1D26" : "#F2FFFFFF") : "#E610151E"));
 
@@ -1545,7 +1555,7 @@ public partial class PdfViewer : UserControl
         pxW = Math.Max(8, a.W * w0);
         bool glassTheme = Services.ThemeManager.Current.GlassWindow;
         string noteRgb = sticky ? Rgb(a.Color) : "10151E";
-        bool darkInk = sticky && !glassTheme && IsLight(noteRgb);
+        bool darkInk = sticky && DarkNoteInk(noteRgb, glassTheme);      // match the live card's ink choice
         bool whiteChrome = sticky && !darkInk;
         var inkBrush = new SolidColorBrush(Color.Parse(
             sticky ? (darkInk ? "#1A1D26" : "#F2FFFFFF") : "#E610151E"));
