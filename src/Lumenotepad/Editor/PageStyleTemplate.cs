@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia;
 
 namespace Lumenotepad.Editor;
@@ -60,6 +61,36 @@ public static class PageStyleTemplate
         }
         return Label(LabelFor(pageStyle, id));
     }
+
+    /// <summary>Re-tag a page's still-free starters as docked regions by matching each box's label line
+    /// to a region's expected label. Robust to stray free boxes (an empty box, extra notes) and to box
+    /// order — a count-based match breaks when a page has picked up an extra box. Fresh pages arrive
+    /// already tagged, so this no-ops. Returns how many boxes were newly tagged.</summary>
+    public static int RetagLegacyStarters(IReadOnlyList<NoteBox> boxes, string pageStyle, Size viewport)
+    {
+        int tagged = 0;
+        foreach (var (id, _) in PageStyleGuides.Regions(pageStyle, viewport, default))
+        {
+            if (boxes.Any(b => b.Region == id)) continue;               // region already claimed
+            string want = RegionLabel(pageStyle, id);
+            if (string.IsNullOrEmpty(want)) continue;
+            var box = boxes.FirstOrDefault(b => b.Region is null
+                && b.ImagePath is null && b.Table is null && b.Divider is null
+                && (b.Doc.Paragraphs.Count > 0 ? b.Doc.Paragraphs[0].Text.Trim() : "") == want);
+            if (box is null) continue;
+            box.Region = id; box.Locked = true; box.H = 0; tagged++;
+        }
+        return tagged;
+    }
+
+    /// <summary>The label line a freshly stamped region starter shows — used to re-tag legacy pages
+    /// whose starters predate the Region field (match a box's first line back to its region id).</summary>
+    public static string RegionLabel(string pageStyle, string id) => pageStyle switch
+    {
+        PageStyles.Outline => "Topic",
+        PageStyles.Sentence => "First point",
+        _ => LabelFor(pageStyle, id),
+    };
 
     /// <summary>The label a region's starter box shows. Numbered styles derive "Topic N"/"Column N"
     /// from the region id's trailing digit (b0 → Topic 1, c0/h0 → Column 1).</summary>

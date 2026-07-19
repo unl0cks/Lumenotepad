@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Lumenotepad.Editor;
@@ -107,6 +108,57 @@ public class PageStyleTemplateTests
         var box = Assert.Single(PageStyleTemplate.StartersFor(PageStyles.Sentence, PageStyles.ModeGuides, Vp));
         Assert.Equal("First point", box.Doc.GetText());
         Assert.Equal("num", box.Doc.Paragraphs[0].Bullet);
+    }
+
+    [Fact]
+    public void RetagLegacyStarters_tagsRealStarters_ignoringStrayBoxes()
+    {
+        // Reproduces the FITTA Boxing page: a stray empty box the user left plus the four Topic starters,
+        // all untagged (saved before regions existed). A count-based match failed (5 ≠ 4 regions) so the
+        // page never docked; label matching tags the four Topics and leaves the stray box free.
+        var boxes = new List<NoteBox>
+        {
+            MakeBox(""),                                     // stray empty box at some random spot
+            MakeBox("Topic 1"), MakeBox("Topic 2"), MakeBox("Topic 3"), MakeBox("Topic 4"),
+        };
+        int n = PageStyleTemplate.RetagLegacyStarters(boxes, PageStyles.Boxing, Vp);
+        Assert.Equal(4, n);
+        Assert.Null(boxes[0].Region);                        // stray box left free
+        Assert.False(boxes[0].Locked);
+        Assert.Equal(new[] { "b0", "b1", "b2", "b3" }, boxes.Skip(1).Select(b => b.Region));
+        Assert.All(boxes.Skip(1), b => Assert.True(b.Locked));
+        Assert.Equal(0, PageStyleTemplate.RetagLegacyStarters(boxes, PageStyles.Boxing, Vp));  // idempotent
+    }
+
+    private static NoteBox MakeBox(string label)
+    {
+        var b = new NoteBox();
+        b.Doc.Paragraphs.Clear();
+        b.Doc.Paragraphs.Add(label.Length == 0
+            ? new Paragraph()
+            : new Paragraph { Runs = { new RichRun { Text = label, Bold = true } } });
+        return b;
+    }
+
+    [Fact]
+    public void RegionLabel_mapsBackToStarterLabels_forLegacyReTagging()
+    {
+        // NoteCanvas re-tags legacy starters by matching a box's first line to these labels, so a page
+        // with stray extra boxes still docks its real starters. Keep them in sync with the templates.
+        Assert.Equal("Cue", PageStyleTemplate.RegionLabel(PageStyles.Cornell, "cue"));
+        Assert.Equal("Summary", PageStyleTemplate.RegionLabel(PageStyles.Cornell, "summary"));
+        Assert.Equal("Topic 1", PageStyleTemplate.RegionLabel(PageStyles.Boxing, "b0"));
+        Assert.Equal("Topic 4", PageStyleTemplate.RegionLabel(PageStyles.Boxing, "b3"));
+        Assert.Equal("Column 2", PageStyleTemplate.RegionLabel(PageStyles.TwoColumn, "c1"));
+        Assert.Equal("Column 3", PageStyleTemplate.RegionLabel(PageStyles.Charting, "h2"));
+        Assert.Equal("Topic", PageStyleTemplate.RegionLabel(PageStyles.Outline, "outline"));
+        Assert.Equal("First point", PageStyleTemplate.RegionLabel(PageStyles.Sentence, "sentence"));
+
+        // The mapped label is exactly what the freshly stamped starter shows (its first line).
+        var boxing = PageStyleTemplate.StartersFor(PageStyles.Boxing, PageStyles.ModeGuides, Vp);
+        for (int i = 0; i < boxing.Count; i++)
+            Assert.Equal(PageStyleTemplate.RegionLabel(PageStyles.Boxing, boxing[i].Region!),
+                         boxing[i].Doc.Paragraphs[0].Text);
     }
 
     [Fact]

@@ -858,20 +858,22 @@ public partial class MainView : UserControl
         {
             bool wasPdf = PagePdfViewer.IsVisible;   // capture BEFORE ApplyPdfPage flips the visibilities
             ApplyPdfPage();     // PDF page → embedded viewer; note page → the canvas below
-            if (string.IsNullOrEmpty(Vm?.SelectedPage?.PdfPath))
+            if (!string.IsNullOrEmpty(Vm?.SelectedPage?.PdfPath))
             {
-                if (wasPdf)
-                {
-                    // Leaving the PDF viewer: PageDock was hidden, so fading it out would flash the STALE
-                    // note doc for a frame first ("pops back to it, THEN animates"). Hide it, swap the doc
-                    // while hidden, then rise the new page in — a clean reveal with no pop.
-                    PageDock.Opacity = 0;
-                    SyncEditorDocument();
-                }
-                // Note → note: fade the current page out, THEN swap + rise the new one in.
-                else if (PageCanvas.Document is not null) Motion.FadeOut(PageDock, Motion.Fast, SyncEditorDocument);
-                else SyncEditorDocument();
+                // Switching TO a PDF: rise the viewer in like a note page instead of popping.
+                Dispatcher.UIThread.Post(() => Motion.RiseIn(PagePdfViewer, Motion.Base), DispatcherPriority.Background);
             }
+            else if (wasPdf)
+            {
+                // Leaving the PDF viewer: PageDock was hidden, so fading it out would flash the STALE
+                // note doc for a frame first ("pops back to it, THEN animates"). Hide it, swap the doc
+                // while hidden, then rise the new page in — a clean reveal with no pop.
+                PageDock.Opacity = 0;
+                SyncEditorDocument();
+            }
+            // Note → note: fade the current page out, THEN swap + rise the new one in.
+            else if (PageCanvas.Document is not null) Motion.FadeOut(PageDock, Motion.Fast, SyncEditorDocument);
+            else SyncEditorDocument();
         }
         else if (e.PropertyName is nameof(MainViewModel.ToolbarPosition) or nameof(MainViewModel.ToolbarScope))
             ApplyToolbarPlacement();

@@ -143,7 +143,9 @@ public sealed class NoteCanvas : Panel
         _viewport = viewport;
         _guides.Viewport = viewport;
         _guides.InvalidateVisual();
-        InvalidateMeasure();           // re-dock Cornell regions to the new viewport
+        DockRegions();                 // reposition region boxes to the new viewport right away
+        InvalidateMeasure();
+        InvalidateArrange();           // force a re-arrange even if the content bounds didn't change
     }
 
     /// <summary>The editor of the most recently focused container (what the toolbar targets).</summary>
@@ -246,9 +248,11 @@ public sealed class NoteCanvas : Panel
     /// once the notes content foot is known (<see cref="DockCornellSummary"/>).</summary>
     private void DockRegions()
     {
-        if (_viewport.Width <= 0 || _viewport.Height <= 0) return;
+        if (_doc is null || _viewport.Width <= 0 || _viewport.Height <= 0) return;
+        if (_mode == PageStyles.ModeStartersOnly) return;              // starters-only keeps free boxes
         var regions = PageStyleGuides.Regions(_pageStyle, _viewport, default);
         if (regions.Count == 0) return;
+        EnsureRegions();                                              // tag legacy starters (idempotent)
         foreach (var child in Children)
         {
             if (child is not NoteBoxView v || v.Box.Region is not { } id) continue;
@@ -276,17 +280,8 @@ public sealed class NoteCanvas : Panel
     {
         if (_doc is null || _doc.Boxes.Count == 0) return;
         if (_mode == PageStyles.ModeStartersOnly) return;                 // starters-only pages keep free boxes
-        var regions = PageStyleGuides.Regions(_pageStyle, _viewport.Width > 0 ? _viewport : new Size(900, 600), default);
-        if (regions.Count == 0) return;                                   // Freeform / Mindmap: nothing to dock
-        if (_doc.Boxes.Any(b => b.Region is not null)) return;            // already tagged
-        if (_doc.Boxes.Count != regions.Count) return;                    // not a pristine starter set
-        if (_doc.Boxes.Any(b => b.ImagePath is not null || b.Table is not null || b.Divider is not null)) return;
-        for (int i = 0; i < regions.Count; i++)
-        {
-            _doc.Boxes[i].Region = regions[i].Id;
-            _doc.Boxes[i].Locked = true;
-            _doc.Boxes[i].H = 0;
-        }
+        // Tag legacy starters (label-matched, robust to stray boxes); fresh pages arrive tagged → no-op.
+        PageStyleTemplate.RetagLegacyStarters(_doc.Boxes, _pageStyle, _viewport.Width > 0 ? _viewport : new Size(900, 600));
     }
 
     protected override Size ArrangeOverride(Size finalSize)
