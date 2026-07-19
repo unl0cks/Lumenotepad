@@ -3,30 +3,34 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Threading;
 using Avalonia.VisualTree;
 
 namespace Lumenotepad.Views;
 
 /// <summary>Wheel-driven smooth vertical scrolling for a <see cref="ScrollViewer"/>: each notch nudges
-/// a target offset and a per-frame timer eases the real offset toward it, so the pane glides instead
-/// of jumping a line at a time. Uses the same code-behind tween approach as <see cref="Motion"/>
-/// (declarative Offset animation isn't a thing here) and honors the reduce-motion pref. Vertical only.
+/// a target offset and the real offset eases toward it, so the pane glides instead of jumping a line at
+/// a time. Honors the reduce-motion pref. Vertical only.
+///
+/// The ease runs on the compositor's animation-frame callback (<see cref="TopLevel.RequestAnimationFrame"/>),
+/// NOT a free-running DispatcherTimer: one update per REAL rendered frame, timed by that frame's own
+/// clock. A timer that fires at a fixed 10ms cadence drifts against vsync — offsets get set at moments
+/// that don't line up with when frames actually paint — which read as a stutter/jump on a heavier pane
+/// (the Customize window's acrylic; owner report). Frame-locked, each rendered frame shows exactly the
+/// right offset for its timestamp, so the glide stays even at whatever rate the pane can render.
 ///
 /// Chaining: when the pointer is over an inner scrollable (e.g. the fonts checklist's own ScrollViewer),
 /// the wheel is left to native handling so that list scrolls itself.</summary>
 public sealed class SmoothScroll
 {
     private readonly ScrollViewer _sv;
-    private DispatcherTimer? _timer;
-    private readonly System.Diagnostics.Stopwatch _clock = new();   // real time between ticks
+    private TopLevel? _top;
     private double _target;
+    private bool _running;
+    private TimeSpan? _last;
 
-    private const double StepPerNotch = 64;   // px of target movement per wheel unit
-    // Fraction of the remaining gap closed per 10ms of REAL time. The per-tick close is scaled to the
-    // actual elapsed time (below), not applied flat each tick — a flat fraction moved the offset in
-    // uneven bursts when frames were expensive (heavy pane → irregular ticks → visibly "jumpy" scroll,
-    // owner report). Same easing feel, frame-rate independent.
+    private const double StepPerNotch = 64;      // px of target movement per wheel unit
+    // Fraction of the remaining gap closed per 10ms of REAL time; scaled to each frame's actual dt so
+    // the pace is identical whether frames land every 8ms or every 30ms.
     private const double CatchUpPer10ms = 0.16;
 
     private SmoothScroll(ScrollViewer sv)
@@ -50,8 +54,7 @@ public sealed class SmoothScroll
         double max = MaxOffset;
         if (max <= 0) return;                          // nothing to scroll
 
-        // Fresh gesture (timer idle): start the target from where we actually are.
-        if (_timer is null || !_timer.IsEnabled) _target = _sv.Offset.Y;
+        if (!_running) _target = _sv.Offset.Y;         // fresh gesture: start from where we actually are
         _target = Math.Clamp(_target - e.Delta.Y * StepPerNotch, 0, max);
         e.Handled = true;
 
@@ -60,44 +63,30 @@ public sealed class SmoothScroll
             _sv.Offset = new Vector(_sv.Offset.X, _target);
             return;
         }
-        _timer ??= CreateTimer();
-        if (!_timer.IsEnabled) { _clock.Restart(); _timer.Start(); }
+        _top ??= TopLevel.GetTopLevel(_sv);
+        if (_top is null) { _sv.Offset = new Vector(_sv.Offset.X, _target); return; }
+        if (!_running) { _running = true; _last = null; _top.RequestAnimationFrame(Frame); }
     }
 
-    private DispatcherTimer CreateTimer()
+    private void Frame(TimeSpan now)
     {
-        // Render priority + 10ms ticks: a default-priority 15ms timer queues behind input/layout
-        // work and visibly stutters (owner report). Render priority fires right before the frame.
-        var t = new DispatcherTimer(TimeSpan.FromMilliseconds(10), DispatcherPriority.Render, (_, _) => Tick());
-        return t;
-    }
-
-    private void Tick()
-    {
-        // Close the gap by an amount matched to the REAL time since the last tick, so the glide keeps a
-        // steady pace whether ticks fire every 8ms or every 40ms. dt is clamped to a couple of frames:
-        // a longer stall shouldn't translate into one giant time-accurate leap (that read as "jumpy").
-        double dtMs = _clock.IsRunning ? Math.Clamp(_clock.Elapsed.TotalMilliseconds, 1, 32) : 10;
-        _clock.Restart();
+        if (!_running) return;
+        // dt from the real frame clock (clamped so a long stall settles rather than leaping).
+        double dtMs = _last is { } l ? Math.Clamp((now - l).TotalMilliseconds, 1, 40) : 16;
+        _last = now;
         double factor = 1 - Math.Pow(1 - CatchUpPer10ms, dtMs / 10.0);
 
+        double max = MaxOffset;
         double cur = _sv.Offset.Y;
-        double delta = (_target - cur) * factor;
-        // Hard cap the per-frame move to a fraction of a screen. Under a heavy pane (Customize window),
-        // frames drop and a single catch-up step could otherwise visibly lurch; capping keeps every
-        // frame's movement small and even, at the cost of a few extra frames on a big fast fling.
-        double cap = Math.Max(48, _sv.Viewport.Height * 0.33);
-        delta = Math.Clamp(delta, -cap, cap);
-
-        double next = cur + delta;
-        if (Math.Abs(_target - next) < 0.5)
+        double next = cur + (Math.Clamp(_target, 0, max) - cur) * factor;
+        if (Math.Abs(Math.Clamp(_target, 0, max) - next) < 0.5)
         {
-            _sv.Offset = new Vector(_sv.Offset.X, _target);
-            _timer?.Stop();
-            _clock.Reset();
+            _sv.Offset = new Vector(_sv.Offset.X, Math.Clamp(_target, 0, max));
+            _running = false;
             return;
         }
         _sv.Offset = new Vector(_sv.Offset.X, next);
+        _top?.RequestAnimationFrame(Frame);            // one callback per frame — re-arm for the next
     }
 
     /// <summary>True when the wheel is over a nested scrollable between the source and our ScrollViewer,
