@@ -44,6 +44,14 @@ public partial class MainViewModel : ObservableObject
         ("Pink",   new[] { ("Pastel", "#F5B8CE"), ("Rose", "#EF8FB2"),       ("Pink", "#E27BA6"),   ("Magenta", "#C7538A"),   ("Berry", "#93375F") }),
     };
 
+    /// <summary>The neutral shade ramp (white → black) offered alongside the coloured families in the
+    /// highlight / text-colour / note-colour pickers — greys the coloured palette doesn't cover.</summary>
+    public static readonly (string Name, string Hex)[] GrayscaleShades =
+    {
+        ("White", "#FFFFFF"), ("Light gray", "#C6CBD2"), ("Gray", "#8B9099"),
+        ("Dark gray", "#464B54"), ("Black", "#111418"),
+    };
+
     private readonly WorkspaceStore _store;
     private readonly Workspace _workspace;
 

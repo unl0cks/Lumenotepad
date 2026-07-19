@@ -314,12 +314,12 @@ public partial class PdfViewer : UserControl
     /// selected mark). The family whose shade is active wears an accent ring.</summary>
     private void BuildSwatches()
     {
-        foreach (var (family, shades) in ViewModels.MainViewModel.NotebookPalette)
+        void AddFamily(string family, (string Name, string Hex)[] shades, IBrush swatch)
         {
             var btn = new Border
             {
                 Width = 22, Height = 22, CornerRadius = new CornerRadius(6),
-                Background = new SolidColorBrush(Color.Parse(shades[2].Hex)),   // middle = family swatch
+                Background = swatch,
                 BorderThickness = new Thickness(1),
                 BorderBrush = this.FindResource("FrameBorderBrush") as IBrush,
                 Cursor = new Cursor(StandardCursorType.Hand), Tag = family,
@@ -346,8 +346,20 @@ public partial class PdfViewer : UserControl
             btn.PointerPressed += (_, _) => flyout.ShowAt(btn);
             ColorSwatches.Children.Add(btn);
         }
+
+        foreach (var (family, shades) in ViewModels.MainViewModel.NotebookPalette)
+            AddFamily(family, shades, new SolidColorBrush(Color.Parse(shades[2].Hex)));   // middle = family swatch
+        AddFamily("Neutral", ViewModels.MainViewModel.GrayscaleShades, NeutralSwatch());   // white → black ramp
         RefreshSwatchRings();
     }
+
+    /// <summary>The grayscale family's swatch: a white→black diagonal so it reads as "neutrals".</summary>
+    private static IBrush NeutralSwatch() => new LinearGradientBrush
+    {
+        StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
+        EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+        GradientStops = { new GradientStop(Colors.White, 0), new GradientStop(Color.Parse("#111418"), 1) },
+    };
 
     // ---- arrow options (curved toggle + arrowhead shape & size) ----
     private static readonly (string Key, string Glyph, string Name)[] HeadStyles =
@@ -1514,7 +1526,9 @@ public partial class PdfViewer : UserControl
             c.DrawBitmap(pageBmp, new SkiaSharp.SKRect(0, 0, wpt, hpt), blur);
             c.Restore();
         }
-        c.DrawImage(img, rect);
+        // Cubic (Mitchell) resampling — the note is supersampled then drawn smaller here; the default
+        // nearest/linear sampling left it faintly blurry. Cubic keeps the downscaled text crisp.
+        c.DrawImage(img, rect, new SkiaSharp.SKSamplingOptions(SkiaSharp.SKCubicResampler.Mitchell));
     }
 
     /// <summary>Render a note/text card to a PNG (its exact on-screen glass look, minus the live
@@ -1594,7 +1608,7 @@ public partial class PdfViewer : UserControl
         box.Arrange(new Rect(0, 0, pxW, pxH));
         // Supersample: the note is laid out at ~110 DPI but the page raster is 150 DPI, so render the
         // card at a higher pixel density and let the PDF downsample — crisp text instead of a blur.
-        const double ss = 2.5;
+        const double ss = 3.5;
         var px = new PixelSize((int)Math.Ceiling(pxW * ss), (int)Math.Ceiling(pxH * ss));
         using var rtb = new RenderTargetBitmap(px, new Vector(96 * ss, 96 * ss));
         rtb.Render(box);

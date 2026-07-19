@@ -74,15 +74,22 @@ public sealed class SmoothScroll
 
     private void Tick()
     {
-        // Close the gap by an amount matched to the REAL time since the last tick, so a late/expensive
-        // frame catches up smoothly instead of the offset lurching a flat 16% whenever a tick happens
-        // to fire. dt is clamped so a long stall (app frozen) just settles rather than snapping wildly.
-        double dtMs = _clock.IsRunning ? Math.Clamp(_clock.Elapsed.TotalMilliseconds, 1, 100) : 10;
+        // Close the gap by an amount matched to the REAL time since the last tick, so the glide keeps a
+        // steady pace whether ticks fire every 8ms or every 40ms. dt is clamped to a couple of frames:
+        // a longer stall shouldn't translate into one giant time-accurate leap (that read as "jumpy").
+        double dtMs = _clock.IsRunning ? Math.Clamp(_clock.Elapsed.TotalMilliseconds, 1, 32) : 10;
         _clock.Restart();
         double factor = 1 - Math.Pow(1 - CatchUpPer10ms, dtMs / 10.0);
 
         double cur = _sv.Offset.Y;
-        double next = cur + (_target - cur) * factor;
+        double delta = (_target - cur) * factor;
+        // Hard cap the per-frame move to a fraction of a screen. Under a heavy pane (Customize window),
+        // frames drop and a single catch-up step could otherwise visibly lurch; capping keeps every
+        // frame's movement small and even, at the cost of a few extra frames on a big fast fling.
+        double cap = Math.Max(48, _sv.Viewport.Height * 0.33);
+        delta = Math.Clamp(delta, -cap, cap);
+
+        double next = cur + delta;
         if (Math.Abs(_target - next) < 0.5)
         {
             _sv.Offset = new Vector(_sv.Offset.X, _target);

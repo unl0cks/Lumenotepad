@@ -246,7 +246,7 @@ public partial class FormatToolbar : UserControl
     /// ∅ chip clears the highlight / resets to the default text colour.</summary>
     private void SetupColorPicker(StackPanel host, bool highlight, Action<string?> apply, Button owner)
     {
-        void ShowFamilies()
+        void ShowFamilies(bool animate)
         {
             host.Children.Clear();
             var none = SwatchChip(22, Brushes.Transparent, highlight ? "None" : "Default");
@@ -260,25 +260,39 @@ public partial class FormatToolbar : UserControl
                 fam.PointerPressed += (_, _) => ShowShades(local);
                 host.Children.Add(fam);
             }
+            // Grayscale ramp (white → black) — greys the coloured families don't cover.
+            var neutral = SwatchChip(22, NeutralBrush(), "White · gray · black");
+            neutral.PointerPressed += (_, _) => ShowShades(ViewModels.MainViewModel.GrayscaleShades);
+            host.Children.Add(neutral);
+            if (animate) Motion.ScaleIn(host, 1.06, Motion.Fast);   // zoom back out to the families
         }
         void ShowShades((string Name, string Hex)[] shades)
         {
             host.Children.Clear();
             var back = SwatchChip(22, Brushes.Transparent, "Back");
             back.Child = Glyph("‹", 16);
-            back.PointerPressed += (_, _) => ShowFamilies();
+            back.PointerPressed += (_, _) => ShowFamilies(animate: true);
             host.Children.Add(back);
             foreach (var (name, hex) in shades)
             {
                 var chip = SwatchChip(26, new SolidColorBrush(Color.Parse(hex)), name);
                 string applied = (highlight ? "#66" : "#FF") + Rgb(hex);
-                chip.PointerPressed += (_, _) => { apply(applied); owner.Flyout?.Hide(); ShowFamilies(); };
+                chip.PointerPressed += (_, _) => { apply(applied); owner.Flyout?.Hide(); ShowFamilies(animate: false); };
                 host.Children.Add(chip);
             }
+            Motion.ScaleIn(host, 0.9, Motion.Fast);                 // zoom in to the picked family's shades
         }
-        ShowFamilies();
-        if (owner.Flyout is FlyoutBase fb) fb.Opened += (_, _) => ShowFamilies();   // always reopen on families
+        ShowFamilies(animate: false);
+        if (owner.Flyout is FlyoutBase fb) fb.Opened += (_, _) => ShowFamilies(animate: false);   // reopen on families
     }
+
+    /// <summary>The grayscale family's swatch: a white→black diagonal so it reads as "neutrals".</summary>
+    private static IBrush NeutralBrush() => new LinearGradientBrush
+    {
+        StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
+        EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+        GradientStops = { new GradientStop(Colors.White, 0), new GradientStop(Color.Parse("#111418"), 1) },
+    };
 
     private Border SwatchChip(double size, IBrush bg, string tip)
     {
