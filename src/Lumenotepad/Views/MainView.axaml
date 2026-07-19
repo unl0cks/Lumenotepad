@@ -544,7 +544,7 @@
             <Panel Grid.Column="3">
             <Border x:Name="CanvasPlate" Background="{DynamicResource CanvasBackgroundBrush}"/>
             <!-- Page: title + freeform canvas of note containers -->
-            <Border Margin="14" CornerRadius="{DynamicResource RadiusPage}"
+            <Border x:Name="PageBoxSurface" Margin="14" CornerRadius="{DynamicResource RadiusPage}"
                     Background="{DynamicResource PaperBackgroundBrush}" BorderBrush="{DynamicResource PaperBorderBrush}" BorderThickness="1">
                 <Panel>
                 <!-- per-notebook paper tint: a translucent veil over the paper, under the content -->

@@ -949,8 +949,12 @@ public partial class MainView : UserControl
             if (Content is Control root) Motion.FadeIn(root, Motion.Fast);   // soft cross to the new theme
             // Posted: MainWindow's own PropertyChanged handler updates ThemeManager.Current on this
             // same VM event, and subscription order between the two views isn't guaranteed — read
-            // GlassWindow only after that handler has had a chance to run.
-            Dispatcher.UIThread.Post(ApplyGlassTint, DispatcherPriority.Background);
+            // GlassWindow / the new paper tokens only after that handler has had a chance to run.
+            Dispatcher.UIThread.Post(() =>
+            {
+                ApplyGlassTint();
+                ApplyPdfBackdrop(PagePdfViewer.IsVisible);   // re-tint the PDF backdrop for the new theme
+            }, DispatcherPriority.Background);
         }
     }
 
@@ -1551,11 +1555,34 @@ public partial class MainView : UserControl
         bool isPdf = !string.IsNullOrEmpty(rel) && Vm?.SelectedNotebookDir is { };
         PageDock.IsVisible = !isPdf;
         PagePdfViewer.IsVisible = isPdf;
+        ApplyPdfBackdrop(isPdf);
         if (isPdf)
         {
             var full = System.IO.Path.Combine(Vm!.SelectedNotebookDir!, rel!);
             PagePdfViewer.Load(full, Vm!.DoubleClickCreate);
         }
+    }
+
+    /// <summary>The page box's own rounded surface is glass on some themes (real-glass note page,
+    /// solid-theme acrylic hole). A PDF can't be annotated over a see-through page, so while a PDF is
+    /// shown we make ONLY the glass cases opaque; light/dark solid paper is left as the theme intends
+    /// so the backdrop still follows Light paper etc. The rounded Border is what we recolor, so corners
+    /// stay rounded (the earlier full-viewer background squared them off — owner report).</summary>
+    private void ApplyPdfBackdrop(bool isPdf)
+    {
+        if (!isPdf)
+        {
+            PageBoxSurface.Bind(Border.BackgroundProperty, PageBoxSurface.GetResourceObservable("PaperBackgroundBrush"));
+            return;
+        }
+        var t = Services.ThemeManager.Current;
+        var paper = Avalonia.Media.Color.Parse(t.PaperBackground);
+        // Opaque paper (Lumen dark/light paper, solid full-theme) → keep it; glass paper → an opaque
+        // neutral that follows the theme's light/dark so white pages read.
+        var c = paper.A >= 0xC0
+            ? new Avalonia.Media.Color(0xFF, paper.R, paper.G, paper.B)
+            : Avalonia.Media.Color.Parse(t.DarkChrome ? "#171A22" : "#E9EDF3");
+        PageBoxSurface.Background = new Avalonia.Media.SolidColorBrush(c);
     }
 
     /// <summary>Drop a line divider ("h"/"v") on the current page, near the top-left of the view.</summary>

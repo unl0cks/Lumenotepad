@@ -57,11 +57,7 @@
         </Style>
     </UserControl.Styles>
 
-    <!-- An OPAQUE, themed document backdrop. The viewer sits in the page box, whose PaperBackground is
-         glass/light/tinted for the note canvas — inheriting that left the PDF viewer see-through, so on
-         some themes the desktop bled around the pages or white pages vanished on light paper. A solid
-         window-surface backdrop keeps the pages readable on every theme (owner report). -->
-    <DockPanel Background="{DynamicResource WindowBackgroundBrush}">
+    <DockPanel>
         <Border DockPanel.Dock="Top" Padding="16,6,16,8" Background="Transparent">
             <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
                 <!-- No Select tool: a single click always selects; the tools arm gestures on top.

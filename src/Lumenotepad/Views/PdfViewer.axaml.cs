@@ -230,6 +230,8 @@ public partial class PdfViewer : UserControl
         {
             Background = Brushes.White, Child = panel,
             BoxShadow = BoxShadows.Parse("0 4 18 0 #55000000"),
+            // A hairline edge keeps a white page distinct from a light backdrop (Lumen light paper).
+            BorderBrush = new SolidColorBrush(Color.Parse("#33000000")), BorderThickness = new Thickness(1),
             HorizontalAlignment = HorizontalAlignment.Center,
         };
         var pv = new PageView(index, wpt, hpt, frame, overlay, img);
