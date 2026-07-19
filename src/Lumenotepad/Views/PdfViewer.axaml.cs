@@ -584,6 +584,7 @@ public partial class PdfViewer : UserControl
                 });
                 RedrawPage(pv); SaveNow();
             }
+            else Select(null, focusEditor: false);     // a plain click on empty page clears selection
         }
         else if (_arrowPreview is not null)
         {
@@ -605,6 +606,7 @@ public partial class PdfViewer : UserControl
                 _annos.Items.Add(arrow);
                 RedrawPage(pv); SaveNow();
             }
+            else Select(null, focusEditor: false);     // a plain click on empty page clears selection
         }
     }
 
