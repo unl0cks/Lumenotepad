@@ -1563,25 +1563,21 @@ public partial class MainView : UserControl
         }
     }
 
-    /// <summary>The page box's own rounded surface is glass on some themes (real-glass note page,
-    /// solid-theme acrylic hole). A PDF can't be annotated over a see-through page, so while a PDF is
-    /// shown we make ONLY the glass cases opaque; light/dark solid paper is left as the theme intends
-    /// so the backdrop still follows Light paper etc. The rounded Border is what we recolor, so corners
-    /// stay rounded (the earlier full-viewer background squared them off — owner report).</summary>
+    /// <summary>The ONLY theme combo where the PDF viewer needed a backdrop fix is a SOLID theme with
+    /// Full-theme OFF: there the page box is a real-glass acrylic hole, so a PDF sat over the bare
+    /// desktop. In that one case we recolor the rounded page-box Border to an opaque neutral (following
+    /// the theme's light/dark). EVERY other combo — all of Lumen (its glass/frost is intentional), and
+    /// solid Full-theme-on — keeps its own PaperBackground untouched, so Lumen looks exactly like it
+    /// always has. The rounded Border is what we recolor, so corners stay rounded.</summary>
     private void ApplyPdfBackdrop(bool isPdf)
     {
-        if (!isPdf)
+        bool needsOpaque = isPdf && Vm is { } vm && vm.Theme != "Lumen" && !vm.FullTheme;
+        if (!needsOpaque)
         {
             PageBoxSurface.Bind(Border.BackgroundProperty, PageBoxSurface.GetResourceObservable("PaperBackgroundBrush"));
             return;
         }
-        var t = Services.ThemeManager.Current;
-        var paper = Avalonia.Media.Color.Parse(t.PaperBackground);
-        // Opaque paper (Lumen dark/light paper, solid full-theme) → keep it; glass paper → an opaque
-        // neutral that follows the theme's light/dark so white pages read.
-        var c = paper.A >= 0xC0
-            ? new Avalonia.Media.Color(0xFF, paper.R, paper.G, paper.B)
-            : Avalonia.Media.Color.Parse(t.DarkChrome ? "#171A22" : "#E9EDF3");
+        var c = Avalonia.Media.Color.Parse(Services.ThemeManager.Current.DarkChrome ? "#171A22" : "#E9EDF3");
         PageBoxSurface.Background = new Avalonia.Media.SolidColorBrush(c);
     }
 
