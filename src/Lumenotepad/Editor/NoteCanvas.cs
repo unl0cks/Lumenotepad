@@ -121,19 +121,28 @@ public sealed class NoteCanvas : Panel
     // The mindmap connector layer: above the guides, under every container (M9 Part 5).
     private readonly LinkLayer _links = new();
     private string _pageStyle = PageStyles.Freeform;
+    private int _mode;
+    private Size _viewport;
 
     /// <summary>Push the page's effective styles (grid background, method guides, apply mode).</summary>
     public void SetStyles(string gridStyle, string pageStyle, int mode)
     {
         _pageStyle = pageStyle;
+        _mode = mode;
         _guides.SetStyles(gridStyle, pageStyle, mode);
+        EnsureCornellRegions();        // tag legacy Cornell starters so they dock like fresh ones
+        InvalidateMeasure();
     }
 
-    /// <summary>The visible page area — guide dividers anchor to it (MainView pushes it on layout).</summary>
+    /// <summary>The visible page area — guide dividers AND docked region boxes anchor to it
+    /// (MainView pushes it on layout / resize / zoom).</summary>
     public void SetViewport(Size viewport)
     {
+        if (viewport == _viewport) return;
+        _viewport = viewport;
         _guides.Viewport = viewport;
         _guides.InvalidateVisual();
+        InvalidateMeasure();           // re-dock Cornell regions to the new viewport
     }
 
     /// <summary>The editor of the most recently focused container (what the toolbar targets).</summary>
@@ -183,6 +192,7 @@ public sealed class NoteCanvas : Panel
         _links.Refresh();
         Children.Add(_links);
         Children.Add(_hint);
+        EnsureCornellRegions();        // tag legacy Cornell starters before their views are built
         if (_doc is not null)
             foreach (var box in _doc.Boxes)
                 Children.Add(new NoteBoxView(this, box));
@@ -207,16 +217,72 @@ public sealed class NoteCanvas : Panel
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        double w = 0, h = 0;
+        DockCornellColumns();                      // cue/notes/summary X+Width, cue/notes Y — from the viewport
+
+        double w = 0, h = 0, notesFoot = 0;
         foreach (var child in Children)
         {
             if (child is not NoteBoxView v) { child.Measure(Size.Infinity); continue; }
             v.Measure(new Size(v.Box.Width, double.PositiveInfinity));
+            double bottom = v.Box.Y + Math.Max(v.DesiredSize.Height, v.Box.H);
             w = Math.Max(w, v.Box.X + v.Box.Width);
-            h = Math.Max(h, v.Box.Y + Math.Max(v.DesiredSize.Height, v.Box.H));
+            h = Math.Max(h, bottom);
+            if (v.Box.Region != "summary") notesFoot = Math.Max(notesFoot, bottom);  // summary excluded (breaks the loop)
         }
-        _guides.ContentBottom = h;                 // the real content foot (pre-breathing) for page-docked guides
+
+        DockCornellSummary(notesFoot);             // drop the summary band just below the notes content
+        _guides.ContentBottom = notesFoot;         // the guide's summary rule uses the very same foot
+
+        foreach (var child in Children)            // the summary box may have moved down — fold it into the height
+            if (child is NoteBoxView sv && sv.Box.Region == "summary")
+                h = Math.Max(h, sv.Box.Y + Math.Max(sv.DesiredSize.Height, sv.Box.H));
+
         return new Size(w + 220, h + 320);        // breathing room so the page can always grow by clicking
+    }
+
+    /// <summary>Snap Cornell's cue/notes columns (and the summary box's X/width) to the live guide
+    /// geometry. Horizontal placement depends only on the viewport, so it's safe to set every measure;
+    /// the summary's Y waits until the notes content foot is known (<see cref="DockCornellSummary"/>).</summary>
+    private void DockCornellColumns()
+    {
+        if (_pageStyle != PageStyles.Cornell || _viewport.Width <= 0 || _viewport.Height <= 0) return;
+        var (cue, notes, summary) = PageStyleGuides.CornellRegions(_viewport.Width, _viewport.Height, 0);
+        foreach (var child in Children)
+        {
+            if (child is not NoteBoxView v || v.Box.Region is not { } r) continue;
+            switch (r)
+            {
+                case "cue":     v.Box.X = cue.X;   v.Box.Y = cue.Y;   v.Box.Width = cue.Width;   break;
+                case "notes":   v.Box.X = notes.X; v.Box.Y = notes.Y; v.Box.Width = notes.Width; break;
+                case "summary": v.Box.X = summary.X;                   v.Box.Width = summary.Width; break;
+            }
+        }
+    }
+
+    /// <summary>Place the summary region a small gap below the notes content foot (never above its
+    /// 80%-of-screen home) — the same rule the guide's summary line uses, so line and box stay glued.</summary>
+    private void DockCornellSummary(double notesFoot)
+    {
+        if (_pageStyle != PageStyles.Cornell || _viewport.Width <= 0 || _viewport.Height <= 0) return;
+        var (_, _, summary) = PageStyleGuides.CornellRegions(_viewport.Width, _viewport.Height, notesFoot);
+        foreach (var child in Children)
+            if (child is NoteBoxView v && v.Box.Region == "summary")
+                v.Box.Y = summary.Y;
+    }
+
+    /// <summary>Legacy Cornell pages (created before regions were docked) carry the Cue/Notes/Summary
+    /// starters with no Region tag — tag them by their label so they dock like freshly stamped ones.</summary>
+    private void EnsureCornellRegions()
+    {
+        if (_pageStyle != PageStyles.Cornell || _doc is null) return;
+        foreach (var b in _doc.Boxes)
+        {
+            if (b.Region is not null || b.Divider is not null || b.ImagePath is not null || b.Table is not null) continue;
+            // Match the LABEL (first line) — the user may have typed notes under it ("Notes\nLALA…").
+            string label = (b.Doc.Paragraphs.Count > 0 ? b.Doc.Paragraphs[0].Text : "").Trim();
+            b.Region = label switch { "Cue" => "cue", "Notes" => "notes", "Summary" => "summary", _ => null };
+            if (b.Region is not null) b.Locked = true;
+        }
     }
 
     protected override Size ArrangeOverride(Size finalSize)

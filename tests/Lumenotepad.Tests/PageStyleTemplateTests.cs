@@ -39,18 +39,33 @@ public class PageStyleTemplateTests
         Assert.Equal(268, boxes[1].X);           // 252 + 16
         Assert.Equal(616, boxes[1].Width);       // 900 − 252 − 32
         Assert.Equal(492, boxes[2].Y);           // 480 + 12
-        Assert.All(boxes, b => Assert.False(b.Locked));
-        Assert.All(boxes, b => Assert.Equal(0, b.H));           // auto height when not rigid
+        Assert.Equal("cue", boxes[0].Region);
+        Assert.Equal("notes", boxes[1].Region);
+        Assert.Equal("summary", boxes[2].Region);
+        Assert.All(boxes, b => Assert.True(b.Locked));          // docked regions are always locked
+        Assert.All(boxes, b => Assert.Equal(0, b.H));           // auto height — the docker owns Y
+    }
+
+    [Fact]
+    public void Cornell_regionsAreDockedRegardlessOfMode()
+    {
+        // Cornell always docks (locked + auto height): the canvas owns its geometry, so the rigid
+        // fixed-height path never applies to it — unlike the plain starter styles below.
+        var boxes = PageStyleTemplate.StartersFor(PageStyles.Cornell, PageStyles.ModeRigid, Vp);
+        Assert.All(boxes, b => Assert.True(b.Locked));
+        Assert.All(boxes, b => Assert.Equal(0, b.H));
+        Assert.Equal(new[] { "cue", "notes", "summary" }, boxes.Select(b => b.Region));
     }
 
     [Fact]
     public void Rigid_locksAndFixesHeights()
     {
-        var boxes = PageStyleTemplate.StartersFor(PageStyles.Cornell, PageStyles.ModeRigid, Vp);
+        // A rigid page's plain (non-docked) starters — Two-column — lock to fixed region heights.
+        var boxes = PageStyleTemplate.StartersFor(PageStyles.TwoColumn, PageStyles.ModeRigid, Vp);
+        Assert.Equal(2, boxes.Count);
         Assert.All(boxes, b => Assert.True(b.Locked));
-        Assert.Equal(448, boxes[0].H);           // 480 − 32
-        Assert.Equal(448, boxes[1].H);
-        Assert.Equal(92, boxes[2].H);            // 600 − 480 − 28
+        Assert.Equal(568, boxes[0].H);           // 600 − 32
+        Assert.Equal(568, boxes[1].H);
     }
 
     [Fact]

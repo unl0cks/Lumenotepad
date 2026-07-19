@@ -84,6 +84,11 @@ public sealed class NoteBox
     /// never evaporates when empty (M9). Persisted.</summary>
     public bool Locked { get; set; }
 
+    /// <summary>A DOCKED page-style region ("cue"/"notes"/"summary" for Cornell): the canvas keeps
+    /// this box glued to the live guide geometry, so a structured page's boxes and its guide lines
+    /// scale together and never drift apart on resize. Null for ordinary free boxes. Persisted.</summary>
+    public string? Region { get; set; }
+
     /// <summary>An IMAGE box (M10): a path relative to the notebook folder ("images/xxx.png").
     /// When set the box renders the image instead of a text editor. Persisted.</summary>
     public string? ImagePath { get; set; }

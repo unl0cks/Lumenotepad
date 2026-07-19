@@ -20,6 +20,7 @@ public static class CanvasDocJson
         [JsonPropertyName("w")] public double W { get; set; } = NoteBox.DefaultWidth;
         [JsonPropertyName("h")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double H { get; set; }
         [JsonPropertyName("lk")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Locked { get; set; }
+        [JsonPropertyName("rg")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Region { get; set; }
         [JsonPropertyName("img")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Img { get; set; }
         [JsonPropertyName("div")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Div { get; set; }
         [JsonPropertyName("att")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Att { get; set; }
@@ -39,7 +40,7 @@ public static class CanvasDocJson
 
     private static BoxDto ToDto(NoteBox b) => new()
     {
-        X = b.X, Y = b.Y, W = b.Width, H = b.H, Locked = b.Locked,
+        X = b.X, Y = b.Y, W = b.Width, H = b.H, Locked = b.Locked, Region = b.Region,
         Img = b.ImagePath, Div = b.Divider, Att = b.AttachPath,
         Tbl = b.Table?.Rows.Select(row => row.Select(RichDocJson.ToDtos).ToList()).ToList(),
         Paras = RichDocJson.ToDtos(b.Doc),
@@ -49,7 +50,7 @@ public static class CanvasDocJson
     {
         var box = new NoteBox(RichDocJson.FromDtos(b.Paras))
         {
-            X = b.X, Y = b.Y, Width = b.W, H = b.H, Locked = b.Locked,
+            X = b.X, Y = b.Y, Width = b.W, H = b.H, Locked = b.Locked, Region = b.Region,
             ImagePath = b.Img, Divider = b.Div, AttachPath = b.Att,
         };
         if (b.Tbl is { Count: > 0 })

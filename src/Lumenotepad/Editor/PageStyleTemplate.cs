@@ -26,12 +26,16 @@ public static class PageStyleTemplate
         {
             case PageStyles.Cornell:
             {
-                // Rounded exactly like PageStyleGuides, so starters sit ON the drawn regions
-                // (fraction-of-viewport math isn't binary-exact: 900 × 0.28 ≠ 252 unrounded).
-                double cue = System.Math.Round(vw * 0.28), sum = System.Math.Round(vh * 0.80);
-                Add(Margin, Margin, cue - 2 * Margin, sum - 2 * Margin, Label("Cue"));
-                Add(cue + Margin, Margin, vw - cue - 2 * Margin, sum - 2 * Margin, Label("Notes"));
-                Add(Margin, sum + 12, vw - 2 * Margin, vh - sum - 28, Label("Summary"));
+                // Cornell's three regions are DOCKED: tagged + locked, they snap to the live guide
+                // geometry (NoteCanvas re-docks them on resize / as the notes grow), so the labelled
+                // boxes and the drawn dividers scale together and never drift apart. These starting
+                // rects are just the first-screen positions — the docker owns them from here.
+                var (cueR, notesR, sumR) = PageStyleGuides.CornellRegions(vw, vh, 0);
+                void Region(Rect r, string region, string label) => list.Add(
+                    new NoteBox(Label(label)) { X = r.X, Y = r.Y, Width = r.Width, H = 0, Locked = true, Region = region });
+                Region(cueR, "cue", "Cue");
+                Region(notesR, "notes", "Notes");
+                Region(sumR, "summary", "Summary");
                 break;
             }
             case PageStyles.TwoColumn:

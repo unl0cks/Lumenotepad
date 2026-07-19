@@ -15,6 +15,7 @@ public static class PageStyleGuides
         public static readonly GuideSet Empty = new(new List<(Point, Point)>(), new List<Rect>());
     }
 
+    public const double Margin = 16;        // must match PageStyleTemplate.Margin (region insets)
     public const double RuleSpacing = 28;   // Sentence/Ruled line pitch
     public const double RuleTop = 48;       // first Sentence rule
     public const double HeaderY = 64;       // Charting header underline
@@ -37,21 +38,14 @@ public static class PageStyleGuides
         switch (pageStyle)
         {
             case PageStyles.Cornell:
-                // The cue-column WIDTH is a viewport fraction (a horizontal position, like TwoColumn's
-                // divider), but the DIVIDERS scale with the page like every other style: the cue/notes
-                // rule runs the full height down to a summary band that stays pinned to the FOOT of the
-                // canvas (a fixed ~1/5-screen band). So a Cornell page grown past one screen keeps its
-                // column running the whole page and the summary at the bottom — not stranded on screen 1.
-                // The Max guard keeps the summary on the first screen while the page is still short, so
-                // the band never rides up above its 80%-of-screen home. It descends from there as content
-                // grows. contentBottom (the real content foot, breathing-room excluded) is preferred over
-                // the padded canvas so the band hugs the notes instead of floating in the trailing pad.
-                double cue = System.Math.Round(vw * 0.28);
-                double band = System.Math.Round(vh * 0.20);
-                double foot = contentBottom > 0 ? contentBottom : ch;
-                double sum = System.Math.Max(System.Math.Round(vh * 0.80), foot - band);
-                lines.Add((new Point(cue, 0), new Point(cue, sum)));
-                lines.Add((new Point(0, sum), new Point(cw, sum)));
+                // The cue/notes rule and the summary rule come from CornellMetrics — the SAME geometry
+                // the docked region boxes snap to (NoteCanvas), so the lines and the labelled boxes can
+                // never drift apart on resize. contentBottom is the notes content foot (breathing-room
+                // and the summary box excluded); the summary rule sits just below it and the cue rule
+                // runs down to meet it, so both descend as the notes grow.
+                var (cx, sy) = CornellMetrics(vw, vh, contentBottom);
+                lines.Add((new Point(cx, 0), new Point(cx, sy)));
+                lines.Add((new Point(0, sy), new Point(cw, sy)));
                 break;
             case PageStyles.TwoColumn:
                 double half = System.Math.Round(vw * 0.5);
@@ -82,4 +76,36 @@ public static class PageStyleGuides
         }
         return lines.Count == 0 && boxes.Count == 0 ? GuideSet.Empty : new GuideSet(lines, boxes);
     }
+
+    /// <summary>The Cornell divider geometry both the guide lines and the docked region boxes derive
+    /// from, so they can never drift apart. <c>Cue</c> = the cue|notes column split (a viewport
+    /// fraction). <c>Sum</c> = the summary rule: it sits a little below the notes content
+    /// (<paramref name="notesFoot"/>, the summary box excluded) but never rides above its 80%-of-screen
+    /// home — so it starts on the first screen and descends as the notes grow, the cue rule running
+    /// down to meet it. A zero/empty notesFoot just parks the summary at its 80% home.</summary>
+    public static (double Cue, double Sum) CornellMetrics(double vw, double vh, double notesFoot)
+    {
+        double cue = System.Math.Round(vw * 0.28);
+        double home = System.Math.Round(vh * 0.80);
+        double gap = System.Math.Round(vh * 0.05);
+        double sum = System.Math.Max(home, notesFoot > 0 ? notesFoot + gap : home);
+        return (cue, sum);
+    }
+
+    /// <summary>The three Cornell region rects (cue / notes / summary), in canvas coords, that the
+    /// docked starter boxes snap to — the same math as the guide lines. Widths are viewport-relative
+    /// so the columns fill the visible page; heights are 0 (auto — the box grows with its content).</summary>
+    public static (Rect Cue, Rect Notes, Rect Summary) CornellRegions(double vw, double vh, double notesFoot)
+    {
+        var (cue, sum) = CornellMetrics(vw, vh, notesFoot);
+        const double m = Margin;
+        return (
+            new Rect(m, m, System.Math.Max(NoteBoxMinWidth, cue - 2 * m), 0),
+            new Rect(cue + m, m, System.Math.Max(NoteBoxMinWidth, vw - cue - 2 * m), 0),
+            new Rect(m, sum + 12, System.Math.Max(NoteBoxMinWidth, vw - 2 * m), 0));
+    }
+
+    /// <summary>Floor for a region box width — mirrors NoteBox.MinWidth without an Avalonia-model
+    /// dependency in this pure geometry file.</summary>
+    private const double NoteBoxMinWidth = 140;
 }

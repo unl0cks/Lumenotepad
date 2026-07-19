@@ -20,36 +20,46 @@ public class PageStyleGuidesTests
     }
 
     [Fact]
-    public void Cornell_cueRunsFullHeight_summaryBandPinnedToCanvasFoot()
+    public void Cornell_default_summaryAtEightyPercent_cueRunsDownToIt()
     {
+        // No notes foot passed → the summary rests at its 80%-of-screen home (0.80×600 = 480) and the
+        // cue rule runs from the top down to meet it. Full canvas width for the summary rule.
         var g = PageStyleGuides.For(PageStyles.Cornell, Vp, Canvas);
         Assert.Equal(2, g.Lines.Count);
-        // cue column x = 0.28×900 = 252; the rule runs the full page down to the summary band.
-        // Summary band = 0.20×600 = 120 tall, pinned to the canvas foot: 1500 − 120 = 1380.
-        Assert.Equal((new Point(252, 0), new Point(252, 1380)), g.Lines[0]);
-        Assert.Equal((new Point(0, 1380), new Point(1200, 1380)), g.Lines[1]);  // summary: full canvas width
+        Assert.Equal((new Point(252, 0), new Point(252, 480)), g.Lines[0]);
+        Assert.Equal((new Point(0, 480), new Point(1200, 480)), g.Lines[1]);
         Assert.Empty(g.Boxes);
     }
 
     [Fact]
-    public void Cornell_summaryBandHugsContentFoot_notThePaddedCanvas()
+    public void Cornell_summaryDescendsBelowNotes_asContentGrows()
     {
-        // When the real content foot is passed it wins over the padded canvas: a page whose content
-        // ends at y=1000 puts the summary a band (0.20×600 = 120) above it → 1000 − 120 = 880,
-        // instead of the canvas-foot 1380. So the band rides the notes, not the trailing breathing pad.
+        // Notes content reaching y=1000 pushes the summary a small gap (0.05×600 = 30) below it →
+        // 1030, and the cue rule follows down to meet it. Line and the docked summary box share this
+        // exact math (PageStyleGuides.CornellMetrics), so they never drift apart.
         var g = PageStyleGuides.For(PageStyles.Cornell, Vp, Canvas, contentBottom: 1000);
-        Assert.Equal((new Point(252, 0), new Point(252, 880)), g.Lines[0]);
-        Assert.Equal((new Point(0, 880), new Point(1200, 880)), g.Lines[1]);
+        Assert.Equal((new Point(252, 0), new Point(252, 1030)), g.Lines[0]);
+        Assert.Equal((new Point(0, 1030), new Point(1200, 1030)), g.Lines[1]);
     }
 
     [Fact]
-    public void Cornell_summaryStaysOnFirstScreen_whenCanvasShorterThanViewport()
+    public void Cornell_shortNotes_summaryStaysAtHome()
     {
-        // Heavy zoom-in makes the visible viewport taller than the (short) canvas — the band must not
-        // ride above its 80%-of-screen home: sum = Max(0.80×600, ch − band) = Max(480, 500−120) = 480.
-        var g = PageStyleGuides.For(PageStyles.Cornell, Vp, new Size(1200, 500));
+        // Notes ending high on the page (y=100) don't drag the summary up above its 80% home: it stays
+        // at 480, so a nearly-empty Cornell page keeps its familiar first-screen layout.
+        var g = PageStyleGuides.For(PageStyles.Cornell, Vp, Canvas, contentBottom: 100);
         Assert.Equal((new Point(252, 0), new Point(252, 480)), g.Lines[0]);
         Assert.Equal((new Point(0, 480), new Point(1200, 480)), g.Lines[1]);
+    }
+
+    [Fact]
+    public void CornellRegions_boxRects_matchTheDividerGeometry()
+    {
+        // The docked boxes snap to these rects; their edges line up with the guide dividers above.
+        var (cue, notes, summary) = PageStyleGuides.CornellRegions(900, 600, notesFoot: 0);
+        Assert.Equal(new Rect(16, 16, 220, 0), cue);        // cue.right = 236, just left of the x=252 divider
+        Assert.Equal(new Rect(268, 16, 616, 0), notes);     // notes.left = 268, just right of it
+        Assert.Equal(new Rect(16, 492, 868, 0), summary);   // summary top = 480 rule + 12 gap
     }
 
     [Fact]
