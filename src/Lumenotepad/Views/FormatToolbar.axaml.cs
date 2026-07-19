@@ -38,8 +38,6 @@ public partial class FormatToolbar : UserControl
     public static readonly string[] BuiltInTextColors =
         TextColors.Where(c => c.Hex is not null).Select(c => c.Hex!).ToArray();
 
-    private System.Collections.Generic.IReadOnlyList<string>? _customHighlights, _customTextColors;
-
     private RichTextEditor? _target;
     private bool _syncing;
 
@@ -123,8 +121,8 @@ public partial class FormatToolbar : UserControl
 
         CustomizeBtn.Click += (_, _) => CustomizeRequested?.Invoke();
 
-        BuildSwatches(HighlightSwatches, Highlights, hex => Do(e => e.ApplyHighlight(hex)), HighlightBtn);
-        BuildSwatches(ColorSwatches, TextColors, hex => Do(e => e.ApplyColor(hex)), ColorBtn);
+        SetupColorPicker(HighlightSwatches, highlight: true, hex => Do(e => e.ApplyHighlight(hex)), HighlightBtn);
+        SetupColorPicker(ColorSwatches, highlight: false, hex => Do(e => e.ApplyColor(hex)), ColorBtn);
         BuildBulletChoices();
         BuildNumStyleRow();
         BuildFontList();
@@ -241,45 +239,79 @@ public partial class FormatToolbar : UserControl
         UpdateFromEditor();
     }
 
-    private void BuildSwatches(StackPanel host, (string? Hex, string Name)[] items, Action<string?> apply, Button owner)
+    /// <summary>Highlight / text-color picker: the shared 9-family × 5-shade palette (the same colours
+    /// as the notebook Color menu and the PDF viewer's swatches). The flyout opens on the family
+    /// swatches; clicking one drills into that family's five shades (with a ‹ back), so every colour has
+    /// its own shade menu. Highlights apply the shade at ~40% alpha, text applies it solid. A leading
+    /// ∅ chip clears the highlight / resets to the default text colour.</summary>
+    private void SetupColorPicker(StackPanel host, bool highlight, Action<string?> apply, Button owner)
     {
-        foreach (var (hex, name) in items)
+        void ShowFamilies()
         {
-            var b = new Button
+            host.Children.Clear();
+            var none = SwatchChip(22, Brushes.Transparent, highlight ? "None" : "Default");
+            none.Child = Glyph("∅", 12);
+            none.PointerPressed += (_, _) => { apply(null); owner.Flyout?.Hide(); };
+            host.Children.Add(none);
+            foreach (var (family, shades) in ViewModels.MainViewModel.NotebookPalette)
             {
-                // SwatchButton: the default theme's hover repaints Background gray, hiding the color.
-                // App-level lookup — the toolbar isn't in the tree yet when its ctor builds these.
-                Theme = (Avalonia.Styling.ControlTheme)Application.Current!.FindResource("SwatchButton")!,
-                Classes = { "swatch" },
-                Background = hex is null ? Brushes.Transparent : new SolidColorBrush(Color.Parse(hex)),
-                Content = hex is null ? new TextBlock { Text = "∅", FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center } : null,
-            };
-            ToolTip.SetTip(b, name);
-            b.Click += (_, _) => { apply(hex); owner.Flyout?.Hide(); };
-            host.Children.Add(b);
+                var local = shades;
+                var fam = SwatchChip(22, new SolidColorBrush(Color.Parse(shades[2].Hex)), $"{family} — pick a shade");
+                fam.PointerPressed += (_, _) => ShowShades(local);
+                host.Children.Add(fam);
+            }
         }
+        void ShowShades((string Name, string Hex)[] shades)
+        {
+            host.Children.Clear();
+            var back = SwatchChip(22, Brushes.Transparent, "Back");
+            back.Child = Glyph("‹", 16);
+            back.PointerPressed += (_, _) => ShowFamilies();
+            host.Children.Add(back);
+            foreach (var (name, hex) in shades)
+            {
+                var chip = SwatchChip(26, new SolidColorBrush(Color.Parse(hex)), name);
+                string applied = (highlight ? "#66" : "#FF") + Rgb(hex);
+                chip.PointerPressed += (_, _) => { apply(applied); owner.Flyout?.Hide(); ShowFamilies(); };
+                host.Children.Add(chip);
+            }
+        }
+        ShowFamilies();
+        if (owner.Flyout is FlyoutBase fb) fb.Opened += (_, _) => ShowFamilies();   // always reopen on families
     }
 
-    /// <summary>Palette prefs: rebuild the highlight/text-color swatch rows from custom lists (names
-    /// become the hex strings for custom colors — tooltips only). Empty lists never reach here — the
-    /// VM's PaletteFor seeds from the built-ins — but the "same" guard still skips redundant rebuilds.</summary>
-    public void SetPalettes(System.Collections.Generic.IReadOnlyList<string> highlights,
-                            System.Collections.Generic.IReadOnlyList<string> textColors)
+    private Border SwatchChip(double size, IBrush bg, string tip)
     {
-        bool same = _customHighlights is not null && _customHighlights.SequenceEqual(highlights)
-                 && _customTextColors is not null && _customTextColors.SequenceEqual(textColors);
-        if (same) return;
-        _customHighlights = highlights.ToList();
-        _customTextColors = textColors.ToList();
-        HighlightSwatches.Children.Clear();
-        ColorSwatches.Children.Clear();
-        BuildSwatches(HighlightSwatches,
-            new[] { ((string?)null, "None") }.Concat(highlights.Select(h => ((string?)h, h))).ToArray(),
-            hex => Do(e => e.ApplyHighlight(hex)), HighlightBtn);
-        BuildSwatches(ColorSwatches,
-            new[] { ((string?)null, "Default") }.Concat(textColors.Select(c => ((string?)c, c))).ToArray(),
-            hex => Do(e => e.ApplyColor(hex)), ColorBtn);
+        bool bare = ReferenceEquals(bg, Brushes.Transparent);
+        var b = new Border
+        {
+            Width = size, Height = size, CornerRadius = new CornerRadius(size < 24 ? 6 : 7),
+            Background = bg, BorderThickness = new Thickness(1),
+            BorderBrush = bare ? this.FindResource("FrameBorderBrush") as IBrush
+                               : new SolidColorBrush(Color.Parse("#33FFFFFF")),
+            Cursor = new Cursor(StandardCursorType.Hand),
+        };
+        ToolTip.SetTip(b, tip);
+        return b;
     }
+
+    private static TextBlock Glyph(string s, double size) => new()
+    {
+        Text = s, FontSize = size,
+        HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+    };
+
+    private static string Rgb(string hex)
+    {
+        var c = Color.Parse(hex);
+        return $"{c.R:X2}{c.G:X2}{c.B:X2}";
+    }
+
+    /// <summary>Kept for the host call site. The highlight/text pickers now use the fixed 9-family shade
+    /// palette (<see cref="SetupColorPicker"/>), so per-notebook custom palette lists no longer drive
+    /// these swatches.</summary>
+    public void SetPalettes(System.Collections.Generic.IReadOnlyList<string> highlights,
+                            System.Collections.Generic.IReadOnlyList<string> textColors) { }
 
     private static readonly (string? Key, string Glyph, string Name)[] Bullets =
     {

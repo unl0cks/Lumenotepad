@@ -1584,10 +1584,19 @@ public partial class PdfViewer : UserControl
             // Bare text: just the ink, fully transparent around it — exactly like on screen.
             box = new Border { Width = pxW, Child = content };
         }
+        // Grayscale AA, NOT subpixel/LCD: subpixel text rasterized onto a TRANSPARENT bitmap bakes
+        // colored fringing that shows up as garbled glyphs once the PNG is composited into the exported
+        // PDF (on screen it looks fine because it composites against a real backdrop). Forcing Antialias
+        // keeps the alpha clean.
+        Avalonia.Media.TextOptions.SetTextRenderingMode(box, Avalonia.Media.TextRenderingMode.Antialias);
         box.Measure(new Size(pxW, double.PositiveInfinity));
         pxH = Math.Max(8, Math.Ceiling(box.DesiredSize.Height));
         box.Arrange(new Rect(0, 0, pxW, pxH));
-        using var rtb = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(pxW), (int)pxH), new Vector(96, 96));
+        // Supersample: the note is laid out at ~110 DPI but the page raster is 150 DPI, so render the
+        // card at a higher pixel density and let the PDF downsample — crisp text instead of a blur.
+        const double ss = 2.5;
+        var px = new PixelSize((int)Math.Ceiling(pxW * ss), (int)Math.Ceiling(pxH * ss));
+        using var rtb = new RenderTargetBitmap(px, new Vector(96 * ss, 96 * ss));
         rtb.Render(box);
         using var mm = new MemoryStream();
         rtb.Save(mm);
