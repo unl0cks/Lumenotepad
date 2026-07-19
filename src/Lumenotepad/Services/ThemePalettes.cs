@@ -105,7 +105,7 @@ public static class ThemePalettes
                 // desktop but washed out to a flat lifeless gray over a WHITE PDF sheet (blurred
                 // white is still white — nothing to smear). This depth matches the PDF note cards'
                 // glass, which reads right on every backdrop.
-                MenuBackground = "#5E14161C", MenuBorder = "#33FFFFFF",
+                MenuBackground = "#4014161C", MenuBorder = "#33FFFFFF",
             };
         return paperLight
             ? t with

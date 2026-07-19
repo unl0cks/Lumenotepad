@@ -23,6 +23,19 @@ public sealed class PdfAnnotation
     [JsonPropertyName("h")] public double H { get; set; }        // normalized height
     [JsonPropertyName("x2")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double X2 { get; set; }  // arrow end x
     [JsonPropertyName("y2")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double Y2 { get; set; }  // arrow end y
+    // Curved arrows (M11): three control points at ~25/50/75% that bend the shaft into a smooth
+    // spline. Curved=false ⇒ a straight line (the control points are ignored / unset).
+    [JsonPropertyName("cv")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Curved { get; set; }
+    [JsonPropertyName("c1x")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double C1x { get; set; }
+    [JsonPropertyName("c1y")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double C1y { get; set; }
+    [JsonPropertyName("c2x")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double C2x { get; set; }
+    [JsonPropertyName("c2y")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double C2y { get; set; }
+    [JsonPropertyName("c3x")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double C3x { get; set; }
+    [JsonPropertyName("c3y")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double C3y { get; set; }
+    /// <summary>Arrowhead size multiplier (0 ⇒ the default 1.0). Bigger = a chunkier head.</summary>
+    [JsonPropertyName("hs")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double HeadScale { get; set; }
+    /// <summary>Arrowhead style: null/"triangle" (filled), "open" (chevron), "diamond", "circle", "none".</summary>
+    [JsonPropertyName("hst")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? HeadStyle { get; set; }
     [JsonPropertyName("color")] public string Color { get; set; } = "#66FFD54A";
     [JsonPropertyName("text")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Text { get; set; }
     /// <summary>Full rich content for note / text annotations (M11): a serialized

@@ -16,6 +16,7 @@ using Avalonia.Threading;
 using Lumenotepad.Editor;
 using Lumenotepad.Platform;
 using Lumenotepad.Services;
+using Shapes = Avalonia.Controls.Shapes;   // `Path` clashes with System.IO.Path; alias the shape set
 
 namespace Lumenotepad.Views;
 
@@ -56,17 +57,24 @@ public partial class PdfViewer : UserControl
     private readonly Dictionary<PdfAnnotation, RichTextEditor> _editors = new();
     private PdfAnnotation? _justAdded;                 // set on create so its box pops in once
 
-    // Move/resize drag state (any tool): which annotation, which handle (0=whole, 1=start, 2=end), the
-    // pointer origin, and the annotation's original geometry.
+    // Move/resize drag state (any tool): which annotation, which handle (0=whole, 1=start, 2=end,
+    // 3=width, 4=height, 5=corner, 6/7/8 = arrow control points), the pointer origin, and the
+    // annotation's original geometry (endpoints + the three curve control points).
     private PdfAnnotation? _drag;
     private int _dragHandle;
     private Point _dragStartPt;
     private (double X, double Y, double W, double H, double X2, double Y2) _dragOrig;
+    private (double C1x, double C1y, double C2x, double C2y, double C3x, double C3y) _dragOrigC;
 
     // Snap annotations to a grid (toolbar toggle). Static so it sticks across page switches + both
     // hosts for the app session.
     public static bool SnapToGrid;
     private const double GridStep = 14;      // unzoomed page px between grid lines
+
+    // New-arrow defaults (set from the Arrow options flyout; also applied to a selected arrow).
+    private bool _arrowCurved;
+    private double _arrowHeadScale = 1.0;
+    private string _arrowHeadStyle = "triangle";
 
     public PdfViewer()
     {
@@ -84,6 +92,7 @@ public partial class PdfViewer : UserControl
         ExportBtn.Click += (_, _) => _ = ExportFlattenedAsync();
         SnapBtn.IsChecked = SnapToGrid;
         SnapBtn.Click += (_, _) => SnapToGrid = SnapBtn.IsChecked == true;
+        ArrowOptsBtn.Click += (_, _) => ShowArrowOptions();
         AddHandler(KeyDownEvent, OnKey, Avalonia.Interactivity.RoutingStrategies.Bubble);
     }
 
@@ -338,6 +347,92 @@ public partial class PdfViewer : UserControl
         RefreshSwatchRings();
     }
 
+    // ---- arrow options (curved toggle + arrowhead shape & size) ----
+    private static readonly (string Key, string Glyph, string Name)[] HeadStyles =
+    {
+        ("triangle", "➤", "Filled"), ("open", "❯", "Open"), ("diamond", "◆", "Diamond"),
+        ("circle", "●", "Dot"), ("none", "—", "None"),
+    };
+
+    /// <summary>Open the arrow-style flyout. Reflects the selected arrow's settings when one is
+    /// selected, else the defaults for new arrows; changes apply to the selected arrow AND become the
+    /// new default. Rebuilt fresh on each open so its controls always mirror the current state.</summary>
+    private void ShowArrowOptions()
+    {
+        var arr = _selected is { Kind: PdfAnnotation.Arrow } a ? a : null;
+        bool curved = arr?.Curved ?? _arrowCurved;
+        string style = arr is { HeadStyle.Length: > 0 } ? arr.HeadStyle! : _arrowHeadStyle;
+        double scale = arr is { HeadScale: > 0 } ? arr.HeadScale : _arrowHeadScale;
+
+        var panel = new StackPanel { Spacing = 9, Margin = new Thickness(6), Width = 214 };
+
+        var curvedBtn = new Button
+        {
+            Content = curved ? "Curved: On" : "Curved: Off",
+            HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center,
+        };
+        curvedBtn.Click += (_, _) =>
+        {
+            curved = !curved;
+            curvedBtn.Content = curved ? "Curved: On" : "Curved: Off";
+            ApplyArrow(x => { x.Curved = curved; if (curved && x.C1x == 0 && x.C2x == 0 && x.C3x == 0) InitCurve(x); },
+                       () => _arrowCurved = curved);
+        };
+        panel.Children.Add(curvedBtn);
+
+        panel.Children.Add(new TextBlock { Text = "Arrowhead", FontSize = 11.5, Opacity = 0.75 });
+        var styleRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5 };
+        foreach (var (key, glyph, name) in HeadStyles)
+        {
+            var b = new Button
+            {
+                Width = 36, Height = 32, FontSize = 15, Content = glyph,
+                HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center,
+                BorderThickness = new Thickness(key == style ? 2 : 1),
+                BorderBrush = (key == style ? this.FindResource("AccentBrush") : this.FindResource("FrameBorderBrush")) as IBrush,
+            };
+            ToolTip.SetTip(b, name);
+            string k = key;
+            b.Click += (_, _) => { style = k; ApplyArrow(x => x.HeadStyle = k, () => _arrowHeadStyle = k); ShowArrowOptions(); };
+            styleRow.Children.Add(b);
+        }
+        panel.Children.Add(styleRow);
+
+        panel.Children.Add(new TextBlock { Text = "Head size", FontSize = 11.5, Opacity = 0.75 });
+        var sizeRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, HorizontalAlignment = HorizontalAlignment.Center };
+        var val = new TextBlock { Text = $"{scale:0.##}×", Width = 52, TextAlignment = TextAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var minus = new Button { Content = "−", Width = 34, Height = 30 };
+        var plus = new Button { Content = "+", Width = 34, Height = 30 };
+        void Nudge(double d)
+        {
+            scale = Math.Clamp(Math.Round((scale + d) / 0.25) * 0.25, 0.5, 3.0);
+            val.Text = $"{scale:0.##}×";
+            ApplyArrow(x => x.HeadScale = scale, () => _arrowHeadScale = scale);
+        }
+        minus.Click += (_, _) => Nudge(-0.25);
+        plus.Click += (_, _) => Nudge(+0.25);
+        sizeRow.Children.Add(minus); sizeRow.Children.Add(val); sizeRow.Children.Add(plus);
+        panel.Children.Add(sizeRow);
+
+        var flyout = new Flyout { Content = panel, Placement = PlacementMode.Bottom };
+        MenuFx.AttachFlyout(flyout);
+        flyout.ShowAt(ArrowOptsBtn);
+    }
+
+    /// <summary>Apply an arrow-property change to the selected arrow (undoable) and record it as the
+    /// default for future arrows.</summary>
+    private void ApplyArrow(Action<PdfAnnotation> mutate, Action setDefault)
+    {
+        setDefault();
+        if (_selected is { Kind: PdfAnnotation.Arrow } arr)
+        {
+            PushUndo();
+            mutate(arr);
+            foreach (var pv in _pages) RedrawPage(pv);
+            SaveNow();
+        }
+    }
+
     /// <summary>Ring the family button whose shades contain the active color.</summary>
     private void RefreshSwatchRings()
     {
@@ -497,12 +592,15 @@ public partial class PdfViewer : UserControl
             {
                 double w0 = pv.WPt * PxPerPoint, h0 = pv.HPt * PxPerPoint;
                 PushUndo();
-                _annos.Items.Add(new PdfAnnotation
+                var arrow = new PdfAnnotation
                 {
                     Page = pv.Index, Kind = PdfAnnotation.Arrow, Color = SolidHex(_color),
                     X = SnapNorm(s.X / w, w0), Y = SnapNorm(s.Y / h, h0),
                     X2 = SnapNorm(en.X / w, w0), Y2 = SnapNorm(en.Y / h, h0),
-                });
+                    Curved = _arrowCurved, HeadScale = _arrowHeadScale, HeadStyle = _arrowHeadStyle,
+                };
+                if (arrow.Curved) InitCurve(arrow);
+                _annos.Items.Add(arrow);
                 RedrawPage(pv); SaveNow();
             }
         }
@@ -530,6 +628,15 @@ public partial class PdfViewer : UserControl
     // Normalized floors so a resize can't collapse a mark into nothing.
     private const double MinW = 0.03, MinH = 0.012;
 
+    /// <summary>Seed a curved arrow's three control points at the straight 25/50/75% positions.</summary>
+    private static void InitCurve(PdfAnnotation a)
+    {
+        static double L(double x1, double x2, double t) => x1 + (x2 - x1) * t;
+        a.C1x = L(a.X, a.X2, 0.25); a.C1y = L(a.Y, a.Y2, 0.25);
+        a.C2x = L(a.X, a.X2, 0.50); a.C2y = L(a.Y, a.Y2, 0.50);
+        a.C3x = L(a.X, a.X2, 0.75); a.C3y = L(a.Y, a.Y2, 0.75);
+    }
+
     /// <summary>Snap a normalized coordinate to the grid (no-op when snap is off). <paramref name="pageDimPx"/>
     /// is the unzoomed page dimension, so the grid stays fixed in page space across any zoom.</summary>
     private static double SnapNorm(double norm, double pageDimPx) =>
@@ -546,8 +653,24 @@ public partial class PdfViewer : UserControl
         double CY(double v) => SnapNorm(Math.Clamp(v, 0, 1), h0);
         if (a.Kind == PdfAnnotation.Arrow)
         {
-            if (handle is 0 or 1) { a.X = CX(_dragOrig.X + dx); a.Y = CY(_dragOrig.Y + dy); }
-            if (handle is 0 or 2) { a.X2 = CX(_dragOrig.X2 + dx); a.Y2 = CY(_dragOrig.Y2 + dy); }
+            // Whole-arrow move (0) shifts endpoints AND control points together so the curve rides along.
+            if (handle == 0)
+            {
+                a.X = CX(_dragOrig.X + dx); a.Y = CY(_dragOrig.Y + dy);
+                a.X2 = CX(_dragOrig.X2 + dx); a.Y2 = CY(_dragOrig.Y2 + dy);
+                if (a.Curved)
+                {
+                    a.C1x = CX(_dragOrigC.C1x + dx); a.C1y = CY(_dragOrigC.C1y + dy);
+                    a.C2x = CX(_dragOrigC.C2x + dx); a.C2y = CY(_dragOrigC.C2y + dy);
+                    a.C3x = CX(_dragOrigC.C3x + dx); a.C3y = CY(_dragOrigC.C3y + dy);
+                }
+                return;
+            }
+            if (handle == 1) { a.X = CX(_dragOrig.X + dx); a.Y = CY(_dragOrig.Y + dy); }
+            if (handle == 2) { a.X2 = CX(_dragOrig.X2 + dx); a.Y2 = CY(_dragOrig.Y2 + dy); }
+            if (handle == 6) { a.C1x = CX(_dragOrigC.C1x + dx); a.C1y = CY(_dragOrigC.C1y + dy); }
+            if (handle == 7) { a.C2x = CX(_dragOrigC.C2x + dx); a.C2y = CY(_dragOrigC.C2y + dy); }
+            if (handle == 8) { a.C3x = CX(_dragOrigC.C3x + dx); a.C3y = CY(_dragOrigC.C3y + dy); }
             return;
         }
         switch (handle)
@@ -575,6 +698,7 @@ public partial class PdfViewer : UserControl
         _drag = a; _dragHandle = handle;
         _dragStartPt = e.GetPosition(pv.Overlay);
         _dragOrig = (a.X, a.Y, a.W, a.H, a.X2, a.Y2);
+        _dragOrigC = (a.C1x, a.C1y, a.C2x, a.C2y, a.C3x, a.C3y);
         e.Pointer.Capture(pv.Overlay);
         e.Handled = true;
     }
@@ -862,61 +986,161 @@ public partial class PdfViewer : UserControl
     {
         double w = pv.Overlay.Width, h = pv.Overlay.Height;
         bool selected = ReferenceEquals(a, _selected);
-        var s = new Point(a.X * w, a.Y * h);
-        var en = new Point(a.X2 * w, a.Y2 * h);
         var brush = new SolidColorBrush(SolidColor(a.Color));
         double thick = ArrowThickness;
 
-        // A fat transparent line under the visible one gives the thin shaft a grabbable hit area.
-        var hit = new Avalonia.Controls.Shapes.Line
+        var pts = ArrowPoints(a, w, h);                    // straight = [s,en]; curved = sampled spline
+        var s = pts[0]; var en = pts[^1];
+        var from = pts.Count >= 2 ? pts[^2] : s;           // tangent into the head
+        string style = string.IsNullOrEmpty(a.HeadStyle) ? "triangle" : a.HeadStyle!;
+        double headLen = ArrowHeadLen * (a.HeadScale <= 0 ? 1.0 : a.HeadScale);
+
+        // A fat transparent copy under the visible shaft gives it a grabbable hit area.
+        var hit = new Shapes.Path
         {
-            StartPoint = s, EndPoint = en, Stroke = Brushes.Transparent, StrokeThickness = Math.Max(14, thick * 4),
+            Data = PolyGeometry(pts), Stroke = Brushes.Transparent, StrokeThickness = Math.Max(16, thick * 5),
+            StrokeLineCap = PenLineCap.Round, StrokeJoin = PenLineJoin.Round,
             IsHitTestVisible = true, Cursor = new Cursor(StandardCursorType.SizeAll), Tag = a,
         };
         hit.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, 0, e); };
-        var shaft = new Avalonia.Controls.Shapes.Line
+
+        // Pull the shaft's tip back under a filled head so it doesn't poke through it.
+        var shaftPts = new List<Point>(pts);
+        if (style is "triangle" or "diamond" or "circle" && pts.Count >= 2)
         {
-            StartPoint = s, EndPoint = en, Stroke = brush, StrokeThickness = thick,
-            StrokeLineCap = PenLineCap.Round, IsHitTestVisible = false, Tag = a,
+            double ang = Math.Atan2(en.Y - from.Y, en.X - from.X);
+            double back = headLen * (style == "circle" ? 0.5 : 0.85);
+            shaftPts[^1] = new Point(en.X - back * Math.Cos(ang), en.Y - back * Math.Sin(ang));
+        }
+        var shaft = new Shapes.Path
+        {
+            Data = PolyGeometry(shaftPts), Stroke = brush, StrokeThickness = thick,
+            StrokeLineCap = PenLineCap.Round, StrokeJoin = PenLineJoin.Round, IsHitTestVisible = false, Tag = a,
         };
-        var head = new Avalonia.Controls.Shapes.Polygon { Fill = brush, Points = ArrowHead(s, en, ArrowHeadLen), IsHitTestVisible = false, Tag = a };
         pv.Overlay.Children.Add(hit);
         pv.Overlay.Children.Add(shaft);
-        pv.Overlay.Children.Add(head);
+        if (ArrowHeadShape(style, en, from, headLen, thick, brush) is { } head) pv.Overlay.Children.Add(head);
 
         if (selected)
         {
-            pv.Overlay.Children.Add(EndpointHandle(pv, a, s, 1));
-            pv.Overlay.Children.Add(EndpointHandle(pv, a, en, 2));
+            if (a.Curved)
+            {
+                foreach (var (cx, cy, handle) in new[] { (a.C1x, a.C1y, 6), (a.C2x, a.C2y, 7), (a.C3x, a.C3y, 8) })
+                    pv.Overlay.Children.Add(Handle(pv, a, new Point(cx * w, cy * h), handle, control: true));
+            }
+            pv.Overlay.Children.Add(Handle(pv, a, s, 1, control: false));
+            pv.Overlay.Children.Add(Handle(pv, a, en, 2, control: false));
             AddDeleteButton(pv, Math.Max(s.X, en.X), Math.Min(s.Y, en.Y), a);
         }
     }
 
-    /// <summary>Arrow shaft thickness + arrowhead length track the zoom so arrows stay proportional to
-    /// the page instead of ballooning (or vanishing) as you zoom.</summary>
-    private double ArrowThickness => Math.Clamp(3 * _zoom, 2.0, 10.0);
-    private double ArrowHeadLen => Math.Clamp(13 * _zoom, 9.0, 40.0);
-
-    private Control EndpointHandle(PageView pv, PdfAnnotation a, Point at, int handle)
+    /// <summary>The arrow's shaft points in overlay pixels: two for a straight arrow, or a sampled
+    /// Catmull-Rom spline through the three control points for a curved one.</summary>
+    private static List<Point> ArrowPoints(PdfAnnotation a, double w, double h)
     {
-        var dot = new Avalonia.Controls.Shapes.Ellipse
+        var s = new Point(a.X * w, a.Y * h);
+        var en = new Point(a.X2 * w, a.Y2 * h);
+        if (!a.Curved) return new List<Point> { s, en };
+        var ctrl = new List<Point>
         {
-            Width = 12, Height = 12, Fill = AccentBrush,
-            Stroke = Brushes.White, StrokeThickness = 1.5, Cursor = new Cursor(StandardCursorType.Cross),
-            Tag = a,
+            s, new(a.C1x * w, a.C1y * h), new(a.C2x * w, a.C2y * h), new(a.C3x * w, a.C3y * h), en,
         };
-        Canvas.SetLeft(dot, at.X - 6); Canvas.SetTop(dot, at.Y - 6);
-        dot.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, handle, e); };
-        return dot;
+        return CatmullRom(ctrl, 16);
     }
 
-    private static Avalonia.Collections.AvaloniaList<Point> ArrowHead(Point from, Point to, double len)
+    private static List<Point> CatmullRom(IReadOnlyList<Point> p, int seg)
     {
-        double ang = Math.Atan2(to.Y - from.Y, to.X - from.X);
-        const double spread = 0.42;
-        var p1 = new Point(to.X - len * Math.Cos(ang - spread), to.Y - len * Math.Sin(ang - spread));
-        var p2 = new Point(to.X - len * Math.Cos(ang + spread), to.Y - len * Math.Sin(ang + spread));
-        return new Avalonia.Collections.AvaloniaList<Point> { to, p1, p2 };
+        var o = new List<Point>();
+        int n = p.Count;
+        for (int i = 0; i < n - 1; i++)
+        {
+            var p0 = p[Math.Max(0, i - 1)]; var p1 = p[i]; var p2 = p[i + 1]; var p3 = p[Math.Min(n - 1, i + 2)];
+            for (int j = 0; j < seg; j++)
+            {
+                double t = (double)j / seg, t2 = t * t, t3 = t2 * t;
+                double x = 0.5 * (2 * p1.X + (-p0.X + p2.X) * t + (2 * p0.X - 5 * p1.X + 4 * p2.X - p3.X) * t2 + (-p0.X + 3 * p1.X - 3 * p2.X + p3.X) * t3);
+                double y = 0.5 * (2 * p1.Y + (-p0.Y + p2.Y) * t + (2 * p0.Y - 5 * p1.Y + 4 * p2.Y - p3.Y) * t2 + (-p0.Y + 3 * p1.Y - 3 * p2.Y + p3.Y) * t3);
+                o.Add(new Point(x, y));
+            }
+        }
+        o.Add(p[^1]);
+        return o;
+    }
+
+    private static Geometry PolyGeometry(IReadOnlyList<Point> pts)
+    {
+        var g = new StreamGeometry();
+        using var c = g.Open();
+        c.BeginFigure(pts[0], false);
+        for (int i = 1; i < pts.Count; i++) c.LineTo(pts[i]);
+        c.EndFigure(false);
+        return g;
+    }
+
+    /// <summary>The arrowhead shape at the tip, oriented along the incoming tangent. Styles: triangle
+    /// (filled), open (chevron strokes), diamond, circle, none.</summary>
+    private static Control? ArrowHeadShape(string style, Point tip, Point from, double len, double thick, IBrush brush)
+    {
+        if (style == "none") return null;
+        double ang = Math.Atan2(tip.Y - from.Y, tip.X - from.X);
+        Point P(double back, double side) => new(
+            tip.X - back * Math.Cos(ang) - side * Math.Sin(ang),
+            tip.Y - back * Math.Sin(ang) + side * Math.Cos(ang));
+        switch (style)
+        {
+            case "open":
+            {
+                var geo = new StreamGeometry();
+                using (var c = geo.Open())
+                { c.BeginFigure(P(len, len * 0.52), false); c.LineTo(tip); c.LineTo(P(len, -len * 0.52)); c.EndFigure(false); }
+                return new Shapes.Path
+                {
+                    Data = geo, Stroke = brush, StrokeThickness = Math.Max(thick, len * 0.17),
+                    StrokeLineCap = PenLineCap.Round, StrokeJoin = PenLineJoin.Round, IsHitTestVisible = false,
+                };
+            }
+            case "diamond":
+                return new Shapes.Polygon
+                {
+                    Fill = brush, IsHitTestVisible = false,
+                    Points = new Avalonia.Collections.AvaloniaList<Point> { tip, P(len * 0.5, len * 0.42), P(len, 0), P(len * 0.5, -len * 0.42) },
+                };
+            case "circle":
+            {
+                double d = len * 0.92;
+                var el = new Shapes.Ellipse { Width = d, Height = d, Fill = brush, IsHitTestVisible = false };
+                Canvas.SetLeft(el, tip.X - d / 2); Canvas.SetTop(el, tip.Y - d / 2);
+                return el;
+            }
+            default:   // triangle
+                return new Shapes.Polygon
+                {
+                    Fill = brush, IsHitTestVisible = false,
+                    Points = new Avalonia.Collections.AvaloniaList<Point> { tip, P(len, len * 0.5), P(len, -len * 0.5) },
+                };
+        }
+    }
+
+    /// <summary>Arrow shaft thickness + arrowhead length track the zoom so arrows stay proportional to
+    /// the page. Heads default much chunkier than before (base 22, not 13) and scale with HeadScale.</summary>
+    private double ArrowThickness => Math.Clamp(3 * _zoom, 2.0, 10.0);
+    private double ArrowHeadLen => Math.Clamp(22 * _zoom, 15.0, 64.0);
+
+    /// <summary>An arrow drag handle: a solid accent dot (endpoints) or a hollow white-ringed dot
+    /// (curve control points), both grabbable.</summary>
+    private Control Handle(PageView pv, PdfAnnotation a, Point at, int handle, bool control)
+    {
+        double d = control ? 13 : 12;
+        var dot = new Shapes.Ellipse
+        {
+            Width = d, Height = d,
+            Fill = control ? new SolidColorBrush(Color.Parse("#F0FFFFFF")) : AccentBrush,
+            Stroke = control ? AccentBrush : Brushes.White, StrokeThickness = control ? 2 : 1.5,
+            Cursor = new Cursor(StandardCursorType.Hand), Tag = a,
+        };
+        Canvas.SetLeft(dot, at.X - d / 2); Canvas.SetTop(dot, at.Y - d / 2);
+        dot.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, handle, e); };
+        return dot;
     }
 
     /// <summary>Delete chip for highlights and arrows (notes carry their ✕ inside the card instead):
@@ -1197,22 +1421,66 @@ public partial class PdfViewer : UserControl
 
     private static void FlattenArrow(SkiaSharp.SKCanvas c, PdfAnnotation a, float wpt, float hpt)
     {
-        var s = new SkiaSharp.SKPoint((float)a.X * wpt, (float)a.Y * hpt);
-        var e = new SkiaSharp.SKPoint((float)a.X2 * wpt, (float)a.Y2 * hpt);
+        var pts = ArrowPoints(a, wpt, hpt);                // point-space (straight or sampled spline)
+        var tip = pts[^1]; var from = pts.Count >= 2 ? pts[^2] : pts[0];
         var col = SkColor(SolidHex(a.Color));
+        const float thick = 2.4f;
+        string style = string.IsNullOrEmpty(a.HeadStyle) ? "triangle" : a.HeadStyle!;
+        double headLen = 15.0 * (a.HeadScale <= 0 ? 1.0 : a.HeadScale);
+
+        var shaftPts = new List<Point>(pts);
+        if (style is "triangle" or "diamond" or "circle" && pts.Count >= 2)
+        {
+            double ang0 = Math.Atan2(tip.Y - from.Y, tip.X - from.X);
+            double back = headLen * (style == "circle" ? 0.5 : 0.85);
+            shaftPts[^1] = new Point(tip.X - back * Math.Cos(ang0), tip.Y - back * Math.Sin(ang0));
+        }
         using var stroke = new SkiaSharp.SKPaint
         {
-            Color = col, IsAntialias = true, StrokeWidth = 2.2f,
-            StrokeCap = SkiaSharp.SKStrokeCap.Round, Style = SkiaSharp.SKPaintStyle.Stroke,
+            Color = col, IsAntialias = true, StrokeWidth = thick,
+            StrokeCap = SkiaSharp.SKStrokeCap.Round, StrokeJoin = SkiaSharp.SKStrokeJoin.Round,
+            Style = SkiaSharp.SKPaintStyle.Stroke,
         };
-        c.DrawLine(s, e, stroke);
-        double ang = Math.Atan2(e.Y - s.Y, e.X - s.X);
-        const double len = 10, spread = 0.42;
-        var p1 = new SkiaSharp.SKPoint((float)(e.X - len * Math.Cos(ang - spread)), (float)(e.Y - len * Math.Sin(ang - spread)));
-        var p2 = new SkiaSharp.SKPoint((float)(e.X - len * Math.Cos(ang + spread)), (float)(e.Y - len * Math.Sin(ang + spread)));
+        using (var sp = new SkiaSharp.SKPath())
+        {
+            sp.MoveTo((float)shaftPts[0].X, (float)shaftPts[0].Y);
+            for (int i = 1; i < shaftPts.Count; i++) sp.LineTo((float)shaftPts[i].X, (float)shaftPts[i].Y);
+            c.DrawPath(sp, stroke);
+        }
+
+        if (style == "none") return;
+        double ang = Math.Atan2(tip.Y - from.Y, tip.X - from.X);
+        SkiaSharp.SKPoint HP(double back, double side) => new(
+            (float)(tip.X - back * Math.Cos(ang) - side * Math.Sin(ang)),
+            (float)(tip.Y - back * Math.Sin(ang) + side * Math.Cos(ang)));
+        var t = new SkiaSharp.SKPoint((float)tip.X, (float)tip.Y);
+        if (style == "open")
+        {
+            using var op = new SkiaSharp.SKPaint
+            {
+                Color = col, IsAntialias = true, StrokeWidth = (float)Math.Max(thick, headLen * 0.17),
+                StrokeCap = SkiaSharp.SKStrokeCap.Round, StrokeJoin = SkiaSharp.SKStrokeJoin.Round,
+                Style = SkiaSharp.SKPaintStyle.Stroke,
+            };
+            using var hp = new SkiaSharp.SKPath();
+            var l = HP(headLen, headLen * 0.52); var r = HP(headLen, -headLen * 0.52);
+            hp.MoveTo(l); hp.LineTo(t); hp.LineTo(r);
+            c.DrawPath(hp, op);
+            return;
+        }
+        if (style == "circle")
+        {
+            using var fillc = new SkiaSharp.SKPaint { Color = col, IsAntialias = true, Style = SkiaSharp.SKPaintStyle.Fill };
+            c.DrawCircle(t, (float)(headLen * 0.46), fillc);
+            return;
+        }
         using var fill = new SkiaSharp.SKPaint { Color = col, IsAntialias = true, Style = SkiaSharp.SKPaintStyle.Fill };
         using var path = new SkiaSharp.SKPath();
-        path.MoveTo(e); path.LineTo(p1); path.LineTo(p2); path.Close();
+        if (style == "diamond")
+        { path.MoveTo(t); path.LineTo(HP(headLen * 0.5, headLen * 0.42)); path.LineTo(HP(headLen, 0)); path.LineTo(HP(headLen * 0.5, -headLen * 0.42)); }
+        else
+        { path.MoveTo(t); path.LineTo(HP(headLen, headLen * 0.5)); path.LineTo(HP(headLen, -headLen * 0.5)); }
+        path.Close();
         c.DrawPath(path, fill);
     }
 
