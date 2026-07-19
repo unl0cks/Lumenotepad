@@ -1044,36 +1044,28 @@ public partial class PdfViewer : UserControl
         }
     }
 
-    /// <summary>The arrow's shaft points in overlay pixels: two for a straight arrow, or a sampled
-    /// Catmull-Rom spline through the three control points for a curved one.</summary>
+    /// <summary>The arrow's shaft points in overlay pixels: two for a straight arrow, or — for a
+    /// curved one — a QUARTIC BÉZIER (Paint.NET-style) whose control points are the three dots. The
+    /// curve is PULLED toward the dots rather than forced through them, so it stays graceful and never
+    /// kinks the way a pass-through spline does. Collinear dots ⇒ a straight line.</summary>
     private static List<Point> ArrowPoints(PdfAnnotation a, double w, double h)
     {
-        var s = new Point(a.X * w, a.Y * h);
-        var en = new Point(a.X2 * w, a.Y2 * h);
-        if (!a.Curved) return new List<Point> { s, en };
-        var ctrl = new List<Point>
+        var p0 = new Point(a.X * w, a.Y * h);
+        var p4 = new Point(a.X2 * w, a.Y2 * h);
+        if (!a.Curved) return new List<Point> { p0, p4 };
+        var p1 = new Point(a.C1x * w, a.C1y * h);
+        var p2 = new Point(a.C2x * w, a.C2y * h);
+        var p3 = new Point(a.C3x * w, a.C3y * h);
+        const int n = 32;
+        var o = new List<Point>(n + 1);
+        for (int i = 0; i <= n; i++)
         {
-            s, new(a.C1x * w, a.C1y * h), new(a.C2x * w, a.C2y * h), new(a.C3x * w, a.C3y * h), en,
-        };
-        return CatmullRom(ctrl, 16);
-    }
-
-    private static List<Point> CatmullRom(IReadOnlyList<Point> p, int seg)
-    {
-        var o = new List<Point>();
-        int n = p.Count;
-        for (int i = 0; i < n - 1; i++)
-        {
-            var p0 = p[Math.Max(0, i - 1)]; var p1 = p[i]; var p2 = p[i + 1]; var p3 = p[Math.Min(n - 1, i + 2)];
-            for (int j = 0; j < seg; j++)
-            {
-                double t = (double)j / seg, t2 = t * t, t3 = t2 * t;
-                double x = 0.5 * (2 * p1.X + (-p0.X + p2.X) * t + (2 * p0.X - 5 * p1.X + 4 * p2.X - p3.X) * t2 + (-p0.X + 3 * p1.X - 3 * p2.X + p3.X) * t3);
-                double y = 0.5 * (2 * p1.Y + (-p0.Y + p2.Y) * t + (2 * p0.Y - 5 * p1.Y + 4 * p2.Y - p3.Y) * t2 + (-p0.Y + 3 * p1.Y - 3 * p2.Y + p3.Y) * t3);
-                o.Add(new Point(x, y));
-            }
+            double t = (double)i / n, u = 1 - t;
+            double b0 = u * u * u * u, b1 = 4 * u * u * u * t, b2 = 6 * u * u * t * t, b3 = 4 * u * t * t * t, b4 = t * t * t * t;
+            o.Add(new Point(
+                b0 * p0.X + b1 * p1.X + b2 * p2.X + b3 * p3.X + b4 * p4.X,
+                b0 * p0.Y + b1 * p1.Y + b2 * p2.Y + b3 * p3.Y + b4 * p4.Y));
         }
-        o.Add(p[^1]);
         return o;
     }
 
