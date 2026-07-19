@@ -108,4 +108,63 @@ public static class PageStyleGuides
     /// <summary>Floor for a region box width — mirrors NoteBox.MinWidth without an Avalonia-model
     /// dependency in this pure geometry file.</summary>
     private const double NoteBoxMinWidth = 140;
+
+    /// <summary>The docking rects for a structured style's labelled starter boxes, keyed by a stable
+    /// region id, in canvas coords — the SAME viewport math the guide lines use, so a page's boxes and
+    /// its guides scale together and never drift apart on resize. Rects are auto-height (Height 0): the
+    /// box sits at the top-left of its region and grows with its content. Cornell's summary is the one
+    /// region that also descends with the notes (<paramref name="notesFoot"/>); the rest ignore it.
+    /// Styles with no docked starters (Freeform, Mindmap) return an empty list.</summary>
+    public static IReadOnlyList<(string Id, Rect Rect)> Regions(
+        string pageStyle, Size viewport, Size canvas, double notesFoot = 0)
+    {
+        double vw = viewport.Width > 0 ? viewport.Width : (canvas.Width > 0 ? canvas.Width : 900);
+        double vh = viewport.Height > 0 ? viewport.Height : (canvas.Height > 0 ? canvas.Height : 600);
+        const double m = Margin;
+        double W(double w) => System.Math.Max(NoteBoxMinWidth, w);
+        var r = new List<(string, Rect)>();
+        switch (pageStyle)
+        {
+            case PageStyles.Cornell:
+            {
+                var (cue, notes, summary) = CornellRegions(vw, vh, notesFoot);
+                r.Add(("cue", cue)); r.Add(("notes", notes)); r.Add(("summary", summary));
+                break;
+            }
+            case PageStyles.TwoColumn:
+            {
+                double half = System.Math.Round(vw * 0.5);
+                r.Add(("c0", new Rect(m, m, W(half - 2 * m), 0)));
+                r.Add(("c1", new Rect(half + m, m, W(vw - half - 2 * m), 0)));
+                break;
+            }
+            case PageStyles.Boxing:
+            {
+                double bw = System.Math.Round((vw - 2 * BoxMargin - BoxGap) / 2);
+                double bh = System.Math.Round((vh - 2 * BoxMargin - BoxGap) / 2);
+                var cells = new[]
+                {
+                    (BoxMargin, BoxMargin), (BoxMargin + bw + BoxGap, BoxMargin),
+                    (BoxMargin, BoxMargin + bh + BoxGap), (BoxMargin + bw + BoxGap, BoxMargin + bh + BoxGap),
+                };
+                for (int i = 0; i < cells.Length; i++)
+                    r.Add(($"b{i}", new Rect(cells[i].Item1 + 12, cells[i].Item2 + 12, W(bw - 24), 0)));
+                break;
+            }
+            case PageStyles.Charting:
+            {
+                double col = System.Math.Round(vw / 3);
+                for (int i = 0; i < 3; i++)
+                    r.Add(($"h{i}", new Rect(i * col + m, m, W(col - 2 * m), 0)));
+                break;
+            }
+            case PageStyles.Outline:
+                r.Add(("outline", new Rect(m, m, W(vw - 2 * m), 0)));
+                break;
+            case PageStyles.Sentence:
+                r.Add(("sentence", new Rect(m, RuleTop - 8, W(vw - 2 * m), 0)));
+                break;
+        }
+        return r;
+    }
 }

@@ -57,15 +57,18 @@ public class PageStyleTemplateTests
         Assert.Equal(new[] { "cue", "notes", "summary" }, boxes.Select(b => b.Region));
     }
 
-    [Fact]
-    public void Rigid_locksAndFixesHeights()
+    [Theory]
+    [InlineData(PageStyles.ModeGuides)]
+    [InlineData(PageStyles.ModeRigid)]
+    public void Structured_startersDockLockedAndAutoHeight_whenGuidesShown(int mode)
     {
-        // A rigid page's plain (non-docked) starters — Two-column — lock to fixed region heights.
-        var boxes = PageStyleTemplate.StartersFor(PageStyles.TwoColumn, PageStyles.ModeRigid, Vp);
+        // With guides drawn, every structured style's starters dock: tagged + locked + auto height
+        // (no more rigid fixed-height path — the canvas owns their geometry so they track the guides).
+        var boxes = PageStyleTemplate.StartersFor(PageStyles.TwoColumn, mode, Vp);
         Assert.Equal(2, boxes.Count);
         Assert.All(boxes, b => Assert.True(b.Locked));
-        Assert.Equal(568, boxes[0].H);           // 600 − 32
-        Assert.Equal(568, boxes[1].H);
+        Assert.All(boxes, b => Assert.Equal(0, b.H));
+        Assert.Equal(new[] { "c0", "c1" }, boxes.Select(b => b.Region));
     }
 
     [Fact]

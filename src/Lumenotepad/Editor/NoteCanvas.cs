@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -130,7 +131,7 @@ public sealed class NoteCanvas : Panel
         _pageStyle = pageStyle;
         _mode = mode;
         _guides.SetStyles(gridStyle, pageStyle, mode);
-        EnsureCornellRegions();        // tag legacy Cornell starters so they dock like fresh ones
+        EnsureRegions();               // tag legacy structured starters so they dock like fresh ones
         InvalidateMeasure();
     }
 
@@ -192,7 +193,7 @@ public sealed class NoteCanvas : Panel
         _links.Refresh();
         Children.Add(_links);
         Children.Add(_hint);
-        EnsureCornellRegions();        // tag legacy Cornell starters before their views are built
+        EnsureRegions();               // tag legacy structured starters before their views are built
         if (_doc is not null)
             foreach (var box in _doc.Boxes)
                 Children.Add(new NoteBoxView(this, box));
@@ -217,7 +218,7 @@ public sealed class NoteCanvas : Panel
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        DockCornellColumns();                      // cue/notes/summary X+Width, cue/notes Y — from the viewport
+        DockRegions();                             // snap every structured style's region boxes to the guides
 
         double w = 0, h = 0, notesFoot = 0;
         foreach (var child in Children)
@@ -240,26 +241,23 @@ public sealed class NoteCanvas : Panel
         return new Size(w + 220, h + 320);        // breathing room so the page can always grow by clicking
     }
 
-    /// <summary>Snap Cornell's cue/notes columns (and the summary box's X/width) to the live guide
-    /// geometry. Horizontal placement depends only on the viewport, so it's safe to set every measure;
-    /// the summary's Y waits until the notes content foot is known (<see cref="DockCornellSummary"/>).</summary>
-    private void DockCornellColumns()
+    /// <summary>Snap every structured style's region boxes (X/Y/Width) to the live guide geometry.
+    /// Purely viewport-driven, so it's safe to run each measure; Cornell's summary Y is finished later
+    /// once the notes content foot is known (<see cref="DockCornellSummary"/>).</summary>
+    private void DockRegions()
     {
-        if (_pageStyle != PageStyles.Cornell || _viewport.Width <= 0 || _viewport.Height <= 0) return;
-        var (cue, notes, summary) = PageStyleGuides.CornellRegions(_viewport.Width, _viewport.Height, 0);
+        if (_viewport.Width <= 0 || _viewport.Height <= 0) return;
+        var regions = PageStyleGuides.Regions(_pageStyle, _viewport, default);
+        if (regions.Count == 0) return;
         foreach (var child in Children)
         {
-            if (child is not NoteBoxView v || v.Box.Region is not { } r) continue;
-            switch (r)
-            {
-                case "cue":     v.Box.X = cue.X;   v.Box.Y = cue.Y;   v.Box.Width = cue.Width;   break;
-                case "notes":   v.Box.X = notes.X; v.Box.Y = notes.Y; v.Box.Width = notes.Width; break;
-                case "summary": v.Box.X = summary.X;                   v.Box.Width = summary.Width; break;
-            }
+            if (child is not NoteBoxView v || v.Box.Region is not { } id) continue;
+            foreach (var (rid, rect) in regions)
+                if (rid == id) { v.Box.X = rect.X; v.Box.Y = rect.Y; v.Box.Width = rect.Width; break; }
         }
     }
 
-    /// <summary>Place the summary region a small gap below the notes content foot (never above its
+    /// <summary>Place Cornell's summary region a small gap below the notes content foot (never above its
     /// 80%-of-screen home) — the same rule the guide's summary line uses, so line and box stay glued.</summary>
     private void DockCornellSummary(double notesFoot)
     {
@@ -270,18 +268,24 @@ public sealed class NoteCanvas : Panel
                 v.Box.Y = summary.Y;
     }
 
-    /// <summary>Legacy Cornell pages (created before regions were docked) carry the Cue/Notes/Summary
-    /// starters with no Region tag — tag them by their label so they dock like freshly stamped ones.</summary>
-    private void EnsureCornellRegions()
+    /// <summary>Legacy structured pages (created before regions were docked) carry untagged starters —
+    /// tag a pristine starter set (box count matching the style's region count, plain text boxes only)
+    /// by creation order so they dock like freshly stamped ones. Pages the user has since reshaped
+    /// (added/removed boxes, images, tables) are left alone as ordinary free boxes.</summary>
+    private void EnsureRegions()
     {
-        if (_pageStyle != PageStyles.Cornell || _doc is null) return;
-        foreach (var b in _doc.Boxes)
+        if (_doc is null || _doc.Boxes.Count == 0) return;
+        if (_mode == PageStyles.ModeStartersOnly) return;                 // starters-only pages keep free boxes
+        var regions = PageStyleGuides.Regions(_pageStyle, _viewport.Width > 0 ? _viewport : new Size(900, 600), default);
+        if (regions.Count == 0) return;                                   // Freeform / Mindmap: nothing to dock
+        if (_doc.Boxes.Any(b => b.Region is not null)) return;            // already tagged
+        if (_doc.Boxes.Count != regions.Count) return;                    // not a pristine starter set
+        if (_doc.Boxes.Any(b => b.ImagePath is not null || b.Table is not null || b.Divider is not null)) return;
+        for (int i = 0; i < regions.Count; i++)
         {
-            if (b.Region is not null || b.Divider is not null || b.ImagePath is not null || b.Table is not null) continue;
-            // Match the LABEL (first line) — the user may have typed notes under it ("Notes\nLALA…").
-            string label = (b.Doc.Paragraphs.Count > 0 ? b.Doc.Paragraphs[0].Text : "").Trim();
-            b.Region = label switch { "Cue" => "cue", "Notes" => "notes", "Summary" => "summary", _ => null };
-            if (b.Region is not null) b.Locked = true;
+            _doc.Boxes[i].Region = regions[i].Id;
+            _doc.Boxes[i].Locked = true;
+            _doc.Boxes[i].H = 0;
         }
     }
 

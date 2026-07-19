@@ -1,3 +1,4 @@
+using System.Linq;
 using Avalonia;
 using Lumenotepad.Editor;
 using Xunit;
@@ -60,6 +61,27 @@ public class PageStyleGuidesTests
         Assert.Equal(new Rect(16, 16, 220, 0), cue);        // cue.right = 236, just left of the x=252 divider
         Assert.Equal(new Rect(268, 16, 616, 0), notes);     // notes.left = 268, just right of it
         Assert.Equal(new Rect(16, 492, 868, 0), summary);   // summary top = 480 rule + 12 gap
+    }
+
+    [Fact]
+    public void Regions_dockRects_matchTheGriddedStyleGeometry()
+    {
+        var two = PageStyleGuides.Regions(PageStyles.TwoColumn, Vp, Canvas);
+        Assert.Equal(new[] { "c0", "c1" }, two.Select(r => r.Id));
+        Assert.Equal(new Rect(16, 16, 418, 0), two[0].Rect);     // half 450 → 450 − 32
+        Assert.Equal(new Rect(466, 16, 418, 0), two[1].Rect);    // 450 + 16 .. 900 − 450 − 32
+
+        var box = PageStyleGuides.Regions(PageStyles.Boxing, Vp, Canvas);
+        Assert.Equal(4, box.Count);
+        Assert.Equal(new Rect(36, 36, 394, 0), box[0].Rect);     // 24 + 12 inset, bw(418) − 24
+        Assert.Equal(new Rect(470, 36, 394, 0), box[1].Rect);    // 24 + 418 + 16 + 12 inset
+
+        var chart = PageStyleGuides.Regions(PageStyles.Charting, Vp, Canvas);
+        Assert.Equal(new[] { "h0", "h1", "h2" }, chart.Select(r => r.Id));
+        Assert.Equal(316, chart[1].Rect.X);                      // col 300 → 300 + 16
+
+        Assert.Empty(PageStyleGuides.Regions(PageStyles.Freeform, Vp, Canvas));
+        Assert.Empty(PageStyleGuides.Regions(PageStyles.Mindmap, Vp, Canvas));
     }
 
     [Fact]
