@@ -676,10 +676,10 @@ public partial class PdfViewer : UserControl
             bool glassTheme = Services.ThemeManager.Current.GlassWindow;
             backdropBrush = glassTheme && pv.Img.Source is Bitmap bmp
                 ? new ImageBrush(bmp) { Stretch = Stretch.Fill } : null;
-            var smoke = new Border      // the dark BLUISH Lumen glass the white text sits on
-            {
+            var smoke = new Border      // the dark bluish body the white text sits on: translucent
+            {                           // glass under Lumen, fully OPAQUE on solid themes (owner request)
                 CornerRadius = new CornerRadius(10),
-                Background = new SolidColorBrush(Color.Parse("#D4131A29")),
+                Background = new SolidColorBrush(Color.Parse(glassTheme ? "#D4131A29" : "#FF131A29")),
                 IsHitTestVisible = false,
             };
             var layers = new Panel();
@@ -1210,11 +1210,14 @@ public partial class PdfViewer : UserControl
         Border box;
         if (sticky)
         {
+            // Translucent glass over the blurred page under Lumen; opaque on solid themes (matching
+            // the on-screen card) so the export isn't see-through where the screen isn't.
+            bool glassTheme = Services.ThemeManager.Current.GlassWindow;
             var layers = new Panel();
-            layers.Children.Add(new Border   // dark bluish smoke (translucent — the blurred page shows through)
+            layers.Children.Add(new Border   // dark bluish body
             {
                 CornerRadius = new CornerRadius(10),
-                Background = new SolidColorBrush(Color.Parse("#D4131A29")),
+                Background = new SolidColorBrush(Color.Parse(glassTheme ? "#D4131A29" : "#FF131A29")),
             });
             layers.Children.Add(new Border
             {
