@@ -19,12 +19,15 @@ public sealed class SmoothScroll
 {
     private readonly ScrollViewer _sv;
     private DispatcherTimer? _timer;
+    private readonly System.Diagnostics.Stopwatch _clock = new();   // real time between ticks
     private double _target;
 
     private const double StepPerNotch = 64;   // px of target movement per wheel unit
-    // Fraction of the remaining gap closed each tick. Scaled down from 0.22/15ms to keep the same
-    // easing feel now that ticks fire more often (0.16 per 10ms).
-    private const double CatchUp = 0.16;
+    // Fraction of the remaining gap closed per 10ms of REAL time. The per-tick close is scaled to the
+    // actual elapsed time (below), not applied flat each tick — a flat fraction moved the offset in
+    // uneven bursts when frames were expensive (heavy pane → irregular ticks → visibly "jumpy" scroll,
+    // owner report). Same easing feel, frame-rate independent.
+    private const double CatchUpPer10ms = 0.16;
 
     private SmoothScroll(ScrollViewer sv)
     {
@@ -58,7 +61,7 @@ public sealed class SmoothScroll
             return;
         }
         _timer ??= CreateTimer();
-        if (!_timer.IsEnabled) _timer.Start();
+        if (!_timer.IsEnabled) { _clock.Restart(); _timer.Start(); }
     }
 
     private DispatcherTimer CreateTimer()
@@ -71,12 +74,20 @@ public sealed class SmoothScroll
 
     private void Tick()
     {
+        // Close the gap by an amount matched to the REAL time since the last tick, so a late/expensive
+        // frame catches up smoothly instead of the offset lurching a flat 16% whenever a tick happens
+        // to fire. dt is clamped so a long stall (app frozen) just settles rather than snapping wildly.
+        double dtMs = _clock.IsRunning ? Math.Clamp(_clock.Elapsed.TotalMilliseconds, 1, 100) : 10;
+        _clock.Restart();
+        double factor = 1 - Math.Pow(1 - CatchUpPer10ms, dtMs / 10.0);
+
         double cur = _sv.Offset.Y;
-        double next = cur + (_target - cur) * CatchUp;
+        double next = cur + (_target - cur) * factor;
         if (Math.Abs(_target - next) < 0.5)
         {
             _sv.Offset = new Vector(_sv.Offset.X, _target);
             _timer?.Stop();
+            _clock.Reset();
             return;
         }
         _sv.Offset = new Vector(_sv.Offset.X, next);
