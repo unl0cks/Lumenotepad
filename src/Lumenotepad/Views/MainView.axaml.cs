@@ -860,7 +860,10 @@ public partial class MainView : UserControl
             ApplyPdfPage();     // PDF page → embedded viewer; note page → the canvas below
             if (!string.IsNullOrEmpty(Vm?.SelectedPage?.PdfPath))
             {
-                // Switching TO a PDF: rise the viewer in like a note page instead of popping.
+                // Switching TO a PDF: rise the viewer in like a note page instead of popping. Hide it
+                // NOW (synchronously) so it doesn't flash at full opacity for the frame before the
+                // Background-posted RiseIn snaps it to 0 — that flash is the "flicker".
+                PagePdfViewer.Opacity = 0;
                 Dispatcher.UIThread.Post(() => Motion.RiseIn(PagePdfViewer, Motion.Base), DispatcherPriority.Background);
             }
             else if (wasPdf)

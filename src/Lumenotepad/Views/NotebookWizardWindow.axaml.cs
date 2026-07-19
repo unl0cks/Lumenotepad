@@ -195,7 +195,12 @@ public partial class NotebookWizardWindow : Window
         {
             try
             {
-                CoverPreview.Background = new ImageBrush(new Avalonia.Media.Imaging.Bitmap(p)) { Stretch = Stretch.UniformToFill };
+                // Decode DOWNSCALED to roughly the preview size. Loading a full-res cover (a phone photo
+                // can be 4000+ px) into this 96×64 border meant a huge bitmap held in memory and resampled
+                // on every repaint — that's what made the window lag and the scroll stutter/jump.
+                using var stream = System.IO.File.OpenRead(p);
+                var bmp = Avalonia.Media.Imaging.Bitmap.DecodeToWidth(stream, 320);
+                CoverPreview.Background = new ImageBrush(bmp) { Stretch = Stretch.UniformToFill };
                 return;
             }
             catch { /* unreadable temp — fall through to the color */ }
