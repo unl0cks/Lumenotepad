@@ -856,11 +856,20 @@ public partial class MainView : UserControl
 
         if (e.PropertyName == nameof(MainViewModel.SelectedPage))
         {
+            bool wasPdf = PagePdfViewer.IsVisible;   // capture BEFORE ApplyPdfPage flips the visibilities
             ApplyPdfPage();     // PDF page → embedded viewer; note page → the canvas below
             if (string.IsNullOrEmpty(Vm?.SelectedPage?.PdfPath))
             {
-                // Fade the current page out, THEN swap + rise the new one in (SyncEditorDocument does the swap).
-                if (PageCanvas.Document is not null) Motion.FadeOut(PageDock, Motion.Fast, SyncEditorDocument);
+                if (wasPdf)
+                {
+                    // Leaving the PDF viewer: PageDock was hidden, so fading it out would flash the STALE
+                    // note doc for a frame first ("pops back to it, THEN animates"). Hide it, swap the doc
+                    // while hidden, then rise the new page in — a clean reveal with no pop.
+                    PageDock.Opacity = 0;
+                    SyncEditorDocument();
+                }
+                // Note → note: fade the current page out, THEN swap + rise the new one in.
+                else if (PageCanvas.Document is not null) Motion.FadeOut(PageDock, Motion.Fast, SyncEditorDocument);
                 else SyncEditorDocument();
             }
         }
