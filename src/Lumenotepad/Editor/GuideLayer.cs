@@ -21,6 +21,16 @@ public sealed class GuideLayer : Control
     /// canvas. Pushed by MainView from the ScrollViewer.</summary>
     public Size Viewport { get; set; }
 
+    /// <summary>The bottom of the REAL content (lowest container), pushed by NoteCanvas on measure.
+    /// The canvas Bounds carry a big trailing breathing-room pad, so styles that dock to the page
+    /// foot (Cornell's summary band) use this instead — it hugs the content and descends with it.</summary>
+    public double ContentBottom
+    {
+        get => _contentBottom;
+        set { if (System.Math.Abs(value - _contentBottom) < 0.5) return; _contentBottom = value; InvalidateVisual(); }
+    }
+    private double _contentBottom;
+
     /// <summary>Chip-preview instances set this (wizard + customize dialogs): styles whose real
     /// page draws NOTHING (Mindmap — bubbles + links only) still get a little illustrative motif
     /// so their chip isn't a blank square. The live canvas leaves it false.</summary>
@@ -47,7 +57,7 @@ public sealed class GuideLayer : Control
         if (_gridBrush is not null) ctx.FillRectangle(_gridBrush, new Rect(size));
         if (PreviewMotif && _pageStyle == PageStyles.Mindmap) { RenderMindmapMotif(ctx, size); return; }
         if (_mode == PageStyles.ModeStartersOnly) return;          // starters-only: no guides
-        var set = PageStyleGuides.For(_pageStyle, Viewport, size);
+        var set = PageStyleGuides.For(_pageStyle, Viewport, size, _contentBottom);
         if (set.Lines.Count == 0 && set.Boxes.Count == 0) return;
         var pen = new Pen(new SolidColorBrush(
             Color.Parse(Services.ThemePalettes.Alpha(Services.ThemeManager.Current.PaperText, 0x26))), 1);

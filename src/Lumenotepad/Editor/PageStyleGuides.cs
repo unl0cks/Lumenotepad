@@ -21,7 +21,7 @@ public static class PageStyleGuides
     public const double BoxMargin = 24;     // Boxing outer margin
     public const double BoxGap = 16;        // Boxing gap between boxes
 
-    public static GuideSet For(string pageStyle, Size viewport, Size canvas)
+    public static GuideSet For(string pageStyle, Size viewport, Size canvas, double contentBottom = 0)
     {
         // Divider positions come from the viewport; a zero viewport (not yet measured) uses the canvas.
         double vw = viewport.Width > 0 ? viewport.Width : canvas.Width;
@@ -37,7 +37,19 @@ public static class PageStyleGuides
         switch (pageStyle)
         {
             case PageStyles.Cornell:
-                double cue = System.Math.Round(vw * 0.28), sum = System.Math.Round(vh * 0.80);
+                // The cue-column WIDTH is a viewport fraction (a horizontal position, like TwoColumn's
+                // divider), but the DIVIDERS scale with the page like every other style: the cue/notes
+                // rule runs the full height down to a summary band that stays pinned to the FOOT of the
+                // canvas (a fixed ~1/5-screen band). So a Cornell page grown past one screen keeps its
+                // column running the whole page and the summary at the bottom — not stranded on screen 1.
+                // The Max guard keeps the summary on the first screen while the page is still short, so
+                // the band never rides up above its 80%-of-screen home. It descends from there as content
+                // grows. contentBottom (the real content foot, breathing-room excluded) is preferred over
+                // the padded canvas so the band hugs the notes instead of floating in the trailing pad.
+                double cue = System.Math.Round(vw * 0.28);
+                double band = System.Math.Round(vh * 0.20);
+                double foot = contentBottom > 0 ? contentBottom : ch;
+                double sum = System.Math.Max(System.Math.Round(vh * 0.80), foot - band);
                 lines.Add((new Point(cue, 0), new Point(cue, sum)));
                 lines.Add((new Point(0, sum), new Point(cw, sum)));
                 break;

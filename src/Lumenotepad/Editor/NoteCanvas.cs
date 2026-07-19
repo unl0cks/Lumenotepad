@@ -215,6 +215,7 @@ public sealed class NoteCanvas : Panel
             w = Math.Max(w, v.Box.X + v.Box.Width);
             h = Math.Max(h, v.Box.Y + Math.Max(v.DesiredSize.Height, v.Box.H));
         }
+        _guides.ContentBottom = h;                 // the real content foot (pre-breathing) for page-docked guides
         return new Size(w + 220, h + 320);        // breathing room so the page can always grow by clicking
     }
 

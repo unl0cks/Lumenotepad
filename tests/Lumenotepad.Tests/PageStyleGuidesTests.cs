@@ -20,13 +20,36 @@ public class PageStyleGuidesTests
     }
 
     [Fact]
-    public void Cornell_cueAndSummaryDividers()
+    public void Cornell_cueRunsFullHeight_summaryBandPinnedToCanvasFoot()
     {
         var g = PageStyleGuides.For(PageStyles.Cornell, Vp, Canvas);
         Assert.Equal(2, g.Lines.Count);
-        Assert.Equal((new Point(252, 0), new Point(252, 480)), g.Lines[0]);   // cue: 0.28×900, down to summary
-        Assert.Equal((new Point(0, 480), new Point(1200, 480)), g.Lines[1]);  // summary: 0.80×600, full canvas width
+        // cue column x = 0.28×900 = 252; the rule runs the full page down to the summary band.
+        // Summary band = 0.20×600 = 120 tall, pinned to the canvas foot: 1500 − 120 = 1380.
+        Assert.Equal((new Point(252, 0), new Point(252, 1380)), g.Lines[0]);
+        Assert.Equal((new Point(0, 1380), new Point(1200, 1380)), g.Lines[1]);  // summary: full canvas width
         Assert.Empty(g.Boxes);
+    }
+
+    [Fact]
+    public void Cornell_summaryBandHugsContentFoot_notThePaddedCanvas()
+    {
+        // When the real content foot is passed it wins over the padded canvas: a page whose content
+        // ends at y=1000 puts the summary a band (0.20×600 = 120) above it → 1000 − 120 = 880,
+        // instead of the canvas-foot 1380. So the band rides the notes, not the trailing breathing pad.
+        var g = PageStyleGuides.For(PageStyles.Cornell, Vp, Canvas, contentBottom: 1000);
+        Assert.Equal((new Point(252, 0), new Point(252, 880)), g.Lines[0]);
+        Assert.Equal((new Point(0, 880), new Point(1200, 880)), g.Lines[1]);
+    }
+
+    [Fact]
+    public void Cornell_summaryStaysOnFirstScreen_whenCanvasShorterThanViewport()
+    {
+        // Heavy zoom-in makes the visible viewport taller than the (short) canvas — the band must not
+        // ride above its 80%-of-screen home: sum = Max(0.80×600, ch − band) = Max(480, 500−120) = 480.
+        var g = PageStyleGuides.For(PageStyles.Cornell, Vp, new Size(1200, 500));
+        Assert.Equal((new Point(252, 0), new Point(252, 480)), g.Lines[0]);
+        Assert.Equal((new Point(0, 480), new Point(1200, 480)), g.Lines[1]);
     }
 
     [Fact]
