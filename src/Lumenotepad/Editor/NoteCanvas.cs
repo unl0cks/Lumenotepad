@@ -642,6 +642,9 @@ internal sealed class NoteBoxView : Panel
     private readonly Border _gripBar;
     private readonly Border _close;
     private readonly TextBlock _closeGlyph;
+    // The close chip's resting look (differs bubble vs card); hover always flips to the red ✕.
+    private IBrush _closeRestBg = Brushes.Transparent;
+    private IBrush _closeRestFg = Brushes.Gray;
     private readonly Border _resizeLeft;
     private readonly Border _resizeRight;
     private readonly Border _resizeTop;
@@ -726,9 +729,10 @@ internal sealed class NoteBoxView : Panel
             ClipToBounds = true,
         };
 
+        _closeRestFg = CloseFg;
         _closeGlyph = new TextBlock
         {
-            Text = "\uE723", FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
+            Text = "\uE711", FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
             FontSize = 7.5, Foreground = CloseFg,
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
         };
@@ -740,7 +744,7 @@ internal sealed class NoteBoxView : Panel
             Cursor = new Cursor(StandardCursorType.Hand),
         };
         _close.PointerEntered += (_, _) => { _close.Background = CloseHoverBg; _closeGlyph.Foreground = Brushes.White; };
-        _close.PointerExited += (_, _) => { _close.Background = Brushes.Transparent; _closeGlyph.Foreground = CloseFg; };
+        _close.PointerExited += (_, _) => { _close.Background = _closeRestBg; _closeGlyph.Foreground = _closeRestFg; };
         _close.PointerPressed += (_, e) => e.Handled = true;      // don't start a grip drag from the ✕
         _close.PointerReleased += (_, e) => { _canvas.RequestDelete(this); e.Handled = true; };
 
@@ -1081,7 +1085,7 @@ internal sealed class NoteBoxView : Panel
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
         row.Children.Add(new TextBlock
         {
-            Text = "", FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
+            Text = "", FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
             FontSize = 16, Foreground = text, VerticalAlignment = VerticalAlignment.Center,
         });
         var lines = new StackPanel { Spacing = 1, VerticalAlignment = VerticalAlignment.Center };
@@ -1202,16 +1206,24 @@ internal sealed class NoteBoxView : Panel
                 Editor.InvalidateVisual();
             }
             Editor.Margin = new Thickness(10, 3, 10, 20);
-            // The ✕ rides the pill's rounded top-right corner; a small round chip inset so it never
-            // pokes past the outline (the old sharp-cornered chip did on a fully-round bubble).
-            _close.CornerRadius = new CornerRadius(8);
-            _close.Margin = new Thickness(0, 5, 8, 0);
+            // A small round close chip inset onto the pill's flat top-right, reading as a real button
+            // (subtle fill) rather than a bare glyph floating past the corner.
+            _close.CornerRadius = new CornerRadius(9);
+            _close.Margin = new Thickness(0, 6, 9, 0);
+            _closeGlyph.FontSize = 8.5;
+            _closeRestBg = new SolidColorBrush(Colors.White, 0.16);
+            _closeRestFg = new SolidColorBrush(Colors.White, 0.85);
         }
         else if (normalBox)   // ordinary note card: the ✕ hugs the square corner as before
         {
             _close.CornerRadius = new CornerRadius(0, NoteCanvas.NoteRadiusPref, 0, 6);
             _close.Margin = default;
+            _closeGlyph.FontSize = 7.5;
+            _closeRestBg = Brushes.Transparent;
+            _closeRestFg = CloseFg;
         }
+        _close.Background = _closeRestBg;       // apply the resting look now the box kind is known
+        _closeGlyph.Foreground = _closeRestFg;
 
         // Connect ports show while the bubble is active or a link is in flight; the diagonals wait for
         // the toolbar toggle. All wear the bubble colour (or accent) so the map's wiring reads clearly.
