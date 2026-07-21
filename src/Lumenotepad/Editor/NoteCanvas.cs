@@ -400,7 +400,7 @@ public sealed class NoteCanvas : Panel
             }
             v.Arrange(new Rect(v.Box.X, v.Box.Y, v.Box.Width, Math.Max(v.DesiredSize.Height, v.Box.H)));
         }
-        _links.InvalidateVisual();               // connectors follow bubbles live during drags
+        _links.Animate();                        // connectors spring after bubbles as they move, then settle
         return finalSize;
     }
 
@@ -644,7 +644,7 @@ internal sealed class NoteBoxView : Panel
             var port = new Border
             {
                 Width = 14, Height = 14, CornerRadius = new CornerRadius(7),
-                BorderThickness = new Thickness(2), BorderBrush = Brushes.White, Background = B(t.Accent),
+                BorderThickness = new Thickness(1.25), BorderBrush = Brushes.White, Background = B(t.Accent),
                 HorizontalAlignment = h, VerticalAlignment = vv, Margin = m, IsVisible = false,
                 Cursor = new Cursor(StandardCursorType.Cross),
             };
