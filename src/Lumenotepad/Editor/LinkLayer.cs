@@ -8,16 +8,16 @@ using Avalonia.Threading;
 
 namespace Lumenotepad.Editor;
 
-/// <summary>Draws the mind-map connectors — under the bubbles, over the paper. Each connector's two ends
-/// ride the bubble outlines at the point facing the other bubble, so a line always leaves toward its
-/// partner and never has to wrap back over a bubble. Lines are stroked with a gradient between the two
-/// bubbles' colours and bend around any OTHER bubble that would cross them; the belly of each curve is a
-/// spring, so dragging a bubble makes its links lag and settle in a few decaying bounces (the ends stay
-/// glued). A straight-line mode swaps the curves for rigid segments.
+/// <summary>Draws the mind-map connectors — under the bubbles, over the paper. Each connector anchors at
+/// the specific compass port it was drawn from / snapped onto (N/S/E/W, plus diagonals on the rounded
+/// corners), leaves along that port's direction, is stroked with a gradient between the two bubbles'
+/// colours, and bends around any OTHER bubble that would cross it. The belly of each curve is a spring,
+/// so dragging a bubble makes its links lag and settle in a few decaying bounces (the ends stay glued).
+/// A straight-line mode swaps the curves for rigid segments.
 ///
 /// The in-flight rubber band (while a connect port is being dragged) keeps its tip on the cursor — no
-/// lag — but its body is a spring too, so a quick flick makes it whip like a string; it wears the source
-/// bubble's colour, carries a node at the tip, and snaps that tip onto any bubble the cursor nears.</summary>
+/// lag — but its body is a spring, so a quick flick whips like a string; it wears the source bubble's
+/// colour, carries a node at the tip, and snaps that tip onto the nearest port of any bubble it hovers.</summary>
 public sealed class LinkLayer : Control
 {
     internal CanvasDocument? Doc;
@@ -26,12 +26,13 @@ public sealed class LinkLayer : Control
     /// <summary>Rigid straight segments instead of springy curves (toolbar "Straight links").</summary>
     internal bool Straight;
 
-    /// <summary>While a connect-port drag is in flight: the source bubble, the edge it started from, the
-    /// live cursor, and the bubble (if any) the tip has snapped onto.</summary>
+    /// <summary>While a connect-port drag is in flight: the source bubble + edge it started from, the live
+    /// cursor, and the bubble + port the tip has snapped onto (if any).</summary>
     internal NoteBox? PendingSource;
     internal string PendingSourceDir = "E";
     internal Point PendingCursor;
     internal NoteBox? PendingSnap;
+    internal string PendingSnapDir = "W";
 
     /// <summary>Per-link spring state for the belly (the two control points chase their target geometry).</summary>
     private sealed class LinkSpring
@@ -116,7 +117,7 @@ public sealed class LinkLayer : Control
         if (PendingSource is { } src && Resolve(src) is { } rs)
         {
             var a = EdgePoint(rs, PendingSourceDir);
-            var end = PendingEnd(a);
+            var end = PendingEnd();
             var mid = new Point((a.X + end.X) / 2, (a.Y + end.Y) / 2);
             Step(ref _penCtrl, ref _penCtrlVel, mid, dt, 320, 13);
             moving = true;   // keep the loop live for the whole drag so the next flick is caught
@@ -194,66 +195,60 @@ public sealed class LinkLayer : Control
         if (PendingSource is { } src && Resolve(src) is { } rs)
         {
             var a = EdgePoint(rs, PendingSourceDir);
-            var end = PendingEnd(a);
+            var end = PendingEnd();
             var col = ColorOf(src);                                        // line wears the source colour
             var pen = new Pen(new SolidColorBrush(col, 0.95), 2.6, lineCap: PenLineCap.Round);
             var geo = new StreamGeometry();
             using (var g = geo.Open())
             {
                 g.BeginFigure(a, false);
-                g.QuadraticBezierTo(_penCtrl, end);   // tip pinned to cursor/snap; body springs → whip
+                g.QuadraticBezierTo(_penCtrl, end);   // tip pinned to cursor/port; body springs → whip
                 g.EndFigure(false);
             }
             ctx.DrawGeometry(null, pen, geo);
-            // A node at the tip so the line reads as a wire forming, not a flat stroke.
-            ctx.DrawEllipse(new SolidColorBrush(col, 0.18), null, end, PendingSnap is null ? 9 : 12, PendingSnap is null ? 9 : 12);
+            // A node at the tip so the line reads as a wire forming; it grows when snapped to a port.
+            double halo = PendingSnap is null ? 9 : 11;
+            ctx.DrawEllipse(new SolidColorBrush(col, 0.18), null, end, halo, halo);
             ctx.DrawEllipse(new SolidColorBrush(col),
                 new Pen(new SolidColorBrush(Colors.White, 0.85), 1.25), end, 4.5, 4.5);
         }
     }
 
-    /// <summary>Where the rubber-band tip sits: snapped onto the outline of the bubble it is near
-    /// (facing the source), else the raw cursor.</summary>
-    private Point PendingEnd(Point a)
+    /// <summary>Where the rubber-band tip sits: on the snapped port of the bubble it hovers, else the cursor.</summary>
+    private Point PendingEnd()
     {
         if (PendingSnap is { } snap && Resolve?.Invoke(snap) is { } sr)
-        {
-            var c = sr.Center;
-            return OutlinePoint(sr, a.X - c.X, a.Y - c.Y);
-        }
+            return EdgePoint(sr, PendingSnapDir);
         return PendingCursor;
     }
 
-    /// <summary>Resolve a link's two outline anchors and their outward (toward-partner) exit directions.
-    /// The anchor is the point on each bubble's outline facing the other bubble, so lines never wrap.</summary>
+    /// <summary>Resolve a link's two port anchors and their outward exit directions.</summary>
     private bool Ends(MindLink link, out Point a, out Point b, out Point va, out Point vb)
     {
         a = b = va = vb = default;
         if (Resolve!(link.A) is not { } ra || Resolve!(link.B) is not { } rb) return false;
-        var ca = ra.Center;
-        var cb = rb.Center;
-        double dx = cb.X - ca.X, dy = cb.Y - ca.Y;
-        double len = Math.Sqrt(dx * dx + dy * dy);
-        if (len < 0.001) { dx = 1; dy = 0; len = 1; }
-        va = new Point(dx / len, dy / len);
-        vb = new Point(-va.X, -va.Y);
-        a = OutlinePoint(ra, dx, dy);
-        b = OutlinePoint(rb, -dx, -dy);
+        a = EdgePoint(ra, link.DirA);
+        b = EdgePoint(rb, link.DirB);
+        va = DirVector(link.DirA);
+        vb = DirVector(link.DirB);
         return true;
     }
 
     private Color ColorOf(NoteBox box) =>
         box.Color is { } h && Color.TryParse(h, out var c) ? c : _accent;
 
-    /// <summary>Control points for the connector: they leave A and enter B along the toward-partner
-    /// directions (a clean flow), then bend to whichever side clears every OTHER bubble the run would
-    /// cross — re-checked against the actual curve so the line routes around a circle, not through it.</summary>
+    /// <summary>Control points for the connector: they leave A and enter B along their port directions
+    /// (a clean flow), then bend to whichever side clears every OTHER bubble the run would cross. A port
+    /// facing away from its partner gets a shorter lead-out, so it bends gently instead of curling into a
+    /// loop over its own bubble.</summary>
     private (Point C1, Point C2) Controls(Point a, Point b, Point va, Point vb, NoteBox ba, NoteBox bb)
     {
         double dist = Distance(a, b);
-        double off = Math.Clamp(dist * 0.35, 34, 160);
-        var baseC1 = new Point(a.X + va.X * off, a.Y + va.Y * off);
-        var baseC2 = new Point(b.X + vb.X * off, b.Y + vb.Y * off);
+        double baseOff = Math.Clamp(dist * 0.35, 34, 160);
+        double offA = baseOff * FaceScale(va, b.X - a.X, b.Y - a.Y);
+        double offB = baseOff * FaceScale(vb, a.X - b.X, a.Y - b.Y);
+        var baseC1 = new Point(a.X + va.X * offA, a.Y + va.Y * offA);
+        var baseC2 = new Point(b.X + vb.X * offB, b.Y + vb.Y * offB);
         var perp = Perp(a, b);
         var mid = new Point((a.X + b.X) / 2, (a.Y + b.Y) / 2);
 
@@ -285,6 +280,16 @@ public sealed class LinkLayer : Control
         }
         return (new Point(baseC1.X + perp.X * push, baseC1.Y + perp.Y * push),
                 new Point(baseC2.X + perp.X * push, baseC2.Y + perp.Y * push));
+    }
+
+    /// <summary>1 when a port points straight at its partner, 0.35 when it points away — scales the
+    /// lead-out length so an away-facing anchor doesn't fling a control point out into a loop.</summary>
+    private static double FaceScale(Point normal, double tx, double ty)
+    {
+        double len = Math.Sqrt(tx * tx + ty * ty);
+        if (len < 1e-6) return 1;
+        double dot = (normal.X * tx + normal.Y * ty) / len;   // 1 = toward partner, -1 = away
+        return 0.35 + 0.65 * (dot * 0.5 + 0.5);
     }
 
     private static Geometry Curve(Point a, Point c1, Point c2, Point b)
@@ -321,38 +326,10 @@ public sealed class LinkLayer : Control
         return Math.Sqrt(best);
     }
 
-    // ---- outline geometry ----
+    // ---- shared port geometry (NoteCanvas reuses these to anchor the drag + pick the snapped port) ----
 
-    /// <summary>The point on a bubble's rounded-rect outline (radius = half the shorter side) along the
-    /// ray from its centre in direction (dx,dy). Bisects the shape's signed-distance field.</summary>
-    public static Point OutlinePoint(Rect rect, double dx, double dy)
-    {
-        double len = Math.Sqrt(dx * dx + dy * dy);
-        double cx = rect.X + rect.Width / 2, cy = rect.Y + rect.Height / 2;
-        if (len < 1e-6) return new Point(cx, cy);
-        dx /= len; dy /= len;
-        double hw = rect.Width / 2, hh = rect.Height / 2;
-        double rad = Math.Min(hw, hh);
-        double lo = 0, hi = Math.Sqrt(hw * hw + hh * hh) + rad + 2;
-        for (int i = 0; i < 22; i++)                     // convex shape → SDF monotonic along the ray
-        {
-            double t = (lo + hi) / 2;
-            if (RoundRectSd(t * dx, t * dy, hw, hh, rad) < 0) lo = t; else hi = t;
-        }
-        double tt = (lo + hi) / 2;
-        return new Point(cx + dx * tt, cy + dy * tt);
-    }
-
-    private static double RoundRectSd(double px, double py, double hw, double hh, double r)
-    {
-        double qx = Math.Abs(px) - hw + r, qy = Math.Abs(py) - hh + r;
-        double ax = Math.Max(qx, 0), ay = Math.Max(qy, 0);
-        return Math.Min(Math.Max(qx, qy), 0) + Math.Sqrt(ax * ax + ay * ay) - r;
-    }
-
-    /// <summary>The point on a bubble's outline at a compass direction — used to anchor the rubber band
-    /// to the exact connect port it was grabbed from (orthogonal at the flat sides, diagonals on the
-    /// rounded corners).</summary>
+    /// <summary>The point on a bubble's outline at a compass port: orthogonal at the flat mid-sides,
+    /// diagonals on the rounded pill corners (radius = half the shorter side).</summary>
     public static Point EdgePoint(Rect r, string dir)
     {
         double rad = Math.Min(r.Width, r.Height) / 2;
@@ -371,12 +348,13 @@ public sealed class LinkLayer : Control
         };
     }
 
-    /// <summary>The compass edge of <paramref name="r"/> whose outline point is nearest <paramref name="p"/>.</summary>
-    public static string NearestDir(Rect r, Point p)
+    /// <summary>The port of <paramref name="r"/> nearest <paramref name="p"/>; diagonals considered only
+    /// when they are shown, so the snap matches the visible dots.</summary>
+    public static string NearestDir(Rect r, Point p, bool diagonals)
     {
         string best = "E";
         double bestD = double.MaxValue;
-        foreach (var dir in Dirs)
+        foreach (var dir in diagonals ? Dirs : Ortho)
         {
             var e = EdgePoint(r, dir);
             double d = (e.X - p.X) * (e.X - p.X) + (e.Y - p.Y) * (e.Y - p.Y);
@@ -385,7 +363,21 @@ public sealed class LinkLayer : Control
         return best;
     }
 
+    public static string NearestDir(Rect r, Point p) => NearestDir(r, p, true);
+
+    private static readonly string[] Ortho = { "N", "S", "E", "W" };
     private static readonly string[] Dirs = { "N", "S", "E", "W", "NE", "NW", "SE", "SW" };
+
+    private static Point DirVector(string dir)
+    {
+        const double q = 0.7071;
+        return dir switch
+        {
+            "N" => new Point(0, -1), "S" => new Point(0, 1), "E" => new Point(1, 0), "W" => new Point(-1, 0),
+            "NE" => new Point(q, -q), "NW" => new Point(-q, -q), "SE" => new Point(q, q), "SW" => new Point(-q, q),
+            _ => new Point(1, 0),
+        };
+    }
 
     private static double Distance(Point a, Point b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
 

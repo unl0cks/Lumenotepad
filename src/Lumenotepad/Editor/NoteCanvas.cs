@@ -223,42 +223,46 @@ public sealed class NoteCanvas : Panel
     internal void BeginLink(NoteBoxView from, string dir, Point canvasPt)
         => _links.BeginPending(from.Box, dir, canvasPt);
 
-    /// <summary>The connect-port drag moved — chase the cursor, and once the cursor nears a bubble snap
-    /// the line's tip onto it and light up that bubble's ports so the target is clear before release.</summary>
+    /// <summary>The connect-port drag moved — chase the cursor, and once the cursor is over a bubble snap
+    /// the line's tip onto that bubble's NEAREST port and light up its ports so the drop point is clear.</summary>
     internal void UpdateLink(Point canvasPt)
     {
         _links.PendingCursor = canvasPt;
         var src = _links.PendingSource;
-        var snap = src is null ? null : FindSnap(canvasPt, src);
+        NoteBoxView? snap = null;
+        string dir = "W";
+        if (src is not null) snap = FindSnap(canvasPt, src, out dir);
         _links.PendingSnap = snap?.Box;
+        _links.PendingSnapDir = dir;
         foreach (var child in Children)
             if (child is NoteBoxView v) v.SetLinkTarget(ReferenceEquals(v, snap));
         _links.Animate();
     }
 
-    /// <summary>The connect-port drag ended — link the source to the bubble the tip snapped onto
+    /// <summary>The connect-port drag ended — link the source to the port the tip snapped onto
     /// (releasing over empty canvas just cancels; releasing on an already-linked bubble unlinks).
     /// Persists so the connector survives a reload.</summary>
     internal void EndLink(Point canvasPt)
     {
         var src = _links.PendingSource;
         string srcDir = _links.PendingSourceDir;
-        var snap = src is null ? null : FindSnap(canvasPt, src);
+        NoteBoxView? snap = null;
+        string dstDir = "W";
+        if (src is not null) snap = FindSnap(canvasPt, src, out dstDir);
         _links.CancelPending();
         foreach (var child in Children)                        // drop the hover highlight on every bubble
             if (child is NoteBoxView v) v.SetLinkTarget(false);
         if (src is null || _doc is null || snap is null) return;
-        string dstDir = LinkLayer.NearestDir(snap.Bounds, canvasPt);   // stored for compat (anchors auto-face)
-        _doc.ToggleLink(src, snap.Box, srcDir, dstDir);
+        _doc.ToggleLink(src, snap.Box, srcDir, dstDir);        // anchor at the exact port snapped to
         _links.InvalidateVisual();
         _doc.CommitGeometry();       // links persist alongside geometry
     }
 
-    /// <summary>The bubble the cursor should snap to while connecting: the nearest one whose body comes
-    /// within the snap margin of <paramref name="p"/> (0 = inside it), excluding the source.</summary>
-    private NoteBoxView? FindSnap(Point p, NoteBox src)
+    /// <summary>The bubble the cursor is over while connecting (nearest whose body is within the margin,
+    /// excluding the source), plus the port on it nearest the cursor — the dot the tip snaps to.</summary>
+    private NoteBoxView? FindSnap(Point p, NoteBox src, out string dir)
     {
-        const double margin = 46;
+        const double margin = 34;   // "hovering over" the bubble (a little slack outside its body)
         NoteBoxView? best = null;
         double bestD = double.MaxValue;
         foreach (var child in Children)
@@ -267,6 +271,7 @@ public sealed class NoteCanvas : Panel
             double d = RectDistance(v.Bounds, p);
             if (d <= margin && d < bestD) { bestD = d; best = v; }
         }
+        dir = best is null ? "W" : LinkLayer.NearestDir(best.Bounds, p, MindmapDiagonalPorts);
         return best;
     }
 
