@@ -94,6 +94,10 @@ public sealed class NoteBox
     /// note look. Persisted.</summary>
     public string? Color { get; set; }
 
+    /// <summary>Text-size multiplier for this container's editor (mind-map hierarchy: a title bubble
+    /// bigger than its children). 1.0 = the page's normal size. Persisted.</summary>
+    public double FontScale { get; set; } = 1.0;
+
     /// <summary>An IMAGE box (M10): a path relative to the notebook folder ("images/xxx.png").
     /// When set the box renders the image instead of a text editor. Persisted.</summary>
     public string? ImagePath { get; set; }

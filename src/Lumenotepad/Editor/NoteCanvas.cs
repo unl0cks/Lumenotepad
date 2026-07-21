@@ -340,6 +340,21 @@ public sealed class NoteCanvas : Panel
         }
     }
 
+    /// <summary>Recolour a specific bubble (its right-click "Colour" menu) — updates its connectors'
+    /// gradient and, when it's the selected one, the toolbar's colour ring.</summary>
+    internal void RecolorBox(NoteBoxView view, string? color)
+    {
+        view.Box.Color = color;
+        view.RefreshChrome();
+        _links.InvalidateVisual();
+        if (ReferenceEquals(ActiveEditor, view.Editor))
+        {
+            MindmapColor = color;
+            ActiveEditorChanged?.Invoke(ActiveEditor);   // MainView re-rings the picker
+        }
+        _doc?.CommitGeometry();
+    }
+
     /// <summary>The editor of the most recently focused container (what the toolbar targets).</summary>
     public RichTextEditor? ActiveEditor { get; private set; }
     public event Action<RichTextEditor?>? ActiveEditorChanged;
@@ -807,6 +822,7 @@ internal sealed class NoteBoxView : Panel
         {
             Editor.GotFocus += (_, _) => { _canvas.SetActive(Editor); RefreshChrome(); };
             Editor.LostFocus += (_, _) => { RefreshChrome(); _canvas.OnEditorLostFocus(this); };
+            Editor.AddHandler(InputElement.KeyDownEvent, OnBubbleKey, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         }
 
         WireDrag(_grip, Edge.None);
@@ -834,6 +850,40 @@ internal sealed class NoteBoxView : Panel
                 var dup = new MenuItem { Header = "Duplicate" };
                 dup.Click += (_, _) => _canvas.DuplicateBox(this);
                 menu.Items.Add(dup);
+
+                var size = new MenuItem { Header = "Text size" };
+                void SizeItem(string h, double s)
+                {
+                    var m = new MenuItem { Header = h };
+                    m.Click += (_, _) => SetFontScale(s);
+                    size.Items.Add(m);
+                }
+                SizeItem("Normal", 1.0);
+                SizeItem("Large", 1.4);
+                SizeItem("Title", 1.9);
+                menu.Items.Add(size);
+            }
+            if (_canvas.IsMindmap && plain)
+            {
+                var col = new MenuItem { Header = "Colour" };
+                void ColItem(string name, string? hex)
+                {
+                    var m = new MenuItem { Header = name };
+                    if (hex is not null)
+                        m.Icon = new Border
+                        {
+                            Width = 12, Height = 12, CornerRadius = new CornerRadius(3),
+                            Background = new SolidColorBrush(Color.Parse(hex)),
+                        };
+                    m.Click += (_, _) => _canvas.RecolorBox(this, hex);
+                    col.Items.Add(m);
+                }
+                ColItem("Default", null);
+                foreach (var (family, shades) in ViewModels.MainViewModel.NotebookPalette)
+                    ColItem(family, shades[2].Hex);
+                foreach (var (name, hex) in ViewModels.MainViewModel.GrayscaleShades)
+                    ColItem(name, hex);
+                menu.Items.Add(col);
             }
             if (Box.AttachPath is not null)
             {
@@ -850,7 +900,39 @@ internal sealed class NoteBoxView : Panel
             e.Handled = true;
         };
 
+        ApplyFontScale();
         RefreshChrome();
+    }
+
+    /// <summary>Mind-map keyboard shortcuts on a focused bubble: Tab spawns a linked child, Ctrl+D
+    /// duplicates. Both are swallowed so the editor doesn't also act on the key.</summary>
+    private void OnBubbleKey(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.D)
+        {
+            _canvas.DuplicateBox(this);
+            e.Handled = true;
+        }
+        else if (_canvas.IsMindmap && e.Key == Key.Tab && e.KeyModifiers == KeyModifiers.None)
+        {
+            _canvas.AddConnectedFrom(Box);
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>Apply this box's text-size multiplier to its editor (mind-map hierarchy).</summary>
+    private void ApplyFontScale()
+    {
+        double baseSize = Math.Clamp(RichTextEditor.EditorFontSizePref, 11, 24);
+        Editor.FontSize = baseSize * (Box.FontScale <= 0 ? 1.0 : Box.FontScale);
+    }
+
+    internal void SetFontScale(double scale)
+    {
+        Box.FontScale = scale;
+        ApplyFontScale();
+        _canvas.InvalidateMeasure();
+        _canvas.Document?.CommitGeometry();
     }
 
     internal void FocusEditor()
