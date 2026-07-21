@@ -679,16 +679,16 @@ internal sealed class NoteBoxView : Panel
     private readonly Border _gripBar;
     private readonly Border _close;
     private readonly TextBlock _closeGlyph;
-    // The close chip's resting look (differs bubble vs card); hover always flips to the red ✕.
+    // The close look (differs bubble vs card): resting + hover fills and glyph colour.
     private IBrush _closeRestBg = Brushes.Transparent;
     private IBrush _closeRestFg = Brushes.Gray;
+    private IBrush _closeHoverBg = CloseHoverBg;
     private readonly Border _resizeLeft;
     private readonly Border _resizeRight;
     private readonly Border _resizeTop;
     private readonly Border _resizeBottom;
     private readonly Border _resizeCorner;       // bottom-right
     private readonly Border _resizeCornerTL;
-    private readonly Border _resizeCornerTR;
     private readonly Border _resizeCornerBL;
     // mind-map: connect dots on the bubble's edges — drag one onto another bubble to link. Four
     // orthogonal (N/S/E/W) always, four diagonal (corners) when the toolbar toggle is on.
@@ -780,10 +780,18 @@ internal sealed class NoteBoxView : Panel
             HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top,
             Cursor = new Cursor(StandardCursorType.Hand),
         };
-        _close.PointerEntered += (_, _) => { _close.Background = CloseHoverBg; _closeGlyph.Foreground = Brushes.White; };
+        _close.PointerEntered += (_, _) => { _close.Background = _closeHoverBg; _closeGlyph.Foreground = Brushes.White; };
         _close.PointerExited += (_, _) => { _close.Background = _closeRestBg; _closeGlyph.Foreground = _closeRestFg; };
         _close.PointerPressed += (_, e) => e.Handled = true;      // don't start a grip drag from the ✕
         _close.PointerReleased += (_, e) => { _canvas.RequestDelete(this); e.Handled = true; };
+
+        // Overlay the close INSIDE the clipped chrome, so on a bubble the red tab follows the pill's
+        // rounded top-right corner (clip cuts it to the outline) instead of a chip poking past it.
+        _chrome.Child = null;                    // detach body so the panel can adopt it
+        var chromeContent = new Panel();
+        chromeContent.Children.Add(body);
+        chromeContent.Children.Add(_close);
+        _chrome.Child = chromeContent;
 
         // Edge strips inset from the ends so the corner squares below stay grabbable.
         Border EdgeStrip(HorizontalAlignment h, VerticalAlignment v, bool vertical, StandardCursorType cur) => new()
@@ -803,7 +811,6 @@ internal sealed class NoteBoxView : Panel
         _resizeTop = EdgeStrip(HorizontalAlignment.Stretch, VerticalAlignment.Top, false, StandardCursorType.SizeNorthSouth);
         _resizeBottom = EdgeStrip(HorizontalAlignment.Stretch, VerticalAlignment.Bottom, false, StandardCursorType.SizeNorthSouth);
         _resizeCornerTL = Corner(HorizontalAlignment.Left, VerticalAlignment.Top, StandardCursorType.TopLeftCorner);
-        _resizeCornerTR = Corner(HorizontalAlignment.Right, VerticalAlignment.Top, StandardCursorType.TopRightCorner);
         _resizeCornerBL = Corner(HorizontalAlignment.Left, VerticalAlignment.Bottom, StandardCursorType.BottomLeftCorner);
         _resizeCorner = Corner(HorizontalAlignment.Right, VerticalAlignment.Bottom, StandardCursorType.BottomRightCorner);
 
@@ -847,7 +854,7 @@ internal sealed class NoteBoxView : Panel
         AddPort(HorizontalAlignment.Left,   VerticalAlignment.Bottom, new Thickness(o, 0, 0, o), true,  "SW");
         AddPort(HorizontalAlignment.Right,  VerticalAlignment.Bottom, new Thickness(0, 0, o, o), true,  "SE");
 
-        Children.Add(_chrome);
+        Children.Add(_chrome);           // the ✕ lives inside the chrome (clipped); TR corner is the close
         Children.Add(_resizeLeft);
         Children.Add(_resizeRight);
         Children.Add(_resizeTop);
@@ -855,8 +862,6 @@ internal sealed class NoteBoxView : Panel
         Children.Add(_resizeCornerTL);
         Children.Add(_resizeCornerBL);
         Children.Add(_resizeCorner);
-        Children.Add(_resizeCornerTR);   // before _close so the ✕ wins the shared top-right corner
-        Children.Add(_close);
         foreach (var (port, _, _) in _ports) Children.Add(port);   // ports on top of the resize strip
 
         PointerEntered += (_, _) => { _hover = true; RefreshChrome(); };
@@ -875,7 +880,6 @@ internal sealed class NoteBoxView : Panel
         WireDrag(_resizeTop, Edge.Top);
         WireDrag(_resizeBottom, Edge.Bottom);
         WireDrag(_resizeCornerTL, Edge.Left | Edge.Top);
-        WireDrag(_resizeCornerTR, Edge.Right | Edge.Top);
         WireDrag(_resizeCornerBL, Edge.Left | Edge.Bottom);
         WireDrag(_resizeCorner, Edge.Right | Edge.Bottom);
 
@@ -1220,7 +1224,6 @@ internal sealed class NoteBoxView : Panel
         _resizeTop.IsVisible = full;
         _resizeCorner.IsVisible = full;
         _resizeCornerTL.IsVisible = full;
-        _resizeCornerTR.IsVisible = full;
         _resizeCornerBL.IsVisible = full;
 
         // Mind-map text bubbles read as circles: a pill (fully-rounded) chrome + matching grip top.
@@ -1243,13 +1246,16 @@ internal sealed class NoteBoxView : Panel
                 Editor.InvalidateVisual();
             }
             Editor.Margin = new Thickness(10, 3, 10, 20);
-            // Part of the grip "title bar": a bare ✕ seated on the bar line (ArrangeOverride places it
-            // at the top-right), no resting fill, red disc on hover — like a window title-bar close.
-            _close.Width = _close.Height = 14;
-            _close.CornerRadius = new CornerRadius(7);
-            _closeGlyph.FontSize = 8;
-            _closeRestBg = Brushes.Transparent;
-            _closeRestFg = new SolidColorBrush(Colors.White, 0.72);
+            // A red close tab flush in the top-right; it sits inside the clipped chrome, so the pill's
+            // rounded corner cuts its outer edge — a corner button that follows the bubble's curve.
+            _close.Width = _close.Height = 20;
+            _close.CornerRadius = new CornerRadius(5);
+            _close.Margin = default;
+            _closeGlyph.FontSize = 9;
+            _closeGlyph.Margin = new Thickness(0, 3, 3, 0);   // nudge the ✕ in, clear of the clipped corner
+            _closeRestBg = new SolidColorBrush(Color.Parse("#E24B4B"));
+            _closeRestFg = Brushes.White;
+            _closeHoverBg = new SolidColorBrush(Color.Parse("#F1352B"));
         }
         else if (normalBox)   // ordinary note card: the ✕ hugs the square corner as before
         {
@@ -1257,8 +1263,10 @@ internal sealed class NoteBoxView : Panel
             _close.CornerRadius = new CornerRadius(0, NoteCanvas.NoteRadiusPref, 0, 6);
             _close.Margin = default;
             _closeGlyph.FontSize = 7.5;
+            _closeGlyph.Margin = default;
             _closeRestBg = Brushes.Transparent;
             _closeRestFg = CloseFg;
+            _closeHoverBg = CloseHoverBg;
         }
         _close.Background = _closeRestBg;       // apply the resting look now the box kind is known
         _closeGlyph.Foreground = _closeRestFg;
@@ -1292,20 +1300,6 @@ internal sealed class NoteBoxView : Panel
         if (_canvas.IsMindmap)
         {
             PlaceDiagonalPorts(finalSize.Width, finalSize.Height);
-            bool bubble = Box.Divider is null && Box.ImagePath is null && Box.Table is null && Box.AttachPath is null;
-            if (bubble)
-            {
-                // Seat the ✕ on the grip "title bar" (vertically centred on it) and hug the pill's
-                // top-right as tightly as the rounded corner allows at the bar height.
-                const double gripH = 17, half = 7;
-                double cy = gripH / 2;
-                double radius = Math.Min(finalSize.Width, finalSize.Height) / 2;
-                double yTop = Math.Max(1, cy - half);
-                double ext = (finalSize.Width - radius) +
-                             Math.Sqrt(Math.Max(0, radius * radius - (radius - yTop) * (radius - yTop)));
-                double rightM = Math.Max(6, finalSize.Width - ext + 2);
-                _close.Margin = new Thickness(0, cy - half, rightM, 0);
-            }
         }
         return base.ArrangeOverride(finalSize);
     }

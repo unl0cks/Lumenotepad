@@ -759,13 +759,15 @@ public partial class MainView : UserControl
             TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis,
         });
 
-        // Every interactive control in the bar gets a springy hover/press animation.
+        // The LumenButton-themed buttons already animate via the theme (content scale + fade). Give the
+        // custom swatches/chips and checkboxes the SAME scale feel so the whole bar reads consistently.
         foreach (var child in MindmapBarContent.Children)
-            if (child is Button or CheckBox || (child is Border bd && bd.Cursor is not null))
+            if (child is CheckBox || (child is Border bd && bd.Cursor is not null))
                 AnimateHover((Control)child);
     }
 
-    /// <summary>Attach a springy scale animation on hover (grow) and press (dip) to a toolbar control.</summary>
+    /// <summary>Match the app's button motion: hover grows the control, press dips it, over the same
+    /// short transform transition the LumenButton theme uses.</summary>
     private static void AnimateHover(Control c)
     {
         c.RenderTransformOrigin = RelativePoint.Center;
@@ -775,14 +777,13 @@ public partial class MainView : UserControl
             new Avalonia.Animation.TransformOperationsTransition
             {
                 Property = Visual.RenderTransformProperty,
-                Duration = System.TimeSpan.FromMilliseconds(150),
-                Easing = new Avalonia.Animation.Easings.CubicEaseOut(),
+                Duration = System.TimeSpan.FromMilliseconds(130),
             },
         };
-        c.PointerEntered += (_, _) => c.RenderTransform = TransformOperations.Parse("scale(1.09)");
+        c.PointerEntered += (_, _) => c.RenderTransform = TransformOperations.Parse("scale(1.12)");
         c.PointerExited += (_, _) => c.RenderTransform = TransformOperations.Parse("scale(1)");
-        c.PointerPressed += (_, _) => c.RenderTransform = TransformOperations.Parse("scale(0.93)");
-        c.PointerReleased += (_, _) => c.RenderTransform = TransformOperations.Parse("scale(1.09)");
+        c.PointerPressed += (_, _) => c.RenderTransform = TransformOperations.Parse("scale(0.88)");
+        c.PointerReleased += (_, _) => c.RenderTransform = TransformOperations.Parse("scale(1.12)");
     }
 
     private Border MindmapSwatch(IBrush bg, string tip, double size = 22)
