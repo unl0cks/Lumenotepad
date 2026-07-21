@@ -721,6 +721,9 @@ internal sealed class NoteBoxView : Panel
             Child = body, CornerRadius = new CornerRadius(r),
             BorderThickness = new Thickness(1), BorderBrush = Brushes.Transparent,
             Background = Brushes.Transparent,
+            // Clip content (notably the full-width grip "title bar" fill) to the rounded outline, so it
+            // follows the pill's curved corners instead of overhanging them.
+            ClipToBounds = true,
         };
 
         _closeGlyph = new TextBlock
