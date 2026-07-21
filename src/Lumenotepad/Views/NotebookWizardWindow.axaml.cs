@@ -357,12 +357,13 @@ public partial class NotebookWizardWindow : Window
     }
 
     /// <summary>Re-sync the per-section pages editors with Step 1's current section list. Each section is
-    /// a single header row — a quiet muted group name on the left, a small subdued "Add page" on the
-    /// right — over its list of page-title rows. Keeps the noise down: no bold name echoing the page
-    /// field right below it, and no full-width blue button repeated under every section.</summary>
+    /// a bold heading (with a divider above it, so it clearly reads as the SECTION even when its page
+    /// shares the section's name) over its page-title rows, closed by ONE "Add page" — the exact structure
+    /// of the Step 1 sections editor, repeated per section.</summary>
     private void SyncStep2()
     {
         PagesEditors.Children.Clear();
+        bool first = true;
         foreach (var sd in _draft.Sections)
         {
             var rows = new StackPanel { Spacing = 6 };
@@ -404,37 +405,39 @@ public partial class NotebookWizardWindow : Window
                     row.Children.Add(remove);
                     rows.Children.Add(row);
                 }
+                // ONE "Add page" at the foot of this section's list — the exact analog of "Add section".
+                var add = new Button
+                {
+                    Theme = (ControlTheme)this.FindResource("LumenButton")!,
+                    Content = "Add page", FontSize = 12.5,
+                    Padding = new Avalonia.Thickness(12, 5),
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
+                    Margin = new Avalonia.Thickness(0, 2, 0, 0),
+                };
+                add.Click += (_, _) => { sd.AddPage($"Page {sd.PageTitles.Count + 1}"); Rebuild(); };
+                rows.Children.Add(add);
             }
             Rebuild();
 
-            // One header row per section: a quiet muted section name on the left, a small subdued
-            // "Add page" on the right — no full-width blue button repeated under every section, and the
-            // name reads as a group heading instead of a second copy of the page field below it.
-            var label = new TextBlock
+            // A clear SECTION heading: a divider above it (except the first) plus the bold section name,
+            // so it reads as "this is the section" even when the section's page happens to share its name
+            // — then the page fields and the single Add page below it.
+            var block = new StackPanel { Spacing = 6 };
+            if (!first)
+                block.Children.Add(new Border
+                {
+                    Height = 1, Background = this.FindResource("FrameBorderBrush") as IBrush,
+                    Opacity = 0.6, Margin = new Avalonia.Thickness(0, 6, 0, 6),
+                });
+            block.Children.Add(new TextBlock
             {
                 Text = string.IsNullOrWhiteSpace(sd.Name) ? "Section" : sd.Name,
-                FontSize = 11, FontWeight = FontWeight.SemiBold,
-                Foreground = this.FindResource("TextMutedBrush") as IBrush,
-                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                FontSize = 13.5, FontWeight = FontWeight.SemiBold,
                 TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis,
-            };
-            var add = new Button
-            {
-                Theme = (ControlTheme)this.FindResource("LumenButtonGray")!,
-                Content = "Add page", FontSize = 12, Padding = new Avalonia.Thickness(12, 4),
-                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-            };
-            add.Click += (_, _) => { sd.AddPage($"Page {sd.PageTitles.Count + 1}"); Rebuild(); };
-            var head = new Grid
-            {
-                ColumnDefinitions = new ColumnDefinitions("*,Auto"),
-                Margin = new Avalonia.Thickness(0, 10, 0, 4),
-            };
-            head.Children.Add(label);
-            Grid.SetColumn(add, 1);
-            head.Children.Add(add);
-
-            PagesEditors.Children.Add(new StackPanel { Spacing = 6, Children = { head, rows } });
+            });
+            block.Children.Add(rows);
+            PagesEditors.Children.Add(block);
+            first = false;
         }
     }
 }
