@@ -356,18 +356,19 @@ public partial class NotebookWizardWindow : Window
         return chip;
     }
 
-    /// <summary>Re-sync the per-section pages editors with Step 1's current section list.</summary>
+    /// <summary>Re-sync the per-section pages editors with Step 1's current section list. Mirrors the
+    /// Step 1 sections editor: each section is a quiet muted label (a group heading, not a bold echo of
+    /// the page name) over a list of page rows, closed by ONE small left-aligned "Add page" — instead of
+    /// a full-width button under every section.</summary>
     private void SyncStep2()
     {
         PagesEditors.Children.Clear();
         foreach (var sd in _draft.Sections)
         {
-            var header = new TextBlock
-            {
-                Text = string.IsNullOrWhiteSpace(sd.Name) ? "Section" : sd.Name,
-                FontSize = 12.5, FontWeight = FontWeight.SemiBold,
-            };
-            var rows = new StackPanel { Spacing = 4, Margin = new Avalonia.Thickness(0, 4, 0, 0) };
+            var header = new TextBlock { Text = string.IsNullOrWhiteSpace(sd.Name) ? "Section" : sd.Name };
+            header.Classes.Add("section");   // same small muted heading as NAME / COLOR / SECTIONS
+
+            var rows = new StackPanel { Spacing = 6, Margin = new Avalonia.Thickness(0, 2, 0, 0) };
             void Rebuild()
             {
                 rows.Children.Clear();
@@ -378,14 +379,15 @@ public partial class NotebookWizardWindow : Window
                     var title = new TextBox
                     {
                         Theme = (ControlTheme)this.FindResource("RoundedFieldTextBox")!,
-                        FontSize = 12.5, Text = sd.PageTitles[idx], PlaceholderText = "Page title",
+                        FontSize = 13, Text = sd.PageTitles[idx], PlaceholderText = "Page title",
                     };
                     title.TextChanged += (_, _) => sd.PageTitles[idx] = title.Text ?? "";
                     var remove = new Button
                     {
                         Theme = (ControlTheme)this.FindResource("IconButton")!,
-                        Width = 26, Height = 26, FontSize = 11, Content = "",
+                        Width = 28, Height = 28, FontSize = 12, Content = "",   // the ✕ glyph (was blank)
                         FontFamily = (FontFamily)this.FindResource("IconFont")!,
+                        VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
                     };
                     ToolTip.SetTip(remove, "Remove page");
                     remove.Click += async (_, _) =>
@@ -408,15 +410,16 @@ public partial class NotebookWizardWindow : Window
                 var add = new Button
                 {
                     Theme = (ControlTheme)this.FindResource("LumenButton")!,
-                    Content = "Add page", FontSize = 12,
+                    Content = "Add page", FontSize = 12.5,
                     Padding = new Avalonia.Thickness(12, 5),
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
+                    Margin = new Avalonia.Thickness(0, 2, 0, 0),
                 };
                 add.Click += (_, _) => { sd.AddPage($"Page {sd.PageTitles.Count + 1}"); Rebuild(); };
                 rows.Children.Add(add);
             }
             Rebuild();
-            var block = new StackPanel { Children = { header, rows } };
-            PagesEditors.Children.Add(block);
+            PagesEditors.Children.Add(new StackPanel { Children = { header, rows } });
         }
     }
 }
