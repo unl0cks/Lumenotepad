@@ -89,14 +89,18 @@ public sealed class SmoothScroll
         _top?.RequestAnimationFrame(Frame);            // one callback per frame — re-arm for the next
     }
 
-    /// <summary>True when the wheel is over a nested scrollable between the source and our ScrollViewer,
-    /// so we leave the event alone and let that inner control scroll natively.</summary>
+    /// <summary>True when the wheel is over a nested scrollable that can ACTUALLY scroll vertically, so
+    /// we leave the event alone and let that inner control scroll natively. The vertical-overflow check
+    /// is essential: every TextBox carries its own inner ScrollViewer that does NOT scroll vertically —
+    /// deferring to those let the native line-jump fire alongside our smooth ease over dense TextBox
+    /// rows (the Customize window), and the two fought into a ~50px stutter (owner report).</summary>
     private bool OverInnerScrollable(object? source)
     {
         var v = source as Visual;
         while (v is not null && !ReferenceEquals(v, _sv))
         {
-            if (v is ScrollViewer) return true;        // e.g. the ScrollViewer inside the fonts ListBox
+            if (v is ScrollViewer inner && inner.Extent.Height - inner.Viewport.Height > 1)
+                return true;                           // a genuinely scrollable inner list (e.g. the fonts checklist)
             v = v.GetVisualParent();
         }
         return false;
