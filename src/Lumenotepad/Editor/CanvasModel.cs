@@ -133,21 +133,32 @@ public sealed class NoteBox
 /// history (<see cref="Trash"/>, newest first) that boxes can be restored from. <see cref="Changed"/>
 /// fires on add/remove/trash/restore, geometry commits, and any edit inside any live box's document —
 /// one hook drives the page's dirty-tracking/autosave.</summary>
+/// <summary>One mind-map connector: the two bubbles it joins and the compass edge each end anchors to
+/// (the connect port it was drawn from / dropped on), so the line leaves and arrives at the right edge.</summary>
+public sealed class MindLink
+{
+    public NoteBox A;
+    public NoteBox B;
+    public string DirA;
+    public string DirB;
+    public MindLink(NoteBox a, NoteBox b, string dirA, string dirB) { A = a; B = b; DirA = dirA; DirB = dirB; }
+}
+
 public sealed class CanvasDocument
 {
     public List<NoteBox> Boxes { get; } = new();
     public List<NoteBox> Trash { get; } = new();
 
-    /// <summary>Mindmap links (M9 Part 5): undirected box pairs, created by dropping one bubble
-    /// onto another while the page's style is Mindmap. Object references — a removed or trashed
-    /// box takes its links with it (a restore comes back unlinked).</summary>
-    public List<(NoteBox A, NoteBox B)> Links { get; } = new();
+    /// <summary>Mind-map links: box pairs, each end anchored to a compass edge ("N"/"S"/"E"/"W" +
+    /// diagonals) — the port the connector was drawn from / dropped on. Object references — a removed
+    /// or trashed box takes its links with it (a restore comes back unlinked).</summary>
+    public List<MindLink> Links { get; } = new();
 
     public event Action? Changed;
 
-    /// <summary>Link two boxes, or UNLINK them when the link already exists (drop again to undo).
-    /// Returns true when the pair is linked after the call.</summary>
-    public bool ToggleLink(NoteBox a, NoteBox b)
+    /// <summary>Link two boxes with the given edge anchors, or UNLINK them when a link already exists
+    /// (drag onto a linked bubble to undo). Returns true when the pair is linked after the call.</summary>
+    public bool ToggleLink(NoteBox a, NoteBox b, string dirA = "E", string dirB = "W")
     {
         if (ReferenceEquals(a, b)) return false;
         int i = Links.FindIndex(l =>
@@ -159,7 +170,7 @@ public sealed class CanvasDocument
             Changed?.Invoke();
             return false;
         }
-        Links.Add((a, b));
+        Links.Add(new MindLink(a, b, dirA, dirB));
         Changed?.Invoke();
         return true;
     }

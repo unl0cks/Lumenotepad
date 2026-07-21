@@ -35,8 +35,18 @@ public static class CanvasDocJson
         [JsonPropertyName("v")] public int V { get; set; } = 2;
         [JsonPropertyName("boxes")] public List<BoxDto> Boxes { get; set; } = new();
         [JsonPropertyName("trash")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<BoxDto>? Trash { get; set; }
-        /// <summary>Mindmap links as BOX-INDEX pairs into <see cref="Boxes"/> (M9 Part 5).</summary>
+        /// <summary>LEGACY mind-map links as BOX-INDEX pairs (read-only migration; superseded by mlinks).</summary>
         [JsonPropertyName("links")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<int[]>? Links { get; set; }
+        /// <summary>Mind-map links with edge anchors — box indices + compass dirs.</summary>
+        [JsonPropertyName("mlinks")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<LinkDto>? MLinks { get; set; }
+    }
+
+    private sealed class LinkDto
+    {
+        [JsonPropertyName("a")] public int A { get; set; }
+        [JsonPropertyName("b")] public int B { get; set; }
+        [JsonPropertyName("da")] public string Da { get; set; } = "E";
+        [JsonPropertyName("db")] public string Db { get; set; } = "W";
     }
 
     private static BoxDto ToDto(NoteBox b) => new()
@@ -70,10 +80,13 @@ public static class CanvasDocJson
         {
             Boxes = canvas.Boxes.Select(ToDto).ToList(),
             Trash = canvas.Trash.Count > 0 ? canvas.Trash.Select(ToDto).ToList() : null,
-            Links = canvas.Links.Count > 0
+            MLinks = canvas.Links.Count > 0
                 ? canvas.Links
-                    .Select(l => new[] { canvas.Boxes.IndexOf(l.A), canvas.Boxes.IndexOf(l.B) })
-                    .Where(p => p[0] >= 0 && p[1] >= 0)
+                    .Select(l => new LinkDto
+                    {
+                        A = canvas.Boxes.IndexOf(l.A), B = canvas.Boxes.IndexOf(l.B), Da = l.DirA, Db = l.DirB,
+                    })
+                    .Where(p => p.A >= 0 && p.B >= 0)
                     .ToList()
                 : null,
         };
@@ -99,13 +112,15 @@ public static class CanvasDocJson
                     if (dto.Trash is not null)                       // trash docs hook on restore, not here
                         foreach (var b in dto.Trash)
                             canvas.Trash.Add(FromDto(b));
-                    if (dto.Links is not null)                       // invalid/out-of-range pairs ignored
+                    bool InRange(int x) => x >= 0 && x < canvas.Boxes.Count;
+                    if (dto.MLinks is not null)                      // new format: indices + edge anchors
+                        foreach (var l in dto.MLinks)
+                            if (InRange(l.A) && InRange(l.B) && l.A != l.B)
+                                canvas.Links.Add(new MindLink(canvas.Boxes[l.A], canvas.Boxes[l.B], l.Da, l.Db));
+                    if (dto.MLinks is null && dto.Links is not null)  // legacy pairs → default E↔W anchors
                         foreach (var pair in dto.Links)
-                            if (pair is { Length: 2 } &&
-                                pair[0] >= 0 && pair[0] < canvas.Boxes.Count &&
-                                pair[1] >= 0 && pair[1] < canvas.Boxes.Count &&
-                                pair[0] != pair[1])
-                                canvas.Links.Add((canvas.Boxes[pair[0]], canvas.Boxes[pair[1]]));
+                            if (pair is { Length: 2 } && InRange(pair[0]) && InRange(pair[1]) && pair[0] != pair[1])
+                                canvas.Links.Add(new MindLink(canvas.Boxes[pair[0]], canvas.Boxes[pair[1]], "E", "W"));
                 }
                 return canvas;
             }

@@ -192,10 +192,12 @@ public sealed class NoteCanvas : Panel
     /// <summary>The active bubble's colour, if a bubble is selected (for the toolbar's ring).</summary>
     public string? ActiveBubbleColor => ActiveBubble()?.Box.Color;
 
-    /// <summary>Connect-port drag started on <paramref name="from"/> — begin the rubber-band line.</summary>
-    internal void BeginLink(NoteBoxView from, Point canvasPt)
+    /// <summary>Connect-port drag started on <paramref name="from"/>'s <paramref name="dir"/> edge —
+    /// begin the rubber-band line from that edge.</summary>
+    internal void BeginLink(NoteBoxView from, string dir, Point canvasPt)
     {
         _links.PendingSource = from.Box;
+        _links.PendingSourceDir = dir;
         _links.PendingCursor = canvasPt;
         _links.InvalidateVisual();
     }
@@ -213,13 +215,15 @@ public sealed class NoteCanvas : Panel
     internal void EndLink(Point canvasPt)
     {
         var src = _links.PendingSource;
+        string srcDir = _links.PendingSourceDir;
         _links.PendingSource = null;
         _links.InvalidateVisual();
         if (src is null || _doc is null) return;
         foreach (var child in Children)
             if (child is NoteBoxView v && !ReferenceEquals(v.Box, src) && v.Bounds.Contains(canvasPt))
             {
-                _doc.ToggleLink(src, v.Box);
+                string dstDir = LinkLayer.NearestDir(v.Bounds, canvasPt);   // anchor at the dropped edge
+                _doc.ToggleLink(src, v.Box, srcDir, dstDir);
                 _links.InvalidateVisual();
                 _doc.CommitGeometry();       // links persist alongside geometry
                 break;
@@ -632,7 +636,7 @@ internal sealed class NoteBoxView : Panel
 
         // Mind-map connect ports on the bubble's edges: drag one onto another bubble to link them.
         const double o = -7;   // half the 14px dot, so it straddles the edge
-        void AddPort(HorizontalAlignment h, VerticalAlignment vv, Thickness m, bool diagonal)
+        void AddPort(HorizontalAlignment h, VerticalAlignment vv, Thickness m, bool diagonal, string dir)
         {
             var port = new Border
             {
@@ -646,7 +650,7 @@ internal sealed class NoteBoxView : Panel
             {
                 if (!e.GetCurrentPoint(port).Properties.IsLeftButtonPressed) return;
                 _linking = true;
-                _canvas.BeginLink(this, e.GetPosition(_canvas));
+                _canvas.BeginLink(this, dir, e.GetPosition(_canvas));
                 e.Pointer.Capture(port);
                 e.Handled = true;
             };
@@ -661,14 +665,14 @@ internal sealed class NoteBoxView : Panel
             };
             _ports.Add((port, diagonal));
         }
-        AddPort(HorizontalAlignment.Center, VerticalAlignment.Top,    new Thickness(0, o, 0, 0), false);  // N
-        AddPort(HorizontalAlignment.Center, VerticalAlignment.Bottom, new Thickness(0, 0, 0, o), false);  // S
-        AddPort(HorizontalAlignment.Left,   VerticalAlignment.Center, new Thickness(o, 0, 0, 0), false);  // W
-        AddPort(HorizontalAlignment.Right,  VerticalAlignment.Center, new Thickness(0, 0, o, 0), false);  // E
-        AddPort(HorizontalAlignment.Left,   VerticalAlignment.Top,    new Thickness(o, o, 0, 0), true);   // NW
-        AddPort(HorizontalAlignment.Right,  VerticalAlignment.Top,    new Thickness(0, o, o, 0), true);   // NE
-        AddPort(HorizontalAlignment.Left,   VerticalAlignment.Bottom, new Thickness(o, 0, 0, o), true);   // SW
-        AddPort(HorizontalAlignment.Right,  VerticalAlignment.Bottom, new Thickness(0, 0, o, o), true);   // SE
+        AddPort(HorizontalAlignment.Center, VerticalAlignment.Top,    new Thickness(0, o, 0, 0), false, "N");
+        AddPort(HorizontalAlignment.Center, VerticalAlignment.Bottom, new Thickness(0, 0, 0, o), false, "S");
+        AddPort(HorizontalAlignment.Left,   VerticalAlignment.Center, new Thickness(o, 0, 0, 0), false, "W");
+        AddPort(HorizontalAlignment.Right,  VerticalAlignment.Center, new Thickness(0, 0, o, 0), false, "E");
+        AddPort(HorizontalAlignment.Left,   VerticalAlignment.Top,    new Thickness(o, o, 0, 0), true,  "NW");
+        AddPort(HorizontalAlignment.Right,  VerticalAlignment.Top,    new Thickness(0, o, o, 0), true,  "NE");
+        AddPort(HorizontalAlignment.Left,   VerticalAlignment.Bottom, new Thickness(o, 0, 0, o), true,  "SW");
+        AddPort(HorizontalAlignment.Right,  VerticalAlignment.Bottom, new Thickness(0, 0, o, o), true,  "SE");
 
         Children.Add(_chrome);
         Children.Add(_resizeRight);
@@ -956,6 +960,18 @@ internal sealed class NoteBoxView : Panel
             double rad = bubble ? 999 : NoteCanvas.NoteRadiusPref;
             _chrome.CornerRadius = new CornerRadius(rad);
             _grip.CornerRadius = new CornerRadius(rad, rad, 0, 0);
+        }
+        if (bubble)
+        {
+            // Centre the label: horizontally via paragraph Align, vertically via a bottom margin that
+            // balances the grip (17) + top inset (3) sitting above the text, so it sits mid-bubble.
+            if (Box.Doc.Paragraphs.Any(p => p.Align != TextAlign.Center))
+            {
+                foreach (var p in Box.Doc.Paragraphs) p.Align = TextAlign.Center;
+                Editor.InvalidateMeasure();
+                Editor.InvalidateVisual();
+            }
+            Editor.Margin = new Thickness(10, 3, 10, 20);
         }
 
         // Connect ports show while the bubble is active or a link is in flight; the diagonals wait for
