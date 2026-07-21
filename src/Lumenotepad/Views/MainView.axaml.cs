@@ -758,6 +758,31 @@ public partial class MainView : UserControl
             Foreground = this.FindResource("TextMutedBrush") as IBrush,
             TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis,
         });
+
+        // Every interactive control in the bar gets a springy hover/press animation.
+        foreach (var child in MindmapBarContent.Children)
+            if (child is Button or CheckBox || (child is Border bd && bd.Cursor is not null))
+                AnimateHover((Control)child);
+    }
+
+    /// <summary>Attach a springy scale animation on hover (grow) and press (dip) to a toolbar control.</summary>
+    private static void AnimateHover(Control c)
+    {
+        c.RenderTransformOrigin = RelativePoint.Center;
+        c.RenderTransform = TransformOperations.Parse("scale(1)");
+        c.Transitions = new Avalonia.Animation.Transitions
+        {
+            new Avalonia.Animation.TransformOperationsTransition
+            {
+                Property = Visual.RenderTransformProperty,
+                Duration = System.TimeSpan.FromMilliseconds(150),
+                Easing = new Avalonia.Animation.Easings.CubicEaseOut(),
+            },
+        };
+        c.PointerEntered += (_, _) => c.RenderTransform = TransformOperations.Parse("scale(1.09)");
+        c.PointerExited += (_, _) => c.RenderTransform = TransformOperations.Parse("scale(1)");
+        c.PointerPressed += (_, _) => c.RenderTransform = TransformOperations.Parse("scale(0.93)");
+        c.PointerReleased += (_, _) => c.RenderTransform = TransformOperations.Parse("scale(1.09)");
     }
 
     private Border MindmapSwatch(IBrush bg, string tip, double size = 22)

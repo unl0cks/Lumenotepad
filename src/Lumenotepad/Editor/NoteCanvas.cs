@@ -382,6 +382,43 @@ public sealed class NoteCanvas : Panel
             RestoreBox(box, p.X - 11, p.Y - 16);
             e.Handled = true;
         });
+
+        ContextRequested += OnCanvasContext;     // right-click the bare canvas for a general menu
+    }
+
+    /// <summary>The general right-click menu on empty canvas (bubbles/editors keep their own). Offers the
+    /// page-appropriate "add here" at the click point, plus a quick connect when a bubble is selected.</summary>
+    private void OnCanvasContext(object? sender, Avalonia.Input.ContextRequestedEventArgs e)
+    {
+        if (_doc is null || !ReferenceEquals(e.Source, this)) return;   // only true bare-canvas right-clicks
+        var pos = e.TryGetPosition(this, out var p) ? p : new Point(80, 80);
+        var menu = new ContextMenu();
+        void Item(string header, Action act)
+        {
+            var m = new MenuItem { Header = header };
+            m.Click += (_, _) => act();
+            menu.Items.Add(m);
+        }
+        if (_pageStyle == PageStyles.Mindmap)
+        {
+            Item("Add bubble here", () => AddBubble(pos.X, pos.Y));
+            if (ActiveBubble() is { } ab)
+                Item("Add connected to selected", () => AddConnectedFrom(ab.Box));
+        }
+        else
+        {
+            Item("Add note here", () =>
+            {
+                double bx = pos.X - 11, by = pos.Y - 16;
+                if (SnapToGrid) { bx = Math.Max(0, GridMath.Snap(bx)); by = Math.Max(0, GridMath.Snap(by)); }
+                var v = AddBoxView(_doc.AddBox(bx, by, Math.Clamp(RichTextEditor.NewNoteWidthPref, 240, 640)));
+                Dispatcher.UIThread.Post(v.FocusEditor, DispatcherPriority.Background);
+            });
+        }
+        if (menu.Items.Count == 0) return;
+        Views.MenuFx.Attach(menu);
+        menu.Open(this);
+        e.Handled = true;
     }
 
     // A quiet starter hint on empty pages, so a blank canvas never feels dead. A child element
@@ -1206,15 +1243,17 @@ internal sealed class NoteBoxView : Panel
                 Editor.InvalidateVisual();
             }
             Editor.Margin = new Thickness(10, 3, 10, 20);
-            // A small round close chip that reads as a real button (subtle fill); ArrangeOverride sits
-            // it on the pill's rounded top-right corner (inset scales with the corner radius).
-            _close.CornerRadius = new CornerRadius(9);
-            _closeGlyph.FontSize = 8.5;
-            _closeRestBg = new SolidColorBrush(Colors.White, 0.16);
-            _closeRestFg = new SolidColorBrush(Colors.White, 0.85);
+            // Part of the grip "title bar": a bare ✕ seated on the bar line (ArrangeOverride places it
+            // at the top-right), no resting fill, red disc on hover — like a window title-bar close.
+            _close.Width = _close.Height = 14;
+            _close.CornerRadius = new CornerRadius(7);
+            _closeGlyph.FontSize = 8;
+            _closeRestBg = Brushes.Transparent;
+            _closeRestFg = new SolidColorBrush(Colors.White, 0.72);
         }
         else if (normalBox)   // ordinary note card: the ✕ hugs the square corner as before
         {
+            _close.Width = _close.Height = 17;
             _close.CornerRadius = new CornerRadius(0, NoteCanvas.NoteRadiusPref, 0, 6);
             _close.Margin = default;
             _closeGlyph.FontSize = 7.5;
@@ -1256,11 +1295,16 @@ internal sealed class NoteBoxView : Panel
             bool bubble = Box.Divider is null && Box.ImagePath is null && Box.Table is null && Box.AttachPath is null;
             if (bubble)
             {
-                // Ride the ✕ on the rounded top-right corner: step in along the 45° diagonal by the
-                // corner radius so the whole chip stays inside the pill at any bubble height.
+                // Seat the ✕ on the grip "title bar" (vertically centred on it) and hug the pill's
+                // top-right as tightly as the rounded corner allows at the bar height.
+                const double gripH = 17, half = 7;
+                double cy = gripH / 2;
                 double radius = Math.Min(finalSize.Width, finalSize.Height) / 2;
-                double m = Math.Max(3, radius - Math.Max(0, radius - 12) * 0.7071 - 8.5);
-                _close.Margin = new Thickness(0, m, m, 0);
+                double yTop = Math.Max(1, cy - half);
+                double ext = (finalSize.Width - radius) +
+                             Math.Sqrt(Math.Max(0, radius * radius - (radius - yTop) * (radius - yTop)));
+                double rightM = Math.Max(6, finalSize.Width - ext + 2);
+                _close.Margin = new Thickness(0, cy - half, rightM, 0);
             }
         }
         return base.ArrangeOverride(finalSize);
