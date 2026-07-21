@@ -132,6 +132,7 @@ public sealed class NoteCanvas : Panel
         _mode = mode;
         _guides.SetStyles(gridStyle, pageStyle, mode);
         EnsureRegions();               // tag legacy structured starters so they dock like fresh ones
+        RefreshMindmapPorts();         // views built before the style was set pick up the bubble look now
         InvalidateMeasure();
     }
 
@@ -155,6 +156,16 @@ public sealed class NoteCanvas : Panel
 
     /// <summary>The colour new bubbles take (and the last colour picked in the mind-map toolbar).</summary>
     public string? MindmapColor { get; set; }
+
+    /// <summary>When true, bubbles also show the four diagonal (corner) connect ports (toolbar toggle).</summary>
+    public bool MindmapDiagonalPorts { get; set; }
+
+    /// <summary>Repaint every bubble's chrome — after the diagonal-ports toggle flips, or the style set.</summary>
+    public void RefreshMindmapPorts()
+    {
+        foreach (var child in Children)
+            if (child is NoteBoxView v) v.RefreshChrome();
+    }
 
     /// <summary>Drop a new bubble centred on (<paramref name="cx"/>,<paramref name="cy"/>) and focus it.</summary>
     public void AddBubble(double cx, double cy)
@@ -478,6 +489,7 @@ public sealed class NoteCanvas : Panel
         Dispatcher.UIThread.Post(() =>
         {
             if (_doc is null || !_doc.Boxes.Contains(view.Box)) return;
+            if (_pageStyle == PageStyles.Mindmap) return;   // mind-map bubbles persist even when empty
             if (!view.Box.IsEmpty || view.Box.Locked || view.IsKeyboardFocusWithin) return;
             DeleteBoxPermanently(view);
         }, DispatcherPriority.Background);
@@ -511,7 +523,9 @@ internal sealed class NoteBoxView : Panel
     private readonly Border _resizeRight;
     private readonly Border _resizeBottom;
     private readonly Border _resizeCorner;
-    private readonly Border _connectPort;      // mind-map: drag this dot onto another bubble to link
+    // mind-map: connect dots on the bubble's edges — drag one onto another bubble to link. Four
+    // orthogonal (N/S/E/W) always, four diagonal (corners) when the toolbar toggle is on.
+    private readonly System.Collections.Generic.List<(Border Port, bool Diagonal)> _ports = new();
     private bool _linking;
     private bool _hover;
 
@@ -616,46 +630,52 @@ internal sealed class NoteBoxView : Panel
             Background = Brushes.Transparent, Cursor = new Cursor(StandardCursorType.BottomRightCorner),
         };
 
-        // Mind-map connect port: a dot on the right edge. Drag it onto another bubble to link them.
-        _connectPort = new Border
+        // Mind-map connect ports on the bubble's edges: drag one onto another bubble to link them.
+        const double o = -7;   // half the 14px dot, so it straddles the edge
+        void AddPort(HorizontalAlignment h, VerticalAlignment vv, Thickness m, bool diagonal)
         {
-            Width = 15, Height = 15, CornerRadius = new CornerRadius(8),
-            BorderThickness = new Thickness(2), BorderBrush = Brushes.White,
-            Background = B(t.Accent),
-            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, -8, 0), IsVisible = false,
-            Cursor = new Cursor(StandardCursorType.Cross),
-        };
-        ToolTip.SetTip(_connectPort, "Drag onto another bubble to connect");
-        _connectPort.PointerPressed += (_, e) =>
-        {
-            if (!e.GetCurrentPoint(_connectPort).Properties.IsLeftButtonPressed) return;
-            _linking = true;
-            _canvas.BeginLink(this, e.GetPosition(_canvas));
-            e.Pointer.Capture(_connectPort);
-            e.Handled = true;
-        };
-        _connectPort.PointerMoved += (_, e) =>
-        {
-            if (!_linking) return;
-            _canvas.UpdateLink(e.GetPosition(_canvas));
-            e.Handled = true;
-        };
-        _connectPort.PointerReleased += (_, e) =>
-        {
-            if (!_linking) return;
-            _linking = false;
-            e.Pointer.Capture(null);
-            _canvas.EndLink(e.GetPosition(_canvas));
-            e.Handled = true;
-        };
+            var port = new Border
+            {
+                Width = 14, Height = 14, CornerRadius = new CornerRadius(7),
+                BorderThickness = new Thickness(2), BorderBrush = Brushes.White, Background = B(t.Accent),
+                HorizontalAlignment = h, VerticalAlignment = vv, Margin = m, IsVisible = false,
+                Cursor = new Cursor(StandardCursorType.Cross),
+            };
+            ToolTip.SetTip(port, "Drag onto another bubble to connect");
+            port.PointerPressed += (_, e) =>
+            {
+                if (!e.GetCurrentPoint(port).Properties.IsLeftButtonPressed) return;
+                _linking = true;
+                _canvas.BeginLink(this, e.GetPosition(_canvas));
+                e.Pointer.Capture(port);
+                e.Handled = true;
+            };
+            port.PointerMoved += (_, e) => { if (_linking) { _canvas.UpdateLink(e.GetPosition(_canvas)); e.Handled = true; } };
+            port.PointerReleased += (_, e) =>
+            {
+                if (!_linking) return;
+                _linking = false;
+                e.Pointer.Capture(null);
+                _canvas.EndLink(e.GetPosition(_canvas));
+                e.Handled = true;
+            };
+            _ports.Add((port, diagonal));
+        }
+        AddPort(HorizontalAlignment.Center, VerticalAlignment.Top,    new Thickness(0, o, 0, 0), false);  // N
+        AddPort(HorizontalAlignment.Center, VerticalAlignment.Bottom, new Thickness(0, 0, 0, o), false);  // S
+        AddPort(HorizontalAlignment.Left,   VerticalAlignment.Center, new Thickness(o, 0, 0, 0), false);  // W
+        AddPort(HorizontalAlignment.Right,  VerticalAlignment.Center, new Thickness(0, 0, o, 0), false);  // E
+        AddPort(HorizontalAlignment.Left,   VerticalAlignment.Top,    new Thickness(o, o, 0, 0), true);   // NW
+        AddPort(HorizontalAlignment.Right,  VerticalAlignment.Top,    new Thickness(0, o, o, 0), true);   // NE
+        AddPort(HorizontalAlignment.Left,   VerticalAlignment.Bottom, new Thickness(o, 0, 0, o), true);   // SW
+        AddPort(HorizontalAlignment.Right,  VerticalAlignment.Bottom, new Thickness(0, 0, o, o), true);   // SE
 
         Children.Add(_chrome);
         Children.Add(_resizeRight);
         Children.Add(_resizeBottom);
         Children.Add(_resizeCorner);
         Children.Add(_close);
-        Children.Add(_connectPort);   // last = on top of the resize strip
+        foreach (var (port, _) in _ports) Children.Add(port);   // ports on top of the resize strip
 
         PointerEntered += (_, _) => { _hover = true; RefreshChrome(); };
         PointerExited += (_, _) => { _hover = false; RefreshChrome(); };
@@ -928,14 +948,26 @@ internal sealed class NoteBoxView : Panel
         _resizeBottom.IsVisible = resize && Box.Divider != "h";
         _resizeCorner.IsVisible = resize && Box.Divider is null;
 
-        // Connect port: only on mind-map text bubbles, while the bubble is active or a link is in flight.
-        bool bubble = _canvas.IsMindmap && Box.Divider is null && Box.ImagePath is null
-                      && Box.Table is null && Box.AttachPath is null;
-        _connectPort.IsVisible = bubble && (active || _linking);
-        if (_connectPort.IsVisible)
-            _connectPort.Background = Box.Color is { } ph && Color.TryParse(ph, out var pc)
-                ? new SolidColorBrush(pc)
-                : new SolidColorBrush(Color.Parse(Services.ThemeManager.Current.Accent));
+        // Mind-map text bubbles read as circles: a pill (fully-rounded) chrome + matching grip top.
+        bool normalBox = Box.Divider is null && Box.ImagePath is null && Box.Table is null && Box.AttachPath is null;
+        bool bubble = _canvas.IsMindmap && normalBox;
+        if (normalBox)   // leave divider/image/attachment/table chrome radii as their constructor set them
+        {
+            double rad = bubble ? 999 : NoteCanvas.NoteRadiusPref;
+            _chrome.CornerRadius = new CornerRadius(rad);
+            _grip.CornerRadius = new CornerRadius(rad, rad, 0, 0);
+        }
+
+        // Connect ports show while the bubble is active or a link is in flight; the diagonals wait for
+        // the toolbar toggle. All wear the bubble colour (or accent) so the map's wiring reads clearly.
+        bool showPorts = bubble && (active || _linking);
+        var portBrush = Box.Color is { } ph && Color.TryParse(ph, out var pc)
+            ? new SolidColorBrush(pc) : new SolidColorBrush(Color.Parse(Services.ThemeManager.Current.Accent));
+        foreach (var (port, diagonal) in _ports)
+        {
+            port.IsVisible = showPorts && (!diagonal || _canvas.MindmapDiagonalPorts);
+            if (port.IsVisible) port.Background = portBrush;
+        }
     }
 
     private Point _dragStart;

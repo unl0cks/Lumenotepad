@@ -654,6 +654,24 @@ public partial class MainView : UserControl
             Width = 1, Height = 20, Margin = new Thickness(2, 0),
             Background = this.FindResource("FrameBorderBrush") as IBrush, Opacity = 0.7,
         });
+        var diag = new CheckBox
+        {
+            Content = "Diagonal points", FontSize = 12,
+            IsChecked = PageCanvas.MindmapDiagonalPorts, VerticalAlignment = VerticalAlignment.Center,
+        };
+        ToolTip.SetTip(diag, "Also show the four corner connect dots on each bubble");
+        diag.IsCheckedChanged += (_, _) =>
+        {
+            PageCanvas.MindmapDiagonalPorts = diag.IsChecked == true;
+            PageCanvas.RefreshMindmapPorts();
+        };
+        MindmapBarContent.Children.Add(diag);
+
+        MindmapBarContent.Children.Add(new Border
+        {
+            Width = 1, Height = 20, Margin = new Thickness(2, 0),
+            Background = this.FindResource("FrameBorderBrush") as IBrush, Opacity = 0.7,
+        });
         MindmapBarContent.Children.Add(new TextBlock
         {
             Text = "Double-click the canvas to add a bubble · drag a bubble's dot onto another to connect",
