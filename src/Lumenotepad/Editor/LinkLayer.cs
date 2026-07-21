@@ -14,7 +14,13 @@ public sealed class LinkLayer : Control
     internal CanvasDocument? Doc;
     internal Func<NoteBox, Rect?>? Resolve;
 
+    /// <summary>While a connect-port drag is in flight: the bubble the line starts at, and the live
+    /// cursor point (canvas coords). NoteCanvas sets these and invalidates the layer per move.</summary>
+    internal NoteBox? PendingSource;
+    internal Point PendingCursor;
+
     private IPen _pen = new Pen(Brushes.Gray, 2);
+    private IPen _pendingPen = new Pen(Brushes.Gray, 2);
 
     public LinkLayer() => IsHitTestVisible = false;
 
@@ -25,14 +31,20 @@ public sealed class LinkLayer : Control
         _pen = new Pen(
             new SolidColorBrush(Color.Parse(Services.ThemePalettes.Alpha(accent, 0x8C))),
             2, lineCap: PenLineCap.Round);
+        _pendingPen = new Pen(
+            new SolidColorBrush(Color.Parse(Services.ThemePalettes.Alpha(accent, 0xC0))),
+            2.2, lineCap: PenLineCap.Round) { DashStyle = new DashStyle(new double[] { 3, 3 }, 0) };
         InvalidateVisual();
     }
 
     public override void Render(DrawingContext ctx)
     {
-        if (Doc is null || Doc.Links.Count == 0 || Resolve is null) return;
-        foreach (var (a, b) in Doc.Links)
-            if (Resolve(a) is { } ra && Resolve(b) is { } rb)
-                ctx.DrawLine(_pen, ra.Center, rb.Center);
+        if (Resolve is null) return;
+        if (Doc is not null)
+            foreach (var (a, b) in Doc.Links)
+                if (Resolve(a) is { } ra && Resolve(b) is { } rb)
+                    ctx.DrawLine(_pen, ra.Center, rb.Center);
+        if (PendingSource is { } src && Resolve(src) is { } rs)
+            ctx.DrawLine(_pendingPen, rs.Center, PendingCursor);   // rubber-band while connecting
     }
 }

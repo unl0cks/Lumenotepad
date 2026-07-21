@@ -181,6 +181,40 @@ public sealed class NoteCanvas : Panel
     /// <summary>The active bubble's colour, if a bubble is selected (for the toolbar's ring).</summary>
     public string? ActiveBubbleColor => ActiveBubble()?.Box.Color;
 
+    /// <summary>Connect-port drag started on <paramref name="from"/> — begin the rubber-band line.</summary>
+    internal void BeginLink(NoteBoxView from, Point canvasPt)
+    {
+        _links.PendingSource = from.Box;
+        _links.PendingCursor = canvasPt;
+        _links.InvalidateVisual();
+    }
+
+    /// <summary>The connect-port drag moved — follow the cursor.</summary>
+    internal void UpdateLink(Point canvasPt)
+    {
+        _links.PendingCursor = canvasPt;
+        _links.InvalidateVisual();
+    }
+
+    /// <summary>The connect-port drag ended — link the source to whatever bubble is under the cursor
+    /// (dropping on the source or empty canvas just cancels; dropping on an already-linked bubble
+    /// unlinks). Persists so the connector survives a reload.</summary>
+    internal void EndLink(Point canvasPt)
+    {
+        var src = _links.PendingSource;
+        _links.PendingSource = null;
+        _links.InvalidateVisual();
+        if (src is null || _doc is null) return;
+        foreach (var child in Children)
+            if (child is NoteBoxView v && !ReferenceEquals(v.Box, src) && v.Bounds.Contains(canvasPt))
+            {
+                _doc.ToggleLink(src, v.Box);
+                _links.InvalidateVisual();
+                _doc.CommitGeometry();       // links persist alongside geometry
+                break;
+            }
+    }
+
     /// <summary>Set the mind-map colour: the default for new bubbles, and (when one is selected) applied
     /// to that bubble immediately.</summary>
     public void SetBubbleColor(string? color)
@@ -432,35 +466,10 @@ public sealed class NoteCanvas : Panel
         InvalidateMeasure();
     }
 
-    /// <summary>Mindmap linking (M9 Part 5): a MOVE drag that ends with the bubble overlapping
-    /// another toggles a link between them (drop again to unlink). Only while the page's effective
-    /// style is Mindmap — every other style keeps plain drags. A heavy overlap nudges the dropped
-    /// bubble past the target's nearest edge so both stay visible with the connector showing.</summary>
-    internal void OnBoxDragEnd(NoteBoxView view)
-    {
-        if (_doc is null || _pageStyle != PageStyles.Mindmap) return;
-        NoteBoxView? hit = null;
-        foreach (var child in Children)                    // later child = higher z — keep the last hit
-            if (child is NoteBoxView v && !ReferenceEquals(v, view) && v.Bounds.Intersects(view.Bounds))
-                hit = v;
-        if (hit is null) return;
-        bool linked = _doc.ToggleLink(view.Box, hit.Box);
-        if (linked) NudgeApart(view, hit);
-        _links.InvalidateVisual();
-    }
-
-    private void NudgeApart(NoteBoxView moved, NoteBoxView target)
-    {
-        var a = moved.Bounds;
-        var b = target.Bounds;
-        var overlap = a.Intersect(b);
-        if (overlap.Width * overlap.Height < 0.35 * a.Width * a.Height) return;   // just touching — leave it
-        if (Math.Abs(a.Center.X - b.Center.X) >= Math.Abs(a.Center.Y - b.Center.Y))
-            moved.Box.X = a.Center.X >= b.Center.X ? b.Right + 24 : Math.Max(0, b.X - a.Width - 24);
-        else
-            moved.Box.Y = a.Center.Y >= b.Center.Y ? b.Bottom + 24 : Math.Max(0, b.Y - a.Height - 24);
-        InvalidateMeasure();
-    }
+    /// <summary>A bubble MOVE drag ended. Linking now happens by dragging a bubble's connect port onto
+    /// another (see <see cref="EndLink"/>), so a plain move no longer toggles links — repositioning a
+    /// bubble over another is just a move. Kept as a hook the view calls after any drag.</summary>
+    internal void OnBoxDragEnd(NoteBoxView view) { _links.InvalidateVisual(); }
 
     /// <summary>OneNote behavior: an empty container evaporates once focus has settled elsewhere.
     /// Deferred a beat so the click that stole focus can land first.</summary>
@@ -502,6 +511,8 @@ internal sealed class NoteBoxView : Panel
     private readonly Border _resizeRight;
     private readonly Border _resizeBottom;
     private readonly Border _resizeCorner;
+    private readonly Border _connectPort;      // mind-map: drag this dot onto another bubble to link
+    private bool _linking;
     private bool _hover;
 
     // Table box (M11): the grid host + its cell editors in row-major order (rebuilt on structural edits).
@@ -605,11 +616,46 @@ internal sealed class NoteBoxView : Panel
             Background = Brushes.Transparent, Cursor = new Cursor(StandardCursorType.BottomRightCorner),
         };
 
+        // Mind-map connect port: a dot on the right edge. Drag it onto another bubble to link them.
+        _connectPort = new Border
+        {
+            Width = 15, Height = 15, CornerRadius = new CornerRadius(8),
+            BorderThickness = new Thickness(2), BorderBrush = Brushes.White,
+            Background = B(t.Accent),
+            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, -8, 0), IsVisible = false,
+            Cursor = new Cursor(StandardCursorType.Cross),
+        };
+        ToolTip.SetTip(_connectPort, "Drag onto another bubble to connect");
+        _connectPort.PointerPressed += (_, e) =>
+        {
+            if (!e.GetCurrentPoint(_connectPort).Properties.IsLeftButtonPressed) return;
+            _linking = true;
+            _canvas.BeginLink(this, e.GetPosition(_canvas));
+            e.Pointer.Capture(_connectPort);
+            e.Handled = true;
+        };
+        _connectPort.PointerMoved += (_, e) =>
+        {
+            if (!_linking) return;
+            _canvas.UpdateLink(e.GetPosition(_canvas));
+            e.Handled = true;
+        };
+        _connectPort.PointerReleased += (_, e) =>
+        {
+            if (!_linking) return;
+            _linking = false;
+            e.Pointer.Capture(null);
+            _canvas.EndLink(e.GetPosition(_canvas));
+            e.Handled = true;
+        };
+
         Children.Add(_chrome);
         Children.Add(_resizeRight);
         Children.Add(_resizeBottom);
         Children.Add(_resizeCorner);
         Children.Add(_close);
+        Children.Add(_connectPort);   // last = on top of the resize strip
 
         PointerEntered += (_, _) => { _hover = true; RefreshChrome(); };
         PointerExited += (_, _) => { _hover = false; RefreshChrome(); };
@@ -881,6 +927,15 @@ internal sealed class NoteBoxView : Panel
         _resizeRight.IsVisible = resize && Box.Divider != "v";
         _resizeBottom.IsVisible = resize && Box.Divider != "h";
         _resizeCorner.IsVisible = resize && Box.Divider is null;
+
+        // Connect port: only on mind-map text bubbles, while the bubble is active or a link is in flight.
+        bool bubble = _canvas.IsMindmap && Box.Divider is null && Box.ImagePath is null
+                      && Box.Table is null && Box.AttachPath is null;
+        _connectPort.IsVisible = bubble && (active || _linking);
+        if (_connectPort.IsVisible)
+            _connectPort.Background = Box.Color is { } ph && Color.TryParse(ph, out var pc)
+                ? new SolidColorBrush(pc)
+                : new SolidColorBrush(Color.Parse(Services.ThemeManager.Current.Accent));
     }
 
     private Point _dragStart;
