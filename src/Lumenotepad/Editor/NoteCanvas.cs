@@ -195,17 +195,17 @@ public sealed class NoteCanvas : Panel
     /// <summary>Connect-port drag started on <paramref name="from"/>'s <paramref name="dir"/> edge —
     /// begin the rubber-band line from that edge.</summary>
     internal void BeginLink(NoteBoxView from, string dir, Point canvasPt)
-    {
-        _links.PendingSource = from.Box;
-        _links.PendingSourceDir = dir;
-        _links.PendingCursor = canvasPt;
-        _links.InvalidateVisual();
-    }
+        => _links.BeginPending(from.Box, dir, canvasPt);
 
-    /// <summary>The connect-port drag moved — follow the cursor.</summary>
+    /// <summary>The connect-port drag moved — chase the cursor, and light up the connect ports of any
+    /// bubble the cursor is over so the drop edge is visible before release.</summary>
     internal void UpdateLink(Point canvasPt)
     {
         _links.PendingCursor = canvasPt;
+        var src = _links.PendingSource;
+        foreach (var child in Children)
+            if (child is NoteBoxView v)
+                v.SetLinkTarget(src is not null && !ReferenceEquals(v.Box, src) && v.Bounds.Contains(canvasPt));
         _links.InvalidateVisual();
     }
 
@@ -216,8 +216,9 @@ public sealed class NoteCanvas : Panel
     {
         var src = _links.PendingSource;
         string srcDir = _links.PendingSourceDir;
-        _links.PendingSource = null;
-        _links.InvalidateVisual();
+        _links.CancelPending();
+        foreach (var child in Children)                        // drop the hover highlight on every bubble
+            if (child is NoteBoxView v) v.SetLinkTarget(false);
         if (src is null || _doc is null) return;
         foreach (var child in Children)
             if (child is NoteBoxView v && !ReferenceEquals(v.Box, src) && v.Bounds.Contains(canvasPt))
@@ -239,6 +240,7 @@ public sealed class NoteCanvas : Panel
         {
             v.Box.Color = color;
             v.RefreshChrome();
+            _links.InvalidateVisual();     // its half of every attached connector's gradient recolours
             _doc?.CommitGeometry();
         }
     }
@@ -529,8 +531,9 @@ internal sealed class NoteBoxView : Panel
     private readonly Border _resizeCorner;
     // mind-map: connect dots on the bubble's edges — drag one onto another bubble to link. Four
     // orthogonal (N/S/E/W) always, four diagonal (corners) when the toolbar toggle is on.
-    private readonly System.Collections.Generic.List<(Border Port, bool Diagonal)> _ports = new();
+    private readonly System.Collections.Generic.List<(Border Port, bool Diagonal, string Dir)> _ports = new();
     private bool _linking;
+    private bool _linkTarget;   // a link drag is hovering this bubble — show its ports as drop targets
     private bool _hover;
 
     // Table box (M11): the grid host + its cell editors in row-major order (rebuilt on structural edits).
@@ -663,7 +666,7 @@ internal sealed class NoteBoxView : Panel
                 _canvas.EndLink(e.GetPosition(_canvas));
                 e.Handled = true;
             };
-            _ports.Add((port, diagonal));
+            _ports.Add((port, diagonal, dir));
         }
         AddPort(HorizontalAlignment.Center, VerticalAlignment.Top,    new Thickness(0, o, 0, 0), false, "N");
         AddPort(HorizontalAlignment.Center, VerticalAlignment.Bottom, new Thickness(0, 0, 0, o), false, "S");
@@ -679,7 +682,7 @@ internal sealed class NoteBoxView : Panel
         Children.Add(_resizeBottom);
         Children.Add(_resizeCorner);
         Children.Add(_close);
-        foreach (var (port, _) in _ports) Children.Add(port);   // ports on top of the resize strip
+        foreach (var (port, _, _) in _ports) Children.Add(port);   // ports on top of the resize strip
 
         PointerEntered += (_, _) => { _hover = true; RefreshChrome(); };
         PointerExited += (_, _) => { _hover = false; RefreshChrome(); };
@@ -976,13 +979,49 @@ internal sealed class NoteBoxView : Panel
 
         // Connect ports show while the bubble is active or a link is in flight; the diagonals wait for
         // the toolbar toggle. All wear the bubble colour (or accent) so the map's wiring reads clearly.
-        bool showPorts = bubble && (active || _linking);
+        bool showPorts = bubble && (active || _linking || _linkTarget);
         var portBrush = Box.Color is { } ph && Color.TryParse(ph, out var pc)
             ? new SolidColorBrush(pc) : new SolidColorBrush(Color.Parse(Services.ThemeManager.Current.Accent));
-        foreach (var (port, diagonal) in _ports)
+        foreach (var (port, diagonal, _) in _ports)
         {
             port.IsVisible = showPorts && (!diagonal || _canvas.MindmapDiagonalPorts);
             if (port.IsVisible) port.Background = portBrush;
+        }
+    }
+
+    /// <summary>A link drag entered/left this bubble: light up its ports as drop targets (and drop them
+    /// again on leave). Cheap no-op when the state hasn't changed — UpdateLink calls it every move.</summary>
+    internal void SetLinkTarget(bool on)
+    {
+        if (_linkTarget == on) return;
+        _linkTarget = on;
+        RefreshChrome();
+    }
+
+    /// <summary>Panels arrange children to fill, so ports sit by alignment + margin. The diagonal ports
+    /// must land on the rounded pill corners (radius = half the shorter side), not the empty rectangular
+    /// corners — recompute their margins from the arranged size each pass.</summary>
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        if (_canvas.IsMindmap) PlaceDiagonalPorts(finalSize.Width, finalSize.Height);
+        return base.ArrangeOverride(finalSize);
+    }
+
+    private void PlaceDiagonalPorts(double w, double h)
+    {
+        double rad = Math.Min(w, h) / 2;
+        double m = 0.2929 * rad - 7;   // 45° point on the corner arc, less half the 14px dot
+        foreach (var (port, diagonal, dir) in _ports)
+        {
+            if (!diagonal) continue;
+            port.Margin = dir switch
+            {
+                "NW" => new Thickness(m, m, 0, 0),
+                "NE" => new Thickness(0, m, m, 0),
+                "SW" => new Thickness(m, 0, 0, m),
+                "SE" => new Thickness(0, 0, m, m),
+                _ => port.Margin,
+            };
         }
     }
 
