@@ -698,6 +698,53 @@ public partial class MainView : UserControl
         });
         MindmapBarContent.Children.Add(new TextBlock
         {
+            Text = "Size", FontSize = 12, VerticalAlignment = VerticalAlignment.Center,
+            Foreground = this.FindResource("TextMutedBrush") as IBrush,
+        });
+        void SizeBtn(string label, double w, string tip)
+        {
+            var b = new Button
+            {
+                Theme = (ControlTheme)Application.Current!.FindResource("LumenButton")!,
+                Content = label, FontSize = 12, Padding = new Thickness(9, 4), MinWidth = 0,
+            };
+            ToolTip.SetTip(b, tip);
+            b.Click += (_, _) => PageCanvas.MindmapBubbleWidth = w;
+            MindmapBarContent.Children.Add(b);
+        }
+        SizeBtn("S", 130, "New bubbles: small");
+        SizeBtn("M", 180, "New bubbles: medium");
+        SizeBtn("L", 240, "New bubbles: large");
+
+        MindmapBarContent.Children.Add(new Border
+        {
+            Width = 1, Height = 20, Margin = new Thickness(2, 0),
+            Background = this.FindResource("FrameBorderBrush") as IBrush, Opacity = 0.7,
+        });
+        var center = new Button
+        {
+            Theme = (ControlTheme)Application.Current!.FindResource("LumenButton")!,
+            Content = "Center map", FontSize = 12.5, Padding = new Thickness(14, 5),
+        };
+        ToolTip.SetTip(center, "Scroll to frame all bubbles");
+        center.Click += (_, _) =>
+        {
+            var bb = PageCanvas.ContentBounds();
+            if (bb.Width <= 0) return;
+            double cx = bb.X + bb.Width / 2, cy = bb.Y + bb.Height / 2;
+            double ox = cx * _canvasZoom - CanvasScroll.Bounds.Width / 2;
+            double oy = cy * _canvasZoom - CanvasScroll.Bounds.Height / 2;
+            CanvasScroll.Offset = new Vector(System.Math.Max(0, ox), System.Math.Max(0, oy));
+        };
+        MindmapBarContent.Children.Add(center);
+
+        MindmapBarContent.Children.Add(new Border
+        {
+            Width = 1, Height = 20, Margin = new Thickness(2, 0),
+            Background = this.FindResource("FrameBorderBrush") as IBrush, Opacity = 0.7,
+        });
+        MindmapBarContent.Children.Add(new TextBlock
+        {
             Text = "Double-click the canvas to add a bubble · drag a bubble's dot onto another to connect",
             FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center,
             Foreground = this.FindResource("TextMutedBrush") as IBrush,
