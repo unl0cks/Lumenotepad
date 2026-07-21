@@ -701,20 +701,28 @@ public partial class MainView : UserControl
             Text = "Size", FontSize = 12, VerticalAlignment = VerticalAlignment.Center,
             Foreground = this.FindResource("TextMutedBrush") as IBrush,
         });
-        void SizeBtn(string label, double w, string tip)
+        void SizeChip(string label, double w)
         {
-            var b = new Button
+            var chip = new Border
             {
-                Theme = (ControlTheme)Application.Current!.FindResource("LumenButton")!,
-                Content = label, FontSize = 12, Padding = new Thickness(9, 4), MinWidth = 0,
+                Height = 26, MinWidth = 30, CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(10, 0), BorderThickness = new Thickness(1),
+                Cursor = new Cursor(StandardCursorType.Hand), VerticalAlignment = VerticalAlignment.Center,
+                Tag = w,
+                Child = new TextBlock
+                {
+                    Text = label, FontSize = 12,
+                    HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+                },
             };
-            ToolTip.SetTip(b, tip);
-            b.Click += (_, _) => PageCanvas.MindmapBubbleWidth = w;
-            MindmapBarContent.Children.Add(b);
+            ToolTip.SetTip(chip, $"New bubbles: {label}");
+            chip.PointerPressed += (_, _) => { PageCanvas.MindmapBubbleWidth = w; RefreshSizeChips(); };
+            MindmapBarContent.Children.Add(chip);
         }
-        SizeBtn("S", 130, "New bubbles: small");
-        SizeBtn("M", 180, "New bubbles: medium");
-        SizeBtn("L", 240, "New bubbles: large");
+        SizeChip("S", 140);
+        SizeChip("M", 220);
+        SizeChip("L", 320);
+        RefreshSizeChips();
 
         MindmapBarContent.Children.Add(new Border
         {
@@ -791,6 +799,20 @@ public partial class MainView : UserControl
             b.BorderBrush = on ? (this.FindResource("AccentBrush") as IBrush ?? Brushes.White)
                                : new SolidColorBrush(Color.Parse("#33FFFFFF"));
             b.BorderThickness = new Thickness(on ? 2 : 1);
+        }
+    }
+
+    /// <summary>Ring the S/M/L chip matching the current new-bubble width so the choice is visible.</summary>
+    private void RefreshSizeChips()
+    {
+        foreach (var child in MindmapBarContent.Children)
+        {
+            if (child is not Border b || b.Tag is not double w) continue;
+            bool on = System.Math.Abs(PageCanvas.MindmapBubbleWidth - w) < 0.5;
+            b.BorderBrush = on ? (this.FindResource("AccentBrush") as IBrush ?? Brushes.White)
+                               : new SolidColorBrush(Color.Parse("#33FFFFFF"));
+            b.BorderThickness = new Thickness(on ? 2 : 1);
+            b.Background = on ? new SolidColorBrush(Colors.White, 0.10) : Brushes.Transparent;
         }
     }
 

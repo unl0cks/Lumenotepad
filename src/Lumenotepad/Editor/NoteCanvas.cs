@@ -161,8 +161,8 @@ public sealed class NoteCanvas : Panel
     /// reads cleanly before the user starts colour-coding.</summary>
     public const string DefaultBubbleColor = "#8B9099";
 
-    /// <summary>Width of newly added bubbles (toolbar S/M/L).</summary>
-    public double MindmapBubbleWidth { get; set; } = 180;
+    /// <summary>Width of newly added bubbles (toolbar S/M/L). Defaults to the medium preset.</summary>
+    public double MindmapBubbleWidth { get; set; } = 220;
 
     /// <summary>When true, bubbles also show the four diagonal (corner) connect ports (toolbar toggle).</summary>
     public bool MindmapDiagonalPorts { get; set; }
@@ -1206,10 +1206,9 @@ internal sealed class NoteBoxView : Panel
                 Editor.InvalidateVisual();
             }
             Editor.Margin = new Thickness(10, 3, 10, 20);
-            // A small round close chip inset onto the pill's flat top-right, reading as a real button
-            // (subtle fill) rather than a bare glyph floating past the corner.
+            // A small round close chip that reads as a real button (subtle fill); ArrangeOverride sits
+            // it on the pill's rounded top-right corner (inset scales with the corner radius).
             _close.CornerRadius = new CornerRadius(9);
-            _close.Margin = new Thickness(0, 6, 9, 0);
             _closeGlyph.FontSize = 8.5;
             _closeRestBg = new SolidColorBrush(Colors.White, 0.16);
             _closeRestFg = new SolidColorBrush(Colors.White, 0.85);
@@ -1251,7 +1250,19 @@ internal sealed class NoteBoxView : Panel
     /// corners — recompute their margins from the arranged size each pass.</summary>
     protected override Size ArrangeOverride(Size finalSize)
     {
-        if (_canvas.IsMindmap) PlaceDiagonalPorts(finalSize.Width, finalSize.Height);
+        if (_canvas.IsMindmap)
+        {
+            PlaceDiagonalPorts(finalSize.Width, finalSize.Height);
+            bool bubble = Box.Divider is null && Box.ImagePath is null && Box.Table is null && Box.AttachPath is null;
+            if (bubble)
+            {
+                // Ride the ✕ on the rounded top-right corner: step in along the 45° diagonal by the
+                // corner radius so the whole chip stays inside the pill at any bubble height.
+                double radius = Math.Min(finalSize.Width, finalSize.Height) / 2;
+                double m = Math.Max(3, radius - Math.Max(0, radius - 12) * 0.7071 - 8.5);
+                _close.Margin = new Thickness(0, m, m, 0);
+            }
+        }
         return base.ArrangeOverride(finalSize);
     }
 
