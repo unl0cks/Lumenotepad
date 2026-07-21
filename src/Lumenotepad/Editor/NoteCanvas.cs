@@ -148,6 +148,52 @@ public sealed class NoteCanvas : Panel
         InvalidateArrange();           // force a re-arrange even if the content bounds didn't change
     }
 
+    // ---- mind map (Mindmap page style): coloured bubbles + drag-to-connect links ----
+
+    /// <summary>True while the page's method is Mindmap — MainView shows the mind-map toolbar then.</summary>
+    public bool IsMindmap => _pageStyle == PageStyles.Mindmap;
+
+    /// <summary>The colour new bubbles take (and the last colour picked in the mind-map toolbar).</summary>
+    public string? MindmapColor { get; set; }
+
+    /// <summary>Drop a new bubble centred on (<paramref name="cx"/>,<paramref name="cy"/>) and focus it.</summary>
+    public void AddBubble(double cx, double cy)
+    {
+        if (_doc is null) return;
+        double bx = cx - 90, by = cy - 18;
+        if (SnapToGrid) { bx = GridMath.Snap(bx); by = GridMath.Snap(by); }
+        var box = _doc.AddBox(Math.Max(0, bx), Math.Max(0, by), 180);
+        box.Color = MindmapColor;
+        var view = AddBoxView(box);
+        _doc.CommitGeometry();
+        Dispatcher.UIThread.Post(view.FocusEditor, DispatcherPriority.Background);
+    }
+
+    /// <summary>The bubble whose editor is currently active, or null.</summary>
+    private NoteBoxView? ActiveBubble()
+    {
+        if (ActiveEditor is null) return null;
+        foreach (var child in Children)
+            if (child is NoteBoxView v && ReferenceEquals(v.Editor, ActiveEditor)) return v;
+        return null;
+    }
+
+    /// <summary>The active bubble's colour, if a bubble is selected (for the toolbar's ring).</summary>
+    public string? ActiveBubbleColor => ActiveBubble()?.Box.Color;
+
+    /// <summary>Set the mind-map colour: the default for new bubbles, and (when one is selected) applied
+    /// to that bubble immediately.</summary>
+    public void SetBubbleColor(string? color)
+    {
+        MindmapColor = color;
+        if (ActiveBubble() is { } v)
+        {
+            v.Box.Color = color;
+            v.RefreshChrome();
+            _doc?.CommitGeometry();
+        }
+    }
+
     /// <summary>The editor of the most recently focused container (what the toolbar targets).</summary>
     public RichTextEditor? ActiveEditor { get; private set; }
     public event Action<RichTextEditor?>? ActiveEditorChanged;
@@ -313,8 +359,14 @@ public sealed class NoteCanvas : Panel
         // Only clicks on bare canvas start a container — clicks inside one bubble with another Source.
         if (_doc is null || !ReferenceEquals(e.Source, this)) return;
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
-        if (CreateOnDoubleClick && e.ClickCount < 2) return;
         var p = e.GetPosition(this);
+        if (_pageStyle == PageStyles.Mindmap)
+        {
+            // Mind map: a bare-canvas DOUBLE-click drops a bubble; a single click just clears focus.
+            if (e.ClickCount >= 2) { AddBubble(p.X, p.Y); e.Handled = true; }
+            return;
+        }
+        if (CreateOnDoubleClick && e.ClickCount < 2) return;
         double bx = p.X - 11, by = p.Y - 16;
         if (SnapToGrid) { bx = Math.Max(0, GridMath.Snap(bx)); by = Math.Max(0, GridMath.Snap(by)); }
         var view = AddBoxView(_doc.AddBox(bx, by, Math.Clamp(RichTextEditor.NewNoteWidthPref, 240, 640)));
@@ -808,7 +860,18 @@ internal sealed class NoteBoxView : Panel
         // Capturing the pointer on a resize/grip handle drops the box's own IsPointerOver (so PointerExited
         // fires and would blank the border mid-drag) — treat an active drag as "keep the chrome lit".
         bool active = _hover || focused || _dragging;
-        _chrome.BorderBrush = _dragging || focused ? FocusBorder : _hover ? HoverBorder : Brushes.Transparent;
+        if (Box.Color is { } hex && Color.TryParse(hex, out var bc))
+        {
+            // Coloured bubble (mind-map): a soft fill of the colour plus a solid coloured edge that
+            // brightens when the bubble is active — the whole card carries its colour category.
+            _chrome.Background = new SolidColorBrush(bc, active ? 0.28 : 0.18);
+            _chrome.BorderBrush = new SolidColorBrush(bc, active ? 1.0 : 0.72);
+        }
+        else
+        {
+            _chrome.Background = Brushes.Transparent;
+            _chrome.BorderBrush = _dragging || focused ? FocusBorder : _hover ? HoverBorder : Brushes.Transparent;
+        }
         _grip.Background = active ? GripFill : Brushes.Transparent;
         _gripBar.IsVisible = active;
         _close.IsVisible = active && !Box.Locked;

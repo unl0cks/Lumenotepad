@@ -89,6 +89,11 @@ public sealed class NoteBox
     /// scale together and never drift apart on resize. Null for ordinary free boxes. Persisted.</summary>
     public string? Region { get; set; }
 
+    /// <summary>A container's own accent colour ("#RRGGBB"), used to tint the card — the mind-map
+    /// bubble colour, and the "colour category" that organizes a map. Null = the theme's default
+    /// note look. Persisted.</summary>
+    public string? Color { get; set; }
+
     /// <summary>An IMAGE box (M10): a path relative to the notebook folder ("images/xxx.png").
     /// When set the box renders the image instead of a text editor. Persisted.</summary>
     public string? ImagePath { get; set; }

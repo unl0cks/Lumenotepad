@@ -566,6 +566,16 @@
                                 FontFamily="{StaticResource IconFont}" Content="&#xE81C;"
                                 IsVisible="{Binding DeletedHistory}" ToolTip.Tip="Deleted containers"/>
                     </Grid>
+
+                    <!-- Mind-map toolbar: shown only on Mindmap pages (built in code-behind). -->
+                    <Border x:Name="MindmapBar" DockPanel.Dock="Top" IsVisible="False"
+                            Margin="26,10,26,0" Padding="10,6" CornerRadius="10"
+                            Background="{DynamicResource ControlHoverBrush}"
+                            BorderBrush="{DynamicResource FrameBorderBrush}" BorderThickness="1">
+                        <StackPanel x:Name="MindmapBarContent" Orientation="Horizontal"
+                                    Spacing="10" VerticalAlignment="Center"/>
+                    </Border>
+
                     <Panel>
                         <ScrollViewer x:Name="CanvasScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                                       Margin="16,12,16,16">

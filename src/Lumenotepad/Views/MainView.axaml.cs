@@ -45,7 +45,9 @@ public partial class MainView : UserControl
         DataContextChanged += (_, _) => HookVm();
 
         // The toolbar follows whichever note container was focused last; dock menu re-docks it (persisted).
-        PageCanvas.ActiveEditorChanged += ed => { if (ed is not null) Toolbar.Target = ed; };
+        PageCanvas.ActiveEditorChanged += ed => { if (ed is not null) Toolbar.Target = ed; RefreshMindmapRings(); };
+
+        BuildMindmapBar();
 
         // A freshly downloaded font (font installer) should appear in the toolbar menu right away.
         Services.AppFonts.InstalledChanged += () =>
@@ -573,6 +575,142 @@ public partial class MainView : UserControl
             ? PageStyles.EffectiveStyle(p, n)
             : (PageStyles.Freeform, 0);
         PageCanvas.SetStyles(grid, style, mode);
+        ApplyMindmapBar();
+    }
+
+    // ---- mind-map toolbar (shown only on Mindmap pages) ----
+
+    /// <summary>Show/hide the mind-map toolbar with the page style, and reflect the active bubble's colour.</summary>
+    private void ApplyMindmapBar()
+    {
+        bool on = PageCanvas.IsMindmap && !PagePdfViewer.IsVisible;
+        MindmapBar.IsVisible = on;
+        if (on) RefreshMindmapRings();
+    }
+
+    /// <summary>Build the mind-map toolbar once: Add bubble, the shared colour picker, and a hint.</summary>
+    private void BuildMindmapBar()
+    {
+        MindmapBarContent.Children.Clear();
+
+        var addBubble = new Button
+        {
+            Theme = (ControlTheme)Application.Current!.FindResource("LumenButton")!,
+            Content = "Add bubble", FontSize = 12.5, Padding = new Thickness(14, 5),
+        };
+        addBubble.Click += (_, _) =>
+        {
+            double x = (CanvasScroll.Offset.X + CanvasScroll.Bounds.Width / 2) / _canvasZoom;
+            double y = (CanvasScroll.Offset.Y + CanvasScroll.Bounds.Height / 2) / _canvasZoom;
+            PageCanvas.AddBubble(x, y);
+        };
+        MindmapBarContent.Children.Add(addBubble);
+
+        MindmapBarContent.Children.Add(new Border
+        {
+            Width = 1, Height = 20, Margin = new Thickness(2, 0),
+            Background = this.FindResource("FrameBorderBrush") as IBrush, Opacity = 0.7,
+        });
+        MindmapBarContent.Children.Add(new TextBlock
+        {
+            Text = "Colour", FontSize = 12, VerticalAlignment = VerticalAlignment.Center,
+            Foreground = this.FindResource("TextMutedBrush") as IBrush,
+        });
+
+        // A "no colour" chip (default note look), then a family swatch per palette colour + grayscale,
+        // each opening its shade flyout — same picker style as the PDF viewer's swatches.
+        var none = MindmapSwatch(Brushes.Transparent, "Default");
+        none.Child = new TextBlock
+        {
+            Text = "∅", FontSize = 12,
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+        };
+        none.PointerPressed += (_, _) => { PageCanvas.SetBubbleColor(null); RefreshMindmapRings(); };
+        MindmapBarContent.Children.Add(none);
+
+        void AddFamily(string family, (string Name, string Hex)[] shades, IBrush swatch)
+        {
+            var btn = MindmapSwatch(swatch, $"{family} — pick a shade");
+            btn.Tag = family;
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(2) };
+            var flyout = new Flyout { Content = row, Placement = PlacementMode.Bottom };
+            MenuFx.AttachFlyout(flyout);
+            foreach (var (name, hex) in shades)
+            {
+                var chip = MindmapSwatch(new SolidColorBrush(Color.Parse(hex)), name, 26);
+                string pick = "#" + hex.TrimStart('#');
+                chip.PointerPressed += (_, _) => { PageCanvas.SetBubbleColor(pick); RefreshMindmapRings(); flyout.Hide(); };
+                row.Children.Add(chip);
+            }
+            btn.PointerPressed += (_, _) => flyout.ShowAt(btn);
+            MindmapBarContent.Children.Add(btn);
+        }
+        foreach (var (family, shades) in ViewModels.MainViewModel.NotebookPalette)
+            AddFamily(family, shades, new SolidColorBrush(Color.Parse(shades[2].Hex)));
+        AddFamily("Neutral", ViewModels.MainViewModel.GrayscaleShades, MindmapNeutralBrush());
+
+        MindmapBarContent.Children.Add(new Border
+        {
+            Width = 1, Height = 20, Margin = new Thickness(2, 0),
+            Background = this.FindResource("FrameBorderBrush") as IBrush, Opacity = 0.7,
+        });
+        MindmapBarContent.Children.Add(new TextBlock
+        {
+            Text = "Double-click the canvas to add a bubble · drag a bubble's dot onto another to connect",
+            FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center,
+            Foreground = this.FindResource("TextMutedBrush") as IBrush,
+            TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis,
+        });
+    }
+
+    private Border MindmapSwatch(IBrush bg, string tip, double size = 22)
+    {
+        bool bare = ReferenceEquals(bg, Brushes.Transparent);
+        var b = new Border
+        {
+            Width = size, Height = size, CornerRadius = new CornerRadius(size < 24 ? 6 : 7),
+            Background = bg, BorderThickness = new Thickness(bare ? 1 : 1),
+            BorderBrush = bare ? this.FindResource("FrameBorderBrush") as IBrush
+                               : new SolidColorBrush(Color.Parse("#33FFFFFF")),
+            Cursor = new Cursor(StandardCursorType.Hand),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        ToolTip.SetTip(b, tip);
+        return b;
+    }
+
+    private static IBrush MindmapNeutralBrush() => new LinearGradientBrush
+    {
+        StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
+        EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+        GradientStops = { new GradientStop(Colors.White, 0), new GradientStop(Color.Parse("#111418"), 1) },
+    };
+
+    /// <summary>Ring the family swatch whose shades contain the active bubble's colour (or the last
+    /// picked colour when nothing is selected).</summary>
+    private void RefreshMindmapRings()
+    {
+        if (!MindmapBar.IsVisible) return;
+        string? activeRgb = Rgb6(PageCanvas.ActiveBubbleColor ?? PageCanvas.MindmapColor);
+        foreach (var child in MindmapBarContent.Children)
+        {
+            if (child is not Border { Tag: string fam } b) continue;
+            var shades = fam == "Neutral" ? ViewModels.MainViewModel.GrayscaleShades
+                : System.Array.Find(ViewModels.MainViewModel.NotebookPalette, f => f.Family == fam).Shades;
+            bool on = shades is not null && activeRgb is not null &&
+                      System.Array.Exists(shades, s => string.Equals(Rgb6(s.Hex), activeRgb, System.StringComparison.OrdinalIgnoreCase));
+            b.BorderBrush = on ? (this.FindResource("AccentBrush") as IBrush ?? Brushes.White)
+                               : new SolidColorBrush(Color.Parse("#33FFFFFF"));
+            b.BorderThickness = new Thickness(on ? 2 : 1);
+        }
+    }
+
+    /// <summary>The last six hex digits (RRGGBB) of a colour string, or null.</summary>
+    private static string? Rgb6(string? hex)
+    {
+        if (string.IsNullOrEmpty(hex)) return null;
+        var h = hex.TrimStart('#');
+        return h.Length >= 6 ? h.Substring(h.Length - 6) : null;
     }
 
     /// <summary>Temporary Part-1 entry point (the Part-4 Page dialog supersedes it): set the style,
