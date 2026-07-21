@@ -160,6 +160,13 @@ public sealed class NoteCanvas : Panel
     /// <summary>When true, bubbles also show the four diagonal (corner) connect ports (toolbar toggle).</summary>
     public bool MindmapDiagonalPorts { get; set; }
 
+    /// <summary>Draw connectors as rigid straight lines instead of springy curves (toolbar toggle).</summary>
+    public bool MindmapStraightLines
+    {
+        get => _links.Straight;
+        set { _links.Straight = value; _links.InvalidateVisual(); }
+    }
+
     /// <summary>Repaint every bubble's chrome — after the diagonal-ports toggle flips, or the style set.</summary>
     public void RefreshMindmapPorts()
     {
@@ -180,6 +187,25 @@ public sealed class NoteCanvas : Panel
         Dispatcher.UIThread.Post(view.FocusEditor, DispatcherPriority.Background);
     }
 
+    /// <summary>Add a bubble beside the selected one and link them — fast branch-building. Inherits the
+    /// parent's colour. Returns false when nothing is selected, so the caller can fall back to a plain
+    /// add at the viewport centre.</summary>
+    public bool AddConnectedBubble()
+    {
+        if (_doc is null) return false;
+        if (ActiveBubble() is not { } from) return false;
+        var fb = from.Box;
+        double nx = fb.X + fb.Width + 110, ny = fb.Y;
+        if (SnapToGrid) { nx = GridMath.Snap(nx); ny = GridMath.Snap(ny); }
+        var box = _doc.AddBox(Math.Max(0, nx), Math.Max(0, ny), fb.Width);
+        box.Color = fb.Color ?? MindmapColor;
+        var view = AddBoxView(box);
+        _doc.ToggleLink(fb, box, "E", "W");   // anchors auto-face on render; dirs kept for persistence
+        _doc.CommitGeometry();
+        Dispatcher.UIThread.Post(view.FocusEditor, DispatcherPriority.Background);
+        return true;
+    }
+
     /// <summary>The bubble whose editor is currently active, or null.</summary>
     private NoteBoxView? ActiveBubble()
     {
@@ -197,38 +223,59 @@ public sealed class NoteCanvas : Panel
     internal void BeginLink(NoteBoxView from, string dir, Point canvasPt)
         => _links.BeginPending(from.Box, dir, canvasPt);
 
-    /// <summary>The connect-port drag moved — chase the cursor, and light up the connect ports of any
-    /// bubble the cursor is over so the drop edge is visible before release.</summary>
+    /// <summary>The connect-port drag moved — chase the cursor, and once the cursor nears a bubble snap
+    /// the line's tip onto it and light up that bubble's ports so the target is clear before release.</summary>
     internal void UpdateLink(Point canvasPt)
     {
         _links.PendingCursor = canvasPt;
         var src = _links.PendingSource;
+        var snap = src is null ? null : FindSnap(canvasPt, src);
+        _links.PendingSnap = snap?.Box;
         foreach (var child in Children)
-            if (child is NoteBoxView v)
-                v.SetLinkTarget(src is not null && !ReferenceEquals(v.Box, src) && v.Bounds.Contains(canvasPt));
-        _links.InvalidateVisual();
+            if (child is NoteBoxView v) v.SetLinkTarget(ReferenceEquals(v, snap));
+        _links.Animate();
     }
 
-    /// <summary>The connect-port drag ended — link the source to whatever bubble is under the cursor
-    /// (dropping on the source or empty canvas just cancels; dropping on an already-linked bubble
-    /// unlinks). Persists so the connector survives a reload.</summary>
+    /// <summary>The connect-port drag ended — link the source to the bubble the tip snapped onto
+    /// (releasing over empty canvas just cancels; releasing on an already-linked bubble unlinks).
+    /// Persists so the connector survives a reload.</summary>
     internal void EndLink(Point canvasPt)
     {
         var src = _links.PendingSource;
         string srcDir = _links.PendingSourceDir;
+        var snap = src is null ? null : FindSnap(canvasPt, src);
         _links.CancelPending();
         foreach (var child in Children)                        // drop the hover highlight on every bubble
             if (child is NoteBoxView v) v.SetLinkTarget(false);
-        if (src is null || _doc is null) return;
+        if (src is null || _doc is null || snap is null) return;
+        string dstDir = LinkLayer.NearestDir(snap.Bounds, canvasPt);   // stored for compat (anchors auto-face)
+        _doc.ToggleLink(src, snap.Box, srcDir, dstDir);
+        _links.InvalidateVisual();
+        _doc.CommitGeometry();       // links persist alongside geometry
+    }
+
+    /// <summary>The bubble the cursor should snap to while connecting: the nearest one whose body comes
+    /// within the snap margin of <paramref name="p"/> (0 = inside it), excluding the source.</summary>
+    private NoteBoxView? FindSnap(Point p, NoteBox src)
+    {
+        const double margin = 46;
+        NoteBoxView? best = null;
+        double bestD = double.MaxValue;
         foreach (var child in Children)
-            if (child is NoteBoxView v && !ReferenceEquals(v.Box, src) && v.Bounds.Contains(canvasPt))
-            {
-                string dstDir = LinkLayer.NearestDir(v.Bounds, canvasPt);   // anchor at the dropped edge
-                _doc.ToggleLink(src, v.Box, srcDir, dstDir);
-                _links.InvalidateVisual();
-                _doc.CommitGeometry();       // links persist alongside geometry
-                break;
-            }
+        {
+            if (child is not NoteBoxView v || ReferenceEquals(v.Box, src)) continue;
+            double d = RectDistance(v.Bounds, p);
+            if (d <= margin && d < bestD) { bestD = d; best = v; }
+        }
+        return best;
+    }
+
+    /// <summary>Distance from a point to a rectangle (0 when the point is inside).</summary>
+    private static double RectDistance(Rect r, Point p)
+    {
+        double dx = Math.Max(Math.Max(r.X - p.X, p.X - r.Right), 0);
+        double dy = Math.Max(Math.Max(r.Y - p.Y, p.Y - r.Bottom), 0);
+        return Math.Sqrt(dx * dx + dy * dy);
     }
 
     /// <summary>Set the mind-map colour: the default for new bubbles, and (when one is selected) applied

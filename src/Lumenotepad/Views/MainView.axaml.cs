@@ -606,6 +606,21 @@ public partial class MainView : UserControl
         };
         MindmapBarContent.Children.Add(addBubble);
 
+        var addConnected = new Button
+        {
+            Theme = (ControlTheme)Application.Current!.FindResource("LumenButton")!,
+            Content = "Add connected", FontSize = 12.5, Padding = new Thickness(14, 5),
+        };
+        ToolTip.SetTip(addConnected, "Add a new bubble already linked to the selected one");
+        addConnected.Click += (_, _) =>
+        {
+            if (PageCanvas.AddConnectedBubble()) return;      // linked to the selection…
+            double x = (CanvasScroll.Offset.X + CanvasScroll.Bounds.Width / 2) / _canvasZoom;
+            double y = (CanvasScroll.Offset.Y + CanvasScroll.Bounds.Height / 2) / _canvasZoom;
+            PageCanvas.AddBubble(x, y);                        // …or a plain bubble when nothing's selected
+        };
+        MindmapBarContent.Children.Add(addConnected);
+
         MindmapBarContent.Children.Add(new Border
         {
             Width = 1, Height = 20, Margin = new Thickness(2, 0),
@@ -666,6 +681,15 @@ public partial class MainView : UserControl
             PageCanvas.RefreshMindmapPorts();
         };
         MindmapBarContent.Children.Add(diag);
+
+        var straight = new CheckBox
+        {
+            Content = "Straight links", FontSize = 12, Margin = new Thickness(10, 0, 0, 0),
+            IsChecked = PageCanvas.MindmapStraightLines, VerticalAlignment = VerticalAlignment.Center,
+        };
+        ToolTip.SetTip(straight, "Draw connectors as straight lines instead of springy curves");
+        straight.IsCheckedChanged += (_, _) => PageCanvas.MindmapStraightLines = straight.IsChecked == true;
+        MindmapBarContent.Children.Add(straight);
 
         MindmapBarContent.Children.Add(new Border
         {

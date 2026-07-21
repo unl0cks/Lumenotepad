@@ -8,25 +8,30 @@ using Avalonia.Threading;
 
 namespace Lumenotepad.Editor;
 
-/// <summary>Draws the mind-map connectors — under the bubbles, over the paper. Each link anchors at the
-/// compass edge its ports were drawn from/dropped on (orthogonal edges at the flat sides, diagonals on
-/// the rounded pill corners), curves smoothly out of those edges, is stroked with a gradient between the
-/// two bubbles' colours, and bends around any other bubble that would otherwise cross it.
+/// <summary>Draws the mind-map connectors — under the bubbles, over the paper. Each connector's two ends
+/// ride the bubble outlines at the point facing the other bubble, so a line always leaves toward its
+/// partner and never has to wrap back over a bubble. Lines are stroked with a gradient between the two
+/// bubbles' colours and bend around any OTHER bubble that would cross them; the belly of each curve is a
+/// spring, so dragging a bubble makes its links lag and settle in a few decaying bounces (the ends stay
+/// glued). A straight-line mode swaps the curves for rigid segments.
 ///
-/// The two ends stay glued to their bubbles, but the belly of each connector is a spring: when a bubble
-/// is dragged its links' control points lag the new geometry and settle in a few decaying bounces, so the
-/// wiring wobbles like elastic strings. The in-flight rubber band (while a connect port is being dragged)
-/// tracks the cursor directly, wears the source bubble's colour, and carries a node at its free end.</summary>
+/// The in-flight rubber band (while a connect port is being dragged) keeps its tip on the cursor — no
+/// lag — but its body is a spring too, so a quick flick makes it whip like a string; it wears the source
+/// bubble's colour, carries a node at the tip, and snaps that tip onto any bubble the cursor nears.</summary>
 public sealed class LinkLayer : Control
 {
     internal CanvasDocument? Doc;
     internal Func<NoteBox, Rect?>? Resolve;
 
-    /// <summary>While a connect-port drag is in flight: the source bubble, the edge it started from,
-    /// and the live cursor point (canvas coords).</summary>
+    /// <summary>Rigid straight segments instead of springy curves (toolbar "Straight links").</summary>
+    internal bool Straight;
+
+    /// <summary>While a connect-port drag is in flight: the source bubble, the edge it started from, the
+    /// live cursor, and the bubble (if any) the tip has snapped onto.</summary>
     internal NoteBox? PendingSource;
     internal string PendingSourceDir = "E";
     internal Point PendingCursor;
+    internal NoteBox? PendingSnap;
 
     /// <summary>Per-link spring state for the belly (the two control points chase their target geometry).</summary>
     private sealed class LinkSpring
@@ -36,8 +41,12 @@ public sealed class LinkLayer : Control
     }
 
     private readonly Dictionary<MindLink, LinkSpring> _springs = new();
-    private DispatcherTimer? _timer;
 
+    // The rubber band's body spring: one control point chasing the straight midpoint.
+    private Point _penCtrl;
+    private Vector _penCtrlVel;
+
+    private DispatcherTimer? _timer;
     private Color _accent = Colors.Gray;
 
     public LinkLayer() => IsHitTestVisible = false;
@@ -49,26 +58,34 @@ public sealed class LinkLayer : Control
         InvalidateVisual();
     }
 
-    // ---- pending rubber band (tracks the cursor directly) ----
+    // ---- pending rubber band ----
 
     internal void BeginPending(NoteBox src, string dir, Point cursor)
     {
         PendingSource = src;
         PendingSourceDir = dir;
         PendingCursor = cursor;
-        InvalidateVisual();
+        PendingSnap = null;
+        if (Resolve?.Invoke(src) is { } rs)
+        {
+            var a = EdgePoint(rs, dir);
+            _penCtrl = new Point((a.X + cursor.X) / 2, (a.Y + cursor.Y) / 2);
+        }
+        else _penCtrl = cursor;
+        _penCtrlVel = default;
+        Animate();
     }
 
     internal void CancelPending()
     {
         PendingSource = null;
+        PendingSnap = null;
         InvalidateVisual();
     }
 
-    // ---- connector belly spring: kicked whenever the canvas re-arranges (i.e. a bubble moved) ----
+    // ---- animation driver: springy connector bellies + the rubber band, self-stopping when at rest ----
 
-    /// <summary>Nudge the connector springs and repaint. The timer settles itself, so calling this on
-    /// every arrange only ever costs a spare tick once everything has come to rest.</summary>
+    /// <summary>Kick the spring loop and repaint. Safe to call on every arrange — the timer settles itself.</summary>
     internal void Animate()
     {
         if (_timer is null)
@@ -85,16 +102,26 @@ public sealed class LinkLayer : Control
         if (Doc is null || Resolve is null) { _timer?.Stop(); return; }
         const double dt = 0.016, stiffness = 300, damping = 12;   // ~2–3 decaying bounces, settles ~0.6s
         bool moving = false;
-        foreach (var link in Doc.Links)
+
+        if (!Straight)
+            foreach (var link in Doc.Links)
+            {
+                if (!Ends(link, out var a, out var b, out var va, out var vb)) continue;
+                var (c1t, c2t) = Controls(a, b, va, vb, link.A, link.B);
+                var s = SpringFor(link, c1t, c2t);
+                moving |= Step(ref s.C1, ref s.V1, c1t, dt, stiffness, damping);
+                moving |= Step(ref s.C2, ref s.V2, c2t, dt, stiffness, damping);
+            }
+
+        if (PendingSource is { } src && Resolve(src) is { } rs)
         {
-            if (Resolve(link.A) is not { } ra || Resolve(link.B) is not { } rb) continue;
-            var a = EdgePoint(ra, link.DirA);
-            var b = EdgePoint(rb, link.DirB);
-            var (c1t, c2t) = Controls(a, b, link.DirA, link.DirB, link.A, link.B);
-            var s = SpringFor(link, c1t, c2t);
-            moving |= Step(ref s.C1, ref s.V1, c1t, dt, stiffness, damping);
-            moving |= Step(ref s.C2, ref s.V2, c2t, dt, stiffness, damping);
+            var a = EdgePoint(rs, PendingSourceDir);
+            var end = PendingEnd(a);
+            var mid = new Point((a.X + end.X) / 2, (a.Y + end.Y) / 2);
+            Step(ref _penCtrl, ref _penCtrlVel, mid, dt, 320, 13);
+            moving = true;   // keep the loop live for the whole drag so the next flick is caught
         }
+
         Prune();
         InvalidateVisual();
         if (!moving) _timer?.Stop();
@@ -135,56 +162,96 @@ public sealed class LinkLayer : Control
 
         if (Doc is not null)
             foreach (var link in Doc.Links)
-                if (Resolve(link.A) is { } ra && Resolve(link.B) is { } rb)
+            {
+                if (!Ends(link, out var a, out var b, out var va, out var vb)) continue;
+                var brush = new LinearGradientBrush
                 {
-                    var a = EdgePoint(ra, link.DirA);
-                    var b = EdgePoint(rb, link.DirB);
+                    StartPoint = new RelativePoint(a, RelativeUnit.Absolute),
+                    EndPoint = new RelativePoint(b, RelativeUnit.Absolute),
+                    GradientStops =
+                    {
+                        new GradientStop(ColorOf(link.A), 0),
+                        new GradientStop(ColorOf(link.B), 1),
+                    },
+                };
+                var pen = new Pen(brush, 2.6, lineCap: PenLineCap.Round);
+                if (Straight)
+                {
+                    ctx.DrawLine(pen, a, b);
+                }
+                else
+                {
                     if (!_springs.TryGetValue(link, out var s))
                     {
-                        var (c1t, c2t) = Controls(a, b, link.DirA, link.DirB, link.A, link.B);
+                        var (c1t, c2t) = Controls(a, b, va, vb, link.A, link.B);
                         s = new LinkSpring { C1 = c1t, C2 = c2t };
                         _springs[link] = s;
                     }
-                    var brush = new LinearGradientBrush
-                    {
-                        StartPoint = new RelativePoint(a, RelativeUnit.Absolute),
-                        EndPoint = new RelativePoint(b, RelativeUnit.Absolute),
-                        GradientStops =
-                        {
-                            new GradientStop(ColorOf(link.A), 0),
-                            new GradientStop(ColorOf(link.B), 1),
-                        },
-                    };
-                    var pen = new Pen(brush, 2.6, lineCap: PenLineCap.Round);
                     ctx.DrawGeometry(null, pen, Curve(a, s.C1, s.C2, b));   // belly = animated control points
                 }
+            }
 
         if (PendingSource is { } src && Resolve(src) is { } rs)
         {
             var a = EdgePoint(rs, PendingSourceDir);
+            var end = PendingEnd(a);
             var col = ColorOf(src);                                        // line wears the source colour
             var pen = new Pen(new SolidColorBrush(col, 0.95), 2.6, lineCap: PenLineCap.Round);
-            ctx.DrawLine(pen, a, PendingCursor);
-            // A node at the free end so the line reads as a wire forming, not a flat stroke.
-            ctx.DrawEllipse(new SolidColorBrush(col, 0.18), null, PendingCursor, 9, 9);
+            var geo = new StreamGeometry();
+            using (var g = geo.Open())
+            {
+                g.BeginFigure(a, false);
+                g.QuadraticBezierTo(_penCtrl, end);   // tip pinned to cursor/snap; body springs → whip
+                g.EndFigure(false);
+            }
+            ctx.DrawGeometry(null, pen, geo);
+            // A node at the tip so the line reads as a wire forming, not a flat stroke.
+            ctx.DrawEllipse(new SolidColorBrush(col, 0.18), null, end, PendingSnap is null ? 9 : 12, PendingSnap is null ? 9 : 12);
             ctx.DrawEllipse(new SolidColorBrush(col),
-                new Pen(new SolidColorBrush(Colors.White, 0.85), 1.25), PendingCursor, 4.5, 4.5);
+                new Pen(new SolidColorBrush(Colors.White, 0.85), 1.25), end, 4.5, 4.5);
         }
+    }
+
+    /// <summary>Where the rubber-band tip sits: snapped onto the outline of the bubble it is near
+    /// (facing the source), else the raw cursor.</summary>
+    private Point PendingEnd(Point a)
+    {
+        if (PendingSnap is { } snap && Resolve?.Invoke(snap) is { } sr)
+        {
+            var c = sr.Center;
+            return OutlinePoint(sr, a.X - c.X, a.Y - c.Y);
+        }
+        return PendingCursor;
+    }
+
+    /// <summary>Resolve a link's two outline anchors and their outward (toward-partner) exit directions.
+    /// The anchor is the point on each bubble's outline facing the other bubble, so lines never wrap.</summary>
+    private bool Ends(MindLink link, out Point a, out Point b, out Point va, out Point vb)
+    {
+        a = b = va = vb = default;
+        if (Resolve!(link.A) is not { } ra || Resolve!(link.B) is not { } rb) return false;
+        var ca = ra.Center;
+        var cb = rb.Center;
+        double dx = cb.X - ca.X, dy = cb.Y - ca.Y;
+        double len = Math.Sqrt(dx * dx + dy * dy);
+        if (len < 0.001) { dx = 1; dy = 0; len = 1; }
+        va = new Point(dx / len, dy / len);
+        vb = new Point(-va.X, -va.Y);
+        a = OutlinePoint(ra, dx, dy);
+        b = OutlinePoint(rb, -dx, -dy);
+        return true;
     }
 
     private Color ColorOf(NoteBox box) =>
         box.Color is { } h && Color.TryParse(h, out var c) ? c : _accent;
 
-    /// <summary>Control points for the connector: they leave A and enter B along their edge directions
-    /// (a clean "flow" curve), then bend to whichever side clears every OTHER bubble the straight run
-    /// would cross — re-checked against the actual curve so the line always tries to route around a
-    /// circle rather than through it.</summary>
-    private (Point C1, Point C2) Controls(Point a, Point b, string dirA, string dirB, NoteBox ba, NoteBox bb)
+    /// <summary>Control points for the connector: they leave A and enter B along the toward-partner
+    /// directions (a clean flow), then bend to whichever side clears every OTHER bubble the run would
+    /// cross — re-checked against the actual curve so the line routes around a circle, not through it.</summary>
+    private (Point C1, Point C2) Controls(Point a, Point b, Point va, Point vb, NoteBox ba, NoteBox bb)
     {
         double dist = Distance(a, b);
         double off = Math.Clamp(dist * 0.35, 34, 160);
-        var va = DirVector(dirA);
-        var vb = DirVector(dirB);
         var baseC1 = new Point(a.X + va.X * off, a.Y + va.Y * off);
         var baseC2 = new Point(b.X + vb.X * off, b.Y + vb.Y * off);
         var perp = Perp(a, b);
@@ -254,11 +321,38 @@ public sealed class LinkLayer : Control
         return Math.Sqrt(best);
     }
 
-    // ---- shared edge geometry (NoteCanvas reuses these to anchor the drag + pick the drop edge) ----
+    // ---- outline geometry ----
 
-    /// <summary>The point on a bubble's outline at a compass direction: orthogonal edges at the flat
-    /// mid-sides, diagonals on the rounded pill corner (radius = half the shorter side), so a diagonal
-    /// link touches the visible corner rather than the empty rectangular corner outside it.</summary>
+    /// <summary>The point on a bubble's rounded-rect outline (radius = half the shorter side) along the
+    /// ray from its centre in direction (dx,dy). Bisects the shape's signed-distance field.</summary>
+    public static Point OutlinePoint(Rect rect, double dx, double dy)
+    {
+        double len = Math.Sqrt(dx * dx + dy * dy);
+        double cx = rect.X + rect.Width / 2, cy = rect.Y + rect.Height / 2;
+        if (len < 1e-6) return new Point(cx, cy);
+        dx /= len; dy /= len;
+        double hw = rect.Width / 2, hh = rect.Height / 2;
+        double rad = Math.Min(hw, hh);
+        double lo = 0, hi = Math.Sqrt(hw * hw + hh * hh) + rad + 2;
+        for (int i = 0; i < 22; i++)                     // convex shape → SDF monotonic along the ray
+        {
+            double t = (lo + hi) / 2;
+            if (RoundRectSd(t * dx, t * dy, hw, hh, rad) < 0) lo = t; else hi = t;
+        }
+        double tt = (lo + hi) / 2;
+        return new Point(cx + dx * tt, cy + dy * tt);
+    }
+
+    private static double RoundRectSd(double px, double py, double hw, double hh, double r)
+    {
+        double qx = Math.Abs(px) - hw + r, qy = Math.Abs(py) - hh + r;
+        double ax = Math.Max(qx, 0), ay = Math.Max(qy, 0);
+        return Math.Min(Math.Max(qx, qy), 0) + Math.Sqrt(ax * ax + ay * ay) - r;
+    }
+
+    /// <summary>The point on a bubble's outline at a compass direction — used to anchor the rubber band
+    /// to the exact connect port it was grabbed from (orthogonal at the flat sides, diagonals on the
+    /// rounded corners).</summary>
     public static Point EdgePoint(Rect r, string dir)
     {
         double rad = Math.Min(r.Width, r.Height) / 2;
@@ -292,17 +386,6 @@ public sealed class LinkLayer : Control
     }
 
     private static readonly string[] Dirs = { "N", "S", "E", "W", "NE", "NW", "SE", "SW" };
-
-    private static Point DirVector(string dir)
-    {
-        const double q = 0.7071;
-        return dir switch
-        {
-            "N" => new Point(0, -1), "S" => new Point(0, 1), "E" => new Point(1, 0), "W" => new Point(-1, 0),
-            "NE" => new Point(q, -q), "NW" => new Point(-q, -q), "SE" => new Point(q, q), "SW" => new Point(-q, q),
-            _ => new Point(1, 0),
-        };
-    }
 
     private static double Distance(Point a, Point b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
 
