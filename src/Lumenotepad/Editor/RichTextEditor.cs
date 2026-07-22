@@ -193,6 +193,24 @@ public sealed class RichTextEditor : Control
         _ => FontWeight.Normal,
     };
 
+    /// <summary>Display-only: render every paragraph centred WITHOUT changing the document's stored
+    /// alignment (mind-map title bubbles). Leaves the doc's real alignment untouched, so it never leaks
+    /// into the saved page or applies to non-bubble notes.</summary>
+    private bool _forceCenter;
+    public bool ForceCenter
+    {
+        get => _forceCenter;
+        set { if (_forceCenter == value) return; _forceCenter = value; InvalidateMeasure(); InvalidateVisual(); }
+    }
+
+    /// <summary>Display-only: render all text bold (a central mind-map bubble) without touching run styles.</summary>
+    private bool _forceBold;
+    public bool ForceBold
+    {
+        get => _forceBold;
+        set { if (_forceBold == value) return; _forceBold = value; InvalidateMeasure(); InvalidateVisual(); }
+    }
+
     private static TextAlignment MapAlign(TextAlign a) => a switch
     {
         TextAlign.Center => TextAlignment.Center,
@@ -206,13 +224,14 @@ public sealed class RichTextEditor : Control
         if ((p.Bullet is not null || p.Tag is not null) && double.IsFinite(width)) width -= IndentOf(p);
         double maxWidth = double.IsFinite(width) && width > 1 ? width : double.PositiveInfinity;
         double baseSize = p.Footnote ? Math.Max(9, FontSize * 0.82) : BaseSizeFor(p.Style, FontSize);
-        var align = MapAlign(p.Align);
+        var align = _forceCenter ? TextAlignment.Center : MapAlign(p.Align);
+        var baseW = _forceBold ? FontWeight.Bold : BaseWeightFor(p.Style);
         if (p.Runs.Count == 0)
-            return new TextLayout("", new Typeface(FontFamily, weight: BaseWeightFor(p.Style)), baseSize, Foreground,
+            return new TextLayout("", new Typeface(FontFamily, weight: baseW), baseSize, Foreground,
                                   align, TextWrapping.Wrap, maxWidth: maxWidth);
 
         var defaultProps = new GenericTextRunProperties(
-            new Typeface(FontFamily, weight: BaseWeightFor(p.Style)), baseSize, foregroundBrush: Foreground);
+            new Typeface(FontFamily, weight: baseW), baseSize, foregroundBrush: Foreground);
         double lineHeight = double.NaN;
         if (LineSpacingScalePref > 1.005 && p.Runs.Count > 0)
             lineHeight = p.Runs.Max(r => r.Size ?? baseSize) * 1.35 * LineSpacingScalePref;
@@ -231,7 +250,7 @@ public sealed class RichTextEditor : Control
         public TextRun? GetTextRun(int index)
         {
             double baseSize = _p.Footnote ? Math.Max(9, _e.FontSize * 0.82) : BaseSizeFor(_p.Style, _e.FontSize);
-            var baseWeight = _p.Footnote ? FontWeight.Normal : BaseWeightFor(_p.Style);
+            var baseWeight = _e._forceBold ? FontWeight.Bold : (_p.Footnote ? FontWeight.Normal : BaseWeightFor(_p.Style));
             int acc = 0;
             foreach (var r in _p.Runs)
             {

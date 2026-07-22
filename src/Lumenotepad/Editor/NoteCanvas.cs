@@ -257,7 +257,8 @@ public sealed class NoteCanvas : Panel
         var adj = boxes.ToDictionary(b => b, _ => new System.Collections.Generic.List<NoteBox>());
         foreach (var l in _doc.Links)
             if (adj.ContainsKey(l.A) && adj.ContainsKey(l.B)) { adj[l.A].Add(l.B); adj[l.B].Add(l.A); }
-        var root = ActiveBubble()?.Box ?? boxes.OrderByDescending(b => adj[b].Count).First();
+        var root = boxes.FirstOrDefault(b => b.Central) ?? ActiveBubble()?.Box
+                   ?? boxes.OrderByDescending(b => adj[b].Count).First();
 
         var children = boxes.ToDictionary(b => b, _ => new System.Collections.Generic.List<NoteBox>());
         var level = new System.Collections.Generic.Dictionary<NoteBox, int> { [root] = 0 };
@@ -294,6 +295,14 @@ public sealed class NoteCanvas : Panel
             targets[n] = new Point(cx + r * Math.Cos(angle[n]), cy + r * Math.Sin(angle[n]));
         }
 
+        // Re-face each connector's ports at the other bubble's new spot so the lines run clean, not looped.
+        foreach (var l in _doc.Links)
+            if (targets.TryGetValue(l.A, out var pa) && targets.TryGetValue(l.B, out var pb))
+            {
+                l.DirA = Compass(pb.X - pa.X, pb.Y - pa.Y);
+                l.DirB = Compass(pa.X - pb.X, pa.Y - pb.Y);
+            }
+
         var start = targets.Keys.ToDictionary(b => b, b => (b.X, b.Y));
         Views.Motion.Clock(430, p =>
         {
@@ -306,6 +315,20 @@ public sealed class NoteCanvas : Panel
             }
             InvalidateMeasure();
         }, done: () => _doc.CommitGeometry());
+    }
+
+    /// <summary>The 8-way compass edge nearest the direction (dx,dy) — used to re-anchor connectors on tidy.</summary>
+    private static string Compass(double dx, double dy)
+    {
+        double deg = Math.Atan2(dy, dx) * 180 / Math.PI;   // screen-down positive; 0 = East
+        if (deg >= -22.5 && deg < 22.5) return "E";
+        if (deg >= 22.5 && deg < 67.5) return "SE";
+        if (deg >= 67.5 && deg < 112.5) return "S";
+        if (deg >= 112.5 && deg < 157.5) return "SW";
+        if (deg >= 157.5 || deg < -157.5) return "W";
+        if (deg >= -157.5 && deg < -112.5) return "NW";
+        if (deg >= -112.5 && deg < -67.5) return "N";
+        return "NE";
     }
 
     /// <summary>The bounding rect of every container on the page (empty rect when there are none) — the
@@ -434,6 +457,16 @@ public sealed class NoteCanvas : Panel
             ActiveEditorChanged?.Invoke(ActiveEditor);   // MainView re-rings the picker
         }
         _doc?.CommitGeometry();
+    }
+
+    /// <summary>Toggle a bubble's CENTRAL state (right-click): larger + bold text, thicker border, and the
+    /// anchor the tidy layout roots on.</summary>
+    internal void SetCentral(NoteBoxView view, bool central)
+    {
+        view.Box.Central = central;
+        view.SetFontScale(central ? 1.6 : 1.0);   // larger when central (applies the size, re-measures, commits)
+        view.RefreshChrome();                      // thick border + bold pick up now
+        _links.InvalidateVisual();
     }
 
     /// <summary>The editor of the most recently focused container (what the toolbar targets).</summary>
@@ -1040,6 +1073,10 @@ internal sealed class NoteBoxView : Panel
                 var conn = new MenuItem { Header = "Add connected bubble" };
                 conn.Click += (_, _) => _canvas.AddConnectedFrom(Box);
                 menu.Items.Add(conn);
+
+                var central = new MenuItem { Header = Box.Central ? "Remove central bubble" : "Make central bubble" };
+                central.Click += (_, _) => _canvas.SetCentral(this, !Box.Central);
+                menu.Items.Add(central);
             }
             if (plain)
             {
@@ -1386,7 +1423,7 @@ internal sealed class NoteBoxView : Panel
         // Mind-map text bubbles read as circles: a pill (fully-rounded) chrome + matching grip top.
         bool normalBox = Box.Divider is null && Box.ImagePath is null && Box.Table is null && Box.AttachPath is null;
         bool bubble = _canvas.IsMindmap && normalBox;
-        _chrome.BorderThickness = new Thickness(bubble ? 2.6 : 1);   // thick bubble outline, matching connectors
+        _chrome.BorderThickness = new Thickness(bubble ? (Box.Central ? 4.5 : 2.6) : 1);   // thicker for a central bubble
         if (normalBox)   // leave divider/image/attachment/table chrome radii as their constructor set them
         {
             double rad = bubble ? 999 : NoteCanvas.NoteRadiusPref;
@@ -1397,12 +1434,8 @@ internal sealed class NoteBoxView : Panel
         {
             // Centre the label: horizontally via paragraph Align, vertically via a bottom margin that
             // balances the grip (17) + top inset (3) sitting above the text, so it sits mid-bubble.
-            if (Box.Doc.Paragraphs.Any(p => p.Align != TextAlign.Center))
-            {
-                foreach (var p in Box.Doc.Paragraphs) p.Align = TextAlign.Center;
-                Editor.InvalidateMeasure();
-                Editor.InvalidateVisual();
-            }
+            Editor.ForceCenter = true;   // centre the label visually, without baking Center into the document
+            Editor.ForceBold = Box.Central;
             Editor.Margin = new Thickness(10, 3, 10, 20);
             // A small round close button nestled just inside the top-right corner — it echoes the
             // connect-port dots (same round chip language), a subtle chip at rest and red on hover.

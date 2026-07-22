@@ -98,6 +98,10 @@ public sealed class NoteBox
     /// bigger than its children). 1.0 = the page's normal size. Persisted.</summary>
     public double FontScale { get; set; } = 1.0;
 
+    /// <summary>A mind-map CENTRAL bubble (right-click): larger, bold, thicker-bordered, and the anchor the
+    /// tidy layout arranges the rest of the map around. Persisted.</summary>
+    public bool Central { get; set; }
+
     /// <summary>An IMAGE box (M10): a path relative to the notebook folder ("images/xxx.png").
     /// When set the box renders the image instead of a text editor. Persisted.</summary>
     public string? ImagePath { get; set; }
