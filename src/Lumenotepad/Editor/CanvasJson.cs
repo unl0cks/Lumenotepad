@@ -49,6 +49,7 @@ public static class CanvasDocJson
         [JsonPropertyName("b")] public int B { get; set; }
         [JsonPropertyName("da")] public string Da { get; set; } = "E";
         [JsonPropertyName("db")] public string Db { get; set; } = "W";
+        [JsonPropertyName("lbl")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Lbl { get; set; }
     }
 
     private static BoxDto ToDto(NoteBox b) => new()
@@ -88,7 +89,7 @@ public static class CanvasDocJson
                 ? canvas.Links
                     .Select(l => new LinkDto
                     {
-                        A = canvas.Boxes.IndexOf(l.A), B = canvas.Boxes.IndexOf(l.B), Da = l.DirA, Db = l.DirB,
+                        A = canvas.Boxes.IndexOf(l.A), B = canvas.Boxes.IndexOf(l.B), Da = l.DirA, Db = l.DirB, Lbl = l.Label,
                     })
                     .Where(p => p.A >= 0 && p.B >= 0)
                     .ToList()
@@ -120,7 +121,7 @@ public static class CanvasDocJson
                     if (dto.MLinks is not null)                      // new format: indices + edge anchors
                         foreach (var l in dto.MLinks)
                             if (InRange(l.A) && InRange(l.B) && l.A != l.B)
-                                canvas.Links.Add(new MindLink(canvas.Boxes[l.A], canvas.Boxes[l.B], l.Da, l.Db));
+                                canvas.Links.Add(new MindLink(canvas.Boxes[l.A], canvas.Boxes[l.B], l.Da, l.Db) { Label = l.Lbl });
                     if (dto.MLinks is null && dto.Links is not null)  // legacy pairs → default E↔W anchors
                         foreach (var pair in dto.Links)
                             if (pair is { Length: 2 } && InRange(pair[0]) && InRange(pair[1]) && pair[0] != pair[1])

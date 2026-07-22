@@ -145,6 +145,8 @@ public sealed class MindLink
     public NoteBox B;
     public string DirA;
     public string DirB;
+    /// <summary>Optional short text that rides the connector's midpoint (the relationship name). Persisted.</summary>
+    public string? Label;
     public MindLink(NoteBox a, NoteBox b, string dirA, string dirB) { A = a; B = b; DirA = dirA; DirB = dirB; }
 }
 

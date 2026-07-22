@@ -49,6 +49,7 @@ public sealed class LinkLayer : Control
 
     private DispatcherTimer? _timer;
     private Color _accent = Colors.Gray;
+    private Color _labelBg = Colors.Black, _labelFg = Colors.White, _labelBorder = Colors.Gray;
 
     // ---- create / remove flourishes: growing links, retracting ghosts, and sparks ----
     private sealed class Particle { public Point Pos; public Vector Vel; public double Life, MaxLife, Size; public Color Color; }
@@ -63,7 +64,11 @@ public sealed class LinkLayer : Control
     /// <summary>Re-derive theme-accent colours (theme changes arrive as a canvas Rebuild).</summary>
     public void Refresh()
     {
-        _accent = Color.Parse(Services.ThemeManager.Current.Accent);
+        var t = Services.ThemeManager.Current;
+        _accent = Color.Parse(t.Accent);
+        _labelBg = Color.Parse(t.FrameBackground);
+        _labelFg = Color.Parse(t.PaperText);
+        _labelBorder = Color.Parse(t.Accent);
         InvalidateVisual();
     }
 
@@ -313,6 +318,15 @@ public sealed class LinkLayer : Control
                     }
                     ctx.DrawGeometry(null, pen, growing ? PartialCurve(a, s.C1, s.C2, b, gp) : Curve(a, s.C1, s.C2, b));
                 }
+
+                if (!growing && !string.IsNullOrEmpty(link.Label))
+                {
+                    Point mid = Straight
+                        ? new Point((a.X + b.X) / 2, (a.Y + b.Y) / 2)
+                        : (_springs.TryGetValue(link, out var sl) ? Bezier(a, sl.C1, sl.C2, b, 0.5)
+                                                                  : new Point((a.X + b.X) / 2, (a.Y + b.Y) / 2));
+                    DrawLabel(ctx, mid, link.Label!);
+                }
             }
 
         if (PendingSource is { } src && Resolve(src) is { } rs)
@@ -428,6 +442,59 @@ public sealed class LinkLayer : Control
 
     private Color ColorOf(NoteBox box) =>
         box.Color is { } h && Color.TryParse(h, out var c) ? c : _accent;
+
+    private void DrawLabel(DrawingContext ctx, Point mid, string text)
+    {
+        var ft = new FormattedText(text, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            Typeface.Default, 12, new SolidColorBrush(_labelFg));
+        const double px = 6, py = 3;
+        var rect = new Rect(mid.X - ft.Width / 2 - px, mid.Y - ft.Height / 2 - py, ft.Width + px * 2, ft.Height + py * 2);
+        ctx.DrawRectangle(new SolidColorBrush(_labelBg, 0.95), new Pen(new SolidColorBrush(_labelBorder, 0.7), 1),
+            new RoundedRect(rect, 5));
+        ctx.DrawText(ft, new Point(rect.X + px, rect.Y + py));
+    }
+
+    /// <summary>The link whose drawn line passes closest to <paramref name="p"/> (within a few px), or null.</summary>
+    internal MindLink? HitLink(Point p)
+    {
+        if (Doc is null || Resolve is null) return null;
+        MindLink? best = null;
+        double bestD = 14;
+        foreach (var link in Doc.Links)
+        {
+            if (!Ends(link, out var a, out var b, out var va, out var vb)) continue;
+            double d;
+            if (Straight) d = DistToSeg(p, a, b);
+            else
+            {
+                Point c1, c2;
+                if (_springs.TryGetValue(link, out var s)) { c1 = s.C1; c2 = s.C2; }
+                else (c1, c2) = Controls(a, b, va, vb, link.A, link.B);
+                d = MinDistToCurve(a, c1, c2, b, p);
+            }
+            if (d < bestD) { bestD = d; best = link; }
+        }
+        return best;
+    }
+
+    /// <summary>The midpoint of a link's drawn line (where its label rides).</summary>
+    internal Point? LinkMidpoint(MindLink link)
+    {
+        if (!Ends(link, out var a, out var b, out var va, out var vb)) return null;
+        if (Straight) return new Point((a.X + b.X) / 2, (a.Y + b.Y) / 2);
+        Point c1, c2;
+        if (_springs.TryGetValue(link, out var s)) { c1 = s.C1; c2 = s.C2; }
+        else (c1, c2) = Controls(a, b, va, vb, link.A, link.B);
+        return Bezier(a, c1, c2, b, 0.5);
+    }
+
+    private static double DistToSeg(Point p, Point a, Point b)
+    {
+        double dx = b.X - a.X, dy = b.Y - a.Y, len2 = dx * dx + dy * dy;
+        if (len2 < 0.001) return Distance(p, a);
+        double t = Math.Clamp(((p.X - a.X) * dx + (p.Y - a.Y) * dy) / len2, 0, 1);
+        return Distance(p, new Point(a.X + t * dx, a.Y + t * dy));
+    }
 
     /// <summary>Control points for the connector: they leave A and enter B along their port directions
     /// (a clean flow), then bend to whichever side clears every OTHER bubble the run would cross. A port

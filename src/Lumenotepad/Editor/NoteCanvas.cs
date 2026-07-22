@@ -391,6 +391,38 @@ public sealed class NoteCanvas : Panel
         });
 
         ContextRequested += OnCanvasContext;     // right-click the bare canvas for a general menu
+
+        _labelEditor.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter) { CommitLabel(true); e.Handled = true; }
+            else if (e.Key == Key.Escape) { CommitLabel(false); e.Handled = true; }
+        };
+        _labelEditor.LostFocus += (_, _) => { if (_editingLink is not null) CommitLabel(true); };
+    }
+
+    /// <summary>Double-clicking a connector edits its label: an inline text box at the line's midpoint.</summary>
+    private void EditLinkLabel(MindLink link)
+    {
+        _editingLink = link;
+        _labelEditor.Text = link.Label ?? "";
+        _labelPos = _links.LinkMidpoint(link) ?? default;
+        _labelEditor.IsVisible = true;
+        InvalidateArrange();
+        Dispatcher.UIThread.Post(() => { _labelEditor.Focus(); _labelEditor.SelectAll(); }, DispatcherPriority.Background);
+    }
+
+    private void CommitLabel(bool save)
+    {
+        if (_editingLink is { } link && save)
+        {
+            var text = _labelEditor.Text?.Trim();
+            link.Label = string.IsNullOrEmpty(text) ? null : text;
+            _doc?.CommitGeometry();
+        }
+        _editingLink = null;
+        _labelEditor.IsVisible = false;
+        _links.InvalidateVisual();
+        Focus();
     }
 
     /// <summary>The general right-click menu on empty canvas (bubbles/editors keep their own). Offers the
@@ -436,6 +468,14 @@ public sealed class NoteCanvas : Panel
         FontSize = 13.5, IsHitTestVisible = false, IsVisible = false,
     };
 
+    // Inline editor for a connector's label (double-click a mind-map line), positioned at its midpoint.
+    private readonly TextBox _labelEditor = new()
+    {
+        IsVisible = false, MinWidth = 46, FontSize = 12, Padding = new Thickness(6, 2),
+    };
+    private MindLink? _editingLink;
+    private Point _labelPos;
+
     private void Rebuild()
     {
         Children.Clear();
@@ -447,6 +487,9 @@ public sealed class NoteCanvas : Panel
         _links.Refresh();
         Children.Add(_links);
         Children.Add(_hint);
+        _editingLink = null;
+        _labelEditor.IsVisible = false;
+        Children.Add(_labelEditor);
         EnsureRegions();               // tag legacy structured starters before their views are built
         if (_doc is not null)
             foreach (var box in _doc.Boxes)
@@ -545,6 +588,12 @@ public sealed class NoteCanvas : Panel
                 child.Arrange(new Rect(finalSize));     // full-page layers under every container
                 continue;
             }
+            if (ReferenceEquals(child, _labelEditor))
+            {
+                var d = child.DesiredSize;
+                child.Arrange(new Rect(_labelPos.X - d.Width / 2, _labelPos.Y - d.Height / 2, d.Width, d.Height));
+                continue;
+            }
             if (child is not NoteBoxView v)
             {
                 var d = child.DesiredSize;
@@ -568,9 +617,10 @@ public sealed class NoteCanvas : Panel
         var p = e.GetPosition(this);
         if (_pageStyle == PageStyles.Mindmap)
         {
-            // Mind map: a bare-canvas DOUBLE-click drops a bubble; a single click deselects the active
-            // bubble (pull keyboard focus here so its editor blurs and its ports/chrome drop).
-            if (e.ClickCount >= 2) { AddBubble(p.X, p.Y); }
+            // Mind map: double-click a connector to label it; double-click bare canvas drops a bubble;
+            // a single click deselects the active bubble (pull focus here so its editor blurs).
+            if (e.ClickCount >= 2 && _links.HitLink(p) is { } hitLink) EditLinkLabel(hitLink);
+            else if (e.ClickCount >= 2) AddBubble(p.X, p.Y);
             else { SetActive(null); Focus(); }
             e.Handled = true;
             return;
