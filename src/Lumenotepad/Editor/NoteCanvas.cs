@@ -859,8 +859,9 @@ public sealed class NoteCanvas : Panel
         base.OnKeyDown(e);
         if (e.Key == Key.Delete && _pageStyle == PageStyles.Mindmap && _selection.Count > 0)
         {
-            foreach (var v in _selection.ToList()) DeleteBoxPermanently(v);
+            foreach (var v in _selection.ToList()) DeleteBoxToHistory(v);
             _selection.Clear();
+            TrashChanged?.Invoke();
             e.Handled = true;
         }
     }
@@ -900,8 +901,11 @@ public sealed class NoteCanvas : Panel
     public void RestoreBox(NoteBox box, double? x = null, double? y = null)
     {
         if (_doc is null) return;
-        _doc.RestoreFromTrash(box, x, y);
+        _doc.RestoreFromTrash(box, x, y);   // reinstates any parked links whose partner is still present
         AddBoxView(box);
+        foreach (var l in _doc.Links)       // grow the reconnected strings back in (also repaints the layer)
+            if (ReferenceEquals(l.A, box) || ReferenceEquals(l.B, box))
+                _links.AnimateLinkIn(l);
         TrashChanged?.Invoke();
     }
 
@@ -938,6 +942,23 @@ public sealed class NoteCanvas : Panel
         if (BoxRect(view.Box) is { } r) _links.AnimateBubbleRemoval(view.Box, r);
         _doc?.RemoveBox(view.Box);
         AnimateOutAndDetach(view);
+    }
+
+    /// <summary>Delete honouring the history preference: trash restorable boxes, remove the rest outright.
+    /// Used by group (multi-select) delete, which has no per-box confirm.</summary>
+    private void DeleteBoxToHistory(NoteBoxView view)
+    {
+        if (_doc is null) return;
+        if (HistoryEnabled && !view.Box.IsEmpty)
+        {
+            if (BoxRect(view.Box) is { } r) _links.AnimateBubbleRemoval(view.Box, r);
+            _doc.DeleteToTrash(view.Box);
+            AnimateOutAndDetach(view);
+        }
+        else
+        {
+            DeleteBoxPermanently(view);
+        }
     }
 
     /// <summary>Play a container's exit animation (shrink + fade), then detach it once the tween ends.</summary>

@@ -220,6 +220,47 @@ public class CanvasJsonTests
     }
 
     [Fact]
+    public void RestoreFromTrash_reconnectsParkedLinks_whenPartnerStillPresent()
+    {
+        var canvas = new CanvasDocument();
+        var a = canvas.AddBox(0, 0);
+        var b = canvas.AddBox(400, 0);
+        var c = canvas.AddBox(0, 400);
+        canvas.ToggleLink(a, b);
+        canvas.ToggleLink(b, c);
+
+        canvas.DeleteToTrash(b);
+        Assert.Empty(canvas.Links);                       // both of b's links parked, not dropped
+
+        canvas.RestoreFromTrash(b);
+        Assert.Equal(2, canvas.Links.Count);              // restoring b brings both connections back
+        Assert.Contains(canvas.Links, l => Touches(l, a, b));
+        Assert.Contains(canvas.Links, l => Touches(l, b, c));
+    }
+
+    [Fact]
+    public void RestoreFromTrash_leavesLinkParked_whenPartnerWasPermanentlyRemoved()
+    {
+        var canvas = new CanvasDocument();
+        var a = canvas.AddBox(0, 0);
+        var b = canvas.AddBox(400, 0);
+        var c = canvas.AddBox(0, 400);
+        canvas.ToggleLink(a, b);
+        canvas.ToggleLink(b, c);
+
+        canvas.DeleteToTrash(b);        // parks a—b and b—c
+        canvas.RemoveBox(a);            // a gone for good → its parked a—b can never return
+
+        canvas.RestoreFromTrash(b);
+        Assert.Single(canvas.Links);                      // only b—c reconnects
+        Assert.True(Touches(canvas.Links[0], b, c));
+    }
+
+    private static bool Touches(MindLink l, NoteBox x, NoteBox y) =>
+        (ReferenceEquals(l.A, x) && ReferenceEquals(l.B, y)) ||
+        (ReferenceEquals(l.A, y) && ReferenceEquals(l.B, x));
+
+    [Fact]
     public void Links_roundTripAsIndexPairs()
     {
         var canvas = new CanvasDocument();

@@ -164,6 +164,10 @@ public sealed class CanvasDocument
     /// or trashed box takes its links with it (a restore comes back unlinked).</summary>
     public List<MindLink> Links { get; } = new();
 
+    /// <summary>Links parked when one of their bubbles was trashed — brought back if that bubble (and its
+    /// partner) is restored from the deleted history. Session-only (not serialized).</summary>
+    private readonly List<MindLink> _heldLinks = new();
+
     public event Action? Changed;
 
     /// <summary>Link two boxes with the given edge anchors, or UNLINK them when a link already exists
@@ -257,21 +261,29 @@ public sealed class CanvasDocument
     {
         if (!Boxes.Remove(box)) return;
         DropLinks(box);
+        _heldLinks.RemoveAll(l => ReferenceEquals(l.A, box) || ReferenceEquals(l.B, box));   // gone for good — its parked links can't return
         Unsubscribe(box);
         Changed?.Invoke();
     }
 
-    /// <summary>Move a box into the page's deleted history (newest first).</summary>
+    /// <summary>Move a box into the page's deleted history (newest first). Its links are parked, not dropped,
+    /// so restoring the box reconnects it to any partner still on the page.</summary>
     public void DeleteToTrash(NoteBox box)
     {
         if (!Boxes.Remove(box)) return;
-        DropLinks(box);
+        for (int i = Links.Count - 1; i >= 0; i--)
+            if (ReferenceEquals(Links[i].A, box) || ReferenceEquals(Links[i].B, box))
+            {
+                _heldLinks.Add(Links[i]);
+                Links.RemoveAt(i);
+            }
         Unsubscribe(box);
         Trash.Insert(0, box);
         Changed?.Invoke();
     }
 
-    /// <summary>Bring a deleted box back, optionally at a new position (drag-drop target point).</summary>
+    /// <summary>Bring a deleted box back, optionally at a new position (drag-drop target point). Any parked link
+    /// whose other endpoint is still present is reinstated so the bubble returns connected.</summary>
     public void RestoreFromTrash(NoteBox box, double? x = null, double? y = null)
     {
         if (!Trash.Remove(box)) return;
@@ -279,6 +291,15 @@ public sealed class CanvasDocument
         if (y is not null) box.Y = Math.Max(0, y.Value);
         Subscribe(box);
         Boxes.Add(box);
+        for (int i = _heldLinks.Count - 1; i >= 0; i--)
+        {
+            var l = _heldLinks[i];
+            if ((ReferenceEquals(l.A, box) || ReferenceEquals(l.B, box)) && Boxes.Contains(l.A) && Boxes.Contains(l.B))
+            {
+                Links.Add(l);
+                _heldLinks.RemoveAt(i);
+            }
+        }
         Changed?.Invoke();
     }
 
