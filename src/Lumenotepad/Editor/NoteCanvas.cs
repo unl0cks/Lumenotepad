@@ -279,33 +279,40 @@ public sealed class NoteCanvas : Panel
         }
         if (visited.Count < 2) return;
 
-        double ring = Math.Max(215, boxes.Max(b => b.Width) * 0.75 + 60);   // even edge length between a node and its children
         double cx = root.X + root.Width / 2, cy = root.Y + H(root) / 2;
-        // Classic radial tree: each node owns an angular SECTOR; its children split that sector by their
-        // leaf-weight and sit at the midpoint of their slice, one ring further out per level (radius grows
-        // with depth). Because a child's slice nests INSIDE its parent's, sub-trees never fold back over the
-        // centre or each other — the fan stays clean and every branch runs straight outward.
+        const double gap = 46;   // constant edge-to-edge breathing room between a node and each of its children
+        // How far a box's edge sits from its centre along a heading: wide boxes get room sideways, short
+        // boxes stay tight vertically. Spacing each child by (parentReach + childReach + gap) keeps the fan
+        // compact yet never overlapping — a huge central pill pushes its side branches out, nothing else.
+        double Reach(NoteBox b, double ang)
+        {
+            double c = Math.Abs(Math.Cos(ang)), s = Math.Abs(Math.Sin(ang));
+            double tx = c < 1e-6 ? double.PositiveInfinity : (b.Width / 2) / c;
+            double ty = s < 1e-6 ? double.PositiveInfinity : (H(b) / 2) / s;
+            return Math.Min(tx, ty);
+        }
+
+        // Classic radial tree: each node owns an angular SECTOR that its children split by leaf-weight; each
+        // child sits at its slice midpoint, placed relative to its PARENT (not the centre, so depth doesn't
+        // fling nodes to the edges). Nested slices keep every sub-tree pointing outward — nothing folds back.
         var leaves = new System.Collections.Generic.Dictionary<NoteBox, int>();
         int Leaves(NoteBox n) => leaves[n] = children[n].Count == 0 ? 1 : children[n].Sum(Leaves);
         Leaves(root);
 
         var targets = new System.Collections.Generic.Dictionary<NoteBox, Point> { [root] = new Point(cx, cy) };
-        void Layout(NoteBox n, double a0, double a1)
+        void Layout(NoteBox n, Point at, double a0, double a1)
         {
-            if (!ReferenceEquals(n, root))
-            {
-                double a = (a0 + a1) / 2, r = level[n] * ring;
-                targets[n] = new Point(cx + r * Math.Cos(a), cy + r * Math.Sin(a));
-            }
+            targets[n] = at;
             double span = a1 - a0, acc = a0;
             foreach (var c in children[n])
             {
                 double slice = span * leaves[c] / leaves[n];
-                Layout(c, acc, acc + slice);
+                double a = acc + slice / 2, dist = Reach(n, a) + Reach(c, a) + gap;
+                Layout(c, new Point(at.X + dist * Math.Cos(a), at.Y + dist * Math.Sin(a)), acc, acc + slice);
                 acc += slice;
             }
         }
-        Layout(root, -Math.PI / 2, 3 * Math.PI / 2);   // full circle, first branch starting due North
+        Layout(root, new Point(cx, cy), -Math.PI / 2, 3 * Math.PI / 2);   // full circle, first branch due North
 
         // Tidy is an explicit rearrange, so re-anchor BOTH ends of every connector to the compass edge that
         // faces its partner's new spot — lines then leave and arrive pointing straight at each other.
