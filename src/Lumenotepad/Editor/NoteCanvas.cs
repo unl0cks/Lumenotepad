@@ -679,9 +679,6 @@ internal sealed class NoteBoxView : Panel
     [System.Flags]
     private enum Edge { None = 0, Left = 1, Right = 2, Top = 4, Bottom = 8 }
 
-    /// <summary>Height of a mind-map bubble's title bar (the grey grip band + its close wedge).</summary>
-    private const double BubbleBand = 22;
-
     // Paper-region theme tokens, read at construction (theme changes rebuild the canvas views).
     private readonly IBrush HoverBorder;
     private readonly IBrush FocusBorder;
@@ -1248,7 +1245,6 @@ internal sealed class NoteBoxView : Panel
             double rad = bubble ? 999 : NoteCanvas.NoteRadiusPref;
             _chrome.CornerRadius = new CornerRadius(rad);
             _grip.CornerRadius = new CornerRadius(rad, rad, 0, 0);
-            _grip.Height = bubble ? BubbleBand : 17;      // bubbles get a taller title bar
         }
         if (bubble)
         {
@@ -1260,20 +1256,20 @@ internal sealed class NoteBoxView : Panel
                 Editor.InvalidateMeasure();
                 Editor.InvalidateVisual();
             }
-            Editor.Margin = new Thickness(10, 3, 10, BubbleBand + 3);   // balances the taller title bar
-            // The title bar reads as a distinct band: a hairline under it when active.
-            _grip.BorderThickness = new Thickness(0, 0, 0, active ? 1 : 0);
-            _grip.BorderBrush = GripBarFill;
-            // The ✕ is the red wedge at the RIGHT END of the title bar: same height as the bar, straight
-            // left edge, right side following the pill curve. Transparent at rest, red on hover (like the
-            // card). ArrangeOverride sets the size + clip (both depend on the pill radius).
-            _closeGlyph.FontSize = 8.5;
+            Editor.Margin = new Thickness(10, 3, 10, 20);
+            // A small round close button nestled just inside the top-right corner — it echoes the
+            // connect-port dots (same round chip language), a subtle chip at rest and red on hover.
+            // ArrangeOverride places it along the corner diagonal so it's always fully on the bubble.
+            _close.Width = _close.Height = 16;
+            _close.CornerRadius = new CornerRadius(8);
+            _close.Clip = null;
+            _closeGlyph.FontSize = 8;
             _closeGlyph.HorizontalAlignment = HorizontalAlignment.Center;
             _closeGlyph.VerticalAlignment = VerticalAlignment.Center;
             _closeGlyph.Margin = default;
-            _closeRestBg = Brushes.Transparent;
-            _closeRestFg = CloseFg;
-            _closeHoverBg = CloseHoverBg;
+            _closeRestBg = new SolidColorBrush(Colors.Black, 0.22);
+            _closeRestFg = new SolidColorBrush(Colors.White, 0.80);
+            _closeHoverBg = new SolidColorBrush(Color.Parse("#E81123"));
         }
         else if (normalBox)   // ordinary note card: the ✕ hugs the square corner as before
         {
@@ -1327,37 +1323,11 @@ internal sealed class NoteBoxView : Panel
                 // Seat the red ✕ on the grip bar (17px tall, inset by the 2.6 border), at the right end
                 // of the bar's flat run (x = w − corner radius) so it's fully visible and bar-attached.
                 double radius = Math.Min(finalSize.Width, finalSize.Height) / 2;
-                double cw = radius + 8;                    // reaches from a touch inside the flat top to the edge
-                _close.Width = cw;
-                _close.Height = BubbleBand;                // the red wedge is exactly the title bar's height
-                _close.CornerRadius = new CornerRadius(0);
-                _close.Margin = default;                   // flush top-right, riding the bar
-                // Clip to the pill outline: the wedge's right side follows the curve, its left + bottom stay straight.
-                _close.Clip = Stadium(new Rect(cw - finalSize.Width, 0, finalSize.Width, finalSize.Height), radius);
+                double m = Math.Max(2, radius * 0.2929 - 1);   // nestle the round close just inside the corner
+                _close.Margin = new Thickness(0, m, m, 0);
             }
         }
         return base.ArrangeOverride(finalSize);
-    }
-
-    /// <summary>A stadium/rounded-rect geometry (uniform corner radius) — the pill outline, used to clip
-    /// the close wedge so its right edge follows the bubble's curve.</summary>
-    private static Geometry Stadium(Rect r, double rad)
-    {
-        rad = Math.Min(rad, Math.Min(r.Width, r.Height) / 2);
-        var geo = new StreamGeometry();
-        using var c = geo.Open();
-        var sz = new Size(rad, rad);
-        c.BeginFigure(new Point(r.X + rad, r.Y), true);
-        c.LineTo(new Point(r.Right - rad, r.Y));
-        c.ArcTo(new Point(r.Right, r.Y + rad), sz, 0, false, SweepDirection.Clockwise);
-        c.LineTo(new Point(r.Right, r.Bottom - rad));
-        c.ArcTo(new Point(r.Right - rad, r.Bottom), sz, 0, false, SweepDirection.Clockwise);
-        c.LineTo(new Point(r.X + rad, r.Bottom));
-        c.ArcTo(new Point(r.X, r.Bottom - rad), sz, 0, false, SweepDirection.Clockwise);
-        c.LineTo(new Point(r.X, r.Y + rad));
-        c.ArcTo(new Point(r.X + rad, r.Y), sz, 0, false, SweepDirection.Clockwise);
-        c.EndFigure(true);
-        return geo;
     }
 
     private void PlaceDiagonalPorts(double w, double h)
