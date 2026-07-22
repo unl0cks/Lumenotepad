@@ -107,6 +107,17 @@ public static class ThemeManager
             Current.GlassWindow ? Platform.DwmAcrylic.Backdrop.Acrylic : Platform.DwmAcrylic.Backdrop.None,
             dark: Current.DarkChrome);
 
+    /// <summary>Force the window's DWM backdrop to re-composite by toggling it OFF then back ON — clears
+    /// the stuck "bright wash" a snap/maximize can leave on the acrylic surface (a plain re-set is often a
+    /// no-op DWM ignores; the off→on toggle makes it tear the surface down and rebuild). No-op unless the
+    /// theme uses glass — solid themes never show the wash.</summary>
+    public static void RefreshBackdrop(Window window)
+    {
+        if (!Current.GlassWindow) { ApplyChrome(window); return; }
+        Platform.DwmAcrylic.Apply(window, Platform.DwmAcrylic.Backdrop.None, dark: Current.DarkChrome);
+        ApplyChrome(window);
+    }
+
     /// <summary>Chrome for secondary windows (preferences, notebook wizard, font browser): acrylic
     /// frost ONLY when the theme is whole-window glass (Lumen), else a plain opaque window matching
     /// the solid frame. Paired with a Background bound to WindowSurfaceBrush.</summary>

@@ -99,7 +99,11 @@ public partial class MainWindow : Window
         SyncMaximizeMargin();
         // Some events (display-mode flips, DWM resets) silently drop the corner preference WITHOUT a
         // WindowState change; re-assert it whenever the floating window regains focus — self-heals square corners.
-        Activated += (_, _) => { if (WindowState == WindowState.Normal) WinChrome.RoundCorners(this, true); };
+        Activated += (_, _) =>
+        {
+            if (WindowState == WindowState.Normal) WinChrome.RoundCorners(this, true);
+            else if (WindowState == WindowState.Maximized) Services.ThemeManager.RefreshBackdrop(this);   // clear any stuck wash on re-focus
+        };
         Motion.ScaleIn(Host, 0.97, 220);                               // launch: fade + scale in
         SyncTrayEnabled();
         SyncHotkey();
@@ -147,10 +151,12 @@ public partial class MainWindow : Window
         }
         else if (state == WindowState.Maximized)
         {
-            // Snap-maximize can leave the acrylic backdrop showing DWM's snap-animation surface
-            // (a stuck bright wash). Re-assert the backdrop once the maximize settles.
-            DispatcherTimer.RunOnce(() => Services.ThemeManager.ApplyChrome(this), TimeSpan.FromMilliseconds(120));
-            DispatcherTimer.RunOnce(() => Services.ThemeManager.ApplyChrome(this), TimeSpan.FromMilliseconds(450));
+            // Snap-maximize can leave the acrylic backdrop showing DWM's snap-animation surface (a stuck
+            // bright wash) that otherwise only clears on the next activation (alt-tab). The wash lands
+            // ~1s in, past a single early re-assert — toggle the backdrop off→on repeatedly as the maximize
+            // settles so it recomposites and clears itself.
+            foreach (var ms in new[] { 120, 450, 900, 1400 })
+                DispatcherTimer.RunOnce(() => Services.ThemeManager.RefreshBackdrop(this), TimeSpan.FromMilliseconds(ms));
         }
     }
 
