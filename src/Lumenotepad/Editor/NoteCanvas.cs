@@ -267,7 +267,6 @@ public sealed class NoteCanvas : Panel
                    ?? boxes.OrderByDescending(b => adj[b].Count).First();
 
         var children = boxes.ToDictionary(b => b, _ => new System.Collections.Generic.List<NoteBox>());
-        var level = new System.Collections.Generic.Dictionary<NoteBox, int> { [root] = 0 };
         var visited = new System.Collections.Generic.HashSet<NoteBox> { root };
         var q = new System.Collections.Generic.Queue<NoteBox>();
         q.Enqueue(root);
@@ -275,44 +274,54 @@ public sealed class NoteCanvas : Panel
         {
             var n = q.Dequeue();
             foreach (var m in adj[n])
-                if (visited.Add(m)) { children[n].Add(m); level[m] = level[n] + 1; q.Enqueue(m); }
+                if (visited.Add(m)) { children[n].Add(m); q.Enqueue(m); }
         }
         if (visited.Count < 2) return;
 
         double cx = root.X + root.Width / 2, cy = root.Y + H(root) / 2;
-        const double gap = 46;   // constant edge-to-edge breathing room between a node and each of its children
-        // How far a box's edge sits from its centre along a heading: wide boxes get room sideways, short
-        // boxes stay tight vertically. Spacing each child by (parentReach + childReach + gap) keeps the fan
-        // compact yet never overlapping — a huge central pill pushes its side branches out, nothing else.
-        double Reach(NoteBox b, double ang)
+        const double hGap = 56;   // horizontal breathing room between a node's right/left edge and its child column
+        const double vGap = 22;   // vertical breathing room between stacked sibling sub-trees
+
+        // The vertical extent each sub-tree needs = the stacked height of all its leaves. Laying children out
+        // in a vertical COLUMN (not a radial fan) means wide text boxes only ever need height separation from
+        // their siblings, never width — so nothing overlaps however long the labels get.
+        var subH = new System.Collections.Generic.Dictionary<NoteBox, double>();
+        double SubHeight(NoteBox n)
         {
-            double c = Math.Abs(Math.Cos(ang)), s = Math.Abs(Math.Sin(ang));
-            double tx = c < 1e-6 ? double.PositiveInfinity : (b.Width / 2) / c;
-            double ty = s < 1e-6 ? double.PositiveInfinity : (H(b) / 2) / s;
-            return Math.Min(tx, ty);
+            var kids = children[n];
+            if (kids.Count == 0) return subH[n] = H(n);
+            double sum = -vGap;
+            foreach (var c in kids) sum += SubHeight(c) + vGap;
+            return subH[n] = Math.Max(H(n), sum);
         }
+        SubHeight(root);
 
-        // Classic radial tree: each node owns an angular SECTOR that its children split by leaf-weight; each
-        // child sits at its slice midpoint, placed relative to its PARENT (not the centre, so depth doesn't
-        // fling nodes to the edges). Nested slices keep every sub-tree pointing outward — nothing folds back.
-        var leaves = new System.Collections.Generic.Dictionary<NoteBox, int>();
-        int Leaves(NoteBox n) => leaves[n] = children[n].Count == 0 ? 1 : children[n].Sum(Leaves);
-        Leaves(root);
-
+        // Classic two-sided mind-map tree: root in the centre, branches flowing out to the RIGHT and LEFT
+        // (split to balance their heights), each node's children stacked in a vertical column one step
+        // further out. Compact vertically, honest horizontally (depth = width), and never self-overlapping.
         var targets = new System.Collections.Generic.Dictionary<NoteBox, Point> { [root] = new Point(cx, cy) };
-        void Layout(NoteBox n, Point at, double a0, double a1)
+        void PlaceColumn(System.Collections.Generic.List<NoteBox> kids, int side, double parentHalfW, double atX, double atY)
         {
-            targets[n] = at;
-            double span = a1 - a0, acc = a0;
-            foreach (var c in children[n])
+            double band = -vGap;
+            foreach (var c in kids) band += subH[c] + vGap;
+            double top = atY - band / 2;
+            foreach (var c in kids)
             {
-                double slice = span * leaves[c] / leaves[n];
-                double a = acc + slice / 2, dist = Reach(n, a) + Reach(c, a) + gap;
-                Layout(c, new Point(at.X + dist * Math.Cos(a), at.Y + dist * Math.Sin(a)), acc, acc + slice);
-                acc += slice;
+                double childCx = atX + side * (parentHalfW + c.Width / 2 + hGap);
+                double childCy = top + subH[c] / 2;
+                targets[c] = new Point(childCx, childCy);
+                PlaceColumn(children[c], side, c.Width / 2, childCx, childCy);
+                top += subH[c] + vGap;
             }
         }
-        Layout(root, new Point(cx, cy), -Math.PI / 2, 3 * Math.PI / 2);   // full circle, first branch due North
+        // Split the root's branches into two sides, greedily balancing total sub-tree height.
+        var right = new System.Collections.Generic.List<NoteBox>();
+        var left = new System.Collections.Generic.List<NoteBox>();
+        double rSum = 0, lSum = 0;
+        foreach (var c in children[root].OrderByDescending(c => subH[c]))
+            if (rSum <= lSum) { right.Add(c); rSum += subH[c] + vGap; } else { left.Add(c); lSum += subH[c] + vGap; }
+        PlaceColumn(right, +1, root.Width / 2, cx, cy);
+        PlaceColumn(left, -1, root.Width / 2, cx, cy);
 
         // Tidy is an explicit rearrange, so re-anchor BOTH ends of every connector to the compass edge that
         // faces its partner's new spot — lines then leave and arrive pointing straight at each other.
