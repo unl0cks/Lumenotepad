@@ -215,6 +215,7 @@ public sealed class NoteCanvas : Panel
         box.Color = from.Color ?? MindmapColor ?? DefaultBubbleColor;
         var view = AddBoxView(box);
         _doc.ToggleLink(from, box, "E", "W");
+        _links.AnimateLinkIn(_doc.Links[^1]);
         _doc.CommitGeometry();
         Dispatcher.UIThread.Post(view.FocusEditor, DispatcherPriority.Background);
     }
@@ -296,7 +297,8 @@ public sealed class NoteCanvas : Panel
         foreach (var child in Children)                        // drop the hover highlight on every bubble
             if (child is NoteBoxView v) v.SetLinkTarget(false);
         if (src is null || _doc is null || snap is null) return;
-        _doc.ToggleLink(src, snap.Box, srcDir, dstDir);        // anchor at the exact port snapped to
+        if (_doc.ToggleLink(src, snap.Box, srcDir, dstDir))    // anchor at the exact port snapped to
+            _links.AnimateLinkIn(_doc.Links[^1]);              // string grows into the target with sparks
         _links.InvalidateVisual();
         _doc.CommitGeometry();       // links persist alongside geometry
     }
@@ -580,6 +582,7 @@ public sealed class NoteCanvas : Panel
     {
         var view = new NoteBoxView(this, box);
         Children.Add(view);
+        Views.Motion.ScaleIn(view, 0.82);   // new container pops in
         UpdateHint();
         InvalidateMeasure();
         return view;
@@ -610,8 +613,9 @@ public sealed class NoteCanvas : Panel
         if (!view.Box.IsEmpty && ConfirmDelete is not null && !await ConfirmDelete()) return;
         if (HistoryEnabled && !view.Box.IsEmpty)
         {
+            if (BoxRect(view.Box) is { } r) _links.AnimateBubbleRemoval(view.Box, r);
             _doc.DeleteToTrash(view.Box);
-            DetachView(view);
+            AnimateOutAndDetach(view);
             TrashChanged?.Invoke();
         }
         else
@@ -622,8 +626,21 @@ public sealed class NoteCanvas : Panel
 
     internal void DeleteBoxPermanently(NoteBoxView view)
     {
+        if (BoxRect(view.Box) is { } r) _links.AnimateBubbleRemoval(view.Box, r);
         _doc?.RemoveBox(view.Box);
-        DetachView(view);
+        AnimateOutAndDetach(view);
+    }
+
+    /// <summary>Play a container's exit animation (shrink + fade), then detach it once the tween ends.</summary>
+    private void AnimateOutAndDetach(NoteBoxView view)
+    {
+        if (ReferenceEquals(ActiveEditor, view.Editor)) SetActive(null);
+        Views.Motion.CollapseOut(view, 190, () =>
+        {
+            Children.Remove(view);
+            UpdateHint();
+            InvalidateMeasure();
+        });
     }
 
     private void DetachView(NoteBoxView view)
@@ -1240,15 +1257,16 @@ internal sealed class NoteBoxView : Panel
                 Editor.InvalidateVisual();
             }
             Editor.Margin = new Thickness(10, 3, 10, 20);
-            // A red close button seated ON the grip "title bar", at the right end of its flat run
-            // (ArrangeOverride positions it there) — fully visible, centred on the bar.
-            _close.Width = _close.Height = 15;
+            // Part OF the grey grip "title bar": transparent at rest so the bar shows through (just the
+            // ✕ glyph), red on hover — exactly like the regular note card. ArrangeOverride seats it at
+            // the right end of the bar's flat run.
+            _close.Width = _close.Height = 16;
             _close.CornerRadius = new CornerRadius(5);
             _closeGlyph.FontSize = 8.5;
             _closeGlyph.Margin = default;
-            _closeRestBg = new SolidColorBrush(Color.Parse("#E24B4B"));
-            _closeRestFg = Brushes.White;
-            _closeHoverBg = new SolidColorBrush(Color.Parse("#F1352B"));
+            _closeRestBg = Brushes.Transparent;
+            _closeRestFg = new SolidColorBrush(Colors.White, 0.66);
+            _closeHoverBg = new SolidColorBrush(Color.Parse("#E81123"));
         }
         else if (normalBox)   // ordinary note card: the ✕ hugs the square corner as before
         {
@@ -1299,7 +1317,7 @@ internal sealed class NoteBoxView : Panel
                 // Seat the red ✕ on the grip bar (17px tall, inset by the 2.6 border), at the right end
                 // of the bar's flat run (x = w − corner radius) so it's fully visible and bar-attached.
                 double radius = Math.Min(finalSize.Width, finalSize.Height) / 2;
-                _close.Margin = new Thickness(0, 3.6, radius, 0);
+                _close.Margin = new Thickness(0, 3.1, radius, 0);   // centred on the 17px grip bar
             }
         }
         return base.ArrangeOverride(finalSize);

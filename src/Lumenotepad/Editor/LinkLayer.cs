@@ -50,6 +50,14 @@ public sealed class LinkLayer : Control
     private DispatcherTimer? _timer;
     private Color _accent = Colors.Gray;
 
+    // ---- create / remove flourishes: growing links, retracting ghosts, and sparks ----
+    private sealed class Particle { public Point Pos; public Vector Vel; public double Life, MaxLife, Size; public Color Color; }
+    private sealed class Retract { public NoteBox Survivor = null!; public string SurvivorDir = "E"; public Point Start; public Color ColSurv, ColGone; public double T; }
+    private readonly List<Particle> _particles = new();
+    private readonly Dictionary<MindLink, double> _grow = new();   // link → draw-in progress 0..1
+    private readonly List<Retract> _retracts = new();
+    private readonly Random _rng = new();
+
     public LinkLayer() => IsHitTestVisible = false;
 
     /// <summary>Re-derive theme-accent colours (theme changes arrive as a canvas Rebuild).</summary>
@@ -82,6 +90,40 @@ public sealed class LinkLayer : Control
         PendingSource = null;
         PendingSnap = null;
         InvalidateVisual();
+    }
+
+    // ---- create / remove animations ----
+
+    /// <summary>Draw a freshly created link IN: the string extends from the source into the target with
+    /// sparks trailing at the growing tip (a fuse getting longer).</summary>
+    internal void AnimateLinkIn(MindLink link)
+    {
+        _grow[link] = 0;
+        Animate();
+    }
+
+    /// <summary>A bubble is being removed: each of its links retracts toward the surviving bubble,
+    /// flailing left/right and shedding sparks until it is sucked in. Call BEFORE the box is removed,
+    /// while its links still exist; <paramref name="goneRect"/> is the bubble's last on-screen rect.</summary>
+    internal void AnimateBubbleRemoval(NoteBox gone, Rect goneRect)
+    {
+        if (Doc is null) return;
+        foreach (var link in Doc.Links)
+        {
+            NoteBox? surv = ReferenceEquals(link.A, gone) ? link.B
+                          : ReferenceEquals(link.B, gone) ? link.A : null;
+            if (surv is null) continue;
+            bool goneIsA = ReferenceEquals(link.A, gone);
+            _retracts.Add(new Retract
+            {
+                Survivor = surv,
+                SurvivorDir = goneIsA ? link.DirB : link.DirA,
+                Start = EdgePoint(goneRect, goneIsA ? link.DirA : link.DirB),
+                ColSurv = ColorOf(surv),
+                ColGone = ColorOf(gone),
+            });
+        }
+        Animate();
     }
 
     // ---- animation driver: springy connector bellies + the rubber band, self-stopping when at rest ----
@@ -122,6 +164,49 @@ public sealed class LinkLayer : Control
             Step(ref _penCtrl, ref _penCtrlVel, mid, dt, 320, 13);
             moving = true;   // keep the loop live for the whole drag so the next flick is caught
         }
+
+        // Link draw-in: advance progress and spray sparks at the growing tip (a fuse getting longer).
+        foreach (var link in _grow.Keys.ToList())
+        {
+            double g = _grow[link] + dt / 0.45;
+            if (g >= 1) { _grow.Remove(link); continue; }
+            _grow[link] = g;
+            if (Ends(link, out var a, out var b, out var va, out var vb))
+            {
+                Point tip;
+                if (Straight) tip = new Point(a.X + (b.X - a.X) * g, a.Y + (b.Y - a.Y) * g);
+                else if (_springs.TryGetValue(link, out var s)) tip = Bezier(a, s.C1, s.C2, b, g);
+                else { var (c1, c2) = Controls(a, b, va, vb, link.A, link.B); tip = Bezier(a, c1, c2, b, g); }
+                Spawn(tip, ColorOf(link.B), 2, 95);
+            }
+        }
+        if (_grow.Count > 0) moving = true;
+
+        // Retracting ghosts (a removed bubble's links): flail toward the survivor, then get sucked in.
+        for (int i = _retracts.Count - 1; i >= 0; i--)
+        {
+            var r = _retracts[i];
+            r.T += dt / 0.6;
+            if (r.T >= 1)
+            {
+                if (Resolve(r.Survivor) is { } srr) Spawn(EdgePoint(srr, r.SurvivorDir), r.ColSurv, 12, 150);
+                _retracts.RemoveAt(i);
+                continue;
+            }
+            if (RetractGeo(r, out _, out _, out var fe)) Spawn(fe, r.ColGone, 1, 70);
+        }
+        if (_retracts.Count > 0) moving = true;
+
+        // Sparks: integrate + fade.
+        for (int i = _particles.Count - 1; i >= 0; i--)
+        {
+            var p = _particles[i];
+            p.Life += dt;
+            if (p.Life >= p.MaxLife) { _particles.RemoveAt(i); continue; }
+            p.Pos = new Point(p.Pos.X + p.Vel.X * dt, p.Pos.Y + p.Vel.Y * dt);
+            p.Vel = new Vector(p.Vel.X * 0.90, p.Vel.Y * 0.90);
+        }
+        if (_particles.Count > 0) moving = true;
 
         Prune();
         InvalidateVisual();
@@ -176,9 +261,11 @@ public sealed class LinkLayer : Control
                     },
                 };
                 var pen = new Pen(brush, 2.6, lineCap: PenLineCap.Round);
+                bool growing = _grow.TryGetValue(link, out var gp);
                 if (Straight)
                 {
-                    ctx.DrawLine(pen, a, b);
+                    var end = growing ? new Point(a.X + (b.X - a.X) * gp, a.Y + (b.Y - a.Y) * gp) : b;
+                    ctx.DrawLine(pen, a, end);
                 }
                 else
                 {
@@ -188,7 +275,7 @@ public sealed class LinkLayer : Control
                         s = new LinkSpring { C1 = c1t, C2 = c2t };
                         _springs[link] = s;
                     }
-                    ctx.DrawGeometry(null, pen, Curve(a, s.C1, s.C2, b));   // belly = animated control points
+                    ctx.DrawGeometry(null, pen, growing ? PartialCurve(a, s.C1, s.C2, b, gp) : Curve(a, s.C1, s.C2, b));
                 }
             }
 
@@ -212,6 +299,73 @@ public sealed class LinkLayer : Control
             ctx.DrawEllipse(new SolidColorBrush(col),
                 new Pen(new SolidColorBrush(Colors.White, 0.85), 1.25), end, 4.5, 4.5);
         }
+
+        // Retracting ghost links (a removed bubble's connectors, whipping into the survivor).
+        foreach (var r in _retracts)
+            if (RetractGeo(r, out var anchor, out var ctrl, out var fe))
+            {
+                var brush = new LinearGradientBrush
+                {
+                    StartPoint = new RelativePoint(anchor, RelativeUnit.Absolute),
+                    EndPoint = new RelativePoint(fe, RelativeUnit.Absolute),
+                    GradientStops = { new GradientStop(r.ColSurv, 0), new GradientStop(r.ColGone, 1) },
+                };
+                var pen = new Pen(brush, 2.6, lineCap: PenLineCap.Round);
+                var geo = new StreamGeometry();
+                using (var g = geo.Open()) { g.BeginFigure(anchor, false); g.QuadraticBezierTo(ctrl, fe); g.EndFigure(false); }
+                ctx.DrawGeometry(null, pen, geo);
+                ctx.DrawEllipse(new SolidColorBrush(r.ColGone), null, fe, 3.2, 3.2);
+            }
+
+        // Sparks on top of everything.
+        foreach (var p in _particles)
+        {
+            double a = 1 - p.Life / p.MaxLife;
+            double rad = p.Size * a + 0.5;
+            ctx.DrawEllipse(new SolidColorBrush(p.Color, a * 0.9), null, p.Pos, rad, rad);
+        }
+    }
+
+    private void Spawn(Point at, Color col, int count, double speed)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            double ang = _rng.NextDouble() * Math.PI * 2;
+            double sp = speed * (0.35 + _rng.NextDouble() * 0.9);
+            _particles.Add(new Particle
+            {
+                Pos = at, Vel = new Vector(Math.Cos(ang) * sp, Math.Sin(ang) * sp),
+                Life = 0, MaxLife = 0.35 + _rng.NextDouble() * 0.45,
+                Size = 1.4 + _rng.NextDouble() * 1.9, Color = col,
+            });
+        }
+    }
+
+    /// <summary>Geometry of a retracting ghost link at its current progress: the survivor anchor, a bowed
+    /// control point, and the flailing free end sweeping toward the anchor.</summary>
+    private bool RetractGeo(Retract r, out Point anchor, out Point ctrl, out Point freeEnd)
+    {
+        anchor = ctrl = freeEnd = default;
+        if (Resolve!(r.Survivor) is not { } sr) return false;
+        anchor = EdgePoint(sr, r.SurvivorDir);
+        double e = r.T * r.T;                                          // ease-in: accelerates into the survivor
+        var to = new Point(r.Start.X + (anchor.X - r.Start.X) * e, r.Start.Y + (anchor.Y - r.Start.Y) * e);
+        var perp = Perp(anchor, to);
+        double off = 30 * (1 - r.T) * (1 - r.T) * Math.Sin(r.T * 24);  // decaying left/right flail
+        freeEnd = new Point(to.X + perp.X * off, to.Y + perp.Y * off);
+        ctrl = new Point((anchor.X + freeEnd.X) / 2 + perp.X * off, (anchor.Y + freeEnd.Y) / 2 + perp.Y * off);
+        return true;
+    }
+
+    private static Geometry PartialCurve(Point a, Point c1, Point c2, Point b, double t)
+    {
+        var geo = new StreamGeometry();
+        using var g = geo.Open();
+        g.BeginFigure(a, false);
+        int n = Math.Max(2, (int)(t * 26));
+        for (int i = 1; i <= n; i++) g.LineTo(Bezier(a, c1, c2, b, t * i / n));
+        g.EndFigure(false);
+        return geo;
     }
 
     /// <summary>Where the rubber-band tip sits: on the snapped port of the bubble it hovers, else the cursor.</summary>

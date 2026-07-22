@@ -740,10 +740,10 @@ public partial class MainView : UserControl
     /// <summary>Toggles for connector style and the diagonal connect ports.</summary>
     private Flyout BuildOptionsFlyout()
     {
-        var panel = new StackPanel { Spacing = 9, Margin = new Thickness(12, 10) };
-        var straight = new CheckBox { Content = "Straight links", FontSize = 12.5, IsChecked = PageCanvas.MindmapStraightLines };
+        var panel = new StackPanel { Spacing = 4, Margin = new Thickness(6, 4) };
+        var straight = new CheckBox { Content = "Straight links", FontSize = 12, IsChecked = PageCanvas.MindmapStraightLines };
         straight.IsCheckedChanged += (_, _) => PageCanvas.MindmapStraightLines = straight.IsChecked == true;
-        var diag = new CheckBox { Content = "Diagonal connect points", FontSize = 12.5, IsChecked = PageCanvas.MindmapDiagonalPorts };
+        var diag = new CheckBox { Content = "Diagonal connect points", FontSize = 12, IsChecked = PageCanvas.MindmapDiagonalPorts };
         diag.IsCheckedChanged += (_, _) => { PageCanvas.MindmapDiagonalPorts = diag.IsChecked == true; PageCanvas.RefreshMindmapPorts(); };
         panel.Children.Add(straight);
         panel.Children.Add(diag);
