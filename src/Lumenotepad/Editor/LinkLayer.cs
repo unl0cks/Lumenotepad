@@ -123,7 +123,43 @@ public sealed class LinkLayer : Control
                 ColGone = ColorOf(gone),
             });
         }
+        Burst(goneRect, ColorOf(gone), 28);   // the bubble pops into a spray of its own colour
         Animate();
+    }
+
+    /// <summary>Remove a single link (both bubbles survive): the same fuse retract — the string detaches
+    /// from A and whips into B, shedding sparks. Call while the link's bubbles still resolve.</summary>
+    internal void AnimateLinkRemoval(MindLink link)
+    {
+        if (Resolve is null || Resolve(link.A) is not { } ra || Resolve(link.B) is null) return;
+        _retracts.Add(new Retract
+        {
+            Survivor = link.B,
+            SurvivorDir = link.DirB,
+            Start = EdgePoint(ra, link.DirA),
+            ColSurv = ColorOf(link.B),
+            ColGone = ColorOf(link.A),
+        });
+        _grow.Remove(link);
+        Animate();
+    }
+
+    /// <summary>Spray particles across a rect's footprint (a bubble popping).</summary>
+    private void Burst(Rect r, Color col, int count)
+    {
+        var c = r.Center;
+        for (int i = 0; i < count; i++)
+        {
+            double ang = _rng.NextDouble() * Math.PI * 2;
+            double sp = 45 + _rng.NextDouble() * 150;
+            double px = c.X + (_rng.NextDouble() - 0.5) * r.Width * 0.7;
+            double py = c.Y + (_rng.NextDouble() - 0.5) * r.Height * 0.6;
+            _particles.Add(new Particle
+            {
+                Pos = new Point(px, py), Vel = new Vector(Math.Cos(ang) * sp, Math.Sin(ang) * sp),
+                Life = 0, MaxLife = 0.5 + _rng.NextDouble() * 0.5, Size = 2 + _rng.NextDouble() * 2.5, Color = col,
+            });
+        }
     }
 
     // ---- animation driver: springy connector bellies + the rubber band, self-stopping when at rest ----
@@ -186,7 +222,7 @@ public sealed class LinkLayer : Control
         for (int i = _retracts.Count - 1; i >= 0; i--)
         {
             var r = _retracts[i];
-            r.T += dt / 0.6;
+            r.T += dt / 0.85;
             if (r.T >= 1)
             {
                 if (Resolve(r.Survivor) is { } srr) Spawn(EdgePoint(srr, r.SurvivorDir), r.ColSurv, 12, 150);
@@ -348,12 +384,14 @@ public sealed class LinkLayer : Control
         anchor = ctrl = freeEnd = default;
         if (Resolve!(r.Survivor) is not { } sr) return false;
         anchor = EdgePoint(sr, r.SurvivorDir);
-        double e = r.T * r.T;                                          // ease-in: accelerates into the survivor
+        double e = r.T * r.T;                                          // ease-in: drifts, then zips into the survivor
         var to = new Point(r.Start.X + (anchor.X - r.Start.X) * e, r.Start.Y + (anchor.Y - r.Start.Y) * e);
         var perp = Perp(anchor, to);
-        double off = 30 * (1 - r.T) * (1 - r.T) * Math.Sin(r.T * 24);  // decaying left/right flail
-        freeEnd = new Point(to.X + perp.X * off, to.Y + perp.Y * off);
-        ctrl = new Point((anchor.X + freeEnd.X) / 2 + perp.X * off, (anchor.Y + freeEnd.Y) / 2 + perp.Y * off);
+        double swing = 52 * (1 - r.T) * Math.Sin(r.T * 12);           // wide, slowly-decaying left↔right swing
+        freeEnd = new Point(to.X + perp.X * swing * 0.55, to.Y + perp.Y * swing * 0.55);
+        // The belly swings MORE than the ends, so the whole string whips side to side like a slack rope.
+        var mid = new Point((anchor.X + freeEnd.X) / 2, (anchor.Y + freeEnd.Y) / 2);
+        ctrl = new Point(mid.X + perp.X * swing * 1.4, mid.Y + perp.Y * swing * 1.4);
         return true;
     }
 

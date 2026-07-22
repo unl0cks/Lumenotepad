@@ -297,8 +297,13 @@ public sealed class NoteCanvas : Panel
         foreach (var child in Children)                        // drop the hover highlight on every bubble
             if (child is NoteBoxView v) v.SetLinkTarget(false);
         if (src is null || _doc is null || snap is null) return;
+        var existing = _doc.Links.FirstOrDefault(l =>
+            (ReferenceEquals(l.A, src) && ReferenceEquals(l.B, snap.Box)) ||
+            (ReferenceEquals(l.A, snap.Box) && ReferenceEquals(l.B, src)));
         if (_doc.ToggleLink(src, snap.Box, srcDir, dstDir))    // anchor at the exact port snapped to
             _links.AnimateLinkIn(_doc.Links[^1]);              // string grows into the target with sparks
+        else if (existing is not null)
+            _links.AnimateLinkRemoval(existing);               // drag onto a linked bubble to unlink → fuse retract
         _links.InvalidateVisual();
         _doc.CommitGeometry();       // links persist alongside geometry
     }
@@ -582,7 +587,10 @@ public sealed class NoteCanvas : Panel
     {
         var view = new NoteBoxView(this, box);
         Children.Add(view);
-        Views.Motion.ScaleIn(view, 0.82);   // new container pops in
+        // Bounce in: grow from small and overshoot past full size before settling (easeOutBack).
+        view.RenderTransformOrigin = RelativePoint.Center;
+        Views.Motion.Tween(view, 0, 0, 0.5, 0, 0, 1, 320,
+            s => { double c1 = 2.4, c3 = c1 + 1, u = s - 1; return 1 + c3 * u * u * u + c1 * u * u; }, 0, 1);
         UpdateHint();
         InvalidateMeasure();
         return view;
@@ -635,7 +643,9 @@ public sealed class NoteCanvas : Panel
     private void AnimateOutAndDetach(NoteBoxView view)
     {
         if (ReferenceEquals(ActiveEditor, view.Editor)) SetActive(null);
-        Views.Motion.CollapseOut(view, 190, () =>
+        // Pop out: accelerate the shrink + fade (the particle burst from AnimateBubbleRemoval fills its place).
+        view.RenderTransformOrigin = RelativePoint.Center;
+        Views.Motion.Tween(view, 0, 0, 1, 0, 0, 0.35, 170, Views.Motion.EaseIn, view.Opacity, 0, () =>
         {
             Children.Remove(view);
             UpdateHint();
