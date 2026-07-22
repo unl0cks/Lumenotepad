@@ -588,202 +588,177 @@ public partial class MainView : UserControl
         if (on) RefreshMindmapRings();
     }
 
-    /// <summary>Build the mind-map toolbar once: Add bubble, the shared colour picker, and a hint.</summary>
+    /// <summary>Build the mind-map toolbar once in the app's icon-toolbar language: icon buttons,
+    /// group separators, and flyout pickers (colour / size / options) — matching the format toolbar.</summary>
     private void BuildMindmapBar()
     {
         MindmapBarContent.Children.Clear();
+        var iconFont = (FontFamily)Application.Current!.FindResource("IconFont")!;
+        var iconTheme = (ControlTheme)Application.Current!.FindResource("IconButton")!;
 
-        var addBubble = new Button
+        Button IconBtn(string glyph, string tip, double fs = 14)
         {
-            Theme = (ControlTheme)Application.Current!.FindResource("LumenButton")!,
-            Content = "Add bubble", FontSize = 12.5, Padding = new Thickness(14, 5),
-        };
-        addBubble.Click += (_, _) =>
+            var b = new Button
+            {
+                Theme = iconTheme, Width = 30, Height = 30, FontSize = fs,
+                FontFamily = iconFont, Content = glyph,
+            };
+            ToolTip.SetTip(b, tip);
+            return b;
+        }
+        void Sep() => MindmapBarContent.Children.Add(new Border
         {
-            double x = (CanvasScroll.Offset.X + CanvasScroll.Bounds.Width / 2) / _canvasZoom;
-            double y = (CanvasScroll.Offset.Y + CanvasScroll.Bounds.Height / 2) / _canvasZoom;
-            PageCanvas.AddBubble(x, y);
-        };
+            Width = 1, Height = 18, Margin = new Thickness(4, 0), VerticalAlignment = VerticalAlignment.Center,
+            Background = this.FindResource("FrameBorderBrush") as IBrush, Opacity = 0.7,
+        });
+
+        var addBubble = IconBtn("", "Add bubble");
+        addBubble.Click += (_, _) => { var (x, y) = CanvasCentre(); PageCanvas.AddBubble(x, y); };
         MindmapBarContent.Children.Add(addBubble);
 
-        var addConnected = new Button
-        {
-            Theme = (ControlTheme)Application.Current!.FindResource("LumenButton")!,
-            Content = "Add connected", FontSize = 12.5, Padding = new Thickness(14, 5),
-        };
-        ToolTip.SetTip(addConnected, "Add a new bubble already linked to the selected one");
+        var addConnected = IconBtn("", "Add a bubble linked to the selected one");
         addConnected.Click += (_, _) =>
         {
-            if (PageCanvas.AddConnectedBubble()) return;      // linked to the selection…
-            double x = (CanvasScroll.Offset.X + CanvasScroll.Bounds.Width / 2) / _canvasZoom;
-            double y = (CanvasScroll.Offset.Y + CanvasScroll.Bounds.Height / 2) / _canvasZoom;
-            PageCanvas.AddBubble(x, y);                        // …or a plain bubble when nothing's selected
+            if (PageCanvas.AddConnectedBubble()) return;
+            var (x, y) = CanvasCentre();
+            PageCanvas.AddBubble(x, y);
         };
         MindmapBarContent.Children.Add(addConnected);
 
-        MindmapBarContent.Children.Add(new Border
-        {
-            Width = 1, Height = 20, Margin = new Thickness(2, 0),
-            Background = this.FindResource("FrameBorderBrush") as IBrush, Opacity = 0.7,
-        });
-        MindmapBarContent.Children.Add(new TextBlock
-        {
-            Text = "Colour", FontSize = 12, VerticalAlignment = VerticalAlignment.Center,
-            Foreground = this.FindResource("TextMutedBrush") as IBrush,
-        });
+        Sep();
 
-        // A "no colour" chip (default note look), then a family swatch per palette colour + grayscale,
-        // each opening its shade flyout — same picker style as the PDF viewer's swatches.
-        var none = MindmapSwatch(Brushes.Transparent, "Default");
-        none.Child = new TextBlock
+        // Colour: an icon button carrying a swatch underline of the current colour, opening a palette.
+        var colourGlyph = new TextBlock
         {
-            Text = "∅", FontSize = 12,
+            Text = "", FontFamily = iconFont, FontSize = 15,
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
         };
-        none.PointerPressed += (_, _) => { PageCanvas.SetBubbleColor(null); RefreshMindmapRings(); };
-        MindmapBarContent.Children.Add(none);
-
-        void AddFamily(string family, (string Name, string Hex)[] shades, IBrush swatch)
+        _mindColourDot = new Border
         {
-            var btn = MindmapSwatch(swatch, $"{family} — pick a shade");
-            btn.Tag = family;
-            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(2) };
-            var flyout = new Flyout { Content = row, Placement = PlacementMode.Bottom };
-            MenuFx.AttachFlyout(flyout);
+            Height = 3, CornerRadius = new CornerRadius(2), Margin = new Thickness(5, 0, 5, 3),
+            VerticalAlignment = VerticalAlignment.Bottom, Background = Brushes.Transparent,
+        };
+        var colourBtn = new Button
+        {
+            Theme = iconTheme, Width = 30, Height = 30,
+            Content = new Grid { Children = { colourGlyph, _mindColourDot } },
+            Flyout = BuildColourFlyout(),
+        };
+        ToolTip.SetTip(colourBtn, "Bubble colour");
+        MindmapBarContent.Children.Add(colourBtn);
+
+        var sizeBtn = new Button
+        {
+            Theme = iconTheme, Width = 30, Height = 30, FontSize = 13, Content = "Aa",
+            Flyout = BuildSizeFlyout(),
+        };
+        ToolTip.SetTip(sizeBtn, "New bubble size");
+        MindmapBarContent.Children.Add(sizeBtn);
+
+        Sep();
+
+        var center = IconBtn("", "Frame all bubbles", 15);
+        center.Click += (_, _) => CentreMap();
+        MindmapBarContent.Children.Add(center);
+
+        var options = IconBtn("", "Mind-map options", 16);
+        options.Flyout = BuildOptionsFlyout();
+        MindmapBarContent.Children.Add(options);
+
+        RefreshMindmapRings();
+    }
+
+    /// <summary>The canvas point at the centre of the current viewport (for "add here" actions).</summary>
+    private (double X, double Y) CanvasCentre()
+    {
+        double x = (CanvasScroll.Offset.X + CanvasScroll.Bounds.Width / 2) / _canvasZoom;
+        double y = (CanvasScroll.Offset.Y + CanvasScroll.Bounds.Height / 2) / _canvasZoom;
+        return (x, y);
+    }
+
+    /// <summary>Scroll so the bounding box of every bubble is centred in the viewport.</summary>
+    private void CentreMap()
+    {
+        var bb = PageCanvas.ContentBounds();
+        if (bb.Width <= 0) return;
+        double cx = bb.X + bb.Width / 2, cy = bb.Y + bb.Height / 2;
+        double ox = cx * _canvasZoom - CanvasScroll.Bounds.Width / 2;
+        double oy = cy * _canvasZoom - CanvasScroll.Bounds.Height / 2;
+        CanvasScroll.Offset = new Vector(System.Math.Max(0, ox), System.Math.Max(0, oy));
+    }
+
+    /// <summary>The palette flyout: a row of shades per family plus grayscale, and a "No colour" reset.</summary>
+    private Flyout BuildColourFlyout()
+    {
+        var panel = new StackPanel { Spacing = 5, Margin = new Thickness(8) };
+        var flyout = new Flyout { Content = panel, Placement = PlacementMode.Bottom };
+        MenuFx.AttachFlyout(flyout);
+
+        void Row((string Name, string Hex)[] shades)
+        {
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5 };
             foreach (var (name, hex) in shades)
             {
-                var chip = MindmapSwatch(new SolidColorBrush(Color.Parse(hex)), name, 26);
+                var chip = MindmapSwatch(new SolidColorBrush(Color.Parse(hex)), name, 24);
                 string pick = "#" + hex.TrimStart('#');
+                SwatchHover(chip);
                 chip.PointerPressed += (_, _) => { PageCanvas.SetBubbleColor(pick); RefreshMindmapRings(); flyout.Hide(); };
                 row.Children.Add(chip);
             }
-            btn.PointerPressed += (_, _) => flyout.ShowAt(btn);
-            MindmapBarContent.Children.Add(btn);
+            panel.Children.Add(row);
         }
-        foreach (var (family, shades) in ViewModels.MainViewModel.NotebookPalette)
-            AddFamily(family, shades, new SolidColorBrush(Color.Parse(shades[2].Hex)));
-        AddFamily("Neutral", ViewModels.MainViewModel.GrayscaleShades, MindmapNeutralBrush());
+        foreach (var (family, shades) in ViewModels.MainViewModel.NotebookPalette) Row(shades);
+        Row(ViewModels.MainViewModel.GrayscaleShades);
 
-        MindmapBarContent.Children.Add(new Border
-        {
-            Width = 1, Height = 20, Margin = new Thickness(2, 0),
-            Background = this.FindResource("FrameBorderBrush") as IBrush, Opacity = 0.7,
-        });
-        var diag = new CheckBox
-        {
-            Content = "Diagonal points", FontSize = 12,
-            IsChecked = PageCanvas.MindmapDiagonalPorts, VerticalAlignment = VerticalAlignment.Center,
-        };
-        ToolTip.SetTip(diag, "Also show the four corner connect dots on each bubble");
-        diag.IsCheckedChanged += (_, _) =>
-        {
-            PageCanvas.MindmapDiagonalPorts = diag.IsChecked == true;
-            PageCanvas.RefreshMindmapPorts();
-        };
-        MindmapBarContent.Children.Add(diag);
-
-        var straight = new CheckBox
-        {
-            Content = "Straight links", FontSize = 12, Margin = new Thickness(10, 0, 0, 0),
-            IsChecked = PageCanvas.MindmapStraightLines, VerticalAlignment = VerticalAlignment.Center,
-        };
-        ToolTip.SetTip(straight, "Draw connectors as straight lines instead of springy curves");
-        straight.IsCheckedChanged += (_, _) => PageCanvas.MindmapStraightLines = straight.IsChecked == true;
-        MindmapBarContent.Children.Add(straight);
-
-        MindmapBarContent.Children.Add(new Border
-        {
-            Width = 1, Height = 20, Margin = new Thickness(2, 0),
-            Background = this.FindResource("FrameBorderBrush") as IBrush, Opacity = 0.7,
-        });
-        MindmapBarContent.Children.Add(new TextBlock
-        {
-            Text = "Size", FontSize = 12, VerticalAlignment = VerticalAlignment.Center,
-            Foreground = this.FindResource("TextMutedBrush") as IBrush,
-        });
-        void SizeChip(string label, double w)
-        {
-            var chip = new Border
-            {
-                Height = 26, MinWidth = 30, CornerRadius = new CornerRadius(6),
-                Padding = new Thickness(10, 0), BorderThickness = new Thickness(1),
-                Cursor = new Cursor(StandardCursorType.Hand), VerticalAlignment = VerticalAlignment.Center,
-                Tag = w,
-                Child = new TextBlock
-                {
-                    Text = label, FontSize = 12,
-                    HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-                },
-            };
-            ToolTip.SetTip(chip, $"New bubbles: {label}");
-            chip.PointerPressed += (_, _) => { PageCanvas.MindmapBubbleWidth = w; RefreshSizeChips(); };
-            MindmapBarContent.Children.Add(chip);
-        }
-        SizeChip("S", 140);
-        SizeChip("M", 220);
-        SizeChip("L", 320);
-        RefreshSizeChips();
-
-        MindmapBarContent.Children.Add(new Border
-        {
-            Width = 1, Height = 20, Margin = new Thickness(2, 0),
-            Background = this.FindResource("FrameBorderBrush") as IBrush, Opacity = 0.7,
-        });
-        var center = new Button
+        var none = new Button
         {
             Theme = (ControlTheme)Application.Current!.FindResource("LumenButton")!,
-            Content = "Center map", FontSize = 12.5, Padding = new Thickness(14, 5),
+            Content = "No colour", FontSize = 12, HorizontalAlignment = HorizontalAlignment.Stretch,
+            Margin = new Thickness(0, 3, 0, 0),
         };
-        ToolTip.SetTip(center, "Scroll to frame all bubbles");
-        center.Click += (_, _) =>
-        {
-            var bb = PageCanvas.ContentBounds();
-            if (bb.Width <= 0) return;
-            double cx = bb.X + bb.Width / 2, cy = bb.Y + bb.Height / 2;
-            double ox = cx * _canvasZoom - CanvasScroll.Bounds.Width / 2;
-            double oy = cy * _canvasZoom - CanvasScroll.Bounds.Height / 2;
-            CanvasScroll.Offset = new Vector(System.Math.Max(0, ox), System.Math.Max(0, oy));
-        };
-        MindmapBarContent.Children.Add(center);
-
-        MindmapBarContent.Children.Add(new Border
-        {
-            Width = 1, Height = 20, Margin = new Thickness(2, 0),
-            Background = this.FindResource("FrameBorderBrush") as IBrush, Opacity = 0.7,
-        });
-        MindmapBarContent.Children.Add(new TextBlock
-        {
-            Text = "Double-click the canvas to add a bubble · drag a bubble's dot onto another to connect",
-            FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center,
-            Foreground = this.FindResource("TextMutedBrush") as IBrush,
-            TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis,
-        });
-
-        // The LumenButton-themed buttons already animate via the theme (content scale + fade). Give the
-        // custom swatches/chips and checkboxes the SAME scale feel so the whole bar reads consistently.
-        foreach (var child in MindmapBarContent.Children)
-            if (child is CheckBox || (child is Border bd && bd.Cursor is not null))
-                AnimateHover((Control)child);
+        none.Click += (_, _) => { PageCanvas.SetBubbleColor(null); RefreshMindmapRings(); flyout.Hide(); };
+        panel.Children.Add(none);
+        return flyout;
     }
 
-    /// <summary>Match the app's button motion: hover grows the control, press dips it, over the same
-    /// short transform transition the LumenButton theme uses.</summary>
-    private static void AnimateHover(Control c)
+    /// <summary>The S/M/L new-bubble-size menu.</summary>
+    private MenuFlyout BuildSizeFlyout()
     {
-        c.RenderTransformOrigin = RelativePoint.Center;
-        c.RenderTransform = TransformOperations.Parse("scale(1)");
-        c.Transitions = new Avalonia.Animation.Transitions
+        var mf = new MenuFlyout();
+        void Opt(string label, double w)
         {
-            new Avalonia.Animation.TransformOperationsTransition
-            {
-                Property = Visual.RenderTransformProperty,
-                Duration = System.TimeSpan.FromMilliseconds(130),
-            },
-        };
-        c.PointerEntered += (_, _) => c.RenderTransform = TransformOperations.Parse("scale(1.12)");
-        c.PointerExited += (_, _) => c.RenderTransform = TransformOperations.Parse("scale(1)");
-        c.PointerPressed += (_, _) => c.RenderTransform = TransformOperations.Parse("scale(0.88)");
-        c.PointerReleased += (_, _) => c.RenderTransform = TransformOperations.Parse("scale(1.12)");
+            var mi = new MenuItem { Header = label };
+            mi.Click += (_, _) => PageCanvas.MindmapBubbleWidth = w;
+            mf.Items.Add(mi);
+        }
+        Opt("Small", 140);
+        Opt("Medium", 220);
+        Opt("Large", 320);
+        return mf;
+    }
+
+    /// <summary>Toggles for connector style and the diagonal connect ports.</summary>
+    private Flyout BuildOptionsFlyout()
+    {
+        var panel = new StackPanel { Spacing = 9, Margin = new Thickness(12, 10) };
+        var straight = new CheckBox { Content = "Straight links", FontSize = 12.5, IsChecked = PageCanvas.MindmapStraightLines };
+        straight.IsCheckedChanged += (_, _) => PageCanvas.MindmapStraightLines = straight.IsChecked == true;
+        var diag = new CheckBox { Content = "Diagonal connect points", FontSize = 12.5, IsChecked = PageCanvas.MindmapDiagonalPorts };
+        diag.IsCheckedChanged += (_, _) => { PageCanvas.MindmapDiagonalPorts = diag.IsChecked == true; PageCanvas.RefreshMindmapPorts(); };
+        panel.Children.Add(straight);
+        panel.Children.Add(diag);
+        var flyout = new Flyout { Content = panel, Placement = PlacementMode.Bottom };
+        MenuFx.AttachFlyout(flyout);
+        return flyout;
+    }
+
+    /// <summary>Swatch hover: border turns accent (matches the format toolbar's swatch style).</summary>
+    private static void SwatchHover(Border b)
+    {
+        var rest = b.BorderBrush;
+        var accent = Application.Current!.FindResource("AccentBrush") as IBrush ?? Brushes.White;
+        b.PointerEntered += (_, _) => b.BorderBrush = accent;
+        b.PointerExited += (_, _) => b.BorderBrush = rest;
     }
 
     private Border MindmapSwatch(IBrush bg, string tip, double size = 22)
@@ -792,7 +767,7 @@ public partial class MainView : UserControl
         var b = new Border
         {
             Width = size, Height = size, CornerRadius = new CornerRadius(size < 24 ? 6 : 7),
-            Background = bg, BorderThickness = new Thickness(bare ? 1 : 1),
+            Background = bg, BorderThickness = new Thickness(1),
             BorderBrush = bare ? this.FindResource("FrameBorderBrush") as IBrush
                                : new SolidColorBrush(Color.Parse("#33FFFFFF")),
             Cursor = new Cursor(StandardCursorType.Hand),
@@ -802,52 +777,13 @@ public partial class MainView : UserControl
         return b;
     }
 
-    private static IBrush MindmapNeutralBrush() => new LinearGradientBrush
-    {
-        StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
-        EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-        GradientStops = { new GradientStop(Colors.White, 0), new GradientStop(Color.Parse("#111418"), 1) },
-    };
-
-    /// <summary>Ring the family swatch whose shades contain the active bubble's colour (or the last
-    /// picked colour when nothing is selected).</summary>
+    /// <summary>Reflect the active (or last-picked) bubble colour on the toolbar's colour button.</summary>
     private void RefreshMindmapRings()
     {
-        if (!MindmapBar.IsVisible) return;
-        string? activeRgb = Rgb6(PageCanvas.ActiveBubbleColor ?? PageCanvas.MindmapColor);
-        foreach (var child in MindmapBarContent.Children)
-        {
-            if (child is not Border { Tag: string fam } b) continue;
-            var shades = fam == "Neutral" ? ViewModels.MainViewModel.GrayscaleShades
-                : System.Array.Find(ViewModels.MainViewModel.NotebookPalette, f => f.Family == fam).Shades;
-            bool on = shades is not null && activeRgb is not null &&
-                      System.Array.Exists(shades, s => string.Equals(Rgb6(s.Hex), activeRgb, System.StringComparison.OrdinalIgnoreCase));
-            b.BorderBrush = on ? (this.FindResource("AccentBrush") as IBrush ?? Brushes.White)
-                               : new SolidColorBrush(Color.Parse("#33FFFFFF"));
-            b.BorderThickness = new Thickness(on ? 2 : 1);
-        }
-    }
-
-    /// <summary>Ring the S/M/L chip matching the current new-bubble width so the choice is visible.</summary>
-    private void RefreshSizeChips()
-    {
-        foreach (var child in MindmapBarContent.Children)
-        {
-            if (child is not Border b || b.Tag is not double w) continue;
-            bool on = System.Math.Abs(PageCanvas.MindmapBubbleWidth - w) < 0.5;
-            b.BorderBrush = on ? (this.FindResource("AccentBrush") as IBrush ?? Brushes.White)
-                               : new SolidColorBrush(Color.Parse("#33FFFFFF"));
-            b.BorderThickness = new Thickness(on ? 2 : 1);
-            b.Background = on ? new SolidColorBrush(Colors.White, 0.10) : Brushes.Transparent;
-        }
-    }
-
-    /// <summary>The last six hex digits (RRGGBB) of a colour string, or null.</summary>
-    private static string? Rgb6(string? hex)
-    {
-        if (string.IsNullOrEmpty(hex)) return null;
-        var h = hex.TrimStart('#');
-        return h.Length >= 6 ? h.Substring(h.Length - 6) : null;
+        if (_mindColourDot is null) return;
+        var hex = PageCanvas.ActiveBubbleColor ?? PageCanvas.MindmapColor;
+        _mindColourDot.Background = hex is not null && Color.TryParse(hex, out var c)
+            ? new SolidColorBrush(c) : Brushes.Transparent;
     }
 
     /// <summary>Temporary Part-1 entry point (the Part-4 Page dialog supersedes it): set the style,
@@ -1588,6 +1524,9 @@ public partial class MainView : UserControl
         if (pg is null || ReferenceEquals(Vm?.SelectedPage, pg))
             PageCanvas.Document = PageCanvas.Document;
     }
+
+    /// <summary>The colour-swatch underline on the mind-map toolbar's colour button (shows current colour).</summary>
+    private Border? _mindColourDot;
 
     // ---- Ctrl+wheel canvas zoom (session-only viewing posture, not a preference) ----
     private double _canvasZoom = 1.0;

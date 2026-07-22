@@ -785,14 +785,6 @@ internal sealed class NoteBoxView : Panel
         _close.PointerPressed += (_, e) => e.Handled = true;      // don't start a grip drag from the ✕
         _close.PointerReleased += (_, e) => { _canvas.RequestDelete(this); e.Handled = true; };
 
-        // Overlay the close INSIDE the clipped chrome, so on a bubble the red tab follows the pill's
-        // rounded top-right corner (clip cuts it to the outline) instead of a chip poking past it.
-        _chrome.Child = null;                    // detach body so the panel can adopt it
-        var chromeContent = new Panel();
-        chromeContent.Children.Add(body);
-        chromeContent.Children.Add(_close);
-        _chrome.Child = chromeContent;
-
         // Edge strips inset from the ends so the corner squares below stay grabbable.
         Border EdgeStrip(HorizontalAlignment h, VerticalAlignment v, bool vertical, StandardCursorType cur) => new()
         {
@@ -854,7 +846,7 @@ internal sealed class NoteBoxView : Panel
         AddPort(HorizontalAlignment.Left,   VerticalAlignment.Bottom, new Thickness(o, 0, 0, o), true,  "SW");
         AddPort(HorizontalAlignment.Right,  VerticalAlignment.Bottom, new Thickness(0, 0, o, o), true,  "SE");
 
-        Children.Add(_chrome);           // the ✕ lives inside the chrome (clipped); TR corner is the close
+        Children.Add(_chrome);
         Children.Add(_resizeLeft);
         Children.Add(_resizeRight);
         Children.Add(_resizeTop);
@@ -862,7 +854,8 @@ internal sealed class NoteBoxView : Panel
         Children.Add(_resizeCornerTL);
         Children.Add(_resizeCornerBL);
         Children.Add(_resizeCorner);
-        foreach (var (port, _, _) in _ports) Children.Add(port);   // ports on top of the resize strip
+        Children.Add(_close);            // on top of the resize strips so the ✕ stays clickable
+        foreach (var (port, _, _) in _ports) Children.Add(port);   // ports on top of everything
 
         PointerEntered += (_, _) => { _hover = true; RefreshChrome(); };
         PointerExited += (_, _) => { _hover = false; RefreshChrome(); };
@@ -1229,6 +1222,7 @@ internal sealed class NoteBoxView : Panel
         // Mind-map text bubbles read as circles: a pill (fully-rounded) chrome + matching grip top.
         bool normalBox = Box.Divider is null && Box.ImagePath is null && Box.Table is null && Box.AttachPath is null;
         bool bubble = _canvas.IsMindmap && normalBox;
+        _chrome.BorderThickness = new Thickness(bubble ? 2.6 : 1);   // thick bubble outline, matching connectors
         if (normalBox)   // leave divider/image/attachment/table chrome radii as their constructor set them
         {
             double rad = bubble ? 999 : NoteCanvas.NoteRadiusPref;
@@ -1246,13 +1240,12 @@ internal sealed class NoteBoxView : Panel
                 Editor.InvalidateVisual();
             }
             Editor.Margin = new Thickness(10, 3, 10, 20);
-            // A red close tab flush in the top-right; it sits inside the clipped chrome, so the pill's
-            // rounded corner cuts its outer edge — a corner button that follows the bubble's curve.
-            _close.Width = _close.Height = 20;
+            // A red close button seated ON the grip "title bar", at the right end of its flat run
+            // (ArrangeOverride positions it there) — fully visible, centred on the bar.
+            _close.Width = _close.Height = 15;
             _close.CornerRadius = new CornerRadius(5);
-            _close.Margin = default;
-            _closeGlyph.FontSize = 9;
-            _closeGlyph.Margin = new Thickness(0, 3, 3, 0);   // nudge the ✕ in, clear of the clipped corner
+            _closeGlyph.FontSize = 8.5;
+            _closeGlyph.Margin = default;
             _closeRestBg = new SolidColorBrush(Color.Parse("#E24B4B"));
             _closeRestFg = Brushes.White;
             _closeHoverBg = new SolidColorBrush(Color.Parse("#F1352B"));
@@ -1300,6 +1293,14 @@ internal sealed class NoteBoxView : Panel
         if (_canvas.IsMindmap)
         {
             PlaceDiagonalPorts(finalSize.Width, finalSize.Height);
+            bool bubble = Box.Divider is null && Box.ImagePath is null && Box.Table is null && Box.AttachPath is null;
+            if (bubble)
+            {
+                // Seat the red ✕ on the grip bar (17px tall, inset by the 2.6 border), at the right end
+                // of the bar's flat run (x = w − corner radius) so it's fully visible and bar-attached.
+                double radius = Math.Min(finalSize.Width, finalSize.Height) / 2;
+                _close.Margin = new Thickness(0, 3.6, radius, 0);
+            }
         }
         return base.ArrangeOverride(finalSize);
     }
