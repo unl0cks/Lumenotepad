@@ -457,6 +457,13 @@ public sealed class NoteCanvas : Panel
     public void SetBubbleColor(string? color)
     {
         MindmapColor = color;
+        if (_selection.Count > 0)          // a rubber-band selection recolours all of them at once
+        {
+            foreach (var sv in _selection) { sv.Box.Color = color; sv.RefreshChrome(); }
+            _links.InvalidateVisual();
+            _doc?.CommitGeometry();
+            return;
+        }
         if (ActiveBubble() is { } v)
         {
             v.Box.Color = color;
@@ -491,6 +498,28 @@ public sealed class NoteCanvas : Panel
         view.SetFontScale(central ? 1.45 : 1.0);   // larger text (applies the size, re-measures, commits)
         view.RefreshChrome();                      // thick border + bold pick up now
         _links.InvalidateVisual();
+    }
+
+    /// <summary>Raise a container above the others (drawn last = on top); persisted via the box order.</summary>
+    internal void BringToFront(NoteBoxView view)
+    {
+        if (_doc is null) return;
+        if (_doc.Boxes.Remove(view.Box)) _doc.Boxes.Add(view.Box);
+        Children.Remove(view);
+        Children.Add(view);
+        _doc.CommitGeometry();
+    }
+
+    /// <summary>Drop a container below the other containers (but still above the connectors/guides).</summary>
+    internal void SendToBack(NoteBoxView view)
+    {
+        if (_doc is null) return;
+        if (_doc.Boxes.Remove(view.Box)) _doc.Boxes.Insert(0, view.Box);
+        Children.Remove(view);
+        int i = 0;
+        while (i < Children.Count && Children[i] is not NoteBoxView) i++;   // first bubble slot, above base layers
+        Children.Insert(i, view);
+        _doc.CommitGeometry();
     }
 
     /// <summary>The editor of the most recently focused container (what the toolbar targets).</summary>
@@ -607,6 +636,14 @@ public sealed class NoteCanvas : Panel
     private MindLink? _editingLink;
     private Point _labelPos;
 
+    // Multi-select: a rubber-band drag on bare canvas selects the bubbles it covers; the set can then be
+    // moved, coloured, or deleted together.
+    private readonly System.Collections.Generic.HashSet<NoteBoxView> _selection = new();
+    private readonly Border _rubber = new() { IsVisible = false, IsHitTestVisible = false, BorderThickness = new Thickness(1) };
+    private Point _rubberStart, _rubberCur;
+    private bool _rubbering, _rubberDown;
+    private System.Collections.Generic.Dictionary<NoteBox, (double X, double Y)>? _groupOrigins;
+
     private void Rebuild()
     {
         Children.Clear();
@@ -621,6 +658,11 @@ public sealed class NoteCanvas : Panel
         _editingLink = null;
         _labelEditor.IsVisible = false;
         Children.Add(_labelEditor);
+        _selection.Clear();
+        _rubber.IsVisible = false;
+        _rubber.BorderBrush = new SolidColorBrush(Color.Parse(Services.ThemeManager.Current.Accent), 0.9);
+        _rubber.Background = new SolidColorBrush(Color.Parse(Services.ThemeManager.Current.Accent), 0.12);
+        Children.Add(_rubber);
         EnsureRegions();               // tag legacy structured starters before their views are built
         if (_doc is not null)
             foreach (var box in _doc.Boxes)
@@ -725,6 +767,12 @@ public sealed class NoteCanvas : Panel
                 child.Arrange(new Rect(_labelPos.X - d.Width / 2, _labelPos.Y - d.Height / 2, d.Width, d.Height));
                 continue;
             }
+            if (ReferenceEquals(child, _rubber))
+            {
+                child.Arrange(new Rect(Math.Min(_rubberStart.X, _rubberCur.X), Math.Min(_rubberStart.Y, _rubberCur.Y),
+                    Math.Abs(_rubberStart.X - _rubberCur.X), Math.Abs(_rubberStart.Y - _rubberCur.Y)));
+                continue;
+            }
             if (child is not NoteBoxView v)
             {
                 var d = child.DesiredSize;
@@ -749,10 +797,13 @@ public sealed class NoteCanvas : Panel
         if (_pageStyle == PageStyles.Mindmap)
         {
             // Mind map: double-click a connector to label it; double-click bare canvas drops a bubble;
-            // a single click deselects the active bubble (pull focus here so its editor blurs).
-            if (e.ClickCount >= 2 && _links.HitLink(p) is { } hitLink) EditLinkLabel(hitLink);
-            else if (e.ClickCount >= 2) AddBubble(p.X, p.Y);
-            else { SetActive(null); Focus(); }
+            // a single click+drag rubber-bands a selection; a plain single click deselects.
+            if (e.ClickCount >= 2 && _links.HitLink(p) is { } hitLink) { EditLinkLabel(hitLink); e.Handled = true; return; }
+            if (e.ClickCount >= 2) { AddBubble(p.X, p.Y); e.Handled = true; return; }
+            _rubberStart = _rubberCur = p;
+            _rubbering = false;
+            _rubberDown = true;
+            e.Pointer.Capture(this);
             e.Handled = true;
             return;
         }
@@ -763,6 +814,74 @@ public sealed class NoteCanvas : Panel
         Dispatcher.UIThread.Post(view.FocusEditor, DispatcherPriority.Background);
         e.Handled = true;
     }
+
+    protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+        if (!_rubberDown) return;
+        _rubberCur = e.GetPosition(this);
+        if (!_rubbering && (Math.Abs(_rubberCur.X - _rubberStart.X) > 4 || Math.Abs(_rubberCur.Y - _rubberStart.Y) > 4))
+        {
+            _rubbering = true;
+            _rubber.IsVisible = true;
+        }
+        if (_rubbering) InvalidateArrange();
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        if (!_rubberDown) return;
+        _rubberDown = false;
+        e.Pointer.Capture(null);
+        if (_rubbering)
+        {
+            _rubbering = false;
+            _rubber.IsVisible = false;
+            var rect = new Rect(Math.Min(_rubberStart.X, _rubberCur.X), Math.Min(_rubberStart.Y, _rubberCur.Y),
+                                Math.Abs(_rubberStart.X - _rubberCur.X), Math.Abs(_rubberStart.Y - _rubberCur.Y));
+            if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift)) ClearSelection();
+            foreach (var child in Children)
+                if (child is NoteBoxView v && rect.Intersects(v.Bounds)) AddToSelection(v);
+            InvalidateArrange();
+            Focus();   // so Delete acts on the selection
+        }
+        else
+        {
+            ClearSelection();
+            SetActive(null);
+            Focus();
+        }
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Key == Key.Delete && _pageStyle == PageStyles.Mindmap && _selection.Count > 0)
+        {
+            foreach (var v in _selection.ToList()) DeleteBoxPermanently(v);
+            _selection.Clear();
+            e.Handled = true;
+        }
+    }
+
+    internal bool IsSelected(NoteBoxView v) => _selection.Contains(v);
+    private void AddToSelection(NoteBoxView v) { if (_selection.Add(v)) v.SetSelected(true); }
+    private void ClearSelection() { foreach (var v in _selection) v.SetSelected(false); _selection.Clear(); }
+
+    /// <summary>Start moving the whole selection together (capture every selected box's origin).</summary>
+    internal void BeginGroupDrag() => _groupOrigins = _selection.ToDictionary(v => v.Box, v => (v.Box.X, v.Box.Y));
+
+    /// <summary>Move the captured selection by (dx,dy) from where the drag began. False = no group drag active.</summary>
+    internal bool GroupDragTo(double dx, double dy)
+    {
+        if (_groupOrigins is null) return false;
+        foreach (var (box, o) in _groupOrigins) { box.X = Math.Max(0, o.X + dx); box.Y = Math.Max(0, o.Y + dy); }
+        InvalidateMeasure();
+        return true;
+    }
+
+    internal void EndGroupDrag() => _groupOrigins = null;
 
     private NoteBoxView AddBoxView(NoteBox box)
     {
@@ -788,6 +907,7 @@ public sealed class NoteCanvas : Panel
 
     internal void SetActive(RichTextEditor? editor)
     {
+        if (editor is not null && _selection.Count > 0) ClearSelection();   // focusing one bubble drops the group
         if (ReferenceEquals(ActiveEditor, editor)) return;
         ActiveEditor = editor;
         ActiveEditorChanged?.Invoke(editor);
@@ -903,6 +1023,7 @@ internal sealed class NoteBoxView : Panel
     private readonly System.Collections.Generic.List<(Border Port, bool Diagonal, string Dir)> _ports = new();
     private bool _linking;
     private bool _linkTarget;   // a link drag is hovering this bubble — show its ports as drop targets
+    private bool _selected;     // part of a rubber-band multi-selection
     private bool _hover;
 
     // Table box (M11): the grid host + its cell editors in row-major order (rebuilt on structural edits).
@@ -1119,6 +1240,13 @@ internal sealed class NoteBoxView : Panel
                 SizeItem("Large", 1.4);
                 SizeItem("Title", 1.9);
                 menu.Items.Add(size);
+
+                var front = new MenuItem { Header = "Bring to front" };
+                front.Click += (_, _) => _canvas.BringToFront(this);
+                menu.Items.Add(front);
+                var back = new MenuItem { Header = "Send to back" };
+                back.Click += (_, _) => _canvas.SendToBack(this);
+                menu.Items.Add(back);
             }
             if (_canvas.IsMindmap && plain)
             {
@@ -1502,6 +1630,9 @@ internal sealed class NoteBoxView : Panel
             port.IsVisible = showPorts && (!diagonal || _canvas.MindmapDiagonalPorts);
             if (port.IsVisible) port.Background = portBrush;
         }
+
+        if (_selected)   // rubber-band selection: an accent outline over whatever the normal border was
+            _chrome.BorderBrush = new SolidColorBrush(Color.Parse(Services.ThemeManager.Current.Accent));
     }
 
     /// <summary>A link drag entered/left this bubble: light up its ports as drop targets (and drop them
@@ -1510,6 +1641,13 @@ internal sealed class NoteBoxView : Panel
     {
         if (_linkTarget == on) return;
         _linkTarget = on;
+        RefreshChrome();
+    }
+
+    internal void SetSelected(bool on)
+    {
+        if (_selected == on) return;
+        _selected = on;
         RefreshChrome();
     }
 
@@ -1568,6 +1706,7 @@ internal sealed class NoteBoxView : Panel
             // Height origin = what's on screen now, so the first drag pixel moves from there.
             _dragOrigin = (Box.X, Box.Y, Box.Width, Box.H > 0 ? Box.H : Bounds.Height);
             _dragging = true;
+            if (edges == Edge.None && _canvas.IsSelected(this)) _canvas.BeginGroupDrag();   // move the whole selection
             RefreshChrome();                          // lock the border visible for the whole drag
             e.Pointer.Capture(handle);
             e.Handled = true;
@@ -1581,10 +1720,13 @@ internal sealed class NoteBoxView : Panel
             bool snap = _canvas.SnapToGrid;
             if (edges == Edge.None)                        // whole-box move (the grip)
             {
-                double nx = ox + dx, ny = oy + dy;
-                if (snap) { nx = GridMath.Snap(nx); ny = GridMath.Snap(ny); }
-                Box.X = Math.Max(0, nx);
-                Box.Y = Math.Max(0, ny);
+                if (!_canvas.GroupDragTo(dx, dy))          // moves the whole selection (incl. this box); else just this box
+                {
+                    double nx = ox + dx, ny = oy + dy;
+                    if (snap) { nx = GridMath.Snap(nx); ny = GridMath.Snap(ny); }
+                    Box.X = Math.Max(0, nx);
+                    Box.Y = Math.Max(0, ny);
+                }
             }
             else
             {
@@ -1614,7 +1756,7 @@ internal sealed class NoteBoxView : Panel
             _dragging = false;
             e.Pointer.Capture(null);
             RefreshChrome();                          // back to hover/focus-driven now the drag is done
-            if (edges == Edge.None) _canvas.OnBoxDragEnd(this);
+            if (edges == Edge.None) { _canvas.EndGroupDrag(); _canvas.OnBoxDragEnd(this); }
             _canvas.Document?.CommitGeometry();      // persist the final geometry once
             e.Handled = true;
         };
