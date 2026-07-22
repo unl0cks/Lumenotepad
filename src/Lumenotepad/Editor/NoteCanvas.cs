@@ -281,40 +281,39 @@ public sealed class NoteCanvas : Panel
 
         double ring = Math.Max(215, boxes.Max(b => b.Width) * 0.75 + 60);   // even edge length between a node and its children
         double cx = root.X + root.Width / 2, cy = root.Y + H(root) / 2;
-        // Even-leaf-angle radial tree: the leaves spread evenly around the full circle, and every internal
-        // node sits at the average angle of its children — a clean, non-overlapping fan (radius = depth).
-        int totalLeaves = visited.Count(b => children[b].Count == 0);
-        double step = totalLeaves > 0 ? 2 * Math.PI / totalLeaves : 0;
-        double nextAng = 0;
-        var angle = new System.Collections.Generic.Dictionary<NoteBox, double>();
-        void Assign(NoteBox n)
-        {
-            if (children[n].Count == 0) { angle[n] = nextAng; nextAng += step; return; }
-            foreach (var c in children[n]) Assign(c);
-            angle[n] = children[n].Average(c => angle[c]);
-        }
-        Assign(root);
-        // Place each child a FIXED distance (ring) from its PARENT along its angle — so every parent→child
-        // edge is the same length (even spacing), rather than distance-from-centre which stretched unevenly.
+        // Classic radial tree: each node owns an angular SECTOR; its children split that sector by their
+        // leaf-weight and sit at the midpoint of their slice, one ring further out per level (radius grows
+        // with depth). Because a child's slice nests INSIDE its parent's, sub-trees never fold back over the
+        // centre or each other — the fan stays clean and every branch runs straight outward.
+        var leaves = new System.Collections.Generic.Dictionary<NoteBox, int>();
+        int Leaves(NoteBox n) => leaves[n] = children[n].Count == 0 ? 1 : children[n].Sum(Leaves);
+        Leaves(root);
+
         var targets = new System.Collections.Generic.Dictionary<NoteBox, Point> { [root] = new Point(cx, cy) };
-        void PlacePos(NoteBox n)
+        void Layout(NoteBox n, double a0, double a1)
         {
+            if (!ReferenceEquals(n, root))
+            {
+                double a = (a0 + a1) / 2, r = level[n] * ring;
+                targets[n] = new Point(cx + r * Math.Cos(a), cy + r * Math.Sin(a));
+            }
+            double span = a1 - a0, acc = a0;
             foreach (var c in children[n])
             {
-                var pn = targets[n];
-                targets[c] = new Point(pn.X + ring * Math.Cos(angle[c]), pn.Y + ring * Math.Sin(angle[c]));
-                PlacePos(c);
+                double slice = span * leaves[c] / leaves[n];
+                Layout(c, acc, acc + slice);
+                acc += slice;
             }
         }
-        PlacePos(root);
+        Layout(root, -Math.PI / 2, 3 * Math.PI / 2);   // full circle, first branch starting due North
 
-        // Only re-face a port when its current one would LOOP (points away from the partner's new spot);
-        // ports that still face roughly the right way are left exactly as the user connected them.
+        // Tidy is an explicit rearrange, so re-anchor BOTH ends of every connector to the compass edge that
+        // faces its partner's new spot — lines then leave and arrive pointing straight at each other.
         foreach (var l in _doc.Links)
             if (targets.TryGetValue(l.A, out var pa) && targets.TryGetValue(l.B, out var pb))
             {
-                if (!Faces(l.DirA, pb.X - pa.X, pb.Y - pa.Y)) l.DirA = Compass(pb.X - pa.X, pb.Y - pa.Y);
-                if (!Faces(l.DirB, pa.X - pb.X, pa.Y - pb.Y)) l.DirB = Compass(pa.X - pb.X, pa.Y - pb.Y);
+                l.DirA = Compass(pb.X - pa.X, pb.Y - pa.Y);
+                l.DirB = Compass(pa.X - pb.X, pa.Y - pb.Y);
             }
 
         var start = targets.Keys.ToDictionary(b => b, b => (b.X, b.Y));
@@ -329,20 +328,6 @@ public sealed class NoteCanvas : Panel
             }
             InvalidateMeasure();
         }, done: () => _doc.CommitGeometry());
-    }
-
-    /// <summary>True when a compass port already points roughly toward (dx,dy) — within ~70°.</summary>
-    private static bool Faces(string dir, double dx, double dy)
-    {
-        double len = Math.Sqrt(dx * dx + dy * dy);
-        if (len < 0.001) return true;
-        var (vx, vy) = dir switch
-        {
-            "N" => (0.0, -1.0), "S" => (0.0, 1.0), "E" => (1.0, 0.0), "W" => (-1.0, 0.0),
-            "NE" => (0.7071, -0.7071), "NW" => (-0.7071, -0.7071), "SE" => (0.7071, 0.7071), "SW" => (-0.7071, 0.7071),
-            _ => (1.0, 0.0),
-        };
-        return (vx * dx + vy * dy) / len > 0.34;
     }
 
     /// <summary>The 8-way compass edge nearest the direction (dx,dy) — used to re-anchor connectors on tidy.</summary>
@@ -1734,18 +1719,20 @@ internal sealed class NoteBoxView : Panel
             bool bubble = Box.Divider is null && Box.ImagePath is null && Box.Table is null && Box.AttachPath is null;
             if (bubble)
             {
-                // Seat the red ✕ high on the grip band. On a Title pill, push its column LEFT to where the
-                // flat top meets the corner curve (x = w − corner radius) so it clears the rounded border;
-                // on the squarer Info/Callout cards the corners are tight, so it simply hugs the top-right.
+                // Seat the round ✕ (16px) inside the top-right corner. On a Title pill the corner is a big
+                // arc, so centre the chip on its 45° diagonal — equal top/right insets of 0.293·R (the arc's
+                // 45° point) less the chip's 8px half-width — and never closer in than the border is thick,
+                // so a central pill's fat ring can't clip it. Info/Callout corners are tight: hug the corner.
+                double bt = _chrome.BorderThickness.Top;
                 if (Box.Kind == BubbleKind.Title)
                 {
-                    double radius = Math.Min(finalSize.Width, finalSize.Height) / 2;
-                    const double rc = 8;
-                    _close.Margin = new Thickness(0, 3, Math.Max(3, radius - rc), 0);
+                    double r = Math.Min(finalSize.Width, finalSize.Height) / 2;
+                    double m = Math.Max(bt + 2, 0.293 * r - 8);
+                    _close.Margin = new Thickness(0, m, m, 0);
                 }
                 else
                 {
-                    _close.Margin = new Thickness(0, 4, 6, 0);
+                    _close.Margin = new Thickness(0, bt + 3, bt + 4, 0);
                 }
             }
         }
