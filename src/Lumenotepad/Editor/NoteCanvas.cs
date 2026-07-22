@@ -1326,7 +1326,7 @@ internal sealed class NoteBoxView : Panel
                 // Keep the round close HIGH on the top band and push its column LEFT to where the flat top
                 // meets the corner curve — so it sits on the straight top, clear of the rounded border.
                 const double rc = 8;
-                _close.Margin = new Thickness(0, 6, Math.Max(3, radius - rc), 0);
+                _close.Margin = new Thickness(0, 3, Math.Max(3, radius - rc), 0);   // centred on the grip band
             }
         }
         return base.ArrangeOverride(finalSize);
