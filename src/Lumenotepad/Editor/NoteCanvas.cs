@@ -272,19 +272,27 @@ public sealed class NoteCanvas : Panel
         }
         if (visited.Count < 2) return;
 
-        int Leaves(NoteBox n) => children[n].Count == 0 ? 1 : children[n].Sum(Leaves);
-        double ring = boxes.Max(b => b.Width) * 0.85 + 95;
+        double ring = Math.Max(240, boxes.Max(b => b.Width) * 0.7 + 110);
         double cx = root.X + root.Width / 2, cy = root.Y + H(root) / 2;
-        var targets = new System.Collections.Generic.Dictionary<NoteBox, Point>();
-        void Place(NoteBox n, double a0, double a1)
+        // Even-leaf-angle radial tree: the leaves spread evenly around the full circle, and every internal
+        // node sits at the average angle of its children — a clean, non-overlapping fan (radius = depth).
+        int totalLeaves = visited.Count(b => children[b].Count == 0);
+        double step = totalLeaves > 0 ? 2 * Math.PI / totalLeaves : 0;
+        double nextAng = 0;
+        var angle = new System.Collections.Generic.Dictionary<NoteBox, double>();
+        void Assign(NoteBox n)
         {
-            double ang = (a0 + a1) / 2, r = level[n] * ring;
-            targets[n] = new Point(cx + r * Math.Cos(ang), cy + r * Math.Sin(ang));
-            double total = Math.Max(1, children[n].Sum(Leaves));
-            double a = a0;
-            foreach (var c in children[n]) { double span = (a1 - a0) * Leaves(c) / total; Place(c, a, a + span); a += span; }
+            if (children[n].Count == 0) { angle[n] = nextAng; nextAng += step; return; }
+            foreach (var c in children[n]) Assign(c);
+            angle[n] = children[n].Average(c => angle[c]);
         }
-        Place(root, -Math.PI, Math.PI);
+        Assign(root);
+        var targets = new System.Collections.Generic.Dictionary<NoteBox, Point>();
+        foreach (var n in visited)
+        {
+            double r = level[n] * ring;
+            targets[n] = new Point(cx + r * Math.Cos(angle[n]), cy + r * Math.Sin(angle[n]));
+        }
 
         var start = targets.Keys.ToDictionary(b => b, b => (b.X, b.Y));
         Views.Motion.Clock(430, p =>

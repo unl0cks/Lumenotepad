@@ -633,15 +633,10 @@ public partial class MainView : UserControl
             Text = "", FontFamily = iconFont, FontSize = 15,
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
         };
-        _mindColourDot = new Border
-        {
-            Height = 3, CornerRadius = new CornerRadius(2), Margin = new Thickness(5, 0, 5, 3),
-            VerticalAlignment = VerticalAlignment.Bottom, Background = Brushes.Transparent,
-        };
         var colourBtn = new Button
         {
             Theme = iconTheme, Width = 30, Height = 30,
-            Content = new Grid { Children = { colourGlyph, _mindColourDot } },
+            Content = colourGlyph,
             Flyout = BuildColourFlyout(),
         };
         ToolTip.SetTip(colourBtn, "Bubble colour");
@@ -673,7 +668,7 @@ public partial class MainView : UserControl
         center.Click += (_, _) => CentreMap();
         MindmapBarContent.Children.Add(center);
 
-        var tidy = IconBtn("", "Tidy up — arrange the map around the selected (or hub) bubble", 15);
+        var tidy = IconBtn("", "Tidy up — arrange the map around the selected (or hub) bubble", 15);
         tidy.Click += (_, _) => PageCanvas.TidyMindmap();
         MindmapBarContent.Children.Add(tidy);
 
@@ -841,14 +836,8 @@ public partial class MainView : UserControl
             : (this.FindResource("TextPrimaryBrush") as IBrush ?? Brushes.White);
     }
 
-    /// <summary>Reflect the active (or last-picked) bubble colour on the toolbar's colour button.</summary>
-    private void RefreshMindmapRings()
-    {
-        if (_mindColourDot is null) return;
-        var hex = PageCanvas.ActiveBubbleColor ?? PageCanvas.MindmapColor;
-        _mindColourDot.Background = hex is not null && Color.TryParse(hex, out var c)
-            ? new SolidColorBrush(c) : Brushes.Transparent;
-    }
+    /// <summary>Kept as a no-op hook (the old colour-dot indicator was removed).</summary>
+    private void RefreshMindmapRings() { }
 
     /// <summary>Temporary Part-1 entry point (the Part-4 Page dialog supersedes it): set the style,
     /// refresh the guides, and offer the starter containers — additive, never clears content.</summary>
@@ -1588,9 +1577,6 @@ public partial class MainView : UserControl
         if (pg is null || ReferenceEquals(Vm?.SelectedPage, pg))
             PageCanvas.Document = PageCanvas.Document;
     }
-
-    /// <summary>The colour-swatch underline on the mind-map toolbar's colour button (shows current colour).</summary>
-    private Border? _mindColourDot;
 
     /// <summary>The mind-map toolbar's paint-bucket button (accent-lit while the fill tool is active).</summary>
     private Button? _paintBtn;
