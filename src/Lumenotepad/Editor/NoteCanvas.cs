@@ -1257,12 +1257,13 @@ internal sealed class NoteBoxView : Panel
                 Editor.InvalidateVisual();
             }
             Editor.Margin = new Thickness(10, 3, 10, 20);
-            // The ✕ nests into the pill's rounded top-right corner exactly like the regular card:
-            // transparent at rest (just the glyph), red on hover. ArrangeOverride sizes it so its rounded
-            // outer corner radius equals the pill radius — so it follows the curve, not a floating chip.
-            _closeGlyph.FontSize = 8;
-            _closeGlyph.HorizontalAlignment = HorizontalAlignment.Right;
-            _closeGlyph.VerticalAlignment = VerticalAlignment.Top;
+            // A narrow tab in the top-right: clipped to the pill's cap so the RIGHT side follows the
+            // curve while the LEFT stays a straight vertical edge. Transparent at rest, red on hover
+            // (like the card). ArrangeOverride sets the size + clip (both depend on the pill radius).
+            _closeGlyph.FontSize = 8.5;
+            _closeGlyph.HorizontalAlignment = HorizontalAlignment.Center;
+            _closeGlyph.VerticalAlignment = VerticalAlignment.Center;
+            _closeGlyph.Margin = default;
             _closeRestBg = Brushes.Transparent;
             _closeRestFg = CloseFg;
             _closeHoverBg = CloseHoverBg;
@@ -1272,6 +1273,7 @@ internal sealed class NoteBoxView : Panel
             _close.Width = _close.Height = 17;
             _close.CornerRadius = new CornerRadius(0, NoteCanvas.NoteRadiusPref, 0, 6);
             _close.Margin = default;
+            _close.Clip = null;
             _closeGlyph.FontSize = 7.5;
             _closeGlyph.Margin = default;
             _closeGlyph.HorizontalAlignment = HorizontalAlignment.Center;
@@ -1318,10 +1320,13 @@ internal sealed class NoteBoxView : Panel
                 // Seat the red ✕ on the grip bar (17px tall, inset by the 2.6 border), at the right end
                 // of the bar's flat run (x = w − corner radius) so it's fully visible and bar-attached.
                 double radius = Math.Min(finalSize.Width, finalSize.Height) / 2;
-                _close.Width = _close.Height = radius;                           // fills the top-right cap quarter
-                _close.CornerRadius = new CornerRadius(0, radius, 0, Math.Min(10, radius * 0.34));
-                _close.Margin = default;                                         // flush into the corner
-                _closeGlyph.Margin = new Thickness(0, radius * 0.32, radius * 0.32, 0);   // ✕ near the corner
+                double k = Math.Min(radius, 26);          // tab width — narrow, full only on small bubbles
+                _close.Width = k;
+                _close.Height = radius;
+                _close.CornerRadius = new CornerRadius(0, 0, 0, 6);
+                _close.Margin = default;                  // flush top-right
+                // Clip to the pill's right-cap circle: straight left + bottom, curved on the right.
+                _close.Clip = new EllipseGeometry(new Rect(k - 2 * radius, 0, 2 * radius, 2 * radius));
             }
         }
         return base.ArrangeOverride(finalSize);
