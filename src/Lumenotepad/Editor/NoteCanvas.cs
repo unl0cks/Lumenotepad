@@ -273,7 +273,7 @@ public sealed class NoteCanvas : Panel
         }
         if (visited.Count < 2) return;
 
-        double ring = Math.Max(200, boxes.Max(b => b.Width) * 0.55 + 70);
+        double ring = Math.Max(215, boxes.Max(b => b.Width) * 0.75 + 60);   // even edge length between a node and its children
         double cx = root.X + root.Width / 2, cy = root.Y + H(root) / 2;
         // Even-leaf-angle radial tree: the leaves spread evenly around the full circle, and every internal
         // node sits at the average angle of its children — a clean, non-overlapping fan (radius = depth).
@@ -288,12 +288,19 @@ public sealed class NoteCanvas : Panel
             angle[n] = children[n].Average(c => angle[c]);
         }
         Assign(root);
-        var targets = new System.Collections.Generic.Dictionary<NoteBox, Point>();
-        foreach (var n in visited)
+        // Place each child a FIXED distance (ring) from its PARENT along its angle — so every parent→child
+        // edge is the same length (even spacing), rather than distance-from-centre which stretched unevenly.
+        var targets = new System.Collections.Generic.Dictionary<NoteBox, Point> { [root] = new Point(cx, cy) };
+        void PlacePos(NoteBox n)
         {
-            double r = level[n] * ring;
-            targets[n] = new Point(cx + r * Math.Cos(angle[n]), cy + r * Math.Sin(angle[n]));
+            foreach (var c in children[n])
+            {
+                var pn = targets[n];
+                targets[c] = new Point(pn.X + ring * Math.Cos(angle[c]), pn.Y + ring * Math.Sin(angle[c]));
+                PlacePos(c);
+            }
         }
+        PlacePos(root);
 
         // Only re-face a port when its current one would LOOP (points away from the partner's new spot);
         // ports that still face roughly the right way are left exactly as the user connected them.
@@ -478,8 +485,10 @@ public sealed class NoteCanvas : Panel
     /// anchor the tidy layout roots on.</summary>
     internal void SetCentral(NoteBoxView view, bool central)
     {
+        if (view.Box.Central == central) return;
         view.Box.Central = central;
-        view.SetFontScale(central ? 1.3 : 1.0);   // larger when central (applies the size, re-measures, commits)
+        view.Box.Width = central ? view.Box.Width * 1.3 : view.Box.Width / 1.3;   // wider too, so it clearly reads as central
+        view.SetFontScale(central ? 1.45 : 1.0);   // larger text (applies the size, re-measures, commits)
         view.RefreshChrome();                      // thick border + bold pick up now
         _links.InvalidateVisual();
     }
@@ -1438,7 +1447,7 @@ internal sealed class NoteBoxView : Panel
         // Mind-map text bubbles read as circles: a pill (fully-rounded) chrome + matching grip top.
         bool normalBox = Box.Divider is null && Box.ImagePath is null && Box.Table is null && Box.AttachPath is null;
         bool bubble = _canvas.IsMindmap && normalBox;
-        _chrome.BorderThickness = new Thickness(bubble ? (Box.Central ? 4.5 : 2.6) : 1);   // thicker for a central bubble
+        _chrome.BorderThickness = new Thickness(bubble ? (Box.Central ? 6.5 : 2.6) : 1);   // much thicker for a central bubble
         if (normalBox)   // leave divider/image/attachment/table chrome radii as their constructor set them
         {
             double rad = bubble ? 999 : NoteCanvas.NoteRadiusPref;
