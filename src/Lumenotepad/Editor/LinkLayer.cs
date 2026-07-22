@@ -49,7 +49,6 @@ public sealed class LinkLayer : Control
 
     private DispatcherTimer? _timer;
     private Color _accent = Colors.Gray;
-    private Color _labelBg = Colors.Black, _labelFg = Colors.White, _labelBorder = Colors.Gray;
 
     // ---- create / remove flourishes: growing links, retracting ghosts, and sparks ----
     private sealed class Particle { public Point Pos; public Vector Vel; public double Life, MaxLife, Size; public Color Color; }
@@ -64,11 +63,7 @@ public sealed class LinkLayer : Control
     /// <summary>Re-derive theme-accent colours (theme changes arrive as a canvas Rebuild).</summary>
     public void Refresh()
     {
-        var t = Services.ThemeManager.Current;
-        _accent = Color.Parse(t.Accent);
-        _labelBg = Color.Parse(t.FrameBackground);
-        _labelFg = Color.Parse(t.PaperText);
-        _labelBorder = Color.Parse(t.Accent);
+        _accent = Color.Parse(Services.ThemeManager.Current.Accent);
         InvalidateVisual();
     }
 
@@ -325,7 +320,7 @@ public sealed class LinkLayer : Control
                         ? new Point((a.X + b.X) / 2, (a.Y + b.Y) / 2)
                         : (_springs.TryGetValue(link, out var sl) ? Bezier(a, sl.C1, sl.C2, b, 0.5)
                                                                   : new Point((a.X + b.X) / 2, (a.Y + b.Y) / 2));
-                    DrawLabel(ctx, mid, link.Label!);
+                    DrawLabel(ctx, mid, link.Label!, a, b, ColorOf(link.A), ColorOf(link.B));
                 }
             }
 
@@ -443,14 +438,23 @@ public sealed class LinkLayer : Control
     private Color ColorOf(NoteBox box) =>
         box.Color is { } h && Color.TryParse(h, out var c) ? c : _accent;
 
-    private void DrawLabel(DrawingContext ctx, Point mid, string text)
+    private void DrawLabel(DrawingContext ctx, Point mid, string text, Point a, Point b, Color colA, Color colB)
     {
+        // Text colour flips with the gradient's brightness so it stays legible on light or dark colours.
+        var midCol = Color.FromRgb((byte)((colA.R + colB.R) / 2), (byte)((colA.G + colB.G) / 2), (byte)((colA.B + colB.B) / 2));
+        double lum = 0.299 * midCol.R + 0.587 * midCol.G + 0.114 * midCol.B;
+        var fg = lum > 140 ? Colors.Black : Colors.White;
         var ft = new FormattedText(text, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-            Typeface.Default, 12, new SolidColorBrush(_labelFg));
-        const double px = 6, py = 3;
+            Typeface.Default, 12, new SolidColorBrush(fg));
+        const double px = 7, py = 3;
         var rect = new Rect(mid.X - ft.Width / 2 - px, mid.Y - ft.Height / 2 - py, ft.Width + px * 2, ft.Height + py * 2);
-        ctx.DrawRectangle(new SolidColorBrush(_labelBg, 0.95), new Pen(new SolidColorBrush(_labelBorder, 0.7), 1),
-            new RoundedRect(rect, 5));
+        var grad = new LinearGradientBrush   // the SAME gradient the connector wears (absolute endpoints)
+        {
+            StartPoint = new RelativePoint(a, RelativeUnit.Absolute),
+            EndPoint = new RelativePoint(b, RelativeUnit.Absolute),
+            GradientStops = { new GradientStop(colA, 0), new GradientStop(colB, 1) },
+        };
+        ctx.DrawRectangle(grad, new Pen(new SolidColorBrush(Colors.White, 0.5), 1), new RoundedRect(rect, 5));
         ctx.DrawText(ft, new Point(rect.X + px, rect.Y + py));
     }
 

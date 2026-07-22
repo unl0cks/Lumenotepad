@@ -655,6 +655,18 @@ public partial class MainView : UserControl
         ToolTip.SetTip(sizeBtn, "New bubble size");
         MindmapBarContent.Children.Add(sizeBtn);
 
+        // Paint bucket (fill tool): pick a colour, then click bubbles to recolour them; click again to stop.
+        var paintBtn = IconBtn("", "Paint bucket — pick a colour, then click bubbles to fill them", 15);
+        _paintBtn = paintBtn;
+        var paintFlyout = BuildPaintFlyout();
+        paintBtn.Click += (_, _) =>
+        {
+            if (PageCanvas.MindmapPaintActive) { PageCanvas.MindmapPaintActive = false; RefreshPaintButton(); }
+            else paintFlyout.ShowAt(paintBtn);
+        };
+        MindmapBarContent.Children.Add(paintBtn);
+        RefreshPaintButton();
+
         Sep();
 
         var center = IconBtn("", "Frame all bubbles", 15);
@@ -784,6 +796,45 @@ public partial class MainView : UserControl
         };
         ToolTip.SetTip(b, tip);
         return b;
+    }
+
+    /// <summary>The paint-bucket colour picker: choosing a colour sets the fill colour and turns the tool on.</summary>
+    private Flyout BuildPaintFlyout()
+    {
+        var panel = new StackPanel { Spacing = 5, Margin = new Thickness(8) };
+        var flyout = new Flyout { Content = panel, Placement = PlacementMode.Bottom };
+        MenuFx.AttachFlyout(flyout);
+        void Row((string Name, string Hex)[] shades)
+        {
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5 };
+            foreach (var (name, hex) in shades)
+            {
+                var chip = MindmapSwatch(new SolidColorBrush(Color.Parse(hex)), name, 24);
+                string pick = "#" + hex.TrimStart('#');
+                SwatchHover(chip);
+                chip.PointerPressed += (_, _) =>
+                {
+                    PageCanvas.MindmapPaintColor = pick;
+                    PageCanvas.MindmapPaintActive = true;
+                    flyout.Hide();
+                    RefreshPaintButton();
+                };
+                row.Children.Add(chip);
+            }
+            panel.Children.Add(row);
+        }
+        foreach (var (family, shades) in ViewModels.MainViewModel.NotebookPalette) Row(shades);
+        Row(ViewModels.MainViewModel.GrayscaleShades);
+        return flyout;
+    }
+
+    /// <summary>Accent-light the paint-bucket button while the fill tool is active.</summary>
+    private void RefreshPaintButton()
+    {
+        if (_paintBtn is null) return;
+        _paintBtn.Foreground = PageCanvas.MindmapPaintActive
+            ? (this.FindResource("AccentBrush") as IBrush ?? Brushes.White)
+            : (this.FindResource("TextPrimaryBrush") as IBrush ?? Brushes.White);
     }
 
     /// <summary>Reflect the active (or last-picked) bubble colour on the toolbar's colour button.</summary>
@@ -1536,6 +1587,9 @@ public partial class MainView : UserControl
 
     /// <summary>The colour-swatch underline on the mind-map toolbar's colour button (shows current colour).</summary>
     private Border? _mindColourDot;
+
+    /// <summary>The mind-map toolbar's paint-bucket button (accent-lit while the fill tool is active).</summary>
+    private Button? _paintBtn;
 
     // ---- Ctrl+wheel canvas zoom (session-only viewing posture, not a preference) ----
     private double _canvasZoom = 1.0;

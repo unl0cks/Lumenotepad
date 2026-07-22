@@ -174,6 +174,14 @@ public sealed class NoteCanvas : Panel
         set { _links.Straight = value; _links.InvalidateVisual(); }
     }
 
+    /// <summary>Paint-bucket (fill) mode: while active, clicking any bubble fills it with
+    /// <see cref="MindmapPaintColor"/> instead of selecting it. Toggled from the toolbar.</summary>
+    public bool MindmapPaintActive { get; set; }
+    public string? MindmapPaintColor { get; set; }
+
+    /// <summary>The fill tool applied the paint colour to a bubble.</summary>
+    internal void PaintBubble(NoteBoxView view) => RecolorBox(view, MindmapPaintColor);
+
     /// <summary>Repaint every bubble's chrome — after the diagonal-ports toggle flips, or the style set.</summary>
     public void RefreshMindmapPorts()
     {
@@ -934,6 +942,10 @@ internal sealed class NoteBoxView : Panel
         Children.Add(_close);            // on top of the resize strips so the ✕ stays clickable
         foreach (var (port, _, _) in _ports) Children.Add(port);   // ports on top of everything
 
+        // Paint-bucket: a click anywhere on a bubble while the fill tool is on recolours it (tunnel so it
+        // beats the editor/ports/grip to the click).
+        AddHandler(InputElement.PointerPressedEvent, OnPaintClick, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+
         PointerEntered += (_, _) => { _hover = true; RefreshChrome(); };
         PointerExited += (_, _) => { _hover = false; RefreshChrome(); };
         // Image/divider/attachment/table boxes don't use the single main editor to focus / evaporate.
@@ -1020,6 +1032,15 @@ internal sealed class NoteBoxView : Panel
 
         ApplyFontScale();
         RefreshChrome();
+    }
+
+    private void OnPaintClick(object? sender, PointerPressedEventArgs e)
+    {
+        if (!_canvas.MindmapPaintActive || !_canvas.IsMindmap) return;
+        if (Box.Divider is not null || Box.ImagePath is not null || Box.Table is not null || Box.AttachPath is not null) return;
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        _canvas.PaintBubble(this);
+        e.Handled = true;
     }
 
     /// <summary>Mind-map keyboard shortcuts on a focused bubble: Tab spawns a linked child, Ctrl+D
