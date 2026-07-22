@@ -273,7 +273,7 @@ public sealed class NoteCanvas : Panel
         }
         if (visited.Count < 2) return;
 
-        double ring = Math.Max(240, boxes.Max(b => b.Width) * 0.7 + 110);
+        double ring = Math.Max(200, boxes.Max(b => b.Width) * 0.55 + 70);
         double cx = root.X + root.Width / 2, cy = root.Y + H(root) / 2;
         // Even-leaf-angle radial tree: the leaves spread evenly around the full circle, and every internal
         // node sits at the average angle of its children — a clean, non-overlapping fan (radius = depth).
@@ -295,12 +295,13 @@ public sealed class NoteCanvas : Panel
             targets[n] = new Point(cx + r * Math.Cos(angle[n]), cy + r * Math.Sin(angle[n]));
         }
 
-        // Re-face each connector's ports at the other bubble's new spot so the lines run clean, not looped.
+        // Only re-face a port when its current one would LOOP (points away from the partner's new spot);
+        // ports that still face roughly the right way are left exactly as the user connected them.
         foreach (var l in _doc.Links)
             if (targets.TryGetValue(l.A, out var pa) && targets.TryGetValue(l.B, out var pb))
             {
-                l.DirA = Compass(pb.X - pa.X, pb.Y - pa.Y);
-                l.DirB = Compass(pa.X - pb.X, pa.Y - pb.Y);
+                if (!Faces(l.DirA, pb.X - pa.X, pb.Y - pa.Y)) l.DirA = Compass(pb.X - pa.X, pb.Y - pa.Y);
+                if (!Faces(l.DirB, pa.X - pb.X, pa.Y - pb.Y)) l.DirB = Compass(pa.X - pb.X, pa.Y - pb.Y);
             }
 
         var start = targets.Keys.ToDictionary(b => b, b => (b.X, b.Y));
@@ -315,6 +316,20 @@ public sealed class NoteCanvas : Panel
             }
             InvalidateMeasure();
         }, done: () => _doc.CommitGeometry());
+    }
+
+    /// <summary>True when a compass port already points roughly toward (dx,dy) — within ~70°.</summary>
+    private static bool Faces(string dir, double dx, double dy)
+    {
+        double len = Math.Sqrt(dx * dx + dy * dy);
+        if (len < 0.001) return true;
+        var (vx, vy) = dir switch
+        {
+            "N" => (0.0, -1.0), "S" => (0.0, 1.0), "E" => (1.0, 0.0), "W" => (-1.0, 0.0),
+            "NE" => (0.7071, -0.7071), "NW" => (-0.7071, -0.7071), "SE" => (0.7071, 0.7071), "SW" => (-0.7071, 0.7071),
+            _ => (1.0, 0.0),
+        };
+        return (vx * dx + vy * dy) / len > 0.34;
     }
 
     /// <summary>The 8-way compass edge nearest the direction (dx,dy) — used to re-anchor connectors on tidy.</summary>
@@ -464,7 +479,7 @@ public sealed class NoteCanvas : Panel
     internal void SetCentral(NoteBoxView view, bool central)
     {
         view.Box.Central = central;
-        view.SetFontScale(central ? 1.6 : 1.0);   // larger when central (applies the size, re-measures, commits)
+        view.SetFontScale(central ? 1.3 : 1.0);   // larger when central (applies the size, re-measures, commits)
         view.RefreshChrome();                      // thick border + bold pick up now
         _links.InvalidateVisual();
     }
