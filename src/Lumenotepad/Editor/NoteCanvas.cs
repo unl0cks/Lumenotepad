@@ -242,6 +242,64 @@ public sealed class NoteCanvas : Panel
         Dispatcher.UIThread.Post(nv.FocusEditor, DispatcherPriority.Background);
     }
 
+    /// <summary>Tidy the mind map into a radial tree around the selected bubble (or the most-connected
+    /// one if nothing is selected): each connection depth rings out from the root, children fanned into
+    /// their parent's angular slice. Bubbles glide to their new spots. Isolated bubbles are left alone.</summary>
+    public void TidyMindmap()
+    {
+        if (_doc is null || _doc.Boxes.Count < 2) return;
+        var boxes = _doc.Boxes;
+        var heights = new System.Collections.Generic.Dictionary<NoteBox, double>();
+        foreach (var child in Children)
+            if (child is NoteBoxView v) heights[v.Box] = v.Bounds.Height > 1 ? v.Bounds.Height : Math.Max(v.Box.H, 44);
+        double H(NoteBox b) => heights.TryGetValue(b, out var h) ? h : Math.Max(b.H, 44);
+
+        var adj = boxes.ToDictionary(b => b, _ => new System.Collections.Generic.List<NoteBox>());
+        foreach (var l in _doc.Links)
+            if (adj.ContainsKey(l.A) && adj.ContainsKey(l.B)) { adj[l.A].Add(l.B); adj[l.B].Add(l.A); }
+        var root = ActiveBubble()?.Box ?? boxes.OrderByDescending(b => adj[b].Count).First();
+
+        var children = boxes.ToDictionary(b => b, _ => new System.Collections.Generic.List<NoteBox>());
+        var level = new System.Collections.Generic.Dictionary<NoteBox, int> { [root] = 0 };
+        var visited = new System.Collections.Generic.HashSet<NoteBox> { root };
+        var q = new System.Collections.Generic.Queue<NoteBox>();
+        q.Enqueue(root);
+        while (q.Count > 0)
+        {
+            var n = q.Dequeue();
+            foreach (var m in adj[n])
+                if (visited.Add(m)) { children[n].Add(m); level[m] = level[n] + 1; q.Enqueue(m); }
+        }
+        if (visited.Count < 2) return;
+
+        int Leaves(NoteBox n) => children[n].Count == 0 ? 1 : children[n].Sum(Leaves);
+        double ring = boxes.Max(b => b.Width) * 0.85 + 95;
+        double cx = root.X + root.Width / 2, cy = root.Y + H(root) / 2;
+        var targets = new System.Collections.Generic.Dictionary<NoteBox, Point>();
+        void Place(NoteBox n, double a0, double a1)
+        {
+            double ang = (a0 + a1) / 2, r = level[n] * ring;
+            targets[n] = new Point(cx + r * Math.Cos(ang), cy + r * Math.Sin(ang));
+            double total = Math.Max(1, children[n].Sum(Leaves));
+            double a = a0;
+            foreach (var c in children[n]) { double span = (a1 - a0) * Leaves(c) / total; Place(c, a, a + span); a += span; }
+        }
+        Place(root, -Math.PI, Math.PI);
+
+        var start = targets.Keys.ToDictionary(b => b, b => (b.X, b.Y));
+        Views.Motion.Clock(430, p =>
+        {
+            double e = Views.Motion.EaseOut(p);
+            foreach (var b in targets.Keys)
+            {
+                var t = targets[b];
+                b.X = Math.Max(0, Views.Motion.Lerp(start[b].X, t.X - b.Width / 2, e));
+                b.Y = Math.Max(0, Views.Motion.Lerp(start[b].Y, t.Y - H(b) / 2, e));
+            }
+            InvalidateMeasure();
+        }, done: () => _doc.CommitGeometry());
+    }
+
     /// <summary>The bounding rect of every container on the page (empty rect when there are none) — the
     /// mind-map "centre on map" command frames it.</summary>
     public Rect ContentBounds()

@@ -673,6 +673,10 @@ public partial class MainView : UserControl
         center.Click += (_, _) => CentreMap();
         MindmapBarContent.Children.Add(center);
 
+        var tidy = IconBtn("", "Tidy up — arrange the map around the selected (or hub) bubble", 15);
+        tidy.Click += (_, _) => PageCanvas.TidyMindmap();
+        MindmapBarContent.Children.Add(tidy);
+
         var options = IconBtn("", "Mind-map options", 16);
         options.Flyout = BuildOptionsFlyout();
         MindmapBarContent.Children.Add(options);
