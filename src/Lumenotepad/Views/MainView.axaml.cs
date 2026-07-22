@@ -612,8 +612,8 @@ public partial class MainView : UserControl
             Background = this.FindResource("FrameBorderBrush") as IBrush, Opacity = 0.7,
         });
 
-        var addBubble = IconBtn("", "Add bubble");
-        addBubble.Click += (_, _) => { var (x, y) = CanvasCentre(); PageCanvas.AddBubble(x, y); };
+        var addBubble = IconBtn("", "Add bubble — pick a type");
+        addBubble.Flyout = BuildAddBubbleFlyout();
         MindmapBarContent.Children.Add(addBubble);
 
         var addConnected = IconBtn("", "Add a bubble linked to the selected one");
@@ -699,6 +699,59 @@ public partial class MainView : UserControl
     }
 
     /// <summary>The palette flyout: a row of shades per family plus grayscale, and a "No colour" reset.</summary>
+    /// <summary>The "+" chooser: pick which bubble family to drop — a Title pill, an Information squircle,
+    /// or a Callout. Each row shows a little shape preview so the choice reads at a glance.</summary>
+    private Flyout BuildAddBubbleFlyout()
+    {
+        var panel = new StackPanel { Spacing = 3, Margin = new Thickness(6), MinWidth = 224 };
+        var flyout = new Flyout { Content = panel, Placement = PlacementMode.Bottom };
+        MenuFx.AttachFlyout(flyout);
+
+        var accent = this.FindResource("AccentBrush") as IBrush ?? Brushes.White;
+
+        Border Preview(BubbleKind kind)
+        {
+            var b = new Border
+            {
+                Width = 34, Height = 22, VerticalAlignment = VerticalAlignment.Center,
+                Background = new SolidColorBrush(Color.Parse("#33FFFFFF")), BorderBrush = accent,
+            };
+            switch (kind)
+            {
+                case BubbleKind.Title:
+                    b.CornerRadius = new CornerRadius(999); b.BorderThickness = new Thickness(2); break;
+                case BubbleKind.Info:
+                    b.CornerRadius = new CornerRadius(7); b.BorderThickness = new Thickness(1.6); break;
+                default:   // Callout: thick left stripe
+                    b.CornerRadius = new CornerRadius(3); b.BorderThickness = new Thickness(5, 1.2, 1.2, 1.2); break;
+            }
+            return b;
+        }
+
+        void Row(BubbleKind kind, string name, string desc)
+        {
+            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            text.Children.Add(new TextBlock { Text = name, FontSize = 12.5, FontWeight = FontWeight.SemiBold });
+            text.Children.Add(new TextBlock { Text = desc, FontSize = 11, Opacity = 0.7, TextWrapping = TextWrapping.Wrap });
+            var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+            content.Children.Add(Preview(kind));
+            content.Children.Add(text);
+            var btn = new Button
+            {
+                Theme = (ControlTheme)Application.Current!.FindResource("LumenButton")!,
+                Content = content, HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Left, Padding = new Thickness(8, 6),
+            };
+            btn.Click += (_, _) => { var (x, y) = CanvasCentre(); PageCanvas.AddBubble(x, y, kind); flyout.Hide(); };
+            panel.Children.Add(btn);
+        }
+
+        Row(BubbleKind.Title, "Title bubble", "Rounded pill, centred text — topics and headings.");
+        Row(BubbleKind.Info, "Information bubble", "Squircle card, left-aligned body text — details.");
+        Row(BubbleKind.Callout, "Callout", "Squarer card with a left accent bar — asides and quotes.");
+        return flyout;
+    }
+
     private Flyout BuildColourFlyout()
     {
         var panel = new StackPanel { Spacing = 5, Margin = new Thickness(8) };

@@ -67,6 +67,12 @@ public sealed class NoteTable
 /// and an optional height floor (<see cref="H"/> = 0 means the height simply follows content;
 /// dragging the bottom/corner handle sets a floor the box won't shrink under).
 /// Pure model — no Avalonia dependencies.</summary>
+/// <summary>The visual family a mind-map bubble reads as. <see cref="Title"/> is the classic centred pill;
+/// <see cref="Info"/> is a squircle card with left-aligned body text; <see cref="Callout"/> is a squarer
+/// card with a thick left accent stripe for asides/quotes. Title is the default (0) so pre-existing pages
+/// stay title bubbles without a serialized field.</summary>
+public enum BubbleKind { Title, Info, Callout }
+
 public sealed class NoteBox
 {
     public const double DefaultWidth = 360;
@@ -101,6 +107,10 @@ public sealed class NoteBox
     /// <summary>A mind-map CENTRAL bubble (right-click): larger, bold, thicker-bordered, and the anchor the
     /// tidy layout arranges the rest of the map around. Persisted.</summary>
     public bool Central { get; set; }
+
+    /// <summary>Which visual family a mind-map bubble reads as (pill / squircle / callout). Only meaningful
+    /// on mind-map pages; ordinary note cards ignore it. Persisted.</summary>
+    public BubbleKind Kind { get; set; } = BubbleKind.Title;
 
     /// <summary>An IMAGE box (M10): a path relative to the notebook folder ("images/xxx.png").
     /// When set the box renders the image instead of a text editor. Persisted.</summary>
@@ -160,8 +170,9 @@ public sealed class CanvasDocument
     public List<NoteBox> Trash { get; } = new();
 
     /// <summary>Mind-map links: box pairs, each end anchored to a compass edge ("N"/"S"/"E"/"W" +
-    /// diagonals) — the port the connector was drawn from / dropped on. Object references — a removed
-    /// or trashed box takes its links with it (a restore comes back unlinked).</summary>
+    /// diagonals) — the port the connector was drawn from / dropped on. Object references. A permanently
+    /// removed box drops its links; a trashed box parks them (see <see cref="_heldLinks"/>) so a restore
+    /// brings its connections back.</summary>
     public List<MindLink> Links { get; } = new();
 
     /// <summary>Links parked when one of their bubbles was trashed — brought back if that bubble (and its

@@ -147,6 +147,23 @@ public class CanvasJsonTests
     }
 
     [Fact]
+    public void V2_roundTrip_preservesBubbleKind_titleStaysDefault()
+    {
+        var canvas = new CanvasDocument();
+        canvas.AddBox(0, 0);                             // Title = default, no serialized field
+        canvas.AddBox(200, 0).Kind = BubbleKind.Info;
+        canvas.AddBox(400, 0).Kind = BubbleKind.Callout;
+
+        var json = CanvasDocJson.ToJson(canvas);
+        Assert.DoesNotContain("\"knd\":0", json);        // the default is omitted from the file
+        var restored = CanvasDocJson.FromJson(json);
+
+        Assert.Equal(BubbleKind.Title, restored.Boxes[0].Kind);
+        Assert.Equal(BubbleKind.Info, restored.Boxes[1].Kind);
+        Assert.Equal(BubbleKind.Callout, restored.Boxes[2].Kind);
+    }
+
+    [Fact]
     public void V1_pageFile_migratesToOneWideBoxAtOrigin()
     {
         var doc = new RichDocument();

@@ -189,14 +189,16 @@ public sealed class NoteCanvas : Panel
             if (child is NoteBoxView v) v.RefreshChrome();
     }
 
-    /// <summary>Drop a new bubble centred on (<paramref name="cx"/>,<paramref name="cy"/>) and focus it.</summary>
-    public void AddBubble(double cx, double cy)
+    /// <summary>Drop a new bubble of the given family centred on (<paramref name="cx"/>,<paramref name="cy"/>)
+    /// and focus it. Info/Callout cards start a touch wider than a Title pill since they hold body text.</summary>
+    public void AddBubble(double cx, double cy, BubbleKind kind = BubbleKind.Title)
     {
         if (_doc is null) return;
-        double w = MindmapBubbleWidth;
+        double w = kind == BubbleKind.Title ? MindmapBubbleWidth : MindmapBubbleWidth * 1.3;
         double bx = cx - w / 2, by = cy - 18;
         if (SnapToGrid) { bx = GridMath.Snap(bx); by = GridMath.Snap(by); }
         var box = _doc.AddBox(Math.Max(0, bx), Math.Max(0, by), w);
+        box.Kind = kind;
         box.Color = MindmapColor ?? DefaultBubbleColor;
         var view = AddBoxView(box);
         _doc.CommitGeometry();
@@ -220,6 +222,7 @@ public sealed class NoteCanvas : Panel
         double nx = from.X + from.Width + 110, ny = from.Y;
         if (SnapToGrid) { nx = GridMath.Snap(nx); ny = GridMath.Snap(ny); }
         var box = _doc.AddBox(Math.Max(0, nx), Math.Max(0, ny), from.Width);
+        box.Kind = from.Kind;   // a branch of same-family nodes
         box.Color = from.Color ?? MindmapColor ?? DefaultBubbleColor;
         var view = AddBoxView(box);
         _doc.ToggleLink(from, box, "E", "W");
@@ -236,6 +239,9 @@ public sealed class NoteCanvas : Panel
         var clone = RichDocJson.FromDtos(RichDocJson.ToDtos(src.Doc));
         var box = _doc.AddBox(src.X + 26, src.Y + 26, src.Width, clone);
         box.Color = src.Color;
+        box.Kind = src.Kind;
+        box.Central = src.Central;
+        box.FontScale = src.FontScale;
         box.H = src.H;
         var nv = AddBoxView(box);
         _doc.CommitGeometry();
@@ -498,6 +504,19 @@ public sealed class NoteCanvas : Panel
         view.SetFontScale(central ? 1.45 : 1.0);   // larger text (applies the size, re-measures, commits)
         view.RefreshChrome();                      // thick border + bold pick up now
         _links.InvalidateVisual();
+    }
+
+    /// <summary>Convert a bubble to another family (Title pill / Info squircle / Callout). Body-text kinds
+    /// get widened to a readable minimum so a narrow pill doesn't become a cramped card.</summary>
+    internal void SetBubbleKind(NoteBoxView view, BubbleKind kind)
+    {
+        if (view.Box.Kind == kind) return;
+        view.Box.Kind = kind;
+        if (kind != BubbleKind.Title && view.Box.Width < 240) view.Box.Width = 240;
+        view.RefreshChrome();     // shape, border, and alignment all switch here
+        view.InvalidateMeasure();
+        _links.InvalidateVisual();
+        _doc?.CommitGeometry();
     }
 
     /// <summary>Raise a container above the others (drawn last = on top); persisted via the box order.</summary>
@@ -1243,6 +1262,25 @@ internal sealed class NoteBoxView : Panel
                 var central = new MenuItem { Header = Box.Central ? "Remove central bubble" : "Make central bubble" };
                 central.Click += (_, _) => _canvas.SetCentral(this, !Box.Central);
                 menu.Items.Add(central);
+
+                var type = new MenuItem { Header = "Bubble type" };
+                void KindItem(string h, BubbleKind k)
+                {
+                    var m = new MenuItem { Header = h };
+                    if (Box.Kind == k)   // an accent dot marks the current family (glyph-free, always renders)
+                        m.Icon = new Border
+                        {
+                            Width = 7, Height = 7, CornerRadius = new CornerRadius(4),
+                            Background = new SolidColorBrush(Color.Parse(Services.ThemeManager.Current.Accent)),
+                            VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center,
+                        };
+                    m.Click += (_, _) => _canvas.SetBubbleKind(this, k);
+                    type.Items.Add(m);
+                }
+                KindItem("Title", BubbleKind.Title);
+                KindItem("Information", BubbleKind.Info);
+                KindItem("Callout", BubbleKind.Callout);
+                menu.Items.Add(type);
             }
             if (plain)
             {
@@ -1593,26 +1631,39 @@ internal sealed class NoteBoxView : Panel
         _resizeCornerTL.IsVisible = full;
         _resizeCornerBL.IsVisible = full;
 
-        // Mind-map text bubbles read as circles: a pill (fully-rounded) chrome + matching grip top.
+        // Mind-map text bubbles read by family: a Title pill (fully-rounded), an Info squircle, or a
+        // Callout with a thick left accent stripe.
         bool normalBox = Box.Divider is null && Box.ImagePath is null && Box.Table is null && Box.AttachPath is null;
         bool bubble = _canvas.IsMindmap && normalBox;
-        _chrome.BorderThickness = new Thickness(bubble ? (Box.Central ? 6.5 : 2.6) : 1);   // much thicker for a central bubble
+        var kind = Box.Kind;
+        bool titlePill = kind == BubbleKind.Title;
+        // Border: a title pill wears a uniform ring (extra-thick when central); Info a slim uniform ring;
+        // a Callout a thick left stripe over a hairline elsewhere (reads as a quote/aside bar).
+        _chrome.BorderThickness = !bubble ? new Thickness(1)
+            : kind == BubbleKind.Callout ? new Thickness(7, 1.6, 1.6, 1.6)
+            : new Thickness(titlePill ? (Box.Central ? 6.5 : 2.6) : 2.2);
         if (normalBox)   // leave divider/image/attachment/table chrome radii as their constructor set them
         {
-            double rad = bubble ? 999 : NoteCanvas.NoteRadiusPref;
+            double rad = !bubble ? NoteCanvas.NoteRadiusPref
+                       : titlePill ? 999                          // pill
+                       : kind == BubbleKind.Info ? 16              // squircle
+                       : 7;                                        // Callout: nearly square
             _chrome.CornerRadius = new CornerRadius(rad);
             _grip.CornerRadius = new CornerRadius(rad, rad, 0, 0);
         }
         if (bubble)
         {
-            // Centre the label: horizontally via paragraph Align, vertically via a bottom margin that
-            // balances the grip (17) + top inset (3) sitting above the text, so it sits mid-bubble.
-            Editor.ForceCenter = true;   // centre the label visually, without baking Center into the document
-            Editor.ForceBold = Box.Central;
-            Editor.Margin = new Thickness(10, 3, 10, 20);
+            // A Title pill centres its single-line label (both axes) via a balancing bottom margin; Info and
+            // Callout read as body cards, so their text sits top-left. Centering/bolding is display-only —
+            // it never bakes alignment or weight into the document.
+            Editor.ForceCenter = titlePill;
+            Editor.ForceBold = titlePill && Box.Central;
+            Editor.Margin = titlePill ? new Thickness(10, 3, 10, 20)
+                          : kind == BubbleKind.Callout ? new Thickness(15, 5, 12, 10)   // clear the left stripe
+                          : new Thickness(12, 5, 12, 10);
             // A small round close button nestled just inside the top-right corner — it echoes the
             // connect-port dots (same round chip language), a subtle chip at rest and red on hover.
-            // ArrangeOverride places it along the corner diagonal so it's always fully on the bubble.
+            // ArrangeOverride seats it: along the pill's corner diagonal, or hugging the corner otherwise.
             _close.Width = _close.Height = 16;
             _close.CornerRadius = new CornerRadius(8);
             _close.Clip = null;
@@ -1683,13 +1734,19 @@ internal sealed class NoteBoxView : Panel
             bool bubble = Box.Divider is null && Box.ImagePath is null && Box.Table is null && Box.AttachPath is null;
             if (bubble)
             {
-                // Seat the red ✕ on the grip bar (17px tall, inset by the 2.6 border), at the right end
-                // of the bar's flat run (x = w − corner radius) so it's fully visible and bar-attached.
-                double radius = Math.Min(finalSize.Width, finalSize.Height) / 2;
-                // Keep the round close HIGH on the top band and push its column LEFT to where the flat top
-                // meets the corner curve — so it sits on the straight top, clear of the rounded border.
-                const double rc = 8;
-                _close.Margin = new Thickness(0, 3, Math.Max(3, radius - rc), 0);   // centred on the grip band
+                // Seat the red ✕ high on the grip band. On a Title pill, push its column LEFT to where the
+                // flat top meets the corner curve (x = w − corner radius) so it clears the rounded border;
+                // on the squarer Info/Callout cards the corners are tight, so it simply hugs the top-right.
+                if (Box.Kind == BubbleKind.Title)
+                {
+                    double radius = Math.Min(finalSize.Width, finalSize.Height) / 2;
+                    const double rc = 8;
+                    _close.Margin = new Thickness(0, 3, Math.Max(3, radius - rc), 0);
+                }
+                else
+                {
+                    _close.Margin = new Thickness(0, 4, 6, 0);
+                }
             }
         }
         return base.ArrangeOverride(finalSize);
