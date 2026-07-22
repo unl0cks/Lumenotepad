@@ -740,13 +740,22 @@ public partial class MainView : UserControl
     /// <summary>Toggles for connector style and the diagonal connect ports.</summary>
     private Flyout BuildOptionsFlyout()
     {
-        var panel = new StackPanel { Spacing = 4, Margin = new Thickness(6, 4) };
-        var straight = new CheckBox { Content = "Straight links", FontSize = 12, IsChecked = PageCanvas.MindmapStraightLines };
-        straight.IsCheckedChanged += (_, _) => PageCanvas.MindmapStraightLines = straight.IsChecked == true;
-        var diag = new CheckBox { Content = "Diagonal connect points", FontSize = 12, IsChecked = PageCanvas.MindmapDiagonalPorts };
-        diag.IsCheckedChanged += (_, _) => { PageCanvas.MindmapDiagonalPorts = diag.IsChecked == true; PageCanvas.RefreshMindmapPorts(); };
-        panel.Children.Add(straight);
-        panel.Children.Add(diag);
+        var panel = new StackPanel { Spacing = 6, Margin = new Thickness(12, 9), MinWidth = 190 };
+        Control ToggleRow(string label, bool init, System.Action<bool> onChanged)
+        {
+            var sw = new ToggleSwitch { IsChecked = init, OnContent = "", OffContent = "", VerticalAlignment = VerticalAlignment.Center };
+            sw.IsCheckedChanged += (_, _) => onChanged(sw.IsChecked == true);
+            var lbl = new TextBlock { Text = label, FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 14, 0) };
+            var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+            Grid.SetColumn(lbl, 0);
+            Grid.SetColumn(sw, 1);
+            row.Children.Add(lbl);
+            row.Children.Add(sw);
+            return row;
+        }
+        panel.Children.Add(ToggleRow("Straight links", PageCanvas.MindmapStraightLines, v => PageCanvas.MindmapStraightLines = v));
+        panel.Children.Add(ToggleRow("Diagonal connect points", PageCanvas.MindmapDiagonalPorts,
+            v => { PageCanvas.MindmapDiagonalPorts = v; PageCanvas.RefreshMindmapPorts(); }));
         var flyout = new Flyout { Content = panel, Placement = PlacementMode.Bottom };
         MenuFx.AttachFlyout(flyout);
         return flyout;

@@ -1257,16 +1257,15 @@ internal sealed class NoteBoxView : Panel
                 Editor.InvalidateVisual();
             }
             Editor.Margin = new Thickness(10, 3, 10, 20);
-            // Part OF the grey grip "title bar": transparent at rest so the bar shows through (just the
-            // ✕ glyph), red on hover — exactly like the regular note card. ArrangeOverride seats it at
-            // the right end of the bar's flat run.
-            _close.Width = _close.Height = 16;
-            _close.CornerRadius = new CornerRadius(5);
-            _closeGlyph.FontSize = 8.5;
-            _closeGlyph.Margin = default;
+            // The ✕ nests into the pill's rounded top-right corner exactly like the regular card:
+            // transparent at rest (just the glyph), red on hover. ArrangeOverride sizes it so its rounded
+            // outer corner radius equals the pill radius — so it follows the curve, not a floating chip.
+            _closeGlyph.FontSize = 8;
+            _closeGlyph.HorizontalAlignment = HorizontalAlignment.Right;
+            _closeGlyph.VerticalAlignment = VerticalAlignment.Top;
             _closeRestBg = Brushes.Transparent;
-            _closeRestFg = new SolidColorBrush(Colors.White, 0.66);
-            _closeHoverBg = new SolidColorBrush(Color.Parse("#E81123"));
+            _closeRestFg = CloseFg;
+            _closeHoverBg = CloseHoverBg;
         }
         else if (normalBox)   // ordinary note card: the ✕ hugs the square corner as before
         {
@@ -1275,6 +1274,8 @@ internal sealed class NoteBoxView : Panel
             _close.Margin = default;
             _closeGlyph.FontSize = 7.5;
             _closeGlyph.Margin = default;
+            _closeGlyph.HorizontalAlignment = HorizontalAlignment.Center;
+            _closeGlyph.VerticalAlignment = VerticalAlignment.Center;
             _closeRestBg = Brushes.Transparent;
             _closeRestFg = CloseFg;
             _closeHoverBg = CloseHoverBg;
@@ -1317,7 +1318,10 @@ internal sealed class NoteBoxView : Panel
                 // Seat the red ✕ on the grip bar (17px tall, inset by the 2.6 border), at the right end
                 // of the bar's flat run (x = w − corner radius) so it's fully visible and bar-attached.
                 double radius = Math.Min(finalSize.Width, finalSize.Height) / 2;
-                _close.Margin = new Thickness(0, 3.1, radius, 0);   // centred on the 17px grip bar
+                _close.Width = _close.Height = radius;                           // fills the top-right cap quarter
+                _close.CornerRadius = new CornerRadius(0, radius, 0, Math.Min(10, radius * 0.34));
+                _close.Margin = default;                                         // flush into the corner
+                _closeGlyph.Margin = new Thickness(0, radius * 0.32, radius * 0.32, 0);   // ✕ near the corner
             }
         }
         return base.ArrangeOverride(finalSize);
