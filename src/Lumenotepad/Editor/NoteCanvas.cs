@@ -1323,12 +1323,13 @@ internal sealed class NoteBoxView : Panel
                 // Seat the red ✕ on the grip bar (17px tall, inset by the 2.6 border), at the right end
                 // of the bar's flat run (x = w − corner radius) so it's fully visible and bar-attached.
                 double radius = Math.Min(finalSize.Width, finalSize.Height) / 2;
-                // Sit the round close on the grip-bar line (top), as far toward the right corner as it can
-                // go while staying fully on the bubble — clear of the side port, aligned with the bar.
-                const double rc = 8, cy = 10.5;
+                // Sit the round close on the top band, as far right as it can go while leaving a clear gap
+                // to the bubble's OUTLINE — inset by the 2.6px border + a couple px so it never touches it.
+                const double rc = 8, cy = 15, clear = 5;
                 double dy = radius - cy;
-                double dx = Math.Sqrt(Math.Max(0, (radius - rc) * (radius - rc) - dy * dy));
-                double right = Math.Max(2, radius - dx - rc);
+                double lim = radius - rc - clear;
+                double dx = Math.Sqrt(Math.Max(0, lim * lim - dy * dy));
+                double right = Math.Max(3, radius - dx - rc);
                 _close.Margin = new Thickness(0, cy - rc, right, 0);
             }
         }
