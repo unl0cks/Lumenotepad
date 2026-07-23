@@ -32,6 +32,27 @@ WriteIco(outIco, sizes, pngs);
 File.WriteAllBytes(outPng, pngs[^1]);
 Console.WriteLine($"wrote {outIco} ({new FileInfo(outIco).Length} bytes) + {outPng}");
 
+// ---- macOS iconset: re-draw at a 1024px master (vector code scales cleanly, no upsampling) and
+// emit the PNG sizes tools/publish-macos.sh packs into lumenotepad.icns for the .app bundle. ----
+string macDir = Path.Combine(root, "assets", "macos-iconset");
+Directory.CreateDirectory(macDir);
+using (var big = SKSurface.Create(new SKImageInfo(1024, 1024, SKColorType.Bgra8888, SKAlphaType.Premul)))
+{
+    big.Canvas.Scale(4f);          // Draw() works in 256-space; 4x = a true 1024 master
+    Draw(big.Canvas);
+    using var bigImg = big.Snapshot();
+    foreach (int s in new[] { 16, 32, 64, 128, 256, 512, 1024 })
+    {
+        using var bmp = SKBitmap.FromImage(bigImg);
+        using var resized = bmp.Resize(new SKImageInfo(s, s, SKColorType.Bgra8888, SKAlphaType.Premul),
+                                       new SKSamplingOptions(SKCubicResampler.Mitchell));
+        using var img = SKImage.FromBitmap(resized);
+        using var data = img.Encode(SKEncodedImageFormat.Png, 100);
+        File.WriteAllBytes(Path.Combine(macDir, $"icon_{s}.png"), data.ToArray());
+    }
+}
+Console.WriteLine($"wrote {macDir}/icon_{{16..1024}}.png");
+
 static string FindRepoRoot()
 {
     var d = new DirectoryInfo(AppContext.BaseDirectory);

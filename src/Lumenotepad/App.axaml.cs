@@ -12,6 +12,14 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        // Off Windows the Segoe icon fonts don't exist, so every toolbar/menu glyph would render as
+        // tofu. Swap the IconFont resource for the bundled LumenIcons face (same PUA codepoints,
+        // MIT Fluent shapes) BEFORE any window is built — app-level Resources win over the merged
+        // Theme.axaml entry, so Windows keeps Segoe untouched and macOS gets real icons.
+        if (!System.OperatingSystem.IsWindows())
+            Resources["IconFont"] = new Avalonia.Media.FontFamily(
+                $"{Services.AppFonts.CollectionUri}#Lumen Icons");
+
         ToggleFx.Install();   // Motion-driven ToggleSwitch knob (one global hook pair)
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {

@@ -3,3 +3,4 @@ obj/
 userdata/
 *.user
 .vs/
+dist/
