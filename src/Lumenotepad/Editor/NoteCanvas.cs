@@ -297,51 +297,61 @@ public sealed class NoteCanvas : Panel
             default: LayoutHybrid(); break;
         }
 
-        // RADIAL: a concentric starburst at (near) its minimum size. Every leaf rides one outer ring sized so
-        // a full turn of them can't touch — with wide bubbles that ring has a hard minimum (circumference =
-        // Σ leaf widths), so radial can't get tighter than this without overlapping. Internal hubs sit on
-        // inner rings by depth; each sub-tree owns a width-proportional wedge so the fan stays even.
+        // RADIAL: only the bubbles CONNECTED TO THE CENTRE ring around it, evenly, on an ellipse that hugs the
+        // central pill (few of them, so it never overlaps). Everything deeper hangs off its branch as a
+        // vertical-stacking column growing outward — like Hybrid — so wide labels cost nothing and nothing
+        // collides, however deep the tree.
         void LayoutRadial()
         {
-            const double lgap = 40;                                   // gap between neighbours on a ring
-            var depth = new System.Collections.Generic.Dictionary<NoteBox, int> { [root] = 0 };
-            int maxDepth = 0, leaves = 0;
-            double leafSpan = 0;                                      // Σ(leaf width + gap) — the outer ring's circumference
-            void Walk(NoteBox n, int d)
+            const double vgap = 22, hstep = 62, lgap = 40;
+            // Vertical extent of each sub-tree once its descendants are stacked in a column.
+            var subH = new System.Collections.Generic.Dictionary<NoteBox, double>();
+            double SubH(NoteBox n)
             {
-                depth[n] = d;
-                maxDepth = Math.Max(maxDepth, d);
-                var kids = children[n];
-                if (kids.Count == 0) { leaves++; leafSpan += n.Width + lgap; return; }
-                foreach (var c in kids) Walk(c, d + 1);
+                var k = children[n];
+                if (k.Count == 0) return subH[n] = H(n);
+                double s = -vgap;
+                foreach (var c in k) s += SubH(c) + vgap;
+                return subH[n] = Math.Max(H(n), s);
             }
-            Walk(root, 0);
-            leaves = Math.Max(1, leaves);
+            SubH(root);
 
-            double leafRing = leafSpan / (2 * Math.PI);               // hard minimum radius for a full ring of leaves
-            double rootClear = root.Width / 2 + 55;                   // first ring clears the (wide) central pill
-            double innerStep = Math.Max(160, (leafRing - rootClear) / Math.Max(1, maxDepth - 1));
-            double outer = Math.Max(leafRing, rootClear + (maxDepth - 1) * innerStep);
-
-            var angW = new System.Collections.Generic.Dictionary<NoteBox, double>();
-            double AngW(NoteBox n) => angW[n] = children[n].Count == 0
-                ? (n.Width + lgap) / outer
-                : Math.Max((n.Width + lgap) / outer, children[n].Sum(AngW));
-            AngW(root);
-            var angle = new System.Collections.Generic.Dictionary<NoteBox, double>();
-            void Assign(NoteBox n, double a0, double a1)
+            double Reach(NoteBox b, double ang)                      // centre-to-edge distance along a heading
             {
-                angle[n] = (a0 + a1) / 2;
-                double acc = a0, span = a1 - a0;
-                foreach (var c in children[n]) { double w = span * angW[c] / angW[n]; Assign(c, acc, acc + w); acc += w; }
+                double c = Math.Abs(Math.Cos(ang)), s = Math.Abs(Math.Sin(ang));
+                double tx = c < 1e-6 ? double.PositiveInfinity : (b.Width / 2) / c;
+                double ty = s < 1e-6 ? double.PositiveInfinity : (H(b) / 2) / s;
+                return Math.Min(tx, ty);
             }
-            Assign(root, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI);
-            foreach (var n in depth.Keys)
+
+            // A sub-tree laid out as a column: children stacked vertically, one horizontal step further out.
+            void PlaceColumn(System.Collections.Generic.List<NoteBox> ch, int side, double parentHalfW, double atX, double atY)
             {
-                if (ReferenceEquals(n, root)) { targets[root] = new Point(cx, cy); continue; }
-                bool leaf = children[n].Count == 0;
-                double r = leaf ? outer : Math.Min(rootClear + (depth[n] - 1) * innerStep, outer - 40);
-                targets[n] = new Point(cx + r * Math.Cos(angle[n]), cy + r * Math.Sin(angle[n]));
+                double band = -vgap;
+                foreach (var c in ch) band += subH[c] + vgap;
+                double top = atY - band / 2;
+                foreach (var c in ch)
+                {
+                    double childCx = atX + side * (parentHalfW + c.Width / 2 + hstep);
+                    double childCy = top + subH[c] / 2;
+                    targets[c] = new Point(childCx, childCy);
+                    PlaceColumn(children[c], side, c.Width / 2, childCx, childCy);
+                    top += subH[c] + vgap;
+                }
+            }
+
+            targets[root] = new Point(cx, cy);
+            var kids = children[root];
+            int cnt = Math.Max(1, kids.Count);
+            for (int i = 0; i < kids.Count; i++)
+            {
+                double a = -Math.PI / 2 + 2 * Math.PI * (i + 0.5) / cnt;   // even around the ellipse
+                var c = kids[i];
+                double r = Reach(root, a) + Reach(c, a) + lgap + 34;        // sit just off the central pill
+                var pos = new Point(cx + r * Math.Cos(a), cy + r * Math.Sin(a));
+                targets[c] = pos;
+                int side = Math.Cos(a) >= 0 ? 1 : -1;                       // its sub-tree grows away from the centre
+                PlaceColumn(children[c], side, c.Width / 2, pos.X, pos.Y);
             }
         }
 
