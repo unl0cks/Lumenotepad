@@ -297,15 +297,14 @@ public sealed class NoteCanvas : Panel
             default: LayoutHybrid(); break;
         }
 
-        // RADIAL: only the bubbles CONNECTED TO THE CENTRE ring around it, evenly, on an ellipse that hugs the
-        // central pill (few of them, so it never overlaps). Everything deeper hangs off its branch as a
-        // vertical-stacking column growing outward — like Hybrid — so wide labels cost nothing and nothing
-        // collides, however deep the tree.
+        // RADIAL: the bubbles CONNECTED TO THE CENTRE ring around it on an ellipse; everything deeper hangs off
+        // its branch as a vertical-stacking column growing outward (like Hybrid) so wide labels cost nothing.
+        // Branches that fan out are put on the LEFT/RIGHT arcs (their columns grow into open space); lone
+        // bubbles fill the TOP/BOTTOM arcs. So the direct children make a clean ellipse and nothing collides.
         void LayoutRadial()
         {
-            const double vgap = 22, hstep = 62, lgap = 40;
-            // Vertical extent of each sub-tree once its descendants are stacked in a column.
-            var subH = new System.Collections.Generic.Dictionary<NoteBox, double>();
+            const double vgap = 22, hstep = 62, agap = 34;
+            var subH = new System.Collections.Generic.Dictionary<NoteBox, double>();   // stacked height of a sub-tree
             double SubH(NoteBox n)
             {
                 var k = children[n];
@@ -316,15 +315,10 @@ public sealed class NoteCanvas : Panel
             }
             SubH(root);
 
-            double Reach(NoteBox b, double ang)                      // centre-to-edge distance along a heading
-            {
-                double c = Math.Abs(Math.Cos(ang)), s = Math.Abs(Math.Sin(ang));
-                double tx = c < 1e-6 ? double.PositiveInfinity : (b.Width / 2) / c;
-                double ty = s < 1e-6 ? double.PositiveInfinity : (H(b) / 2) / s;
-                return Math.Min(tx, ty);
-            }
+            double ax = root.Width / 2 + 120;                                 // ellipse semi-axes: clear the pill,
+            double ay = Math.Max(H(root) / 2 + 120, ax * 0.62);               // floored so top/bottom aren't jammed
 
-            // A sub-tree laid out as a column: children stacked vertically, one horizontal step further out.
+            // A sub-tree as a column: children stacked vertically, one horizontal step further out.
             void PlaceColumn(System.Collections.Generic.List<NoteBox> ch, int side, double parentHalfW, double atX, double atY)
             {
                 double band = -vgap;
@@ -342,17 +336,55 @@ public sealed class NoteCanvas : Panel
 
             targets[root] = new Point(cx, cy);
             var kids = children[root];
-            int cnt = Math.Max(1, kids.Count);
-            for (int i = 0; i < kids.Count; i++)
+            var deep = kids.Where(c => children[c].Count > 0).ToList();
+            var lone = kids.Where(c => children[c].Count == 0).ToList();
+
+            // Deep branches → left/right arcs, balanced by sub-tree height; stacked vertically, sitting on the
+            // ellipse curve at each row's height, columns growing outward.
+            var right = new System.Collections.Generic.List<NoteBox>();
+            var left = new System.Collections.Generic.List<NoteBox>();
+            double rS = 0, lS = 0;
+            foreach (var c in deep.OrderByDescending(c => subH[c]))
+                if (rS <= lS) { right.Add(c); rS += subH[c]; } else { left.Add(c); lS += subH[c]; }
+            void PlaceSide(System.Collections.Generic.List<NoteBox> group, int side)
             {
-                double a = -Math.PI / 2 + 2 * Math.PI * (i + 0.5) / cnt;   // even around the ellipse
-                var c = kids[i];
-                double r = Reach(root, a) + Reach(c, a) + lgap + 34;        // sit just off the central pill
-                var pos = new Point(cx + r * Math.Cos(a), cy + r * Math.Sin(a));
-                targets[c] = pos;
-                int side = Math.Cos(a) >= 0 ? 1 : -1;                       // its sub-tree grows away from the centre
-                PlaceColumn(children[c], side, c.Width / 2, pos.X, pos.Y);
+                double band = -vgap;
+                foreach (var c in group) band += subH[c] + vgap;
+                double top = cy - band / 2;
+                foreach (var c in group)
+                {
+                    double ccy = top + subH[c] / 2;
+                    double ny = Math.Clamp((ccy - cy) / ay, -0.96, 0.96);
+                    double ccx = cx + side * ax * Math.Sqrt(1 - ny * ny);       // on the ellipse at this height
+                    targets[c] = new Point(ccx, ccy);
+                    PlaceColumn(children[c], side, c.Width / 2, ccx, ccy);
+                    top += subH[c] + vgap;
+                }
             }
+            PlaceSide(right, 1);
+            PlaceSide(left, -1);
+
+            // Lone bubbles → spread across the top and bottom arcs of the same ellipse.
+            var topRow = new System.Collections.Generic.List<NoteBox>();
+            var botRow = new System.Collections.Generic.List<NoteBox>();
+            for (int i = 0; i < lone.Count; i++) (i % 2 == 0 ? topRow : botRow).Add(lone[i]);
+            void PlaceArc(System.Collections.Generic.List<NoteBox> group, int vside)
+            {
+                if (group.Count == 0) return;
+                double totalW = -agap;
+                foreach (var c in group) totalW += c.Width + agap;
+                double x = cx - totalW / 2;
+                foreach (var c in group)
+                {
+                    double ccx = x + c.Width / 2;
+                    double nx = Math.Clamp((ccx - cx) / ax, -0.96, 0.96);
+                    double ccy = cy + vside * ay * Math.Sqrt(1 - nx * nx);      // on the ellipse at this x
+                    targets[c] = new Point(ccx, ccy);
+                    x += c.Width + agap;
+                }
+            }
+            PlaceArc(topRow, -1);
+            PlaceArc(botRow, 1);
         }
 
         // HYBRID: branches that FAN OUT (have children) go left & right as vertical-stacking columns — the
