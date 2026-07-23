@@ -319,8 +319,8 @@ public sealed class NoteCanvas : Panel
             leaves = Math.Max(1, leaves);
 
             double leafRing = leafSpan / (2 * Math.PI);               // radius a full ring of the actual leaves needs
-            double rootClear = root.Width / 2 + 45;                   // first ring clears the (wide) central pill
-            double innerStep = Math.Max(120, (leafRing - rootClear) / Math.Max(1, maxDepth - 1));
+            double rootClear = root.Width / 2 + 65;                   // first ring clears the (wide) central pill
+            double innerStep = Math.Max(140, (leafRing - rootClear) / Math.Max(1, maxDepth - 1));
             double outer = Math.Max(leafRing, rootClear + (maxDepth - 1) * innerStep);
 
             // Angular width each sub-tree needs is proportional to the actual widths of the leaves it must fit
