@@ -303,7 +303,7 @@ public sealed class NoteCanvas : Panel
         // around the whole circle and nothing overlaps — a balanced starburst, not a lopsided fan.
         void LayoutRadial()
         {
-            const double lgap = 34;                                   // breathing room between neighbours on a ring
+            const double lgap = 38;                                   // breathing room between neighbours on a ring
             var depth = new System.Collections.Generic.Dictionary<NoteBox, int> { [root] = 0 };
             int maxDepth = 0, leaves = 0;
             double leafSpan = 0;                                      // Σ(leaf width + gap) — the outer ring's circumference
@@ -319,8 +319,9 @@ public sealed class NoteCanvas : Panel
             leaves = Math.Max(1, leaves);
 
             double leafRing = leafSpan / (2 * Math.PI);               // radius a full ring of the actual leaves needs
-            double rootClear = root.Width / 2 + 65;                   // first ring clears the (wide) central pill
-            double innerStep = Math.Max(140, (leafRing - rootClear) / Math.Max(1, maxDepth - 1));
+            double rootClear = root.Width / 2 + 55;                   // first ring clears the (wide) central pill
+            // Ring gap ≈ enough that a leaf sitting outboard of its hub clears it (wide boxes need the room).
+            double innerStep = Math.Max(178, (leafRing - rootClear) / Math.Max(1, maxDepth - 1));
             double outer = Math.Max(leafRing, rootClear + (maxDepth - 1) * innerStep);
 
             // Angular width each sub-tree needs is proportional to the actual widths of the leaves it must fit
