@@ -106,6 +106,14 @@ public partial class PreferencesWindow : Window
             if (_syncingStartup) return;
             Platform.StartupRegistry.SetEnabled(StartupToggle.IsChecked == true);
         };
+        // Windows-only features stay off the prefs sheet elsewhere: the startup toggle writes the HKCU
+        // Run key and the summon shortcut is a Win32 RegisterHotKey — both are inert no-ops off Windows,
+        // so showing dead switches would only confuse (macOS tester feedback loop).
+        if (!OperatingSystem.IsWindows())
+        {
+            StartupRow.IsVisible = false;
+            SummonRow.IsVisible = false;
+        }
         // Sliders no longer snap-to-tick (the thumb glides with the cursor) — snap the STORED value
         // and the label to the tick here instead. Autosave: 100ms steps.
         AutosaveSlider.ValueChanged += (_, e) =>
@@ -174,9 +182,15 @@ public partial class PreferencesWindow : Window
 
         OpenDataBtn.Click += (_, _) =>
         {
-            if (Vm?.SettingsDir is { } d)
+            if (Vm?.SettingsDir is not { } d) return;
+            // Shell-open the folder itself: Explorer on Windows, Finder on macOS, the default file
+            // manager on Linux — no hard-coded explorer.exe, which crashes off Windows.
+            try
+            {
                 System.Diagnostics.Process.Start(
-                    new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{d}\"") { UseShellExecute = true });
+                    new System.Diagnostics.ProcessStartInfo { FileName = d, UseShellExecute = true });
+            }
+            catch { /* a missing handler shouldn't take the prefs window down */ }
         };
         ResetShortcutsBtn.Click += (_, _) =>
         {

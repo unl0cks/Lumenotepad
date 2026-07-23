@@ -133,6 +133,7 @@ public partial class MainWindow
     /// hotkey id, so it is inert until <see cref="RegisterHotKey"/> has run.</summary>
     private void InstallWndHook()
     {
+        if (!OperatingSystem.IsWindows()) return;      // WndProc is Win32-only
         if (_wndHook is not null) return;
         _wndHook = (IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, ref bool handled) =>
         {
@@ -146,16 +147,19 @@ public partial class MainWindow
         Win32Properties.AddWndProcHookCallback(this, _wndHook);
     }
 
-    /// <summary>Register or unregister the global hotkey to match the pref.</summary>
+    /// <summary>Register or unregister the global hotkey to match the pref. RegisterHotKey/WM_HOTKEY are
+    /// Win32-only, so off Windows the whole feature is an inert no-op (a Windows settings.json carried to a
+    /// Mac with SummonHotkey=true must not crash the app at launch with DllNotFoundException).</summary>
     private void SyncHotkey()
     {
+        if (!OperatingSystem.IsWindows()) return;
         if (Vm is { SummonHotkey: true }) RegisterSummon();
         else UnregisterSummon();
     }
 
     private void RegisterSummon()
     {
-        if (_hotkeyRegistered) return;
+        if (!OperatingSystem.IsWindows() || _hotkeyRegistered) return;
         if (TryGetPlatformHandle()?.Handle is not { } hwnd || hwnd == IntPtr.Zero) return;   // handle not ready yet
         InstallWndHook();
         _hotkeyRegistered = RegisterHotKey(hwnd, SummonHotkeyId, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_N);
@@ -163,7 +167,7 @@ public partial class MainWindow
 
     private void UnregisterSummon()
     {
-        if (!_hotkeyRegistered) return;
+        if (!OperatingSystem.IsWindows() || !_hotkeyRegistered) return;
         if (TryGetPlatformHandle()?.Handle is { } hwnd && hwnd != IntPtr.Zero)
             UnregisterHotKey(hwnd, SummonHotkeyId);
         _hotkeyRegistered = false;

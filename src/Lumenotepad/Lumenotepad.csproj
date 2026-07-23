@@ -6,12 +6,16 @@
     <LangVersion>latest</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>Assets\lumenotepad.ico</ApplicationIcon>
+    <!-- macOS port: publishable for Apple Silicon and Intel Macs (tools/publish-macos.ps1). The
+         Windows PE bits (Win32 manifest, .ico embedding) only apply to win RIDs / RID-less dev builds. -->
+    <RuntimeIdentifiers>win-x64;osx-arm64;osx-x64</RuntimeIdentifiers>
+    <ApplicationManifest Condition="'$(RuntimeIdentifier)' == '' or $(RuntimeIdentifier.StartsWith('win'))">app.manifest</ApplicationManifest>
+    <ApplicationIcon Condition="'$(RuntimeIdentifier)' == '' or $(RuntimeIdentifier.StartsWith('win'))">Assets\lumenotepad.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-    <!-- CA1416: this is a Windows-only app (DWM acrylic interop, WinExe) — the "reachable on all
-         platforms" analyzer noise for PDFium calls doesn't apply. AVLN3001: chromeless windows with
-         parameterized ctors are never loaded via the runtime XAML loader; the warning is benign. -->
+    <!-- CA1416: every Windows-only call site (DWM acrylic, registry, hotkey) is guarded with
+         OperatingSystem.IsWindows(); the remaining analyzer noise is PDFium/SkiaSharp annotations that
+         list explicit platforms we do target. AVLN3001: chromeless windows with parameterized ctors are
+         never loaded via the runtime XAML loader; the warning is benign. -->
     <NoWarn>$(NoWarn);CA1416;AVLN3001</NoWarn>
   </PropertyGroup>
   <ItemGroup>

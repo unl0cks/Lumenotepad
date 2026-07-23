@@ -93,8 +93,13 @@ public sealed class AppSettings
         catch { return new AppSettings(); }
     }
 
-    /// <summary>The portable userdata folder beside the app's assemblies. Uses AppContext.BaseDirectory
-    /// (the app's own folder) rather than ProcessPath, which points at dotnet.exe when launched via
-    /// `dotnet App.dll` and would try to write into a protected install folder.</summary>
-    public static string DefaultDir => Path.Combine(System.AppContext.BaseDirectory, "userdata");
+    /// <summary>Where all user data lives (settings, notebooks, fonts, backups source). On Windows this is
+    /// the PORTABLE userdata folder beside the app's assemblies — AppContext.BaseDirectory (the app's own
+    /// folder) rather than ProcessPath, which points at dotnet.exe under `dotnet App.dll`. On macOS the app
+    /// ships as a .app bundle that gets REPLACED wholesale on every update, so data must live outside it:
+    /// SpecialFolder.ApplicationData resolves to ~/Library/Application Support on .NET 8+ (and to
+    /// ~/.config on Linux), giving the platform-correct home in one line.</summary>
+    public static string DefaultDir => OperatingSystem.IsWindows()
+        ? Path.Combine(System.AppContext.BaseDirectory, "userdata")
+        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Lumenotepad");
 }

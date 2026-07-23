@@ -1333,7 +1333,11 @@ internal sealed class NoteBoxView : Panel
         _closeRestFg = CloseFg;
         _closeGlyph = new TextBlock
         {
-            Text = "\uE711", FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
+            // IconFont resource (not an inline Segoe literal) so the theme's cross-platform fallback
+            // chain applies: on macOS the bundled LumenIcons supplies the glyph.
+            Text = "\uE711",
+            FontFamily = Avalonia.Application.Current?.FindResource("IconFont") as FontFamily
+                         ?? new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
             FontSize = 7.5, Foreground = CloseFg,
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
         };
@@ -1726,7 +1730,8 @@ internal sealed class NoteBoxView : Panel
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
         row.Children.Add(new TextBlock
         {
-            Text = "", FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
+            Text = "", FontFamily = Avalonia.Application.Current?.FindResource("IconFont") as FontFamily
+                         ?? new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),   // theme fallback chain (LumenIcons on macOS)
             FontSize = 16, Foreground = text, VerticalAlignment = VerticalAlignment.Center,
         });
         var lines = new StackPanel { Spacing = 1, VerticalAlignment = VerticalAlignment.Center };
