@@ -297,41 +297,36 @@ public sealed class NoteCanvas : Panel
             default: LayoutHybrid(); break;
         }
 
-        // RADIAL: an elliptical starburst. Each sub-tree owns an angular wedge (sized by the widths of the
-        // leaves it must fit) so branches fan evenly around the whole circle; each node then sits just clear
-        // of its parent ALONG ITS OWN HEADING. Because the bubbles are short, a branch only needs the full
-        // wide-box gap within a narrow cone of dead-horizontal — off-axis the clearance drops to the box
-        // height — so vertical/diagonal branches stay tight while sideways ones reach out. Never overlaps.
+        // RADIAL: a concentric starburst at (near) its minimum size. Every leaf rides one outer ring sized so
+        // a full turn of them can't touch — with wide bubbles that ring has a hard minimum (circumference =
+        // Σ leaf widths), so radial can't get tighter than this without overlapping. Internal hubs sit on
+        // inner rings by depth; each sub-tree owns a width-proportional wedge so the fan stays even.
         void LayoutRadial()
         {
-            const double lgap = 38;                                   // gap between a node and the next thing out
-            const double minStep = 96;                                // shortest branch segment (keeps it from jamming)
-            var nodes = new System.Collections.Generic.List<NoteBox>();
-            int leaves = 0;
-            double leafSpan = 0;                                      // Σ(leaf width + gap) — sets the angular scale
-            void Walk(NoteBox n)
+            const double lgap = 40;                                   // gap between neighbours on a ring
+            var depth = new System.Collections.Generic.Dictionary<NoteBox, int> { [root] = 0 };
+            int maxDepth = 0, leaves = 0;
+            double leafSpan = 0;                                      // Σ(leaf width + gap) — the outer ring's circumference
+            void Walk(NoteBox n, int d)
             {
-                nodes.Add(n);
+                depth[n] = d;
+                maxDepth = Math.Max(maxDepth, d);
                 var kids = children[n];
                 if (kids.Count == 0) { leaves++; leafSpan += n.Width + lgap; return; }
-                foreach (var c in kids) Walk(c);
+                foreach (var c in kids) Walk(c, d + 1);
             }
-            Walk(root);
-            double refRing = Math.Max(220, leafSpan / (2 * Math.PI));   // reference radius for turning widths into angles
+            Walk(root, 0);
+            leaves = Math.Max(1, leaves);
 
-            double Reach(NoteBox b, double ang)                      // centre-to-edge distance along a heading
-            {
-                double c = Math.Abs(Math.Cos(ang)), s = Math.Abs(Math.Sin(ang));
-                double tx = c < 1e-6 ? double.PositiveInfinity : (b.Width / 2) / c;
-                double ty = s < 1e-6 ? double.PositiveInfinity : (H(b) / 2) / s;
-                return Math.Min(tx, ty);
-            }
+            double leafRing = leafSpan / (2 * Math.PI);               // hard minimum radius for a full ring of leaves
+            double rootClear = root.Width / 2 + 55;                   // first ring clears the (wide) central pill
+            double innerStep = Math.Max(160, (leafRing - rootClear) / Math.Max(1, maxDepth - 1));
+            double outer = Math.Max(leafRing, rootClear + (maxDepth - 1) * innerStep);
 
-            // Angular wedge per sub-tree, proportional to the actual leaf widths it must hold; node = wedge centre.
             var angW = new System.Collections.Generic.Dictionary<NoteBox, double>();
             double AngW(NoteBox n) => angW[n] = children[n].Count == 0
-                ? (n.Width + lgap) / refRing
-                : Math.Max((n.Width + lgap) / refRing, children[n].Sum(AngW));
+                ? (n.Width + lgap) / outer
+                : Math.Max((n.Width + lgap) / outer, children[n].Sum(AngW));
             AngW(root);
             var angle = new System.Collections.Generic.Dictionary<NoteBox, double>();
             void Assign(NoteBox n, double a0, double a1)
@@ -341,22 +336,13 @@ public sealed class NoteCanvas : Panel
                 foreach (var c in children[n]) { double w = span * angW[c] / angW[n]; Assign(c, acc, acc + w); acc += w; }
             }
             Assign(root, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI);
-
-            // Radius: each child sits outboard of its parent by the clearance the two boxes need in the child's
-            // direction (short edges above/below → tight, wide edges left/right → roomy).
-            var radius = new System.Collections.Generic.Dictionary<NoteBox, double> { [root] = 0 };
-            void PlaceR(NoteBox n)
+            foreach (var n in depth.Keys)
             {
-                foreach (var c in children[n])
-                {
-                    double ca = angle[c];
-                    radius[c] = radius[n] + Math.Max(minStep, Reach(n, ca) + Reach(c, ca) + lgap);
-                    PlaceR(c);
-                }
+                if (ReferenceEquals(n, root)) { targets[root] = new Point(cx, cy); continue; }
+                bool leaf = children[n].Count == 0;
+                double r = leaf ? outer : Math.Min(rootClear + (depth[n] - 1) * innerStep, outer - 40);
+                targets[n] = new Point(cx + r * Math.Cos(angle[n]), cy + r * Math.Sin(angle[n]));
             }
-            PlaceR(root);
-            foreach (var n in nodes)
-                targets[n] = new Point(cx + radius[n] * Math.Cos(angle[n]), cy + radius[n] * Math.Sin(angle[n]));
         }
 
         // HYBRID: branches that FAN OUT (have children) go left & right as vertical-stacking columns — the
