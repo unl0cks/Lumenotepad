@@ -11,6 +11,9 @@ VERSION="${1:-1.0.0}"
 
 for RID in osx-arm64 osx-x64; do
   echo "== publish $RID =="
+  # dotnet publish never deletes files a previous publish left behind - a renamed dll would
+  # linger and ship inside the .app. Start every publish from a clean output dir.
+  rm -rf "src/Lumenotepad/bin/Release/net10.0/$RID/publish"
   dotnet publish src/Lumenotepad/Lumenotepad.csproj -c Release -r "$RID" \
     --self-contained true -p:UseAppHost=true -v q --nologo
 done

@@ -24,14 +24,50 @@ ICONSET = os.path.join(ROOT, "assets", "macos-iconset")
 DIST = os.path.join(ROOT, "dist")
 
 
+def icns_rle(data: bytes) -> bytes:
+    """The icns packbits variant (it32/ARGB channels): 0x80+n = run of n+3 repeats, 0..0x7F = n+1 literals."""
+    out = bytearray()
+    i, n = 0, len(data)
+    while i < n:
+        run = 1
+        while i + run < n and run < 130 and data[i + run] == data[i]:
+            run += 1
+        if run >= 3:
+            out.append(0x80 + run - 3)
+            out.append(data[i])
+            i += run
+        else:
+            j = i
+            while j < n and j - i < 128:
+                if j + 2 < n and data[j] == data[j + 1] == data[j + 2]:
+                    break
+                j += 1
+            out.append(j - i - 1)
+            out.extend(data[i:j])
+            i = j
+    return bytes(out)
+
+
+def argb_chunk(size: int) -> bytes:
+    """Apple-native ARGB entry (what iconutil emits for the small 1x slots): 'ARGB' + RLE'd A,R,G,B planes."""
+    with open(os.path.join(ICONSET, f"icon_{size}.rgba"), "rb") as f:
+        rgba = f.read()
+    if len(rgba) != size * size * 4:
+        sys.exit(f"icon_{size}.rgba has {len(rgba)} bytes, expected {size * size * 4} - re-run tools/icongen")
+    planes = [rgba[c::4] for c in (3, 0, 1, 2)]        # A, R, G, B
+    return b"ARGB" + b"".join(icns_rle(p) for p in planes)
+
+
 def build_icns() -> bytes:
-    """Compose a .icns from the iconset PNGs (modern PNG-based entry types only)."""
-    entries = [  # (icns type, source png size)
-        (b"icp4", 16), (b"icp5", 32), (b"ic07", 128), (b"ic08", 256), (b"ic09", 512),
-        (b"ic10", 1024), (b"ic11", 32), (b"ic12", 64), (b"ic13", 256), (b"ic14", 512),
-    ]
+    """Compose a .icns: PNG entries for the big sizes, native ARGB for the 16/32 1x slots.
+    (PNG data in the small legacy types icp4/icp5 renders SCRAMBLED as an app icon in non-Retina
+    1x contexts - macOS decodes it as packbits RGB - so those slots use Apple's ARGB format.)"""
     chunks = []
-    for typ, size in entries:
+    for typ, size in [(b"ic04", 16), (b"ic05", 32)]:
+        data = argb_chunk(size)
+        chunks.append(typ + struct.pack(">I", len(data) + 8) + data)
+    for typ, size in [(b"ic07", 128), (b"ic08", 256), (b"ic09", 512), (b"ic10", 1024),
+                      (b"ic11", 32), (b"ic12", 64), (b"ic13", 256), (b"ic14", 512)]:
         with open(os.path.join(ICONSET, f"icon_{size}.png"), "rb") as f:
             data = f.read()
         chunks.append(typ + struct.pack(">I", len(data) + 8) + data)
@@ -58,7 +94,9 @@ def info_plist() -> bytes:
 
 
 INSTALL_CMD = """#!/bin/bash
-# Lumenotepad installer / updater. Double-click me (first time: right-click > Open).
+# Lumenotepad installer / updater. Double-click me.
+# First run on macOS 15+: click Done on the warning, then System Settings > Privacy & Security >
+# "Open Anyway". (macOS 13/14: right-click this file > Open works as a shortcut.)
 set -e
 cd "$(dirname "$0")"
 
@@ -69,9 +107,13 @@ DEST="/Applications"
 if [ ! -w "$DEST" ]; then DEST="$HOME/Applications"; mkdir -p "$DEST"; fi
 
 echo "Installing Lumenotepad ($ARCH) into $DEST ..."
-# quit a running copy so the bundle can be replaced cleanly
-osascript -e 'tell application "Lumenotepad" to quit' >/dev/null 2>&1 || true
-sleep 1
+# quit a running copy so the bundle can be replaced cleanly.
+# (no Apple events: osascript would LAUNCH the app when it isn't running, and triggers a TCC
+# Automation prompt when it is - a remembered "Don't Allow" would make the quit fail silently
+# forever. Plain signals need no permission; .NET exits cleanly on SIGTERM.)
+pkill -x Lumenotepad 2>/dev/null || true
+for i in 1 2 3 4 5; do pgrep -x Lumenotepad >/dev/null || break; sleep 1; done
+pgrep -x Lumenotepad >/dev/null && pkill -9 -x Lumenotepad 2>/dev/null || true
 rm -rf "$DEST/Lumenotepad.app"
 cp -R "$SRC" "$DEST/Lumenotepad.app"
 
@@ -95,9 +137,19 @@ README = f"""Lumenotepad for macOS  (v{VERSION})
 HOW TO INSTALL (also how to UPDATE - it replaces the old version, your notes are kept):
 
   1. Unzip this file (double-click it).
-  2. RIGHT-CLICK "Install Lumenotepad.command" and choose "Open"
-     (needed the first time only, because this build isn't notarized with Apple).
-  3. If macOS still asks, click "Open" in the dialog.
+  2. Double-click "Install Lumenotepad.command".
+     macOS will say it could not verify it - click "Done" (NOT "Move to Trash").
+  3. Open System Settings > Privacy & Security, scroll down to the message about
+     "Install Lumenotepad.command" being blocked, and click "Open Anyway"
+     (you may need your password or Touch ID).
+  4. In the final dialog, click "Open Anyway" / "Open" - the installer then runs
+     in a Terminal window.
+
+  (On macOS 13 or 14 there is a shortcut: right-click the .command file and
+   choose "Open", then "Open" again.)
+
+  IF NOTHING WORKS: open the Terminal app, type  bash  followed by a space,
+  then drag "Install Lumenotepad.command" into the window and press Return.
 
 The installer picks the right build for this Mac (Apple Silicon or Intel), puts
 Lumenotepad.app into Applications, and launches it.
@@ -126,7 +178,7 @@ def add_tree(zf: zipfile.ZipFile, src_dir: str, arc_prefix: str, exe_names: set)
 def write_file(zf: zipfile.ZipFile, arcname: str, data: bytes, mode: int) -> None:
     zi = zipfile.ZipInfo(arcname)
     zi.create_system = 3                      # unix, so modes survive extraction on macOS
-    zi.external_attr = (mode & 0xFFFF) << 16
+    zi.external_attr = ((0o100000 | mode) & 0xFFFF) << 16   # S_IFREG + mode, for picky extractors
     zi.compress_type = zipfile.ZIP_DEFLATED
     zf.writestr(zi, data)
 

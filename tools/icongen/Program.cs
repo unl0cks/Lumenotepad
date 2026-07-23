@@ -49,6 +49,15 @@ using (var big = SKSurface.Create(new SKImageInfo(1024, 1024, SKColorType.Bgra88
         using var img = SKImage.FromBitmap(resized);
         using var data = img.Encode(SKEncodedImageFormat.Png, 100);
         File.WriteAllBytes(Path.Combine(macDir, $"icon_{s}.png"), data.ToArray());
+        // The 16/32px slots ALSO go out as raw straight-alpha RGBA: macOS scrambles PNG payloads in
+        // the small icns entry types when used as an APP icon (non-Retina 1x contexts), so
+        // make_bundle.py packs these into Apple's native ARGB ic04/ic05 chunks instead.
+        if (s is 16 or 32)
+        {
+            using var straight = new SKBitmap(new SKImageInfo(s, s, SKColorType.Rgba8888, SKAlphaType.Unpremul));
+            img.ReadPixels(straight.Info, straight.GetPixels(), straight.RowBytes, 0, 0);
+            File.WriteAllBytes(Path.Combine(macDir, $"icon_{s}.rgba"), straight.Bytes);
+        }
     }
 }
 Console.WriteLine($"wrote {macDir}/icon_{{16..1024}}.png");

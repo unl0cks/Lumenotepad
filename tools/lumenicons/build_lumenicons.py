@@ -124,11 +124,20 @@ def svg_view_size(svg: str) -> float:
     return float(m.group(1)) if m else 24.0
 
 
+# Segoe draws the window-CAPTION glyphs (close/min/max) edge-to-edge across the full em, while the
+# Fluent 24px source icons keep ~2px inner padding — uniform scaling left them 25-35% smaller than
+# the Windows look (adversarial-review measurement vs C:\Windows\Fonts\SegoeIcons.ttf). These
+# codepoints get a post-scale about the em centre so their long dimension fills the em.
+CHROME_FILL = {0xE8BB, 0xE921, 0xE922}
+
+
 def build_font(paths: dict) -> None:
     from fontTools.fontBuilder import FontBuilder
-    from fontTools.pens.ttGlyphPen import TTGlyphPen
+    from fontTools.pens.boundsPen import BoundsPen
     from fontTools.pens.cu2quPen import Cu2QuPen
+    from fontTools.pens.recordingPen import RecordingPen
     from fontTools.pens.transformPen import TransformPen
+    from fontTools.pens.ttGlyphPen import TTGlyphPen
     from fontTools.svgLib.path import parse_path
 
     glyphs, cmap = {}, {}
@@ -138,18 +147,28 @@ def build_font(paths: dict) -> None:
 
     for cp in sorted(paths):
         gname, _, _ = ICONS[cp]
-        if gname in glyphs:          # E8BB reuses the Dismiss shape under a distinct glyph name
+        if gname in glyphs:          # duplicate mapping reuses the built glyph
             cmap[cp] = gname
             continue
         with open(paths[cp], encoding="utf-8") as f:
             svg = f.read()
         box = svg_view_size(svg)
         s = UPM / box                # scale the SVG box to the em; flip Y (SVG is y-down)
-        tt = TTGlyphPen(None)
-        quad = Cu2QuPen(tt, max_err=UPM / 1000)
-        xform = TransformPen(quad, (s, 0, 0, -s, 0, UPM))
+        rec = RecordingPen()         # record em-space outlines first so chrome glyphs can re-scale
+        xform = TransformPen(rec, (s, 0, 0, -s, 0, UPM))
         for d in re.findall(r'\bd="([^"]+)"', svg):
             parse_path(d, xform)
+        tt = TTGlyphPen(None)
+        quad = Cu2QuPen(tt, max_err=UPM / 1000)
+        if cp in CHROME_FILL:
+            bp = BoundsPen(None)
+            rec.replay(bp)
+            x0, y0, x1, y1 = bp.bounds
+            k = UPM / max(x1 - x0, y1 - y0)      # long dimension -> full em, scaled about the centre
+            c = UPM / 2 * (1 - k)
+            rec.replay(TransformPen(quad, (k, 0, 0, k, c, c)))
+        else:
+            rec.replay(quad)
         glyphs[gname] = tt.glyph()
         order.append(gname)
         cmap[cp] = gname
