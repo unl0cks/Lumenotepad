@@ -303,31 +303,33 @@ public sealed class NoteCanvas : Panel
         // around the whole circle and nothing overlaps — a balanced starburst, not a lopsided fan.
         void LayoutRadial()
         {
+            const double lgap = 34;                                   // breathing room between neighbours on a ring
             var depth = new System.Collections.Generic.Dictionary<NoteBox, int> { [root] = 0 };
             int maxDepth = 0, leaves = 0;
+            double leafSpan = 0;                                      // Σ(leaf width + gap) — the outer ring's circumference
             void Walk(NoteBox n, int d)
             {
                 depth[n] = d;
                 maxDepth = Math.Max(maxDepth, d);
                 var kids = children[n];
-                if (kids.Count == 0) { leaves++; return; }
+                if (kids.Count == 0) { leaves++; leafSpan += n.Width + lgap; return; }
                 foreach (var c in kids) Walk(c, d + 1);
             }
             Walk(root, 0);
             leaves = Math.Max(1, leaves);
-            double maxW = 0;
-            foreach (var b in boxes) maxW = Math.Max(maxW, b.Width);
 
-            double leafRing = (maxW + 55) * leaves / (2 * Math.PI);   // radius a full ring of leaves needs
-            double rootClear = root.Width / 2 + 80;                   // first ring clears the (wide) central pill
-            double innerStep = Math.Max(150, (leafRing - rootClear) / Math.Max(1, maxDepth - 1));
+            double leafRing = leafSpan / (2 * Math.PI);               // radius a full ring of the actual leaves needs
+            double rootClear = root.Width / 2 + 45;                   // first ring clears the (wide) central pill
+            double innerStep = Math.Max(120, (leafRing - rootClear) / Math.Max(1, maxDepth - 1));
             double outer = Math.Max(leafRing, rootClear + (maxDepth - 1) * innerStep);
 
-            // Angular width each sub-tree needs on the outer ring (floored so a lone leaf still gets a slot);
-            // node angle = wedge centre. Dividing the full circle in proportion spreads the branches evenly.
-            double leafAngle = (maxW + 55) / Math.Max(140, outer);
+            // Angular width each sub-tree needs is proportional to the actual widths of the leaves it must fit
+            // (a narrow leaf takes a narrow slice); node angle = wedge centre. Assign then fills the whole
+            // circle in proportion, so branches spread evenly and neighbours keep their gap without waste.
             var angW = new System.Collections.Generic.Dictionary<NoteBox, double>();
-            double AngW(NoteBox n) => angW[n] = children[n].Count == 0 ? leafAngle : Math.Max(leafAngle, children[n].Sum(AngW));
+            double AngW(NoteBox n) => angW[n] = children[n].Count == 0
+                ? (n.Width + lgap) / outer
+                : Math.Max((n.Width + lgap) / outer, children[n].Sum(AngW));
             AngW(root);
             var angle = new System.Collections.Generic.Dictionary<NoteBox, double>();
             void Assign(NoteBox n, double a0, double a1)
