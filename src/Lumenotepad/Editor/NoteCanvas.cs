@@ -336,7 +336,9 @@ public sealed class NoteCanvas : Panel
                 double ty = s < 1e-6 ? double.PositiveInfinity : (H(b) / 2) / s;
                 return Math.Min(tx, ty);
             }
-            const double step = 132;                                   // one branch segment per depth level
+            const double step = 150;                                   // one branch segment per depth level
+            const double firstRing = 190;                              // min first-ring radius: vertical branches
+                                                                       // aren't jammed against the short root edge
             double leafFloor = (maxW + 40) * leaves / (2 * Math.PI);    // min radius so a full ring of leaves can't touch
             foreach (var n in depth.Keys)
             {
@@ -344,8 +346,10 @@ public sealed class NoteCanvas : Panel
                 double a = angle[n];
                 bool leaf = children[n].Count == 0;
                 int ring = leaf ? maxDepth : depth[n];                  // leaves ride the outermost ring
-                double r = Reach(root, a) + Reach(n, a) + 36 + (ring - 1) * step;
-                if (leaf) r = Math.Max(r, leafFloor);                   // but keep a full ring of leaves apart
+                // First-ring distance clears the root elliptically (tight above/below, wider sideways) but
+                // never closer than firstRing; deeper rings add a fixed step; leaves keep a full ring apart.
+                double r = Math.Max(Reach(root, a) + Reach(n, a) + 40, firstRing) + (ring - 1) * step;
+                if (leaf) r = Math.Max(r, leafFloor);
                 targets[n] = new Point(cx + r * Math.Cos(a), cy + r * Math.Sin(a));
             }
         }
@@ -431,9 +435,10 @@ public sealed class NoteCanvas : Panel
                 return subW[n] = Math.Max(n.Width, sum);
             }
             SubWidth(root);
+            double firstDrop = H(root) / 2 + 145;   // extra breathing room under the (tall) central bubble
             void Place(NoteBox n, double centerX, int depth)
             {
-                targets[n] = new Point(centerX, cy + depth * vStep);
+                targets[n] = new Point(centerX, depth == 0 ? cy : cy + firstDrop + (depth - 1) * vStep);
                 var kids = children[n];
                 double band = -hGap;
                 foreach (var c in kids) band += subW[c] + hGap;
