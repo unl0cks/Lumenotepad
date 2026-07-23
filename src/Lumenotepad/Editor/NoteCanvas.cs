@@ -317,11 +317,6 @@ public sealed class NoteCanvas : Panel
             int leaves = Math.Max(1, leafOrder.Count);
             double maxW = 0;
             foreach (var b in boxes) maxW = Math.Max(maxW, b.Width);
-            // ALL leaves ride one outer ring, evenly spaced so they can't touch; internal nodes fall on inner
-            // rings by depth. The outer radius is sized both for leaf spacing AND so the first inner ring
-            // (outer / maxDepth) clears the — possibly very wide — central root.
-            double rootClear = root.Width / 2 + 90;
-            double outer = Math.Clamp(Math.Max((maxW + 80) * leaves / (2 * Math.PI), rootClear * maxDepth), 260, 1400);
             var angle = new System.Collections.Generic.Dictionary<NoteBox, double>();
             for (int i = 0; i < leafOrder.Count; i++) angle[leafOrder[i]] = -Math.PI / 2 + 2 * Math.PI * i / leaves;
             double Angle(NoteBox n)
@@ -332,11 +327,26 @@ public sealed class NoteCanvas : Panel
                 return angle[n] = sum / children[n].Count;   // internal node → mean angle of its children
             }
             Angle(root);
+            // Distance from a box's centre to its edge along a heading — lets branches hug the (wide, short)
+            // root elliptically: nodes above/below sit close, only sideways nodes are pushed past its width.
+            double Reach(NoteBox b, double ang)
+            {
+                double c = Math.Abs(Math.Cos(ang)), s = Math.Abs(Math.Sin(ang));
+                double tx = c < 1e-6 ? double.PositiveInfinity : (b.Width / 2) / c;
+                double ty = s < 1e-6 ? double.PositiveInfinity : (H(b) / 2) / s;
+                return Math.Min(tx, ty);
+            }
+            const double step = 132;                                   // one branch segment per depth level
+            double leafFloor = (maxW + 40) * leaves / (2 * Math.PI);    // min radius so a full ring of leaves can't touch
             foreach (var n in depth.Keys)
             {
+                if (ReferenceEquals(n, root)) { targets[root] = new Point(cx, cy); continue; }
+                double a = angle[n];
                 bool leaf = children[n].Count == 0;
-                double r = ReferenceEquals(n, root) ? 0 : leaf ? outer : (double)depth[n] / maxDepth * outer;
-                targets[n] = new Point(cx + r * Math.Cos(angle[n]), cy + r * Math.Sin(angle[n]));
+                int ring = leaf ? maxDepth : depth[n];                  // leaves ride the outermost ring
+                double r = Reach(root, a) + Reach(n, a) + 36 + (ring - 1) * step;
+                if (leaf) r = Math.Max(r, leafFloor);                   // but keep a full ring of leaves apart
+                targets[n] = new Point(cx + r * Math.Cos(a), cy + r * Math.Sin(a));
             }
         }
 
@@ -410,7 +420,7 @@ public sealed class NoteCanvas : Panel
         // horizontally by their sub-tree width (parent centred over its children). Reads as a hierarchy.
         void LayoutTopDown()
         {
-            const double vStep = 120, hGap = 34;
+            const double vStep = 150, hGap = 34;
             var subW = new System.Collections.Generic.Dictionary<NoteBox, double>();
             double SubWidth(NoteBox n)
             {
