@@ -315,8 +315,8 @@ public sealed class NoteCanvas : Panel
             }
             SubH(root);
 
-            double ax = root.Width / 2 + 190;                                 // ellipse semi-axes: clear the pill,
-            double ay = Math.Max(H(root) / 2 + 120, ax * 0.62);               // floored so top/bottom aren't jammed
+            double ax = root.Width / 2 + 240;                                 // ellipse semi-axes — roomy so the
+            double ay = Math.Max(H(root) / 2 + 150, ax * 0.72);               // side branches curve onto a real ring
 
             // A sub-tree as a column: children stacked vertically, one horizontal step further out.
             void PlaceColumn(System.Collections.Generic.List<NoteBox> ch, int side, double parentHalfW, double atX, double atY)
@@ -348,20 +348,24 @@ public sealed class NoteCanvas : Panel
                 if (rS <= lS) { right.Add(c); rS += subH[c]; } else { left.Add(c); lS += subH[c]; }
             void PlaceSide(System.Collections.Generic.List<NoteBox> group, int side)
             {
-                double band = -vgap;
-                foreach (var c in group) band += subH[c] + vgap;
-                double top = cy - band / 2;
+                if (group.Count == 0) return;
+                double span = 0;
+                foreach (var c in group) span += subH[c] + vgap;   // total vertical room the branches need
+                double baseA = side > 0 ? 0 : Math.PI;             // right arc around 0°, left around 180°
+                double acc = 0;
                 foreach (var c in group)
                 {
-                    double ccy = top + subH[c] / 2;
-                    double ny = Math.Clamp((ccy - cy) / ay, -1, 1);
-                    double arcX = ax * Math.Sqrt(Math.Max(0, 1 - ny * ny));
-                    // Bow onto the ellipse where there's room, but never nearer than clears the central pill,
-                    // so a column of branches taller than the ellipse can't collapse back over the centre.
-                    double ccx = cx + side * Math.Max(root.Width / 2 + c.Width / 2 + 46, arcX);
+                    // Spread the branches across a ~120° arc (weighted by sub-tree height) so they curve up and
+                    // down the side instead of stacking into a straight column — this is what reads as radial.
+                    double frac = span > 1e-6 ? (acc + subH[c] / 2) / span - 0.5 : 0;   // -0.5..+0.5 down the arc
+                    double a = baseA - side * frac * 2.1;
+                    double ex = ax * Math.Cos(a);
+                    double minCx = root.Width / 2 + c.Width / 2 + 46;   // but never nearer than clears the pill
+                    double ccx = Math.Abs(ex) < minCx ? cx + side * minCx : cx + ex;
+                    double ccy = cy + ay * Math.Sin(a);
                     targets[c] = new Point(ccx, ccy);
                     PlaceColumn(children[c], side, c.Width / 2, ccx, ccy);
-                    top += subH[c] + vgap;
+                    acc += subH[c] + vgap;
                 }
             }
             PlaceSide(right, 1);
