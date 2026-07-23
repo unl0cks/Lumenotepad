@@ -167,13 +167,24 @@ public partial class MainView : UserControl
         CanvasScroll.SizeChanged += (_, _) => PushCanvasViewport();
         // The page glides like every other pane (SmoothScroll leaves Ctrl+wheel to the zoom below).
         SmoothScroll.Attach(CanvasScroll);
-        // Ctrl+wheel canvas zoom (M8 Part 6): 50%–200% in ×1.1 notches, Ctrl+0 resets. Tunnel so
-        // the ScrollViewer never also scrolls on the same notch.
+        // Ctrl+wheel canvas zoom (M8 Part 6): 50%–200% in ×1.1 notches, Ctrl+0 resets. Shift+wheel pans the
+        // canvas horizontally. Tunnel so the ScrollViewer never also scrolls vertically on the same notch.
         CanvasScroll.AddHandler(PointerWheelChangedEvent, (_, e) =>
         {
-            if (!e.KeyModifiers.HasFlag(KeyModifiers.Control)) return;
-            SetCanvasZoom(_canvasZoom * (e.Delta.Y > 0 ? 1.1 : 1 / 1.1));
-            e.Handled = true;
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+            {
+                SetCanvasZoom(_canvasZoom * (e.Delta.Y > 0 ? 1.1 : 1 / 1.1));
+                e.Handled = true;
+            }
+            else if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+            {
+                // Turn the vertical wheel notch into a horizontal pan (wheel up = scroll left).
+                double notch = e.Delta.Y != 0 ? e.Delta.Y : e.Delta.X;
+                double max = System.Math.Max(0, CanvasScroll.Extent.Width - CanvasScroll.Viewport.Width);
+                double x = System.Math.Clamp(CanvasScroll.Offset.X - notch * 110, 0, max);
+                CanvasScroll.Offset = new Vector(x, CanvasScroll.Offset.Y);
+                e.Handled = true;
+            }
         }, RoutingStrategies.Tunnel);
         AddHandler(KeyDownEvent, (_, e) =>
         {

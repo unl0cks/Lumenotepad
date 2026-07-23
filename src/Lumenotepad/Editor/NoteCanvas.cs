@@ -297,34 +297,47 @@ public sealed class NoteCanvas : Panel
             default: LayoutHybrid(); break;
         }
 
-        // RADIAL: branches emanate in every direction; the root fans evenly around the full circle and each
-        // deeper node fans its children within a LIMITED wedge about its outward heading (so nothing wraps
-        // back over the centre). Children are placed relative to their parent, spaced by each box's edge
-        // reach along the heading plus a gap — the most organic look, uses all four sides.
+        // RADIAL: a dendrogram. Every LEAF gets an even slice of the full circle, so the outermost bubbles
+        // spread around a ring wide enough that they can't touch; each internal node sits at the mean angle
+        // of its leaves, one ring inward per depth. Branches emanate in every direction and never overlap.
         void LayoutRadial()
         {
-            const double gap = 66, childFan = 1.15;
-            double Reach(NoteBox b, double ang)
+            var depth = new System.Collections.Generic.Dictionary<NoteBox, int> { [root] = 0 };
+            var leafOrder = new System.Collections.Generic.List<NoteBox>();
+            int maxDepth = 0;
+            void Walk(NoteBox n, int d)
             {
-                double c = Math.Abs(Math.Cos(ang)), s = Math.Abs(Math.Sin(ang));
-                double tx = c < 1e-6 ? double.PositiveInfinity : (b.Width / 2) / c;
-                double ty = s < 1e-6 ? double.PositiveInfinity : (H(b) / 2) / s;
-                return Math.Min(tx, ty);
-            }
-            void Place(NoteBox n, Point at, double outward, double halfSpread)
-            {
-                targets[n] = at;
+                depth[n] = d;
+                maxDepth = Math.Max(maxDepth, d);
                 var kids = children[n];
-                int k = kids.Count;
-                for (int i = 0; i < k; i++)
-                {
-                    double a = outward - halfSpread + 2 * halfSpread * (i + 0.5) / k;   // slice centre
-                    var c = kids[i];
-                    double dist = Reach(n, a) + Reach(c, a) + gap;
-                    Place(c, new Point(at.X + dist * Math.Cos(a), at.Y + dist * Math.Sin(a)), a, childFan);
-                }
+                if (kids.Count == 0) { leafOrder.Add(n); return; }
+                foreach (var c in kids) Walk(c, d + 1);
             }
-            Place(root, new Point(cx, cy), Math.PI / 2, Math.PI);
+            Walk(root, 0);
+            int leaves = Math.Max(1, leafOrder.Count);
+            double maxW = 0;
+            foreach (var b in boxes) maxW = Math.Max(maxW, b.Width);
+            // ALL leaves ride one outer ring, evenly spaced so they can't touch; internal nodes fall on inner
+            // rings by depth. The outer radius is sized both for leaf spacing AND so the first inner ring
+            // (outer / maxDepth) clears the — possibly very wide — central root.
+            double rootClear = root.Width / 2 + 90;
+            double outer = Math.Clamp(Math.Max((maxW + 80) * leaves / (2 * Math.PI), rootClear * maxDepth), 260, 1400);
+            var angle = new System.Collections.Generic.Dictionary<NoteBox, double>();
+            for (int i = 0; i < leafOrder.Count; i++) angle[leafOrder[i]] = -Math.PI / 2 + 2 * Math.PI * i / leaves;
+            double Angle(NoteBox n)
+            {
+                if (angle.TryGetValue(n, out var a)) return a;
+                double sum = 0;
+                foreach (var c in children[n]) sum += Angle(c);
+                return angle[n] = sum / children[n].Count;   // internal node → mean angle of its children
+            }
+            Angle(root);
+            foreach (var n in depth.Keys)
+            {
+                bool leaf = children[n].Count == 0;
+                double r = ReferenceEquals(n, root) ? 0 : leaf ? outer : (double)depth[n] / maxDepth * outer;
+                targets[n] = new Point(cx + r * Math.Cos(angle[n]), cy + r * Math.Sin(angle[n]));
+            }
         }
 
         // HYBRID: branches that FAN OUT (have children) go left & right as vertical-stacking columns — the
@@ -397,7 +410,7 @@ public sealed class NoteCanvas : Panel
         // horizontally by their sub-tree width (parent centred over its children). Reads as a hierarchy.
         void LayoutTopDown()
         {
-            const double vStep = 104, hGap = 30;
+            const double vStep = 120, hGap = 34;
             var subW = new System.Collections.Generic.Dictionary<NoteBox, double>();
             double SubWidth(NoteBox n)
             {
@@ -424,14 +437,38 @@ public sealed class NoteCanvas : Panel
             Place(root, cx, 0);
         }
 
-        // Tidy is an explicit rearrange, so re-anchor BOTH ends of every connector to the compass edge that
-        // faces its partner's new spot — lines then leave and arrive pointing straight at each other.
+        // Tidy is an explicit rearrange, so re-anchor BOTH ends of every connector. Top-down wants clean
+        // VERTICAL runs (leave the upper box's bottom, enter the lower box's top) — Compass would pick
+        // sideways ports for the long diagonal spans and the lines would bow up and over. The radial and
+        // hybrid layouts point each end straight at its partner.
         foreach (var l in _doc.Links)
             if (targets.TryGetValue(l.A, out var pa) && targets.TryGetValue(l.B, out var pb))
             {
-                l.DirA = Compass(pb.X - pa.X, pb.Y - pa.Y);
-                l.DirB = Compass(pa.X - pb.X, pa.Y - pb.Y);
+                if (TidyLayout == MindmapLayout.TopDown)
+                {
+                    bool aUpper = pa.Y <= pb.Y;
+                    l.DirA = aUpper ? "S" : "N";
+                    l.DirB = aUpper ? "N" : "S";
+                }
+                else
+                {
+                    l.DirA = Compass(pb.X - pa.X, pb.Y - pa.Y);
+                    l.DirB = Compass(pa.X - pb.X, pa.Y - pb.Y);
+                }
             }
+
+        // The animator clamps X/Y at 0, which would pile any box that landed above/left of the origin into
+        // the corner. Shift the whole arrangement into positive space (a 40px margin) so that never happens.
+        double minX = double.MaxValue, minY = double.MaxValue;
+        foreach (var kv in targets)
+        {
+            minX = Math.Min(minX, kv.Value.X - kv.Key.Width / 2);
+            minY = Math.Min(minY, kv.Value.Y - H(kv.Key) / 2);
+        }
+        double shiftX = minX < 40 ? 40 - minX : 0, shiftY = minY < 40 ? 40 - minY : 0;
+        if (shiftX != 0 || shiftY != 0)
+            foreach (var k in targets.Keys.ToList())
+                targets[k] = new Point(targets[k].X + shiftX, targets[k].Y + shiftY);
 
         var start = targets.Keys.ToDictionary(b => b, b => (b.X, b.Y));
         Views.Motion.Clock(430, p =>
