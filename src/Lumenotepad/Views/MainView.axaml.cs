@@ -34,6 +34,15 @@ public partial class MainView : UserControl
         MaxBtn.Click += (_, _) => { if (Window is { } w) w.WindowState = w.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized; };
         CloseBtn.Click += (_, _) => Window?.Close();
 
+        // macOS keeps its NATIVE window shell (traffic lights top-left, real fullscreen), so our custom
+        // caption buttons are redundant — hide them — and shift the logo/title right so it clears the
+        // traffic lights that now float over our extended title-bar band.
+        if (!System.OperatingSystem.IsWindows())
+        {
+            CaptionButtons.IsVisible = false;
+            TitleLeft.Margin = new Thickness(78, 0, 0, 0);
+        }
+
         // Header rename fields (notebook, page) commit on blur / Enter.
         foreach (var box in new[] { NotebookName, PageTitle })
         {

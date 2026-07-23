@@ -199,7 +199,7 @@
 
         <!-- ============ Title bar ============ -->
         <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto" x:Name="TitleBar" Background="{DynamicResource FrameBackgroundBrush}">
-            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0" Spacing="9">
+            <StackPanel x:Name="TitleLeft" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0" Spacing="9">
                 <Border Width="22" Height="22" CornerRadius="7" Background="{DynamicResource AccentBrush}">
                     <TextBlock Text="&#xE82F;" FontFamily="{StaticResource IconFont}" FontSize="13"
                                Foreground="#04213F" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -225,7 +225,7 @@
                         Command="{Binding TogglePagesCommand}" ToolTip.Tip="Show / hide pages"/>
             </StackPanel>
 
-            <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="0,0,3,0">
+            <StackPanel x:Name="CaptionButtons" Grid.Column="3" Orientation="Horizontal" Margin="0,0,3,0">
                 <Button x:Name="MinBtn" Theme="{StaticResource CaptionButton}" Content="&#xE921;"/>
                 <Button x:Name="MaxBtn" Theme="{StaticResource CaptionButton}" Content="&#xE922;"/>
                 <Button x:Name="CloseBtn" Theme="{StaticResource CloseCaptionButton}" Content="&#xE8BB;"/>

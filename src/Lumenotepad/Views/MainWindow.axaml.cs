@@ -11,8 +11,31 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        if (!OperatingSystem.IsWindows())
+        {
+            // macOS: keep the NATIVE window shell — rounded corners, shadow, traffic lights, and
+            // working native fullscreen — and extend our UI up under its (hidden) titlebar. The
+            // Windows recipe (WindowDecorations=None + DWM) gave macOS a square, fullscreen-broken
+            // borderless NSWindow (tester report). Our own caption buttons hide in MainView.
+            WindowDecorations = WindowDecorations.Full;
+            ExtendClientAreaToDecorationsHint = true;
+            ExtendClientAreaTitleBarHeightHint = 44;   // traffic lights centre on our title bar band
+            // DWM acrylic is a no-op here; the frost must come from Avalonia's own NSVisualEffectView.
+            // Request real blur only (bare "Transparent" = see-through-to-desktop on mac); if the OS
+            // can't honour it the window falls back to the opaque dark base set in ApplyTheme, never
+            // the white TransparencyBackgroundFallback default that washed everything grey.
+            TransparencyLevelHint = new[]
+            {
+                Avalonia.Controls.WindowTransparencyLevel.AcrylicBlur,
+                Avalonia.Controls.WindowTransparencyLevel.Blur,
+            };
+        }
         DataContextChanged += (_, _) => HookThemeVm();
     }
+
+    /// <summary>The edge-grip overlay only exists for the chromeless Windows shell; on macOS the
+    /// native frame resizes and the overlay would fight its edge hit-testing.</summary>
+    private bool UseResizeOverlay => OperatingSystem.IsWindows();
 
     private ViewModels.MainViewModel? _themeVm;
 
@@ -63,6 +86,9 @@ public partial class MainWindow : Window
         if (seed is { } accent) tokens = Services.ThemePalettes.WithAccent(tokens, accent);
         Services.ThemeManager.Apply(app, tokens);
         Services.ThemeManager.ApplyChrome(this);
+        // macOS: request real blur + repaint the opaque-dark fallback per the just-applied theme so the
+        // frost never washes to grey. (No-op on Windows, where DWM ApplyChrome above does the work.)
+        if (!OperatingSystem.IsWindows()) Services.ThemeManager.ApplyMacGlass(this);
     }
 
     private bool _closingAnimated;
@@ -95,7 +121,7 @@ public partial class MainWindow : Window
     {
         base.OnOpened(e);
         ReassertChrome();
-        ResizeBorder.IsVisible = WindowState == WindowState.Normal;
+        ResizeBorder.IsVisible = UseResizeOverlay && WindowState == WindowState.Normal;
         SyncMaximizeMargin();
         // Some events (display-mode flips, DWM resets) silently drop the corner preference WITHOUT a
         // WindowState change; re-assert it whenever the floating window regains focus — self-heals square corners.
@@ -124,7 +150,7 @@ public partial class MainWindow : Window
 
         // A maximized / full-screen window must NOT expose the custom resize grips — they bypass the OS and
         // would let you drag-resize an edge a maximized window should treat as fixed. Only float them in Normal.
-        ResizeBorder.IsVisible = state == WindowState.Normal;
+        ResizeBorder.IsVisible = UseResizeOverlay && state == WindowState.Normal;
 
         // Snapping / maximizing strips the sizing styles (WS_THICKFRAME), so the SECOND snap after a
         // snap-to-top silently fails unless we re-assert them on every state change.

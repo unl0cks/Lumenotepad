@@ -121,8 +121,29 @@ public static class ThemeManager
     /// <summary>Chrome for secondary windows (preferences, notebook wizard, font browser): acrylic
     /// frost ONLY when the theme is whole-window glass (Lumen), else a plain opaque window matching
     /// the solid frame. Paired with a Background bound to WindowSurfaceBrush.</summary>
-    public static void ApplyChildChrome(Window window) =>
+    public static void ApplyChildChrome(Window window)
+    {
+        if (!System.OperatingSystem.IsWindows())
+        {
+            ApplyMacGlass(window);   // no DWM on mac; blur via NSVisualEffectView, opaque-dark fallback
+            return;
+        }
         Platform.DwmAcrylic.Apply(window,
             Current.FrostedWindow ? Platform.DwmAcrylic.Backdrop.Acrylic : Platform.DwmAcrylic.Backdrop.None,
             dark: Current.DarkChrome);
+    }
+
+    /// <summary>macOS frost: request real system blur (bare "Transparent" = see-through-to-desktop on
+    /// mac, so ask only for AcrylicBlur/Blur) and, for the moment the OS declines it, paint the theme's
+    /// opaque frame base instead of Avalonia's default white — which otherwise washes the translucent
+    /// window brushes to grey. Called for the main window (via its own path) and every child window.</summary>
+    public static void ApplyMacGlass(Window window)
+    {
+        window.TransparencyLevelHint = new[]
+        {
+            WindowTransparencyLevel.AcrylicBlur,
+            WindowTransparencyLevel.Blur,
+        };
+        window.TransparencyBackgroundFallback = new SolidColorBrush(Color.Parse(Current.WindowBackground));
+    }
 }
