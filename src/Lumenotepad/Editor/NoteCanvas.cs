@@ -297,60 +297,52 @@ public sealed class NoteCanvas : Panel
             default: LayoutHybrid(); break;
         }
 
-        // RADIAL: a dendrogram. Every LEAF gets an even slice of the full circle, so the outermost bubbles
-        // spread around a ring wide enough that they can't touch; each internal node sits at the mean angle
-        // of its leaves, one ring inward per depth. Branches emanate in every direction and never overlap.
+        // RADIAL: the classic concentric mind-map. Internal "hub" nodes step outward ring by ring with depth
+        // from a first ring that clears the wide central pill; EVERY leaf rides the single outermost ring.
+        // Each sub-tree owns an angular wedge sized by how many leaves it must fit, so branches spread evenly
+        // around the whole circle and nothing overlaps — a balanced starburst, not a lopsided fan.
         void LayoutRadial()
         {
             var depth = new System.Collections.Generic.Dictionary<NoteBox, int> { [root] = 0 };
-            var leafOrder = new System.Collections.Generic.List<NoteBox>();
-            int maxDepth = 0;
+            int maxDepth = 0, leaves = 0;
             void Walk(NoteBox n, int d)
             {
                 depth[n] = d;
                 maxDepth = Math.Max(maxDepth, d);
                 var kids = children[n];
-                if (kids.Count == 0) { leafOrder.Add(n); return; }
+                if (kids.Count == 0) { leaves++; return; }
                 foreach (var c in kids) Walk(c, d + 1);
             }
             Walk(root, 0);
-            int leaves = Math.Max(1, leafOrder.Count);
+            leaves = Math.Max(1, leaves);
             double maxW = 0;
             foreach (var b in boxes) maxW = Math.Max(maxW, b.Width);
+
+            double leafRing = (maxW + 55) * leaves / (2 * Math.PI);   // radius a full ring of leaves needs
+            double rootClear = root.Width / 2 + 80;                   // first ring clears the (wide) central pill
+            double innerStep = Math.Max(150, (leafRing - rootClear) / Math.Max(1, maxDepth - 1));
+            double outer = Math.Max(leafRing, rootClear + (maxDepth - 1) * innerStep);
+
+            // Angular width each sub-tree needs on the outer ring (floored so a lone leaf still gets a slot);
+            // node angle = wedge centre. Dividing the full circle in proportion spreads the branches evenly.
+            double leafAngle = (maxW + 55) / Math.Max(140, outer);
+            var angW = new System.Collections.Generic.Dictionary<NoteBox, double>();
+            double AngW(NoteBox n) => angW[n] = children[n].Count == 0 ? leafAngle : Math.Max(leafAngle, children[n].Sum(AngW));
+            AngW(root);
             var angle = new System.Collections.Generic.Dictionary<NoteBox, double>();
-            for (int i = 0; i < leafOrder.Count; i++) angle[leafOrder[i]] = -Math.PI / 2 + 2 * Math.PI * i / leaves;
-            double Angle(NoteBox n)
+            void Assign(NoteBox n, double a0, double a1)
             {
-                if (angle.TryGetValue(n, out var a)) return a;
-                double sum = 0;
-                foreach (var c in children[n]) sum += Angle(c);
-                return angle[n] = sum / children[n].Count;   // internal node → mean angle of its children
+                angle[n] = (a0 + a1) / 2;
+                double acc = a0, span = a1 - a0;
+                foreach (var c in children[n]) { double w = span * angW[c] / angW[n]; Assign(c, acc, acc + w); acc += w; }
             }
-            Angle(root);
-            // Distance from a box's centre to its edge along a heading — lets branches hug the (wide, short)
-            // root elliptically: nodes above/below sit close, only sideways nodes are pushed past its width.
-            double Reach(NoteBox b, double ang)
-            {
-                double c = Math.Abs(Math.Cos(ang)), s = Math.Abs(Math.Sin(ang));
-                double tx = c < 1e-6 ? double.PositiveInfinity : (b.Width / 2) / c;
-                double ty = s < 1e-6 ? double.PositiveInfinity : (H(b) / 2) / s;
-                return Math.Min(tx, ty);
-            }
-            const double step = 150;                                   // one branch segment per depth level
-            const double firstRing = 190;                              // min first-ring radius: vertical branches
-                                                                       // aren't jammed against the short root edge
-            double leafFloor = (maxW + 40) * leaves / (2 * Math.PI);    // min radius so a full ring of leaves can't touch
+            Assign(root, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI);
             foreach (var n in depth.Keys)
             {
                 if (ReferenceEquals(n, root)) { targets[root] = new Point(cx, cy); continue; }
-                double a = angle[n];
                 bool leaf = children[n].Count == 0;
-                int ring = leaf ? maxDepth : depth[n];                  // leaves ride the outermost ring
-                // First-ring distance clears the root elliptically (tight above/below, wider sideways) but
-                // never closer than firstRing; deeper rings add a fixed step; leaves keep a full ring apart.
-                double r = Math.Max(Reach(root, a) + Reach(n, a) + 40, firstRing) + (ring - 1) * step;
-                if (leaf) r = Math.Max(r, leafFloor);
-                targets[n] = new Point(cx + r * Math.Cos(a), cy + r * Math.Sin(a));
+                double r = leaf ? outer : Math.Min(rootClear + (depth[n] - 1) * innerStep, outer - 40);
+                targets[n] = new Point(cx + r * Math.Cos(angle[n]), cy + r * Math.Sin(angle[n]));
             }
         }
 
