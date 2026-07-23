@@ -1735,21 +1735,20 @@ internal sealed class NoteBoxView : Panel
             bool bubble = Box.Divider is null && Box.ImagePath is null && Box.Table is null && Box.AttachPath is null;
             if (bubble)
             {
-                // Seat the round ✕ (16px) inside the top-right corner. On a Title pill the corner is a big
-                // arc, so centre the chip on its 45° diagonal — equal top/right insets of 0.293·R (the arc's
-                // 45° point) less the chip's 8px half-width — and never closer in than the border is thick,
-                // so a central pill's fat ring can't clip it. Info/Callout corners are tight: hug the corner.
+                // Seat the round ✕ (16px) so its OUTER corner lands just inside the bubble's rounded corner:
+                // the 45° point of a corner arc of radius cr sits (0.293·cr) in from each edge, and we back
+                // off a further (0.707·bt) so the chip clears the border ring (fat on a central pill). This
+                // keeps the whole chip on-bubble for every kind — Title's big pill cap and the tight Info/
+                // Callout corners alike — instead of the old maths that let it ride over the curve.
                 double bt = _chrome.BorderThickness.Top;
-                if (Box.Kind == BubbleKind.Title)
+                double cr = Box.Kind switch
                 {
-                    double r = Math.Min(finalSize.Width, finalSize.Height) / 2;
-                    double m = Math.Max(bt + 2, 0.293 * r - 8);
-                    _close.Margin = new Thickness(0, m, m, 0);
-                }
-                else
-                {
-                    _close.Margin = new Thickness(0, bt + 3, bt + 4, 0);
-                }
+                    BubbleKind.Title => Math.Min(finalSize.Width, finalSize.Height) / 2,   // pill cap radius
+                    BubbleKind.Info => 16,
+                    _ => 7,                                                                // Callout
+                };
+                double m = 0.293 * cr + 0.707 * bt + 1;
+                _close.Margin = new Thickness(0, m, m, 0);
             }
         }
         return base.ArrangeOverride(finalSize);
