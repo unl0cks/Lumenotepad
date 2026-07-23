@@ -315,7 +315,7 @@ public sealed class NoteCanvas : Panel
             }
             SubH(root);
 
-            double ax = root.Width / 2 + 120;                                 // ellipse semi-axes: clear the pill,
+            double ax = root.Width / 2 + 190;                                 // ellipse semi-axes: clear the pill,
             double ay = Math.Max(H(root) / 2 + 120, ax * 0.62);               // floored so top/bottom aren't jammed
 
             // A sub-tree as a column: children stacked vertically, one horizontal step further out.
@@ -354,8 +354,11 @@ public sealed class NoteCanvas : Panel
                 foreach (var c in group)
                 {
                     double ccy = top + subH[c] / 2;
-                    double ny = Math.Clamp((ccy - cy) / ay, -0.96, 0.96);
-                    double ccx = cx + side * ax * Math.Sqrt(1 - ny * ny);       // on the ellipse at this height
+                    double ny = Math.Clamp((ccy - cy) / ay, -1, 1);
+                    double arcX = ax * Math.Sqrt(Math.Max(0, 1 - ny * ny));
+                    // Bow onto the ellipse where there's room, but never nearer than clears the central pill,
+                    // so a column of branches taller than the ellipse can't collapse back over the centre.
+                    double ccx = cx + side * Math.Max(root.Width / 2 + c.Width / 2 + 46, arcX);
                     targets[c] = new Point(ccx, ccy);
                     PlaceColumn(children[c], side, c.Width / 2, ccx, ccy);
                     top += subH[c] + vgap;
@@ -377,8 +380,9 @@ public sealed class NoteCanvas : Panel
                 foreach (var c in group)
                 {
                     double ccx = x + c.Width / 2;
-                    double nx = Math.Clamp((ccx - cx) / ax, -0.96, 0.96);
-                    double ccy = cy + vside * ay * Math.Sqrt(1 - nx * nx);      // on the ellipse at this x
+                    double nx = Math.Clamp((ccx - cx) / ax, -1, 1);
+                    double ey = ay * Math.Sqrt(Math.Max(0, 1 - nx * nx));
+                    double ccy = cy + vside * Math.Max(H(root) / 2 + H(c) / 2 + 40, ey);   // clear the pill vertically
                     targets[c] = new Point(ccx, ccy);
                     x += c.Width + agap;
                 }
