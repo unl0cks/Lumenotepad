@@ -554,6 +554,12 @@ public partial class MainView : UserControl
         if (Vm is not { } vm) return;
         PageCanvas.CanResize = vm.ResizablePages;
         PageCanvas.HistoryEnabled = vm.DeletedHistory;
+        PageCanvas.TidyLayout = vm.MindmapTidyLayout switch
+        {
+            "Hybrid" => Editor.MindmapLayout.Hybrid,
+            "TopDown" => Editor.MindmapLayout.TopDown,
+            _ => Editor.MindmapLayout.Radial,
+        };
         ApplyPageStyles();             // per-page effective styles (falls back to the global grid pref)
         PageCanvas.SnapToGrid = vm.GridSnap;
         PageCanvas.CreateOnDoubleClick = vm.DoubleClickCreate;
@@ -1199,7 +1205,8 @@ public partial class MainView : UserControl
             ApplyToolbarPlacement();
         else if (e.PropertyName is nameof(MainViewModel.ResizablePages) or nameof(MainViewModel.DeletedHistory)
                  or nameof(MainViewModel.PageGrid) or nameof(MainViewModel.GridSnap)
-                 or nameof(MainViewModel.DoubleClickCreate) or nameof(MainViewModel.RoundedPdfCorners))
+                 or nameof(MainViewModel.DoubleClickCreate) or nameof(MainViewModel.RoundedPdfCorners)
+                 or nameof(MainViewModel.MindmapTidyLayout))
             ApplyCanvasPrefs();
         else if (e.PropertyName == nameof(MainViewModel.CornerRoundness))
         {

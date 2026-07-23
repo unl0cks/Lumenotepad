@@ -361,6 +361,15 @@ public partial class PreferencesWindow : Window
         {
             if (Vm is { } vm && PageGridBox.SelectedItem is string g && vm.PageGrid != g) vm.PageGrid = g;
         };
+        TidyLayoutBox.ItemsSource = new[] { "Radial", "Hybrid", "Top-down" };
+        TidyLayoutBox.SelectionChanged += (_, _) =>
+        {
+            if (Vm is { } vm && TidyLayoutBox.SelectedItem is string s)
+            {
+                var stored = s switch { "Hybrid" => "Hybrid", "Top-down" => "TopDown", _ => "Radial" };
+                if (vm.MindmapTidyLayout != stored) vm.MindmapTidyLayout = stored;
+            }
+        };
 
         // ItemsSource is (re)built in RefreshEditorFontList — the ctor runs before the DataContext
         // lands, so building it here would permanently miss the Extended-fonts master switch.
@@ -386,7 +395,7 @@ public partial class PreferencesWindow : Window
         // Dropdown treatment (shared with the wizard): rise-in, rounded/blurred popup window, and
         // eased wheel scrolling inside the popup's list. Null-safe throughout.
         foreach (var combo in new[] { LaunchTargetBox, MotionSpeedBox, CardSizeBox, DateFormatBox,
-                                      EditorFontBox, ToolbarPosBox, ToolbarScopeBox, PageGridBox,
+                                      EditorFontBox, ToolbarPosBox, ToolbarScopeBox, PageGridBox, TidyLayoutBox,
                                       BackupEveryBox, NumBoldBox, NumItalicBox, NumUnderlineBox, NumStrikeBox })
             MenuFx.AttachDropDown(combo);
 
@@ -1145,6 +1154,12 @@ public partial class PreferencesWindow : Window
             "Blank" => "None",
             "None" or "Ruled" or "Grid" or "Dots" => vm.PageGrid,
             _ => "None",
+        };
+        TidyLayoutBox.SelectedItem = vm.MindmapTidyLayout switch
+        {
+            "Hybrid" => "Hybrid",
+            "TopDown" => "Top-down",
+            _ => "Radial",
         };
         UpdateHighlightRings();
         RefreshEditorFontList();

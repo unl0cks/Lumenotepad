@@ -67,6 +67,7 @@ public sealed class AppSettings
     public string ToolbarScope { get; set; } = "Window";    // "Window" (window edge) | "Page" (inside the page box)
     public bool ResizablePages { get; set; } = true;        // note containers show resize handles
     public bool DeletedHistory { get; set; } = true;        // deleted containers kept per page, restorable
+    public string MindmapTidyLayout { get; set; } = "Radial";  // Tidy arrangement: Radial | Hybrid | TopDown
     public bool StartRailVisible { get; set; } = true;      // notebooks rail shown at launch
     public bool StartPagesVisible { get; set; } = true;     // pages panel shown at launch
     public bool AdvancedUnlocked { get; set; }              // advanced prefs gate accepted

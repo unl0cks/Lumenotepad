@@ -10,6 +10,11 @@ using Avalonia.Threading;
 
 namespace Lumenotepad.Editor;
 
+/// <summary>How the mind-map Tidy command arranges the tree. <see cref="Radial"/> fans branches in every
+/// direction; <see cref="Hybrid"/> sends fanning branches left/right and single bubbles top/bottom;
+/// <see cref="TopDown"/> is a top-rooted org-chart tree.</summary>
+public enum MindmapLayout { Radial, Hybrid, TopDown }
+
 /// <summary>The freeform page canvas (the OneNote model): any number of movable, resizable note
 /// containers, each holding its own rich document. Click empty space to start a new container
 /// there; a container that loses focus while still empty evaporates. Deleted containers go to the
@@ -164,6 +169,9 @@ public sealed class NoteCanvas : Panel
     /// <summary>Width of newly added bubbles (toolbar S/M/L). Defaults to the medium preset.</summary>
     public double MindmapBubbleWidth { get; set; } = 220;
 
+    /// <summary>Which arrangement the Tidy command lays the map out in (Preferences ▸ Mind map ▸ Tidy layout).</summary>
+    public MindmapLayout TidyLayout { get; set; } = MindmapLayout.Radial;
+
     /// <summary>When true, bubbles also show the four diagonal (corner) connect ports (toolbar toggle).</summary>
     public bool MindmapDiagonalPorts { get; set; }
 
@@ -279,49 +287,142 @@ public sealed class NoteCanvas : Panel
         if (visited.Count < 2) return;
 
         double cx = root.X + root.Width / 2, cy = root.Y + H(root) / 2;
-        const double hGap = 56;   // horizontal breathing room between a node's right/left edge and its child column
-        const double vGap = 22;   // vertical breathing room between stacked sibling sub-trees
-
-        // The vertical extent each sub-tree needs = the stacked height of all its leaves. Laying children out
-        // in a vertical COLUMN (not a radial fan) means wide text boxes only ever need height separation from
-        // their siblings, never width — so nothing overlaps however long the labels get.
-        var subH = new System.Collections.Generic.Dictionary<NoteBox, double>();
-        double SubHeight(NoteBox n)
-        {
-            var kids = children[n];
-            if (kids.Count == 0) return subH[n] = H(n);
-            double sum = -vGap;
-            foreach (var c in kids) sum += SubHeight(c) + vGap;
-            return subH[n] = Math.Max(H(n), sum);
-        }
-        SubHeight(root);
-
-        // Classic two-sided mind-map tree: root in the centre, branches flowing out to the RIGHT and LEFT
-        // (split to balance their heights), each node's children stacked in a vertical column one step
-        // further out. Compact vertically, honest horizontally (depth = width), and never self-overlapping.
         var targets = new System.Collections.Generic.Dictionary<NoteBox, Point> { [root] = new Point(cx, cy) };
-        void PlaceColumn(System.Collections.Generic.List<NoteBox> kids, int side, double parentHalfW, double atX, double atY)
+
+        // ---- three interchangeable layouts (Preferences ▸ Mind map ▸ Tidy layout) ----
+        switch (TidyLayout)
         {
-            double band = -vGap;
-            foreach (var c in kids) band += subH[c] + vGap;
-            double top = atY - band / 2;
-            foreach (var c in kids)
-            {
-                double childCx = atX + side * (parentHalfW + c.Width / 2 + hGap);
-                double childCy = top + subH[c] / 2;
-                targets[c] = new Point(childCx, childCy);
-                PlaceColumn(children[c], side, c.Width / 2, childCx, childCy);
-                top += subH[c] + vGap;
-            }
+            case MindmapLayout.Radial: LayoutRadial(); break;
+            case MindmapLayout.TopDown: LayoutTopDown(); break;
+            default: LayoutHybrid(); break;
         }
-        // Split the root's branches into two sides, greedily balancing total sub-tree height.
-        var right = new System.Collections.Generic.List<NoteBox>();
-        var left = new System.Collections.Generic.List<NoteBox>();
-        double rSum = 0, lSum = 0;
-        foreach (var c in children[root].OrderByDescending(c => subH[c]))
-            if (rSum <= lSum) { right.Add(c); rSum += subH[c] + vGap; } else { left.Add(c); lSum += subH[c] + vGap; }
-        PlaceColumn(right, +1, root.Width / 2, cx, cy);
-        PlaceColumn(left, -1, root.Width / 2, cx, cy);
+
+        // RADIAL: branches emanate in every direction; the root fans evenly around the full circle and each
+        // deeper node fans its children within a LIMITED wedge about its outward heading (so nothing wraps
+        // back over the centre). Children are placed relative to their parent, spaced by each box's edge
+        // reach along the heading plus a gap — the most organic look, uses all four sides.
+        void LayoutRadial()
+        {
+            const double gap = 66, childFan = 1.15;
+            double Reach(NoteBox b, double ang)
+            {
+                double c = Math.Abs(Math.Cos(ang)), s = Math.Abs(Math.Sin(ang));
+                double tx = c < 1e-6 ? double.PositiveInfinity : (b.Width / 2) / c;
+                double ty = s < 1e-6 ? double.PositiveInfinity : (H(b) / 2) / s;
+                return Math.Min(tx, ty);
+            }
+            void Place(NoteBox n, Point at, double outward, double halfSpread)
+            {
+                targets[n] = at;
+                var kids = children[n];
+                int k = kids.Count;
+                for (int i = 0; i < k; i++)
+                {
+                    double a = outward - halfSpread + 2 * halfSpread * (i + 0.5) / k;   // slice centre
+                    var c = kids[i];
+                    double dist = Reach(n, a) + Reach(c, a) + gap;
+                    Place(c, new Point(at.X + dist * Math.Cos(a), at.Y + dist * Math.Sin(a)), a, childFan);
+                }
+            }
+            Place(root, new Point(cx, cy), Math.PI / 2, Math.PI);
+        }
+
+        // HYBRID: branches that FAN OUT (have children) go left & right as vertical-stacking columns — the
+        // only orientation that never overlaps wide text boxes — while simple single-bubble branches are
+        // spread across the TOP and BOTTOM. Clean like the two-sided tree, but uses the vertical space too.
+        void LayoutHybrid()
+        {
+            const double hGap = 56, vGap = 22;
+            var subH = new System.Collections.Generic.Dictionary<NoteBox, double>();
+            double SubHeight(NoteBox n)
+            {
+                var kids = children[n];
+                if (kids.Count == 0) return subH[n] = H(n);
+                double sum = -vGap;
+                foreach (var c in kids) sum += SubHeight(c) + vGap;
+                return subH[n] = Math.Max(H(n), sum);
+            }
+            SubHeight(root);
+            void PlaceColumn(System.Collections.Generic.List<NoteBox> kids, int side, double parentHalfW, double atX, double atY)
+            {
+                double band = -vGap;
+                foreach (var c in kids) band += subH[c] + vGap;
+                double top = atY - band / 2;
+                foreach (var c in kids)
+                {
+                    double childCx = atX + side * (parentHalfW + c.Width / 2 + hGap);
+                    double childCy = top + subH[c] / 2;
+                    targets[c] = new Point(childCx, childCy);
+                    PlaceColumn(children[c], side, c.Width / 2, childCx, childCy);
+                    top += subH[c] + vGap;
+                }
+            }
+            var deep = children[root].Where(c => children[c].Count > 0).ToList();
+            var singles = children[root].Where(c => children[c].Count == 0).ToList();
+            var right = new System.Collections.Generic.List<NoteBox>();
+            var left = new System.Collections.Generic.List<NoteBox>();
+            double rSum = 0, lSum = 0;
+            foreach (var c in deep.OrderByDescending(c => subH[c]))
+                if (rSum <= lSum) { right.Add(c); rSum += subH[c] + vGap; } else { left.Add(c); lSum += subH[c] + vGap; }
+            PlaceColumn(right, +1, root.Width / 2, cx, cy);
+            PlaceColumn(left, -1, root.Width / 2, cx, cy);
+            // The simple branches ride a row above and a row below, cleared past however tall the side
+            // columns grew, spread horizontally and centred on the root.
+            double sideExtent = 0;
+            foreach (var c in right) sideExtent = Math.Max(sideExtent, subH[c] / 2);
+            foreach (var c in left) sideExtent = Math.Max(sideExtent, subH[c] / 2);
+            void PlaceRow(System.Collections.Generic.List<NoteBox> row, int vside)
+            {
+                if (row.Count == 0) return;
+                const double colGap = 40;
+                double totalW = -colGap;
+                foreach (var c in row) totalW += c.Width + colGap;
+                double rowH = row.Max(H);
+                double x = cx - totalW / 2;
+                double y = cy + vside * (Math.Max(H(root) / 2, sideExtent) + 54 + rowH / 2);
+                foreach (var c in row)
+                {
+                    targets[c] = new Point(x + c.Width / 2, y);
+                    x += c.Width + colGap;
+                }
+            }
+            var topRow = new System.Collections.Generic.List<NoteBox>();
+            var botRow = new System.Collections.Generic.List<NoteBox>();
+            for (int i = 0; i < singles.Count; i++) (i % 2 == 0 ? topRow : botRow).Add(singles[i]);
+            PlaceRow(topRow, -1);
+            PlaceRow(botRow, +1);
+        }
+
+        // TOP-DOWN: an org-chart tree. The root sits up top; each level drops one row, and siblings spread
+        // horizontally by their sub-tree width (parent centred over its children). Reads as a hierarchy.
+        void LayoutTopDown()
+        {
+            const double vStep = 104, hGap = 30;
+            var subW = new System.Collections.Generic.Dictionary<NoteBox, double>();
+            double SubWidth(NoteBox n)
+            {
+                var kids = children[n];
+                if (kids.Count == 0) return subW[n] = n.Width;
+                double sum = -hGap;
+                foreach (var c in kids) sum += SubWidth(c) + hGap;
+                return subW[n] = Math.Max(n.Width, sum);
+            }
+            SubWidth(root);
+            void Place(NoteBox n, double centerX, int depth)
+            {
+                targets[n] = new Point(centerX, cy + depth * vStep);
+                var kids = children[n];
+                double band = -hGap;
+                foreach (var c in kids) band += subW[c] + hGap;
+                double x = centerX - band / 2;
+                foreach (var c in kids)
+                {
+                    Place(c, x + subW[c] / 2, depth + 1);
+                    x += subW[c] + hGap;
+                }
+            }
+            Place(root, cx, 0);
+        }
 
         // Tidy is an explicit rearrange, so re-anchor BOTH ends of every connector to the compass edge that
         // faces its partner's new spot — lines then leave and arrive pointing straight at each other.

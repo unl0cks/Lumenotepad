@@ -538,6 +538,15 @@
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding DeletedHistory, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
                         <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Classes="label" Text="Mind-map tidy layout"/>
+                                    <Border Classes="qmark" ToolTip.Tip="How the mind-map Tidy button arranges bubbles: Radial fans them in every direction; Hybrid sends branches with children left and right and single bubbles to the top and bottom; Top-down stacks the map as a hierarchy."><TextBlock/></Border>
+                                </StackPanel>
+                            </StackPanel>
+                            <ComboBox x:Name="TidyLayoutBox" Grid.Column="1" Width="140" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Classes="label" Text="New container width"/>
                                 <Border Classes="qmark" ToolTip.Tip="How wide a new note box is when you first create it. You can still resize any note box afterward."><TextBlock/></Border>
