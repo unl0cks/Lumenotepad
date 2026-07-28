@@ -68,8 +68,14 @@ public static class ThemeManager
         Brush("AccentDeepBrush", t.AccentDeep);
         Brush("WindowBackgroundBrush", t.WindowBackground);
         // Secondary-window surface: opaque normally, but a translucent tint when the theme is
-        // whole-window glass (Lumen) so the DWM acrylic behind child windows shows through as frost.
-        Brush("WindowSurfaceBrush", t.FrostedWindow ? "#D8" + t.WindowBackground[^6..] : t.WindowBackground);
+        // whole-window glass (Lumen) so the DWM acrylic behind child windows shows through as frost. On macOS the WINDOW itself must stay transparent (its
+        // rounded shape is drawn by a content wrapper), so the fill moves to this separate key and
+        // WindowSurfaceBrush goes clear — otherwise every theme change re-pushed an opaque brush onto
+        // the window through its DynamicResource binding and the square surface reappeared behind the
+        // rounded corners (tester: corners go sharp again after switching theme).
+        string childSurface = t.FrostedWindow ? "#D8" + t.WindowBackground[^6..] : t.WindowBackground;
+        Brush("ChildSurfaceBrush", childSurface);
+        Brush("WindowSurfaceBrush", System.OperatingSystem.IsWindows() ? childSurface : "#00000000");
         Brush("MenuBackgroundBrush", t.MenuBackground);
         Brush("MenuBorderBrush", t.MenuBorder);
 
@@ -187,7 +193,7 @@ public static class ThemeManager
         object? surface = null;
         Application.Current?.TryFindResource("WindowSurfaceBrush", out surface);
         if (Application.Current is { } app && ReferenceEquals(window.Background, surface))
-            shell.Bind(Border.BackgroundProperty, app.GetResourceObservable("WindowSurfaceBrush"));
+            shell.Bind(Border.BackgroundProperty, app.GetResourceObservable("ChildSurfaceBrush"));
         if (Application.Current is { } bapp)
             shell.Bind(Border.BorderBrushProperty, bapp.GetResourceObservable("FrameBorderBrush"));
         else
@@ -207,6 +213,13 @@ public static class ThemeManager
         var target = Current.DarkChrome ? ThemeVariant.Dark : ThemeVariant.Light;
         window.RequestedThemeVariant = target == ThemeVariant.Dark ? ThemeVariant.Light : ThemeVariant.Dark;
         window.RequestedThemeVariant = target;
+        // ...then hand the window BACK to the app-level variant. Pinning it here permanently left a
+        // window that was open across a theme switch stuck on its old variant — a Preferences window
+        // opened under Lumen (dark) and then switched to Pink kept dark-variant Fluent styling, i.e.
+        // white text on a pale pink sheet (tester report; Windows was fine because nothing pins it).
+        // Default re-inherits, and since the app is already on `target` no further change fires, so
+        // the native appearance set above stands.
+        window.RequestedThemeVariant = ThemeVariant.Default;
         // Then force a real OFF→ON transition. The backend ignores any level equal to the one already
         // active (so a plain re-assert is a no-op, and a list whose entries are all no-ops resets the
         // window to Opaque). Stepping through None guarantees the next assignment genuinely re-arms it.

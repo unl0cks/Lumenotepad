@@ -1094,8 +1094,12 @@ public partial class MainView : UserControl
         double t = System.Math.Clamp(vm.GlassTint, -1, 1);
         bool on = Services.ThemeManager.Current.GlassWindow && System.Math.Abs(t) > 0.01;
         GlassTintVeil.IsVisible = on;
+        // macOS frosts far brighter than the DWM acrylic, so the Windows-tuned 35% ceiling left the
+        // glass washed out even at -100% (tester: "-100% on the Mac looks like 30-35% on Windows").
+        // Give the mac a deeper range so the slider actually reaches a dark glass.
+        double max = System.OperatingSystem.IsWindows() ? 0.35 : 0.70;
         if (on) GlassTintVeil.Background =
-            new SolidColorBrush(t >= 0 ? Colors.White : Colors.Black, System.Math.Abs(t) * 0.35);
+            new SolidColorBrush(t >= 0 ? Colors.White : Colors.Black, System.Math.Abs(t) * max);
     }
 
     /// <summary>Push the bullet/number prefs onto the editor statics; optionally rebuild the open
