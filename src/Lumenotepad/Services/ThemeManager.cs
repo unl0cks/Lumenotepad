@@ -152,7 +152,9 @@ public static class ThemeManager
     ///     Avalonia's default white, so the failure mode is clean dark instead of washed grey.
     /// Must be re-applied once the native window exists (see MainWindow.OnOpened): a hint set before
     /// the handle is created can be dropped.</summary>
-    /// <summary>The macOS level list. ONE entry, shared, and never rebuilt — see <see cref="ApplyMacGlass"/>.</summary>
+    /// <summary>The macOS level lists — see <see cref="ApplyMacGlass"/> for why the frost is armed by
+    /// stepping through <see cref="MacOff"/> first.</summary>
+    private static readonly WindowTransparencyLevel[] MacOff = { WindowTransparencyLevel.None };
     private static readonly WindowTransparencyLevel[] MacLevels = { WindowTransparencyLevel.AcrylicBlur };
 
     /// <summary>Round a borderless child window's corners on macOS. Windows rounds these through DWM,
@@ -164,6 +166,10 @@ public static class ThemeManager
     {
         const string Tag = "mac-rounded";
         if (window.Content is not Control inner || (inner as Border)?.Tag as string == Tag) return;
+        // DETACH before re-parenting: handing `inner` to the Border while it is still the window's
+        // content leaves it owning two parents, and Avalonia throws on the attach (this crashed
+        // Preferences on macOS in 1.0.3).
+        window.Content = null;
         var shell = new Border
         {
             Tag = Tag,
@@ -185,13 +191,16 @@ public static class ThemeManager
 
     public static void ApplyMacGlass(Window window)
     {
+        // Appearance FIRST: NSVisualEffectView takes its material from it, so arming the frost before
+        // the variant is set is what produced a light/grey frost under a dark theme.
         window.RequestedThemeVariant = Current.DarkChrome ? ThemeVariant.Dark : ThemeVariant.Light;
-        // NEVER re-assign a hint that already leads with AcrylicBlur — every window's XAML already
-        // asks for it, and assigning any new list re-runs the destructive backend path above (which is
-        // exactly how the frost was being downgraded to plain transparency, then to opaque).
-        var hint = window.TransparencyLevelHint;
-        if (hint is not { Count: > 0 } || hint[0] != WindowTransparencyLevel.AcrylicBlur)
-            window.TransparencyLevelHint = MacLevels;
+        // Then force a real OFF→ON transition. The backend ignores any level equal to the one already
+        // active (so a plain re-assert is a no-op, and a list whose entries are all no-ops resets the
+        // window to Opaque). Stepping through None guarantees the next assignment genuinely re-arms
+        // the frost — the same off→on trick RefreshBackdrop uses for DWM. This is why the tester could
+        // "fix" a grey window by switching theme away and back: only a transition takes effect.
+        window.TransparencyLevelHint = MacOff;
+        window.TransparencyLevelHint = MacLevels;
         window.TransparencyBackgroundFallback = new SolidColorBrush(Color.Parse(Current.WindowBackground));
     }
 }

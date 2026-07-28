@@ -99,7 +99,25 @@ public sealed class AppSettings
     /// ships as a .app bundle that gets REPLACED wholesale on every update, so data must live outside it:
     /// SpecialFolder.ApplicationData resolves to ~/Library/Application Support on .NET 8+ (and to
     /// ~/.config on Linux), giving the platform-correct home in one line.</summary>
-    public static string DefaultDir => OperatingSystem.IsWindows()
-        ? Path.Combine(System.AppContext.BaseDirectory, "userdata")
-        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Lumenotepad");
+    public static string DefaultDir
+    {
+        get
+        {
+            if (OperatingSystem.IsWindows())
+                return Path.Combine(System.AppContext.BaseDirectory, "userdata");
+            var root = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            if (string.IsNullOrEmpty(root))
+            {
+                // GetFolderPath yields "" when HOME is unset (some launch contexts); resolving to a
+                // RELATIVE "Lumenotepad" would scatter the user's notebooks into the working
+                // directory, so rebuild the platform path explicitly instead.
+                var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                if (string.IsNullOrEmpty(home)) home = Environment.GetEnvironmentVariable("HOME") ?? ".";
+                root = OperatingSystem.IsMacOS()
+                    ? Path.Combine(home, "Library", "Application Support")
+                    : Path.Combine(home, ".config");
+            }
+            return Path.Combine(root, "Lumenotepad");
+        }
+    }
 }
