@@ -20,15 +20,9 @@ public partial class MainWindow : Window
             WindowDecorations = WindowDecorations.Full;
             ExtendClientAreaToDecorationsHint = true;
             ExtendClientAreaTitleBarHeightHint = 44;   // traffic lights centre on our title bar band
-            // DWM acrylic is a no-op here; the frost must come from Avalonia's own NSVisualEffectView.
-            // Request real blur only (bare "Transparent" = see-through-to-desktop on mac); if the OS
-            // can't honour it the window falls back to the opaque dark base set in ApplyTheme, never
-            // the white TransparencyBackgroundFallback default that washed everything grey.
-            TransparencyLevelHint = new[]
-            {
-                Avalonia.Controls.WindowTransparencyLevel.AcrylicBlur,
-                Avalonia.Controls.WindowTransparencyLevel.Blur,
-            };
+            // NOTE: deliberately NOT touching TransparencyLevelHint here. The XAML already asks for
+            // AcrylicBlur first, and that request is honoured on its FIRST application — re-assigning
+            // it (as an earlier build did) re-runs the backend path that downgrades the frost.
         }
         DataContextChanged += (_, _) => HookThemeVm();
     }

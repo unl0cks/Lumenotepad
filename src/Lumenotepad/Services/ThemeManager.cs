@@ -128,6 +128,7 @@ public static class ThemeManager
             // No DWM on mac; frost via NSVisualEffectView. Child windows call this from their ctors —
             // before the native handle exists — so re-assert once the window is actually open.
             ApplyMacGlass(window);
+            RoundMacChildWindow(window);
             window.Opened += (_, _) => ApplyMacGlass(window);
             return;
         }
@@ -138,8 +139,12 @@ public static class ThemeManager
 
     /// <summary>macOS frost. Three things must all line up or the window reads as a flat wash:
     /// (1) the LEVEL — Avalonia's macOS backend maps only None→Opaque, Transparent→Transparent and
-    ///     AcrylicBlur→Blur; plain <c>Blur</c> is silently UNRECOGNISED (verified by disassembling
-    ///     Avalonia.Native's SetTransparencyLevelHint), so AcrylicBlur must lead the list.
+    ///     AcrylicBlur→Blur; plain <c>Blur</c> is silently UNRECOGNISED. Worse, re-running the
+    ///     backend's SetTransparencyLevelHint is DESTRUCTIVE (verified by disassembling
+    ///     Avalonia.Native): it skips any level equal to the one already active, and if the whole list
+    ///     ends up applying nothing it falls out of the loop and forces the window back to Opaque. So
+    ///     the list is a single shared AcrylicBlur entry, assigned only when it isn't already set —
+    ///     a second entry would simply override the frost on the next call.
     /// (2) the APPEARANCE — NSVisualEffectView takes its material from the window's NSAppearance,
     ///     which follows the theme variant. A Light appearance frosts WHITE: exactly the grey-white
     ///     wash the tester reported. Pin the variant to the theme's own chrome darkness.
@@ -147,14 +152,46 @@ public static class ThemeManager
     ///     Avalonia's default white, so the failure mode is clean dark instead of washed grey.
     /// Must be re-applied once the native window exists (see MainWindow.OnOpened): a hint set before
     /// the handle is created can be dropped.</summary>
+    /// <summary>The macOS level list. ONE entry, shared, and never rebuilt — see <see cref="ApplyMacGlass"/>.</summary>
+    private static readonly WindowTransparencyLevel[] MacLevels = { WindowTransparencyLevel.AcrylicBlur };
+
+    /// <summary>Round a borderless child window's corners on macOS. Windows rounds these through DWM,
+    /// but a borderless NSWindow is square, so the shape has to come from the CONTENT: move the window's
+    /// own surface fill onto a clipped, rounded Border wrapped around the existing content and let the
+    /// window itself go transparent. Keeps the surface bound to the theme resource so it still restyles,
+    /// and is idempotent (the wrapper tags itself) since chrome is re-applied on theme changes.</summary>
+    internal static void RoundMacChildWindow(Window window)
+    {
+        const string Tag = "mac-rounded";
+        if (window.Content is not Control inner || (inner as Border)?.Tag as string == Tag) return;
+        var shell = new Border
+        {
+            Tag = Tag,
+            CornerRadius = new CornerRadius(11),
+            ClipToBounds = true,
+            Child = inner,
+        };
+        // Windows whose fill IS the themed surface keep following it (Preferences is open while the
+        // user switches themes); the few dialogs that set their own literal brush keep that brush.
+        object? surface = null;
+        Application.Current?.TryFindResource("WindowSurfaceBrush", out surface);
+        if (Application.Current is { } app && ReferenceEquals(window.Background, surface))
+            shell.Bind(Border.BackgroundProperty, app.GetResourceObservable("WindowSurfaceBrush"));
+        else
+            shell.Background = window.Background;
+        window.Content = shell;
+        window.Background = Brushes.Transparent;   // the rounded Border is what paints now
+    }
+
     public static void ApplyMacGlass(Window window)
     {
         window.RequestedThemeVariant = Current.DarkChrome ? ThemeVariant.Dark : ThemeVariant.Light;
-        window.TransparencyLevelHint = new[]
-        {
-            WindowTransparencyLevel.AcrylicBlur,   // → NSVisualEffectView frost
-            WindowTransparencyLevel.Transparent,   // last resort: at least genuinely see-through
-        };
+        // NEVER re-assign a hint that already leads with AcrylicBlur — every window's XAML already
+        // asks for it, and assigning any new list re-runs the destructive backend path above (which is
+        // exactly how the frost was being downgraded to plain transparency, then to opaque).
+        var hint = window.TransparencyLevelHint;
+        if (hint is not { Count: > 0 } || hint[0] != WindowTransparencyLevel.AcrylicBlur)
+            window.TransparencyLevelHint = MacLevels;
         window.TransparencyBackgroundFallback = new SolidColorBrush(Color.Parse(Current.WindowBackground));
     }
 }

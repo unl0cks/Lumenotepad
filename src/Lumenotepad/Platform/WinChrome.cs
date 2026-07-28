@@ -42,10 +42,18 @@ public static class WinChrome
         catch { /* pre-Windows-11: no rounded-corner API */ }
     }
 
-    /// <summary>Round (or un-round) the window's corners on Windows 11. Safe to call anywhere.</summary>
+    /// <summary>Round (or un-round) the window's corners on Windows 11. Safe to call anywhere.
+    /// On macOS there is no DWM corner attribute and a BORDERLESS NSWindow is square, so the rounding
+    /// has to come from the content — every child window already calls this, making it the one funnel
+    /// point. The main window is skipped: it uses the native (already rounded) mac shell.</summary>
     public static void RoundCorners(Window window, bool round = true)
     {
-        if (!OperatingSystem.IsWindows()) return;
+        if (!OperatingSystem.IsWindows())
+        {
+            if (round && window.WindowDecorations == WindowDecorations.None)
+                Services.ThemeManager.RoundMacChildWindow(window);
+            return;
+        }
         var handle = window.TryGetPlatformHandle();
         if (handle is null || handle.Handle == IntPtr.Zero) return;
         int pref = !round ? DWMWCP_DEFAULT
