@@ -51,7 +51,12 @@ public static class WinChrome
         if (!OperatingSystem.IsWindows())
         {
             if (round && window.WindowDecorations == WindowDecorations.None)
+            {
+                // Clear glass, not frost: the blur layer is a square NSVisualEffectView filling the
+                // whole window, which pokes out from behind the rounded content as a hard-edged slab.
+                Services.ThemeManager.ApplyMacGlass(window, blur: false);
                 Services.ThemeManager.RoundMacChildWindow(window);
+            }
             return;
         }
         var handle = window.TryGetPlatformHandle();

@@ -127,9 +127,9 @@ public static class ThemeManager
         {
             // No DWM on mac; frost via NSVisualEffectView. Child windows call this from their ctors —
             // before the native handle exists — so re-assert once the window is actually open.
-            ApplyMacGlass(window);
+            ApplyMacGlass(window, blur: false);
             RoundMacChildWindow(window);
-            window.Opened += (_, _) => ApplyMacGlass(window);
+            window.Opened += (_, _) => ApplyMacGlass(window, blur: false);
             return;
         }
         Platform.DwmAcrylic.Apply(window,
@@ -155,7 +155,11 @@ public static class ThemeManager
     /// <summary>The macOS level lists — see <see cref="ApplyMacGlass"/> for why the frost is armed by
     /// stepping through <see cref="MacOff"/> first.</summary>
     private static readonly WindowTransparencyLevel[] MacOff = { WindowTransparencyLevel.None };
-    private static readonly WindowTransparencyLevel[] MacLevels = { WindowTransparencyLevel.AcrylicBlur };
+    private static readonly WindowTransparencyLevel[] MacBlur = { WindowTransparencyLevel.AcrylicBlur };
+    /// <summary>Child windows use plain transparency, never blur: the NSVisualEffectView is a SQUARE
+    /// layer filling the whole window, so on a borderless window it shows as a hard-edged slab behind
+    /// our rounded content ("a sharp layer underneath" in testing). Clear glass has no such layer.</summary>
+    private static readonly WindowTransparencyLevel[] MacClear = { WindowTransparencyLevel.Transparent };
 
     /// <summary>Round a borderless child window's corners on macOS. Windows rounds these through DWM,
     /// but a borderless NSWindow is square, so the shape has to come from the CONTENT: move the window's
@@ -175,6 +179,7 @@ public static class ThemeManager
             Tag = Tag,
             CornerRadius = new CornerRadius(11),
             ClipToBounds = true,
+            BorderThickness = new Thickness(1),   // borderless mac windows have no edge of their own
             Child = inner,
         };
         // Windows whose fill IS the themed surface keep following it (Preferences is open while the
@@ -183,24 +188,30 @@ public static class ThemeManager
         Application.Current?.TryFindResource("WindowSurfaceBrush", out surface);
         if (Application.Current is { } app && ReferenceEquals(window.Background, surface))
             shell.Bind(Border.BackgroundProperty, app.GetResourceObservable("WindowSurfaceBrush"));
+        if (Application.Current is { } bapp)
+            shell.Bind(Border.BorderBrushProperty, bapp.GetResourceObservable("FrameBorderBrush"));
         else
             shell.Background = window.Background;
         window.Content = shell;
         window.Background = Brushes.Transparent;   // the rounded Border is what paints now
     }
 
-    public static void ApplyMacGlass(Window window)
+    public static void ApplyMacGlass(Window window, bool blur = true)
     {
-        // Appearance FIRST: NSVisualEffectView takes its material from it, so arming the frost before
-        // the variant is set is what produced a light/grey frost under a dark theme.
-        window.RequestedThemeVariant = Current.DarkChrome ? ThemeVariant.Dark : ThemeVariant.Light;
+        // APPEARANCE FIRST, and as a real TRANSITION. The native layer only pushes the frame appearance
+        // to the NSWindow when the variant actually CHANGES, so a window that is dark from birth is
+        // never told — the NSVisualEffectView keeps the default VibrantLight material and renders as
+        // pale grey (diagnostics from the tester's Mac: frost granted, variant Dark, yet grey). Passing
+        // through the opposite variant guarantees the change fires. It is exactly why switching theme
+        // away and back "fixed" the window by hand.
+        var target = Current.DarkChrome ? ThemeVariant.Dark : ThemeVariant.Light;
+        window.RequestedThemeVariant = target == ThemeVariant.Dark ? ThemeVariant.Light : ThemeVariant.Dark;
+        window.RequestedThemeVariant = target;
         // Then force a real OFF→ON transition. The backend ignores any level equal to the one already
         // active (so a plain re-assert is a no-op, and a list whose entries are all no-ops resets the
-        // window to Opaque). Stepping through None guarantees the next assignment genuinely re-arms
-        // the frost — the same off→on trick RefreshBackdrop uses for DWM. This is why the tester could
-        // "fix" a grey window by switching theme away and back: only a transition takes effect.
+        // window to Opaque). Stepping through None guarantees the next assignment genuinely re-arms it.
         window.TransparencyLevelHint = MacOff;
-        window.TransparencyLevelHint = MacLevels;
+        window.TransparencyLevelHint = blur ? MacBlur : MacClear;
         window.TransparencyBackgroundFallback = new SolidColorBrush(Color.Parse(Current.WindowBackground));
     }
 }
