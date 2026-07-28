@@ -54,7 +54,7 @@ public static class WinChrome
             {
                 // Clear glass, not frost: the blur layer is a square NSVisualEffectView filling the
                 // whole window, which pokes out from behind the rounded content as a hard-edged slab.
-                Services.ThemeManager.ApplyMacGlass(window, blur: false);
+                Services.ThemeManager.ApplyMacGlass(window, Services.ThemeManager.MacGlass.Clear);
                 Services.ThemeManager.RoundMacChildWindow(window);
             }
             return;

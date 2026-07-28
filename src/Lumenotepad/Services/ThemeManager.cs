@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -68,14 +69,11 @@ public static class ThemeManager
         Brush("AccentDeepBrush", t.AccentDeep);
         Brush("WindowBackgroundBrush", t.WindowBackground);
         // Secondary-window surface: opaque normally, but a translucent tint when the theme is
-        // whole-window glass (Lumen) so the DWM acrylic behind child windows shows through as frost. On macOS the WINDOW itself must stay transparent (its
-        // rounded shape is drawn by a content wrapper), so the fill moves to this separate key and
-        // WindowSurfaceBrush goes clear — otherwise every theme change re-pushed an opaque brush onto
-        // the window through its DynamicResource binding and the square surface reappeared behind the
-        // rounded corners (tester: corners go sharp again after switching theme).
+        // whole-window glass (Lumen) so the acrylic behind child windows shows through as frost.
+        // ChildSurfaceBrush is the same fill under a stable name for the dialog rounding wrapper.
         string childSurface = t.FrostedWindow ? "#D8" + t.WindowBackground[^6..] : t.WindowBackground;
         Brush("ChildSurfaceBrush", childSurface);
-        Brush("WindowSurfaceBrush", System.OperatingSystem.IsWindows() ? childSurface : "#00000000");
+        Brush("WindowSurfaceBrush", childSurface);
         Brush("MenuBackgroundBrush", t.MenuBackground);
         Brush("MenuBorderBrush", t.MenuBorder);
 
@@ -103,6 +101,9 @@ public static class ThemeManager
         r["SystemAccentColorDark1"] = Color.Parse(ThemePalettes.Shade(t.Accent, -0.15));
         r["SystemAccentColorDark2"] = Color.Parse(ThemePalettes.Shade(t.Accent, -0.30));
         app.RequestedThemeVariant = t.DarkChrome ? ThemeVariant.Dark : ThemeVariant.Light;
+        // macOS child windows are real NSWindows with their own backdrop, so they have to be re-armed
+        // when the theme changes underneath them (Lumen = frost, anything else = opaque).
+        if (!System.OperatingSystem.IsWindows()) RefreshMacChildGlass();
     }
 
     /// <summary>Re-tint a window's native chrome for the active theme: immersive dark, and the
@@ -133,9 +134,12 @@ public static class ThemeManager
         {
             // No DWM on mac; frost via NSVisualEffectView. Child windows call this from their ctors —
             // before the native handle exists — so re-assert once the window is actually open.
-            ApplyMacGlass(window, blur: false);
-            RoundMacChildWindow(window);
-            window.Opened += (_, _) => ApplyMacGlass(window, blur: false);
+            // A window that already took the native mac frame follows the theme (frost only for
+            // Lumen); the rest are rounded from content, which requires plain clear glass.
+            bool native = window.WindowDecorations != WindowDecorations.None;
+            ApplyMacGlass(window, native ? ChildGlass : MacGlass.Clear);
+            if (!native) RoundMacChildWindow(window);
+            window.Opened += (_, _) => ApplyMacGlass(window, native ? ChildGlass : MacGlass.Clear);
             return;
         }
         Platform.DwmAcrylic.Apply(window,
@@ -173,12 +177,35 @@ public static class ThemeManager
         // Shifting the whole title-bar grid right keeps its right-aligned buttons in place and only
         // moves the title clear of the traffic lights.
         if (titleBar is not null) titleBar.Margin = new Thickness(72, 0, 0, 0);
-        ApplyMacGlass(window, blur: true);
+        // The traffic lights now close the window, so our own caption button is a duplicate.
+        if (window.FindControl<Button>("CloseBtn") is { } close) close.IsVisible = false;
+        _macChildWindows.Add(new System.WeakReference<Window>(window));
+        ApplyMacGlass(window, ChildGlass);
         window.Opened += (_, _) =>
         {
-            ApplyMacGlass(window, blur: true);
+            ApplyMacGlass(window, ChildGlass);
             Platform.MacVibrancy.KeepFrostActive(window);
         };
+    }
+
+    /// <summary>Secondary windows wearing the native mac frame, so a theme switch can re-run their
+    /// glass (Lumen frosts; every other theme is an opaque sheet). Weak, and pruned as it is walked.</summary>
+    private static readonly List<System.WeakReference<Window>> _macChildWindows = new();
+
+    private static void RefreshMacChildGlass()
+    {
+        for (int i = _macChildWindows.Count - 1; i >= 0; i--)
+        {
+            if (_macChildWindows[i].TryGetTarget(out var w) && w.IsVisible)
+            {
+                ApplyMacGlass(w, ChildGlass);
+                Platform.MacVibrancy.KeepFrostActive(w);
+            }
+            else if (!_macChildWindows[i].TryGetTarget(out _))
+            {
+                _macChildWindows.RemoveAt(i);
+            }
+        }
     }
 
     /// <summary>The macOS level lists — see <see cref="ApplyMacGlass"/> for why the frost is armed by
@@ -225,7 +252,16 @@ public static class ThemeManager
         window.Background = Brushes.Transparent;   // the rounded Border is what paints now
     }
 
-    public static void ApplyMacGlass(Window window, bool blur = true)
+    /// <summary>How a macOS window treats its backdrop. <see cref="Frost"/> = real NSVisualEffectView
+    /// blur, <see cref="Clear"/> = plain see-through (used only where we round from content and a
+    /// square blur pane would show), <see cref="Opaque"/> = no transparency at all.</summary>
+    public enum MacGlass { Frost, Clear, Opaque }
+
+    /// <summary>What a SECONDARY window should be: glass only when the theme actually is glass
+    /// (Lumen), otherwise a plain opaque sheet — mirrors ApplyChildChrome's rule on Windows.</summary>
+    private static MacGlass ChildGlass => Current.FrostedWindow ? MacGlass.Frost : MacGlass.Opaque;
+
+    public static void ApplyMacGlass(Window window, MacGlass mode)
     {
         // APPEARANCE FIRST, and as a real TRANSITION. The native layer only pushes the frame appearance
         // to the NSWindow when the variant actually CHANGES, so a window that is dark from birth is
@@ -247,7 +283,8 @@ public static class ThemeManager
         // active (so a plain re-assert is a no-op, and a list whose entries are all no-ops resets the
         // window to Opaque). Stepping through None guarantees the next assignment genuinely re-arms it.
         window.TransparencyLevelHint = MacOff;
-        window.TransparencyLevelHint = blur ? MacBlur : MacClear;
+        if (mode != MacGlass.Opaque)
+            window.TransparencyLevelHint = mode == MacGlass.Frost ? MacBlur : MacClear;
         window.TransparencyBackgroundFallback = new SolidColorBrush(Color.Parse(Current.WindowBackground));
     }
 }
