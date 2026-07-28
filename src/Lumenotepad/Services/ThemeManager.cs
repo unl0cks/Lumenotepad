@@ -158,6 +158,29 @@ public static class ThemeManager
     ///     Avalonia's default white, so the failure mode is clean dark instead of washed grey.
     /// Must be re-applied once the native window exists (see MainWindow.OnOpened): a hint set before
     /// the handle is created can be dropped.</summary>
+    /// <summary>macOS: give a SECONDARY window the native frame. A borderless NSWindow is square and
+    /// cannot host the frost (the blur layer is a square pane that juts out of any corner we round
+    /// ourselves), so the only way to get Windows-like frosted-AND-rounded child windows is to let
+    /// macOS draw the frame: native rounding, shadow, and a real NSVisualEffectView. The cost is the
+    /// traffic-light buttons, which the caller's title bar is inset to clear. Windows path untouched.
+    /// Because decorations are no longer None, the content-rounding wrapper is skipped automatically.</summary>
+    public static void UseMacNativeChrome(Window window, Panel? titleBar = null, double titleBarHeight = 38)
+    {
+        if (System.OperatingSystem.IsWindows()) return;
+        window.WindowDecorations = WindowDecorations.Full;
+        window.ExtendClientAreaToDecorationsHint = true;
+        window.ExtendClientAreaTitleBarHeightHint = titleBarHeight;
+        // Shifting the whole title-bar grid right keeps its right-aligned buttons in place and only
+        // moves the title clear of the traffic lights.
+        if (titleBar is not null) titleBar.Margin = new Thickness(72, 0, 0, 0);
+        ApplyMacGlass(window, blur: true);
+        window.Opened += (_, _) =>
+        {
+            ApplyMacGlass(window, blur: true);
+            Platform.MacVibrancy.KeepFrostActive(window);
+        };
+    }
+
     /// <summary>The macOS level lists — see <see cref="ApplyMacGlass"/> for why the frost is armed by
     /// stepping through <see cref="MacOff"/> first.</summary>
     private static readonly WindowTransparencyLevel[] MacOff = { WindowTransparencyLevel.None };

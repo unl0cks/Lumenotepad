@@ -133,7 +133,12 @@ public partial class MainWindow : Window
             // Re-assert the frost NOW that the native window exists — a transparency hint applied
             // before the handle is created can be dropped, leaving an opaque window.
             Services.ThemeManager.ApplyMacGlass(this);
-            DispatcherTimer.RunOnce(() => Services.ThemeManager.ApplyMacGlass(this), TimeSpan.FromMilliseconds(200));
+            MacVibrancy.KeepFrostActive(this);
+            DispatcherTimer.RunOnce(() =>
+            {
+                Services.ThemeManager.ApplyMacGlass(this);
+                MacVibrancy.KeepFrostActive(this);   // frost must not drain when a child window takes focus
+            }, TimeSpan.FromMilliseconds(200));
             DispatcherTimer.RunOnce(WriteMacChromeDiagnostics, TimeSpan.FromMilliseconds(1200));
         }
     }

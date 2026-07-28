@@ -45,6 +45,7 @@ public partial class NotebookWizardWindow : Window
 
         Opened += (_, _) =>
         {
+            Services.ThemeManager.UseMacNativeChrome(this, WizTitleBar);   // mac: native frame = rounded + frosted
             WinChrome.RoundCorners(this, true);
             if (Content is Control root) Motion.ScaleIn(root, 0.96, 180);
             NameBox.Focus();

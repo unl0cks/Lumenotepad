@@ -47,6 +47,7 @@ public partial class PreferencesWindow : Window
 
         Opened += (_, _) =>
         {
+            Services.ThemeManager.UseMacNativeChrome(this, PrefsTitleBar);   // mac: native frame = rounded + frosted
             WinChrome.RoundCorners(this, true);
             if (Content is Control root) Motion.ScaleIn(root, 0.96, 180);   // quick fade + scale in
         };

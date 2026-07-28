@@ -67,6 +67,7 @@ public partial class CustomizeSheetWindow : Window
 
         Opened += (_, _) =>
         {
+            Services.ThemeManager.UseMacNativeChrome(this, SheetTitleBar);   // mac: native frame = rounded + frosted
             WinChrome.RoundCorners(this, true);
             if (Content is Control root) Motion.ScaleIn(root, 0.96, 180);
             NameBox.Focus();

@@ -67,6 +67,7 @@ public partial class FontBrowserWindow : Window
 
         Opened += async (_, _) =>
         {
+            Services.ThemeManager.UseMacNativeChrome(this, BrowserTitleBar);   // mac: native frame = rounded + frosted
             WinChrome.RoundCorners(this, true);
             Services.ThemeManager.ApplyChildChrome(this);   // acrylic frost when the theme is glass (Lumen)
             if (Content is Control root) Motion.ScaleIn(root, 0.96, 180);
