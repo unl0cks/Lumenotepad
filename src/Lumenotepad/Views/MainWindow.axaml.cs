@@ -133,6 +133,37 @@ public partial class MainWindow : Window
         Motion.ScaleIn(Host, 0.97, 220);                               // launch: fade + scale in
         SyncTrayEnabled();
         SyncHotkey();
+
+        if (!OperatingSystem.IsWindows())
+        {
+            // Re-assert the frost NOW that the native window exists — a transparency hint applied
+            // before the handle is created can be dropped, leaving an opaque window.
+            Services.ThemeManager.ApplyMacGlass(this);
+            DispatcherTimer.RunOnce(() => Services.ThemeManager.ApplyMacGlass(this), TimeSpan.FromMilliseconds(200));
+            DispatcherTimer.RunOnce(WriteMacChromeDiagnostics, TimeSpan.FromMilliseconds(1200));
+        }
+    }
+
+    /// <summary>Record what the OS actually granted, so a "still not transparent" report can be
+    /// diagnosed from the tester's Mac without guesswork (no macOS machine on this side).</summary>
+    private void WriteMacChromeDiagnostics()
+    {
+        try
+        {
+            var dir = Services.AppSettings.DefaultDir;
+            System.IO.Directory.CreateDirectory(dir);
+            System.IO.File.WriteAllText(System.IO.Path.Combine(dir, "macos-chrome-diagnostics.txt"),
+                $"os                      = {Environment.OSVersion.VersionString}\n" +
+                $"arch                    = {System.Runtime.InteropServices.RuntimeInformation.OSArchitecture}\n" +
+                $"requestedLevels         = {string.Join(", ", TransparencyLevelHint)}\n" +
+                $"ActualTransparencyLevel = {ActualTransparencyLevel}\n" +
+                $"ActualThemeVariant      = {ActualThemeVariant}\n" +
+                $"WindowDecorations       = {WindowDecorations}\n" +
+                $"extendedIntoDecorations = {IsExtendedIntoWindowDecorations}\n" +
+                $"windowBackground        = {Background}\n" +
+                $"fallbackBrush           = {TransparencyBackgroundFallback}\n");
+        }
+        catch { /* diagnostics must never break startup */ }
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)

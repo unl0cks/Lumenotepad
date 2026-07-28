@@ -125,7 +125,10 @@ public static class ThemeManager
     {
         if (!System.OperatingSystem.IsWindows())
         {
-            ApplyMacGlass(window);   // no DWM on mac; blur via NSVisualEffectView, opaque-dark fallback
+            // No DWM on mac; frost via NSVisualEffectView. Child windows call this from their ctors —
+            // before the native handle exists — so re-assert once the window is actually open.
+            ApplyMacGlass(window);
+            window.Opened += (_, _) => ApplyMacGlass(window);
             return;
         }
         Platform.DwmAcrylic.Apply(window,
@@ -133,16 +136,24 @@ public static class ThemeManager
             dark: Current.DarkChrome);
     }
 
-    /// <summary>macOS frost: request real system blur (bare "Transparent" = see-through-to-desktop on
-    /// mac, so ask only for AcrylicBlur/Blur) and, for the moment the OS declines it, paint the theme's
-    /// opaque frame base instead of Avalonia's default white — which otherwise washes the translucent
-    /// window brushes to grey. Called for the main window (via its own path) and every child window.</summary>
+    /// <summary>macOS frost. Three things must all line up or the window reads as a flat wash:
+    /// (1) the LEVEL — Avalonia's macOS backend maps only None→Opaque, Transparent→Transparent and
+    ///     AcrylicBlur→Blur; plain <c>Blur</c> is silently UNRECOGNISED (verified by disassembling
+    ///     Avalonia.Native's SetTransparencyLevelHint), so AcrylicBlur must lead the list.
+    /// (2) the APPEARANCE — NSVisualEffectView takes its material from the window's NSAppearance,
+    ///     which follows the theme variant. A Light appearance frosts WHITE: exactly the grey-white
+    ///     wash the tester reported. Pin the variant to the theme's own chrome darkness.
+    /// (3) the FALLBACK — if the OS still declines, paint the theme's opaque frame base rather than
+    ///     Avalonia's default white, so the failure mode is clean dark instead of washed grey.
+    /// Must be re-applied once the native window exists (see MainWindow.OnOpened): a hint set before
+    /// the handle is created can be dropped.</summary>
     public static void ApplyMacGlass(Window window)
     {
+        window.RequestedThemeVariant = Current.DarkChrome ? ThemeVariant.Dark : ThemeVariant.Light;
         window.TransparencyLevelHint = new[]
         {
-            WindowTransparencyLevel.AcrylicBlur,
-            WindowTransparencyLevel.Blur,
+            WindowTransparencyLevel.AcrylicBlur,   // → NSVisualEffectView frost
+            WindowTransparencyLevel.Transparent,   // last resort: at least genuinely see-through
         };
         window.TransparencyBackgroundFallback = new SolidColorBrush(Color.Parse(Current.WindowBackground));
     }
