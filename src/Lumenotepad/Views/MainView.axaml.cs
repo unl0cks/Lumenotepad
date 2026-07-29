@@ -1096,6 +1096,16 @@ public partial class MainView : UserControl
             new SolidColorBrush(t >= 0 ? Colors.White : Colors.Black, System.Math.Abs(t) * max);
     }
 
+    /// <summary>Re-seat every macOS frost layer on the newly chosen material. The material is a
+    /// property of the live NSVisualEffectView, so nothing needs rebuilding — but the windows do have
+    /// to be walked again, and the frost has to be re-pinned after any glass re-arm.</summary>
+    private void RefreshMacMaterial()
+    {
+        if (System.OperatingSystem.IsWindows()) return;
+        (TopLevel.GetTopLevel(this) as MainWindow)?.RearmMacGlass();
+        Services.ThemeManager.RefreshMacChildGlass();
+    }
+
     /// <summary>Push the bullet/number prefs onto the editor statics; optionally rebuild the open
     /// page so existing note boxes re-render with the new furniture.</summary>
     private void ApplyBulletPrefs(bool rebuild)
@@ -1244,6 +1254,8 @@ public partial class MainView : UserControl
             ApplyCardSize();
         else if (e.PropertyName == nameof(MainViewModel.GlassTint))
             ApplyGlassTint();
+        else if (e.PropertyName == nameof(MainViewModel.MacGlassMaterial))
+            RefreshMacMaterial();
         else if (e.PropertyName is nameof(MainViewModel.ReduceMotion) or nameof(MainViewModel.MotionSpeed))
             ApplyMotionPrefs();
         else if (e.PropertyName is nameof(MainViewModel.BulletPrefsVersion)
@@ -1467,14 +1479,105 @@ public partial class MainView : UserControl
             CornerRadius = new CornerRadius(8), Padding = new Thickness(9, 7),
             Cursor = new Cursor(StandardCursorType.Hand), Child = grid,
         };
-        chip.PointerPressed += async (_, e) =>
+        chip.PointerPressed += (_, e) =>
         {
             if (!e.GetCurrentPoint(chip).Properties.IsLeftButtonPressed) return;
-            var data = new DataTransfer();
-            data.Add(DataTransferItem.Create(NoteCanvas.TrashFormat, box));
-            await DragDrop.DoDragDropAsync(e, data, DragDropEffects.Move);
+            // includeSelf: a press landing directly ON the restore button reports the button itself.
+            if (e.Source is Visual v && v.FindAncestorOfType<Button>(true) is not null) return;
+            BeginTrashDrag(chip, box, e);
         };
         return chip;
+    }
+
+    /// <summary>Drag a chip out of the deleted history and drop it back onto the page.
+    ///
+    /// Deliberately a plain pointer-capture drag rather than a platform drag-and-drop. macOS routes
+    /// every DnD through NSPasteboard and calls the data provider back FROM AppKit; an in-process CLR
+    /// payload has no pasteboard representation, so the wrapper threw inside a native frame, where a
+    /// managed exception cannot unwind and the runtime kills the process instead ("Avalonia Application
+    /// quit unexpectedly" the moment the tester dragged a container back onto a page). Doing the drag
+    /// ourselves keeps the payload an ordinary object reference and behaves the same on both platforms.
+    /// This was the app's only use of platform DnD.</summary>
+    private void BeginTrashDrag(Control chip, NoteBox box, PointerPressedEventArgs e)
+    {
+        if (Avalonia.Controls.Primitives.OverlayLayer.GetOverlayLayer(chip) is not { } layer) return;
+        var pointer = e.Pointer;
+        Point start = e.GetPosition(layer);
+        Border? ghost = null;
+
+        void Move(object? _, PointerEventArgs me)
+        {
+            Point p = me.GetPosition(layer);
+            if (ghost is null)
+            {
+                // Small threshold so a click on the chip is still just a click.
+                if (System.Math.Abs(p.X - start.X) < 4 && System.Math.Abs(p.Y - start.Y) < 4) return;
+                ghost = BuildTrashGhost(box);
+                layer.Children.Add(ghost);
+            }
+            Canvas.SetLeft(ghost, p.X - 11);
+            Canvas.SetTop(ghost, p.Y - 16);
+        }
+
+        void Detach()
+        {
+            chip.PointerMoved -= Move;
+            chip.PointerReleased -= Released;
+            chip.PointerCaptureLost -= Lost;
+        }
+
+        // Detach BEFORE releasing capture: Capture(null) raises PointerCaptureLost synchronously, so a
+        // still-subscribed Lost would tear the drag down (ghost gone, handlers off) before the release
+        // handler ever got to work out where the drop landed — the box would silently never come back.
+        void Finish(Point? drop)
+        {
+            if (ghost is null) return;
+            layer.Children.Remove(ghost);
+            ghost = null;
+            if (drop is not { } screenPoint) return;
+            // Hit-test from the root: a point can sit inside the canvas's bounds while a panel covers
+            // it, and dropping behind the sidebar should do nothing.
+            if (this.InputHitTest(screenPoint) is not Visual hit) return;
+            if (!ReferenceEquals(hit, PageCanvas) && hit.FindAncestorOfType<NoteCanvas>() is null) return;
+            Point onCanvas = this.TranslatePoint(screenPoint, PageCanvas) ?? default;
+            PageCanvas.RestoreBox(box, System.Math.Max(0, onCanvas.X - 11), System.Math.Max(0, onCanvas.Y - 16));
+        }
+
+        void Released(object? _, PointerReleasedEventArgs re)
+        {
+            Point p = re.GetPosition(this);
+            Detach();
+            pointer.Capture(null);
+            Finish(p);
+        }
+
+        void Lost(object? _, PointerCaptureLostEventArgs _2) { Detach(); Finish(null); }
+
+        chip.PointerMoved += Move;
+        chip.PointerReleased += Released;
+        chip.PointerCaptureLost += Lost;
+        pointer.Capture(chip);
+    }
+
+    /// <summary>The translucent card that follows the pointer while a deleted container is being
+    /// dragged back onto the page.</summary>
+    private Border BuildTrashGhost(NoteBox box)
+    {
+        var preview = box.Doc.GetText().Replace('\n', ' ').Trim();
+        if (preview.Length == 0) preview = "(empty container)";
+        else if (preview.Length > 40) preview = preview[..40] + "…";
+        return new Border
+        {
+            IsHitTestVisible = false,
+            Opacity = 0.75,
+            Width = 190,
+            Background = (IBrush?)this.FindResource("MenuBackgroundBrush") ?? Brushes.DimGray,
+            BorderBrush = (IBrush?)this.FindResource("FrameBorderBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(NoteCanvas.NoteRadiusPref),
+            Padding = new Thickness(9, 7),
+            Child = new TextBlock { Text = preview, FontSize = 12, TextWrapping = TextWrapping.Wrap, MaxLines = 2 },
+        };
     }
 
     private void BeginRenameSection(Section? sec)

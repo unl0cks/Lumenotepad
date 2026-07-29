@@ -213,7 +213,7 @@ public static class ThemeManager
     /// glass (Lumen frosts; every other theme is an opaque sheet). Weak, and pruned as it is walked.</summary>
     private static readonly List<System.WeakReference<Window>> _macChildWindows = new();
 
-    private static void RefreshMacChildGlass()
+    internal static void RefreshMacChildGlass()
     {
         for (int i = _macChildWindows.Count - 1; i >= 0; i--)
         {

@@ -16,6 +16,7 @@ public sealed class AppSettings
     public bool ExtendedFonts { get; set; }                 // full installed-font list vs curated shortlist
     public string? CustomAccent { get; set; }               // accent override; null = theme's own
     public double GlassTint { get; set; }                   // -1..1: darken / lighten the glass; 0 = off
+    public int MacGlassMaterial { get; set; }               // macOS frost density, 0 = system default (see MacVibrancy)
     public bool ReduceMotion { get; set; }                  // skip animations entirely
     public string MotionSpeed { get; set; } = "Normal";     // "Calm" | "Normal" | "Snappy"
     public Dictionary<string, string> BulletColors { get; set; } = new();  // bullet style → hex override

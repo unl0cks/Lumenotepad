@@ -45,6 +45,22 @@ internal static class MacVibrancy
     [DllImport(Objc, EntryPoint = "objc_msgSend")]
     private static extern void MsgSetByte(IntPtr receiver, IntPtr selector, byte value);
 
+    [DllImport(Objc, EntryPoint = "objc_msgSend")]
+    private static extern void MsgSetDouble(IntPtr receiver, IntPtr selector, double value);
+
+    [DllImport(Objc, EntryPoint = "objc_msgSend")]
+    private static extern void MsgSetPtr(IntPtr receiver, IntPtr selector, IntPtr value);
+
+    /// <summary>NSVisualEffectMaterial forced onto every frost layer, or 0 to keep whatever Avalonia
+    /// picked. Avalonia hard-codes one material and exposes no way to choose, and its choice frosts far
+    /// paler than the DWM acrylic the Windows build uses — the tester's glass stayed washed out even
+    /// with the tint slider at -100%. The "Glass material (macOS)" preference writes this.
+    ///
+    /// Values are documented NSVisualEffectMaterial constants (10.14+, all still valid on macOS 26);
+    /// only ones from that fixed list are ever assigned, because an out-of-range material is one of the
+    /// few things here that AppKit can raise on.</summary>
+    public static nint Material;
+
     /// <summary>Resolve the NSWindow behind an Avalonia window (the handle is normally the top-level
     /// NSView, but accept an NSWindow too). Zero when it cannot be resolved.</summary>
     private static IntPtr NSWindowOf(TopLevel window)
@@ -96,7 +112,7 @@ internal static class MacVibrancy
             // The frost usually sits BESIDE the content view under the window's theme frame, so start
             // from the superview when there is one — that covers both layouts.
             IntPtr root = Msg(content, Sel("superview"));
-            Pin(root != IntPtr.Zero ? root : content, effectCls, isKindSel, 0);
+            Pin(root != IntPtr.Zero ? root : content, effectCls, isKindSel, 0, 0);
         }
         catch { /* interop must never take the window (or the app) down */ }
     }
@@ -104,32 +120,88 @@ internal static class MacVibrancy
     /// <summary>True when macOS actually gave this surface a frost layer. Popups do not always get
     /// one, and a transparent surface with NO frost behind it is simply invisible — callers use this
     /// to fall back to an opaque background instead of shipping an invisible menu.</summary>
-    public static bool HasFrostLayer(TopLevel topLevel)
+    public static bool HasFrostLayer(TopLevel topLevel) => FrostLayerCount(topLevel) > 0;
+
+    /// <summary>How many NSVisualEffectViews this surface actually has (also re-pins them). Written to
+    /// the chrome diagnostics: whether the OS granted a frost layer at all is the one fact that decides
+    /// between "our request was wrong" and "macOS declines frost here", and it cannot be observed from
+    /// Windows.</summary>
+    public static int FrostLayerCount(TopLevel topLevel)
     {
-        if (!OperatingSystem.IsMacOS()) return false;
+        if (!OperatingSystem.IsMacOS()) return 0;
         try
         {
             IntPtr effectCls = GetClass("NSVisualEffectView");
             IntPtr nsWindow = NSWindowOf(topLevel);
-            if (effectCls == IntPtr.Zero || nsWindow == IntPtr.Zero) return false;
+            if (effectCls == IntPtr.Zero || nsWindow == IntPtr.Zero) return 0;
             IntPtr content = Msg(nsWindow, Sel("contentView"));
-            if (content == IntPtr.Zero) return false;
+            if (content == IntPtr.Zero) return 0;
             IntPtr root = Msg(content, Sel("superview"));
-            return Pin(root != IntPtr.Zero ? root : content, effectCls, Sel("isKindOfClass:"), 0);
+            return Pin(root != IntPtr.Zero ? root : content, effectCls, Sel("isKindOfClass:"), 0, 0);
         }
-        catch { return false; }
+        catch { return 0; }
     }
 
-    /// <summary>Depth-limited walk: pin every NSVisualEffectView in the subtree to the active state.
-    /// Returns true when at least one was found.</summary>
-    private static bool Pin(IntPtr view, IntPtr effectCls, IntPtr isKindSel, int depth)
+    /// <summary>Round a POPUP's window surface (menus, flyouts, combo drop-downs). Windows rounds these
+    /// through DWM; a macOS popup NSWindow is an unrounded opaque rectangle, so its square corners show
+    /// through behind the menu's rounded content (tester screenshot: sharp-cornered context menus).
+    /// A popup cannot take the native frame the way our dialogs do, so the shape has to come from the
+    /// layers: clear the window surface, then round the content view AND every frost layer, since the
+    /// NSVisualEffectView is a square pane that Avalonia parks beside the content view rather than
+    /// inside it.</summary>
+    public static void RoundPopup(TopLevel topLevel, double radius)
     {
-        if (view == IntPtr.Zero || depth > 6) return false;
-        bool found = false;
+        if (!OperatingSystem.IsMacOS()) return;
+        try
+        {
+            IntPtr nsWindow = NSWindowOf(topLevel);
+            if (nsWindow == IntPtr.Zero) return;
+            // An opaque window surface fills the corners we are about to cut out of the layers.
+            MsgSetByte(nsWindow, Sel("setOpaque:"), 0);
+            IntPtr colorCls = GetClass("NSColor");
+            if (colorCls != IntPtr.Zero)
+            {
+                IntPtr clear = Msg(colorCls, Sel("clearColor"));
+                if (clear != IntPtr.Zero) MsgSetPtr(nsWindow, Sel("setBackgroundColor:"), clear);
+            }
+
+            IntPtr content = Msg(nsWindow, Sel("contentView"));
+            if (content == IntPtr.Zero) return;
+            RoundLayer(content, radius);
+            IntPtr effectCls = GetClass("NSVisualEffectView");
+            if (effectCls == IntPtr.Zero) return;
+            IntPtr isKindSel = Sel("isKindOfClass:");
+            Pin(content, effectCls, isKindSel, 0, radius);
+            IntPtr root = Msg(content, Sel("superview"));
+            if (root != IntPtr.Zero) Pin(root, effectCls, isKindSel, 0, radius);
+        }
+        catch { /* interop must never take the window (or the app) down */ }
+    }
+
+    /// <summary>Give a view a backing layer with rounded, clipping corners.</summary>
+    private static void RoundLayer(IntPtr view, double radius)
+    {
+        if (view == IntPtr.Zero || radius <= 0) return;
+        MsgSetByte(view, Sel("setWantsLayer:"), 1);
+        IntPtr layer = Msg(view, Sel("layer"));
+        if (layer == IntPtr.Zero) return;
+        MsgSetDouble(layer, Sel("setCornerRadius:"), radius);
+        MsgSetByte(layer, Sel("setMasksToBounds:"), 1);
+    }
+
+    /// <summary>Depth-limited walk: pin every NSVisualEffectView in the subtree to the active state,
+    /// apply the chosen material, and (when <paramref name="radius"/> is set) round its layer.
+    /// Returns how many were found.</summary>
+    private static int Pin(IntPtr view, IntPtr effectCls, IntPtr isKindSel, int depth, double radius)
+    {
+        if (view == IntPtr.Zero || depth > 6) return 0;
+        int found = 0;
         if (MsgIsKind(view, isKindSel, effectCls))
         {
             MsgSetLong(view, Sel("setState:"), StateActive);
-            found = true;
+            if (Material > 0) MsgSetLong(view, Sel("setMaterial:"), Material);
+            RoundLayer(view, radius);
+            found = 1;
         }
 
         IntPtr subviews = Msg(view, Sel("subviews"));
@@ -137,7 +209,7 @@ internal static class MacVibrancy
         nint count = MsgCount(subviews, Sel("count"));
         IntPtr atIndex = Sel("objectAtIndex:");
         for (nint i = 0; i < count && i < 64; i++)
-            found |= Pin(MsgIndex(subviews, atIndex, i), effectCls, isKindSel, depth + 1);
+            found += Pin(MsgIndex(subviews, atIndex, i), effectCls, isKindSel, depth + 1, radius);
         return found;
     }
 }

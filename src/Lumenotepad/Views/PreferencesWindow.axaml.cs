@@ -311,6 +311,11 @@ public partial class PreferencesWindow : Window
             if (Vm is { } vm && Math.Abs(vm.CornerRoundness - v) > 1e-6) vm.CornerRoundness = v;
             RoundnessValue.Text = $"{(int)Math.Round(v * 100)}%";
         };
+        MacMaterialRow.IsVisible = !OperatingSystem.IsWindows();
+        MacMaterialBox.SelectionChanged += (_, _) =>
+        {
+            if (Vm is { } vm && MacMaterialBox.SelectedIndex >= 0) vm.MacGlassMaterial = MacMaterialBox.SelectedIndex;
+        };
         MotionSpeedBox.ItemsSource = new[] { "Calm", "Normal", "Snappy" };
         MotionSpeedBox.SelectionChanged += (_, _) =>
         {
@@ -1138,6 +1143,7 @@ public partial class PreferencesWindow : Window
         GlassTintValue.Text = $"{(int)Math.Round(vm.GlassTint * 100)}%";
         RoundnessSlider.Value = vm.CornerRoundness;
         RoundnessValue.Text = $"{(int)Math.Round(vm.CornerRoundness * 100)}%";
+        MacMaterialBox.SelectedIndex = Math.Clamp(vm.MacGlassMaterial, 0, 4);
         MotionSpeedBox.SelectedItem = vm.MotionSpeed;
         NumBoldBox.SelectedItem = NumOpt(vm.NumBoldDefault);
         NumItalicBox.SelectedItem = NumOpt(vm.NumItalicDefault);

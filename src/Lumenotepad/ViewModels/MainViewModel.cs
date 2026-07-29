@@ -80,6 +80,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _advancedUnlocked;            // prefs: advanced gate accepted
     [ObservableProperty] private string? _customAccent;             // prefs: accent override; null = theme's own
     [ObservableProperty] private double _glassTint;                 // prefs: -1..1 glass veil; 0 = off
+    [ObservableProperty] private int _macGlassMaterial;             // prefs: macOS frost density; 0 = system default
     [ObservableProperty] private double _cornerRoundness = 1.0;     // prefs: 0.5..1.5 corner-radius scale
     [ObservableProperty] private bool _sectionsSidebar;             // prefs: sections as their own sidebar
     [ObservableProperty] private bool _singleMode;                  // prefs: notebooks hold pages directly (no sections)
@@ -226,6 +227,7 @@ public partial class MainViewModel : ObservableObject
             AdvancedUnlocked = _settings.AdvancedUnlocked;
             CustomAccent = _settings.CustomAccent;
             GlassTint = _settings.GlassTint;
+            MacGlassMaterial = _settings.MacGlassMaterial;
             CornerRoundness = _settings.CornerRoundness;
             SectionsSidebar = _settings.SectionsSidebar;
             _singleMode = _settings.SingleMode;   // field, not property: the saved tree is already in this shape — don't restructure on load
@@ -422,6 +424,25 @@ public partial class MainViewModel : ObservableObject
         _settings.GlassTint = value;
         _settings.Save(_settingsDir);
     }
+
+    partial void OnMacGlassMaterialChanged(int value)
+    {
+        Platform.MacVibrancy.Material = MacMaterialOf(value);
+        if (_settings is null || _settingsDir is null) return;
+        _settings.MacGlassMaterial = value;
+        _settings.Save(_settingsDir);
+    }
+
+    /// <summary>Preference index → NSVisualEffectMaterial. Only documented constants, and only ones
+    /// that have existed since 10.14, so nothing here can be an out-of-range material.</summary>
+    internal static nint MacMaterialOf(int choice) => choice switch
+    {
+        1 => 13,   // hudWindow            — darkest / densest, closest to the Windows acrylic
+        2 => 21,   // underWindowBackground
+        3 => 7,    // sidebar
+        4 => 6,    // popover              — most see-through
+        _ => 0,    // Automatic: leave Avalonia's own choice alone
+    };
 
     partial void OnSectionsSidebarChanged(bool value)
     {
@@ -941,6 +962,7 @@ public partial class MainViewModel : ObservableObject
         AdvancedUnlocked = d.AdvancedUnlocked;
         CustomAccent = d.CustomAccent;
         GlassTint = d.GlassTint;
+        MacGlassMaterial = d.MacGlassMaterial;
         CornerRoundness = d.CornerRoundness;
         SectionsSidebar = d.SectionsSidebar;
         ReduceMotion = d.ReduceMotion; MotionSpeed = d.MotionSpeed;

@@ -66,6 +66,17 @@ public static class MenuFx
 
     private static void ApplyPopupFx(Control anyInPopup)
     {
+        if (!OperatingSystem.IsWindows())
+        {
+            // ONCE, and only after the popup surface exists. Everything the mac path does needs the
+            // NSWindow, and — unlike the Windows path — re-running it is actively harmful: see
+            // ApplyMacPopupFx.
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (TopLevel.GetTopLevel(anyInPopup) is { } tl) ApplyMacPopupFx(tl);
+            }, DispatcherPriority.Loaded);
+            return;
+        }
         ApplyPopupFxCore(anyInPopup);
         // Re-assert once the popup has fully materialized: on some opens the composition-attribute
         // blur lands before the popup surface is ready and silently does nothing — the menu then
@@ -73,24 +84,49 @@ public static class MenuFx
         Dispatcher.UIThread.Post(() => ApplyPopupFxCore(anyInPopup), DispatcherPriority.Loaded);
     }
 
+    private static readonly WindowTransparencyLevel[] MacOff = { WindowTransparencyLevel.None };
+    private static readonly WindowTransparencyLevel[] MacBlur = { WindowTransparencyLevel.AcrylicBlur };
+
     /// <summary>macOS menu material. Frost under a glass theme (Lumen), opaque otherwise — and always
     /// with an OPAQUE fallback set first, because the themed menu fill is only ~25% opaque: it is
     /// designed to sit over a blur, so a transparent surface with no frost behind it is an invisible
     /// menu (exactly what the tester hit). After the popup materialises we check whether macOS really
-    /// gave it a frost layer; if it did not, the request is withdrawn so the opaque fallback paints.</summary>
+    /// gave it a frost layer; if it did not, the request is withdrawn so the opaque fallback paints.
+    ///
+    /// The transition MUST step through None. Avalonia's backend ignores any level equal to the one
+    /// already active, and a pass that ends up applying nothing falls through and forces the window
+    /// back to Opaque — so plainly re-asserting AcrylicBlur on an already-frosted popup DESTROYS its
+    /// frost. That is what turned every mac menu opaque in 1.1.1: the fx ran twice per open, the
+    /// second run knocked the popup to Opaque, and the frost check then withdrew the request for
+    /// good. Fixed on both sides — this runs once per open now, and the assignment is a real
+    /// transition either way.</summary>
     private static void ApplyMacPopupFx(TopLevel tl)
     {
+        // Square popup corners poke out from behind the rounded menu content; macOS rounds neither the
+        // popup window nor its frost pane for us, so cut the radius into the layers ourselves.
+        Platform.MacVibrancy.RoundPopup(tl, 8);
+
         string bg = ThemeManager.Current.MenuBackground;
         var opaque = new SolidColorBrush(Color.Parse(bg.Length == 9 ? "#FF" + bg[^6..] : bg));
         tl.TransparencyBackgroundFallback = opaque;
-        if (!ThemeManager.Current.FrostedWindow) return;      // solid themes: plain opaque menu
-
-        tl.TransparencyLevelHint = new[] { WindowTransparencyLevel.AcrylicBlur };
-        Dispatcher.UIThread.Post(() =>
+        if (!ThemeManager.Current.FrostedWindow)
         {
-            if (Platform.MacVibrancy.HasFrostLayer(tl)) return;   // real frost — leave it be
-            tl.TransparencyLevelHint = new[] { WindowTransparencyLevel.None };   // no frost: paint opaque
-        }, DispatcherPriority.Loaded);
+            // Rounding required clearing the NSWindow's own surface, so under a solid theme the popup
+            // must paint its fill from the CONTENT side — otherwise cutting the corners would also cut
+            // away the only thing drawing the menu's background.
+            tl.Background = opaque;
+            return;
+        }
+
+        tl.TransparencyLevelHint = MacOff;
+        tl.TransparencyLevelHint = MacBlur;
+        // Verify on a real timer rather than another dispatcher pass: AppKit builds the effect view
+        // when it services the window, which is not guaranteed to have happened by the next frame.
+        DispatcherTimer.RunOnce(() =>
+        {
+            if (Platform.MacVibrancy.HasFrostLayer(tl)) { Platform.MacVibrancy.RoundPopup(tl, 8); return; }
+            tl.TransparencyLevelHint = MacOff;                // no frost: let the opaque fallback paint
+        }, TimeSpan.FromMilliseconds(90));
     }
 
     private static void ApplyPopupFxCore(Control anyInPopup)
@@ -98,11 +134,6 @@ public static class MenuFx
         try
         {
             if (TopLevel.GetTopLevel(anyInPopup) is not { } tl) return;
-            if (!OperatingSystem.IsWindows())
-            {
-                ApplyMacPopupFx(tl);
-                return;
-            }
             var hwnd = tl.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
             // Standard (8px) rounding, matching the content styles' CornerRadius 8 — mismatched
             // radii leave a wedge of popup surface visible in each corner (owner screenshot).

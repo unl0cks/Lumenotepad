@@ -21,10 +21,6 @@ public enum MindmapLayout { Radial, Hybrid, TopDown }
 /// page's history and can be dragged back onto the canvas.</summary>
 public sealed class NoteCanvas : Panel
 {
-    /// <summary>In-process drag-drop format for restoring a box from the deleted history.</summary>
-    public static readonly DataFormat<NoteBox> TrashFormat =
-        DataFormat.CreateInProcessFormat<NoteBox>("lumenotepad-trash-box");
-
     /// <summary>Note-container corner radius (M8 Part 6 roundness pref; default 9). Views read it
     /// at construction — pushing a new value takes effect on the next canvas rebuild.</summary>
     public static double NoteRadiusPref = 9;
@@ -752,21 +748,6 @@ public sealed class NoteCanvas : Panel
         // An un-rendered control is not hit-testable — bare-canvas clicks would fall through.
         Background = Brushes.Transparent;
         Focusable = true;   // so a bare-canvas click can pull focus off a bubble to deselect it
-
-        DragDrop.SetAllowDrop(this, true);
-        AddHandler(DragDrop.DragOverEvent, (_, e) =>
-        {
-            e.DragEffects = e.DataTransfer.Contains(TrashFormat) ? DragDropEffects.Move : DragDropEffects.None;
-            e.Handled = true;
-        });
-        AddHandler(DragDrop.DropEvent, (_, e) =>
-        {
-            var box = e.DataTransfer.TryGetValue(TrashFormat);
-            if (box is null || _doc is null || !_doc.Trash.Contains(box)) return;
-            var p = e.GetPosition(this);
-            RestoreBox(box, p.X - 11, p.Y - 16);
-            e.Handled = true;
-        });
 
         ContextRequested += OnCanvasContext;     // right-click the bare canvas for a general menu
 

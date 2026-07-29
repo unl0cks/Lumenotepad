@@ -140,7 +140,7 @@ public partial class MainWindow : Window
 
     /// <summary>Re-arm the macOS backdrop for the active theme (frost for glass themes, opaque
     /// otherwise) and pin the frost so it does not drain while another window is focused.</summary>
-    private void RearmMacGlass()
+    internal void RearmMacGlass()
     {
         Services.ThemeManager.ApplyMacGlass(this, Services.ThemeManager.Current.GlassWindow
             ? Services.ThemeManager.MacGlass.Frost
@@ -165,7 +165,12 @@ public partial class MainWindow : Window
                 $"WindowDecorations       = {WindowDecorations}\n" +
                 $"extendedIntoDecorations = {IsExtendedIntoWindowDecorations}\n" +
                 $"windowBackground        = {Background}\n" +
-                $"fallbackBrush           = {TransparencyBackgroundFallback}\n");
+                $"fallbackBrush           = {TransparencyBackgroundFallback}\n" +
+                // Whether the OS granted a frost layer AT ALL is the one thing that separates "our
+                // request was wrong" from "macOS declines frost here" — and it cannot be observed
+                // from Windows, so it has to come back in the file.
+                $"frostLayers             = {MacVibrancy.FrostLayerCount(this)}\n" +
+                $"glassMaterial           = {MacVibrancy.Material}\n");
         }
         catch { /* diagnostics must never break startup */ }
     }
