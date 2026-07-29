@@ -26,7 +26,7 @@ public sealed class ReorderDialog : Window
         Title = title;
         Width = 360; Height = 460; MinWidth = 300; MinHeight = 300;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        WindowDecorations = Avalonia.Controls.WindowDecorations.None;
+        Services.ThemeManager.ConfigureDialogChrome(this);   // mac: native rounding + frost, no traffic lights
         ShowInTaskbar = false;
         Background = this.FindResource("WindowSurfaceBrush") as IBrush;
         TransparencyLevelHint = new[] { WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent };

@@ -82,8 +82,7 @@ public partial class MainWindow : Window
         Services.ThemeManager.ApplyChrome(this);
         // macOS: request real blur + repaint the opaque-dark fallback per the just-applied theme so the
         // frost never washes to grey. (No-op on Windows, where DWM ApplyChrome above does the work.)
-        if (!OperatingSystem.IsWindows()) Services.ThemeManager.ApplyMacGlass(this, Services.ThemeManager.Current.GlassWindow
-                ? Services.ThemeManager.MacGlass.Frost : Services.ThemeManager.MacGlass.Opaque);
+        if (!OperatingSystem.IsWindows()) RearmMacGlass();
     }
 
     private bool _closingAnimated;
@@ -133,17 +132,20 @@ public partial class MainWindow : Window
         {
             // Re-assert the frost NOW that the native window exists — a transparency hint applied
             // before the handle is created can be dropped, leaving an opaque window.
-            Services.ThemeManager.ApplyMacGlass(this, Services.ThemeManager.Current.GlassWindow
-                ? Services.ThemeManager.MacGlass.Frost : Services.ThemeManager.MacGlass.Opaque);
-            MacVibrancy.KeepFrostActive(this);
-            DispatcherTimer.RunOnce(() =>
-            {
-                Services.ThemeManager.ApplyMacGlass(this, Services.ThemeManager.Current.GlassWindow
-                ? Services.ThemeManager.MacGlass.Frost : Services.ThemeManager.MacGlass.Opaque);
-                MacVibrancy.KeepFrostActive(this);   // frost must not drain when a child window takes focus
-            }, TimeSpan.FromMilliseconds(200));
+            RearmMacGlass();
+            DispatcherTimer.RunOnce(RearmMacGlass, TimeSpan.FromMilliseconds(200));
             DispatcherTimer.RunOnce(WriteMacChromeDiagnostics, TimeSpan.FromMilliseconds(1200));
         }
+    }
+
+    /// <summary>Re-arm the macOS backdrop for the active theme (frost for glass themes, opaque
+    /// otherwise) and pin the frost so it does not drain while another window is focused.</summary>
+    private void RearmMacGlass()
+    {
+        Services.ThemeManager.ApplyMacGlass(this, Services.ThemeManager.Current.GlassWindow
+            ? Services.ThemeManager.MacGlass.Frost
+            : Services.ThemeManager.MacGlass.Opaque);
+        MacVibrancy.KeepFrostActive(this);
     }
 
     /// <summary>Record what the OS actually granted, so a "still not transparent" report can be
@@ -188,6 +190,17 @@ public partial class MainWindow : Window
         // Snapping / maximizing strips the sizing styles (WS_THICKFRAME), so the SECOND snap after a
         // snap-to-top silently fails unless we re-assert them on every state change.
         WinChrome.EnableSnap(this);
+
+        if (!OperatingSystem.IsWindows())
+        {
+            // macOS REBUILDS the window when it enters or leaves fullscreen, and the rebuilt one has no
+            // NSVisualEffectView — the Lumen frost died on going fullscreen (tester report). The
+            // transition is animated (~1s), so a single immediate re-arm lands too early and is thrown
+            // away with the old window; re-arm across the whole animation instead.
+            RearmMacGlass();
+            foreach (var ms in new[] { 150, 500, 950, 1500 })
+                DispatcherTimer.RunOnce(RearmMacGlass, TimeSpan.FromMilliseconds(ms));
+        }
 
         // Native Aero Snap maximizes a WS_THICKFRAME window to (-7,-7) + a 14px oversize — a ~7px overhang past
         // every screen edge that clips the title bar / caption buttons (the maximize BUTTON constrains cleanly to

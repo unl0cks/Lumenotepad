@@ -188,6 +188,27 @@ public static class ThemeManager
         };
     }
 
+    /// <summary>Chrome for the small code-built dialogs (confirm / input / reorder / crop). On Windows
+    /// they stay chromeless and DWM rounds them. On macOS a borderless NSWindow is square AND cannot
+    /// host the frost, so they take the native frame for its rounding, shadow and real
+    /// NSVisualEffectView — then the traffic lights are hidden, because a confirm box must not sprout
+    /// window buttons. Glass follows the theme: frosted under Lumen, opaque under the others.</summary>
+    public static void ConfigureDialogChrome(Window window)
+    {
+        if (System.OperatingSystem.IsWindows()) { window.WindowDecorations = WindowDecorations.None; return; }
+        window.WindowDecorations = WindowDecorations.Full;
+        window.ExtendClientAreaToDecorationsHint = true;
+        window.ExtendClientAreaTitleBarHeightHint = 0;   // no titlebar band: the dialog owns the whole sheet
+        _macChildWindows.Add(new System.WeakReference<Window>(window));
+        ApplyMacGlass(window, ChildGlass);
+        window.Opened += (_, _) =>
+        {
+            ApplyMacGlass(window, ChildGlass);
+            Platform.MacVibrancy.HideTrafficLights(window);
+            Platform.MacVibrancy.KeepFrostActive(window);
+        };
+    }
+
     /// <summary>Secondary windows wearing the native mac frame, so a theme switch can re-run their
     /// glass (Lumen frosts; every other theme is an opaque sheet). Weak, and pruned as it is walked.</summary>
     private static readonly List<System.WeakReference<Window>> _macChildWindows = new();

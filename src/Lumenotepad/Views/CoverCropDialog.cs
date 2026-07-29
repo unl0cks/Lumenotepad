@@ -108,7 +108,6 @@ public static class CoverCropDialog
 
             var win = new Window
             {
-                WindowDecorations = WindowDecorations.None,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 SizeToContent = SizeToContent.WidthAndHeight,
                 CanResize = false,
@@ -116,6 +115,7 @@ public static class CoverCropDialog
                 Background = new SolidColorBrush(Color.Parse("#1B1D27")),
             };
             win.Opened += (_, _) => WinChrome.RoundCorners(win, true);
+            Services.ThemeManager.ConfigureDialogChrome(win);   // mac: native rounding + frost, no traffic lights
 
             var lumenTheme = Application.Current?.FindResource("LumenButton") as Avalonia.Styling.ControlTheme;
             var cancel = new Button

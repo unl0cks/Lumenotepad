@@ -73,15 +73,36 @@ public static class MenuFx
         Dispatcher.UIThread.Post(() => ApplyPopupFxCore(anyInPopup), DispatcherPriority.Loaded);
     }
 
+    /// <summary>macOS menu material. Frost under a glass theme (Lumen), opaque otherwise — and always
+    /// with an OPAQUE fallback set first, because the themed menu fill is only ~25% opaque: it is
+    /// designed to sit over a blur, so a transparent surface with no frost behind it is an invisible
+    /// menu (exactly what the tester hit). After the popup materialises we check whether macOS really
+    /// gave it a frost layer; if it did not, the request is withdrawn so the opaque fallback paints.</summary>
+    private static void ApplyMacPopupFx(TopLevel tl)
+    {
+        string bg = ThemeManager.Current.MenuBackground;
+        var opaque = new SolidColorBrush(Color.Parse(bg.Length == 9 ? "#FF" + bg[^6..] : bg));
+        tl.TransparencyBackgroundFallback = opaque;
+        if (!ThemeManager.Current.FrostedWindow) return;      // solid themes: plain opaque menu
+
+        tl.TransparencyLevelHint = new[] { WindowTransparencyLevel.AcrylicBlur };
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (Platform.MacVibrancy.HasFrostLayer(tl)) return;   // real frost — leave it be
+            tl.TransparencyLevelHint = new[] { WindowTransparencyLevel.None };   // no frost: paint opaque
+        }, DispatcherPriority.Loaded);
+    }
+
     private static void ApplyPopupFxCore(Control anyInPopup)
     {
         try
         {
             if (TopLevel.GetTopLevel(anyInPopup) is not { } tl) return;
-            // Windows-only from here: the blur is DWM, and asking a macOS POPUP for transparency just
-            // makes it see-through with nothing behind it — menus vanished entirely (tester report).
-            // Off Windows the themed opaque MenuBackground is exactly what we want.
-            if (!OperatingSystem.IsWindows()) return;
+            if (!OperatingSystem.IsWindows())
+            {
+                ApplyMacPopupFx(tl);
+                return;
+            }
             var hwnd = tl.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
             // Standard (8px) rounding, matching the content styles' CornerRadius 8 — mismatched
             // radii leave a wedge of popup surface visible in each corner (owner screenshot).

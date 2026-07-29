@@ -21,7 +21,6 @@ public static class InputDialog
     {
         var win = new Window
         {
-            WindowDecorations = WindowDecorations.None,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             SizeToContent = SizeToContent.WidthAndHeight,
             CanResize = false,
@@ -29,6 +28,7 @@ public static class InputDialog
             Background = new SolidColorBrush(Color.Parse("#1B1D27")),
         };
         win.Opened += (_, _) => WinChrome.RoundCorners(win, true);
+        Services.ThemeManager.ConfigureDialogChrome(win);   // mac: native rounding + frost, no traffic lights
 
         var fieldTheme = Application.Current?.FindResource("RoundedFieldTextBox") as ControlTheme;
         var stack = new StackPanel { Margin = new Thickness(22, 18, 22, 16), Spacing = 8, Width = 320 };
