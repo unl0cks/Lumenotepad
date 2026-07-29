@@ -566,6 +566,7 @@ public partial class MainView : UserControl
     {
         if (Vm is not { } vm) return;
         PageCanvas.CanResize = vm.ResizablePages;
+        PageCanvas.AlwaysShowBorders = vm.AlwaysShowBorders;
         PageCanvas.HistoryEnabled = vm.DeletedHistory;
         PageCanvas.TidyLayout = vm.MindmapTidyLayout switch
         {
@@ -1221,6 +1222,7 @@ public partial class MainView : UserControl
         else if (e.PropertyName is nameof(MainViewModel.ToolbarPosition) or nameof(MainViewModel.ToolbarScope))
             ApplyToolbarPlacement();
         else if (e.PropertyName is nameof(MainViewModel.ResizablePages) or nameof(MainViewModel.DeletedHistory)
+                 or nameof(MainViewModel.AlwaysShowBorders)
                  or nameof(MainViewModel.PageGrid) or nameof(MainViewModel.GridSnap)
                  or nameof(MainViewModel.DoubleClickCreate) or nameof(MainViewModel.RoundedPdfCorners)
                  or nameof(MainViewModel.MindmapTidyLayout))

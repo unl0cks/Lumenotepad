@@ -66,6 +66,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _toolbarPosition = "Top";   // "Top" | "Left" | "Right" | "Bottom"
     [ObservableProperty] private string _toolbarScope = "Window";   // "Window" | "Page"
     [ObservableProperty] private bool _resizablePages = true;       // prefs: "Resizable pages"
+    [ObservableProperty] private bool _alwaysShowBorders;           // prefs: "Always show container borders"
     [ObservableProperty] private bool _deletedHistory = true;       // prefs: "Deleted pages history"
     [ObservableProperty] private string _mindmapTidyLayout = "Radial";  // prefs: Tidy arrangement (Radial|Hybrid|TopDown)
     [ObservableProperty] private string _theme = "Lumen";           // prefs: frame theme
@@ -211,6 +212,7 @@ public partial class MainViewModel : ObservableObject
             ToolbarPosition = _settings.ToolbarPosition;
             ToolbarScope = _settings.ToolbarScope;
             ResizablePages = _settings.ResizablePages;
+            AlwaysShowBorders = _settings.AlwaysShowBorders;
             DeletedHistory = _settings.DeletedHistory;
             MindmapTidyLayout = _settings.MindmapTidyLayout;
             Theme = _settings.Theme;
@@ -316,6 +318,13 @@ public partial class MainViewModel : ObservableObject
     {
         if (_settings is null || _settingsDir is null) return;
         _settings.ResizablePages = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnAlwaysShowBordersChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.AlwaysShowBorders = value;
         _settings.Save(_settingsDir);
     }
 
@@ -926,6 +935,7 @@ public partial class MainViewModel : ObservableObject
         FlatCovers = d.FlatCovers; GlossyAccents = d.GlossyAccents; ExtendedFonts = d.ExtendedFonts;
         ToolbarPosition = d.ToolbarPosition; ToolbarScope = d.ToolbarScope;
         ResizablePages = d.ResizablePages; DeletedHistory = d.DeletedHistory;
+        AlwaysShowBorders = d.AlwaysShowBorders;
         MindmapTidyLayout = d.MindmapTidyLayout;
         StartRailVisible = d.StartRailVisible; StartPagesVisible = d.StartPagesVisible;
         AdvancedUnlocked = d.AdvancedUnlocked;

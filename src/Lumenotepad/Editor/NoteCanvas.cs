@@ -119,6 +119,10 @@ public sealed class NoteCanvas : Panel
     /// <summary>"Snap to grid" preference: drag/resize/placement land on the 20px cell.</summary>
     public bool SnapToGrid { get; set; }
 
+    /// <summary>"Always show container borders" preference: containers keep a visible edge instead of
+    /// only revealing it on hover/focus.</summary>
+    public bool AlwaysShowBorders { get; set; }
+
     /// <summary>"Create notes with double-click" preference: a bare-canvas single click does nothing.</summary>
     public bool CreateOnDoubleClick { get; set; }
 
@@ -1226,6 +1230,11 @@ internal sealed class NoteBoxView : Panel
     [System.Flags]
     private enum Edge { None = 0, Left = 1, Right = 2, Top = 4, Bottom = 8 }
 
+    /// <summary>The container's own edge brush. Kept as ONE instance whose Opacity is animated, so the
+    /// hover edge fades in/out instead of popping — swapping brush instances can only snap.</summary>
+    private readonly SolidColorBrush _edge = new(Colors.Transparent, 0);
+    private DispatcherTimer? _edgeFade;
+
     // Paper-region theme tokens, read at construction (theme changes rebuild the canvas views).
     private readonly IBrush HoverBorder;
     private readonly IBrush FocusBorder;
@@ -1814,7 +1823,14 @@ internal sealed class NoteBoxView : Panel
         else
         {
             _chrome.Background = Brushes.Transparent;
-            _chrome.BorderBrush = _dragging || focused ? FocusBorder : _hover ? HoverBorder : Brushes.Transparent;
+            // Pick the edge COLOUR for the current state, then ease its opacity toward the target so a
+            // hover edge fades in rather than popping. "Always show borders" keeps a quieter resting edge.
+            bool strong = _dragging || focused;
+            var edgeSrc = strong ? FocusBorder : HoverBorder;
+            if (edgeSrc is ISolidColorBrush sb) _edge.Color = sb.Color;
+            double target = strong || _hover ? 1 : (_canvas.AlwaysShowBorders ? 0.55 : 0);
+            FadeEdge(target);
+            _chrome.BorderBrush = _edge;
         }
         _grip.Background = active ? GripFill : Brushes.Transparent;
         _gripBar.IsVisible = active;
@@ -1906,6 +1922,19 @@ internal sealed class NoteBoxView : Panel
 
         if (_selected)   // rubber-band selection: an accent outline over whatever the normal border was
             _chrome.BorderBrush = new SolidColorBrush(Color.Parse(Services.ThemeManager.Current.Accent));
+    }
+
+    /// <summary>Ease the container edge toward <paramref name="target"/> opacity (instant when motion is
+    /// off, or when it is already there).</summary>
+    private void FadeEdge(double target)
+    {
+        if (System.Math.Abs(_edge.Opacity - target) < 0.01) return;
+        _edgeFade?.Stop();
+        if (!Views.Motion.Enabled) { _edge.Opacity = target; return; }
+        double from = _edge.Opacity;
+        _edgeFade = Views.Motion.Clock(130,
+            p => _edge.Opacity = Views.Motion.Lerp(from, target, Views.Motion.EaseOut(p)),
+            done: () => _edge.Opacity = target);
     }
 
     /// <summary>A link drag entered/left this bubble: light up its ports as drop targets (and drop them

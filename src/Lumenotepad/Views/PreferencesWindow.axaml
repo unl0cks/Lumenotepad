@@ -531,6 +531,15 @@
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
+                                    <TextBlock Classes="label" Text="Always show container borders"/>
+                                    <Border Classes="qmark" ToolTip.Tip="Note boxes keep a faint outline all the time. Off, the outline fades in only when you point at a box, so the page looks cleaner."><TextBlock/></Border>
+                                </StackPanel>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding AlwaysShowBorders, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
                                     <TextBlock Classes="label" Text="Deleted pages history"/>
                                     <Border Classes="qmark" ToolTip.Tip="Keeps a copy of deleted note boxes so you can drag them back onto the page later. Turn this off to delete them for good right away."><TextBlock/></Border>
                                 </StackPanel>
