@@ -137,9 +137,9 @@ public static class ThemeManager
             // A window that already took the native mac frame follows the theme (frost only for
             // Lumen); the rest are rounded from content, which requires plain clear glass.
             bool native = window.WindowDecorations != WindowDecorations.None;
-            ApplyMacGlass(window, native ? ChildGlass : MacGlass.Clear);
-            if (!native) RoundMacChildWindow(window);
-            window.Opened += (_, _) => ApplyMacGlass(window, native ? ChildGlass : MacGlass.Clear);
+            var mode = native ? ChildGlass : MacGlass.Opaque;
+            ApplyMacGlass(window, mode);
+            window.Opened += (_, _) => ApplyMacGlass(window, native ? ChildGlass : MacGlass.Opaque);
             return;
         }
         Platform.DwmAcrylic.Apply(window,

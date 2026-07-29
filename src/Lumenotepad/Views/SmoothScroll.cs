@@ -9,7 +9,7 @@ namespace Lumenotepad.Views;
 
 /// <summary>Wheel-driven smooth vertical scrolling for a <see cref="ScrollViewer"/>: each notch nudges
 /// a target offset and the real offset eases toward it, so the pane glides instead of jumping a line at
-/// a time. Honors the reduce-motion pref. Vertical only.
+/// a time. Honors the reduce-motion pref. Vertical, plus horizontal when Shift is held.
 ///
 /// The ease runs on the compositor's animation-frame callback (<see cref="TopLevel.RequestAnimationFrame"/>),
 /// NOT a free-running DispatcherTimer: one update per REAL rendered frame, timed by that frame's own
@@ -24,7 +24,8 @@ public sealed class SmoothScroll
 {
     private readonly ScrollViewer _sv;
     private TopLevel? _top;
-    private double _target;
+    private double _target;      // vertical
+    private double _targetX;     // horizontal (Shift+wheel)
     private bool _running;
     private TimeSpan? _last;
 
@@ -45,26 +46,36 @@ public sealed class SmoothScroll
     public static void Attach(ScrollViewer sv) => _ = new SmoothScroll(sv);
 
     private double MaxOffset => Math.Max(0, _sv.Extent.Height - _sv.Viewport.Height);
+    private double MaxOffsetX => Math.Max(0, _sv.Extent.Width - _sv.Viewport.Width);
 
     private void OnWheel(object? sender, PointerWheelEventArgs e)
     {
         // Ctrl+wheel (zoom intent) and inner scrollables keep native handling.
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) || OverInnerScrollable(e.Source)) return;
 
-        double max = MaxOffset;
-        if (max <= 0) return;                          // nothing to scroll
+        // Shift turns the wheel into a HORIZONTAL pan; it eases through the same frame-locked glide
+        // so sideways scrolling feels identical to vertical instead of jumping.
+        bool sideways = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        double max = sideways ? MaxOffsetX : MaxOffset;
+        if (max <= 0) return;                          // nothing to scroll on that axis
 
-        if (!_running) _target = _sv.Offset.Y;         // fresh gesture: start from where we actually are
-        _target = Math.Clamp(_target - e.Delta.Y * StepPerNotch, 0, max);
+        if (!_running) { _target = _sv.Offset.Y; _targetX = _sv.Offset.X; }   // fresh gesture: start from where we are
+        double notch = e.Delta.Y != 0 ? e.Delta.Y : e.Delta.X;
+        if (sideways) _targetX = Math.Clamp(_targetX - notch * StepPerNotch, 0, max);
+        else _target = Math.Clamp(_target - notch * StepPerNotch, 0, max);
         e.Handled = true;
 
         if (!Motion.Enabled)                           // reduce-motion: jump straight there
         {
-            _sv.Offset = new Vector(_sv.Offset.X, _target);
+            _sv.Offset = new Vector(Math.Clamp(_targetX, 0, MaxOffsetX), Math.Clamp(_target, 0, MaxOffset));
             return;
         }
         _top ??= TopLevel.GetTopLevel(_sv);
-        if (_top is null) { _sv.Offset = new Vector(_sv.Offset.X, _target); return; }
+        if (_top is null)
+        {
+            _sv.Offset = new Vector(Math.Clamp(_targetX, 0, MaxOffsetX), Math.Clamp(_target, 0, MaxOffset));
+            return;
+        }
         if (!_running) { _running = true; _last = null; _top.RequestAnimationFrame(Frame); }
     }
 
@@ -76,16 +87,17 @@ public sealed class SmoothScroll
         _last = now;
         double factor = 1 - Math.Pow(1 - CatchUpPer10ms, dtMs / 10.0);
 
-        double max = MaxOffset;
-        double cur = _sv.Offset.Y;
-        double next = cur + (Math.Clamp(_target, 0, max) - cur) * factor;
-        if (Math.Abs(Math.Clamp(_target, 0, max) - next) < 0.5)
+        double goalY = Math.Clamp(_target, 0, MaxOffset);
+        double goalX = Math.Clamp(_targetX, 0, MaxOffsetX);
+        double nextY = _sv.Offset.Y + (goalY - _sv.Offset.Y) * factor;
+        double nextX = _sv.Offset.X + (goalX - _sv.Offset.X) * factor;
+        if (Math.Abs(goalY - nextY) < 0.5 && Math.Abs(goalX - nextX) < 0.5)
         {
-            _sv.Offset = new Vector(_sv.Offset.X, Math.Clamp(_target, 0, max));
+            _sv.Offset = new Vector(goalX, goalY);     // both axes settled
             _running = false;
             return;
         }
-        _sv.Offset = new Vector(_sv.Offset.X, next);
+        _sv.Offset = new Vector(nextX, nextY);
         _top?.RequestAnimationFrame(Frame);            // one callback per frame — re-arm for the next
     }
 

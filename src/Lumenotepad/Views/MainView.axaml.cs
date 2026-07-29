@@ -185,15 +185,8 @@ public partial class MainView : UserControl
                 SetCanvasZoom(_canvasZoom * (e.Delta.Y > 0 ? 1.1 : 1 / 1.1));
                 e.Handled = true;
             }
-            else if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
-            {
-                // Turn the vertical wheel notch into a horizontal pan (wheel up = scroll left).
-                double notch = e.Delta.Y != 0 ? e.Delta.Y : e.Delta.X;
-                double max = System.Math.Max(0, CanvasScroll.Extent.Width - CanvasScroll.Viewport.Width);
-                double x = System.Math.Clamp(CanvasScroll.Offset.X - notch * 110, 0, max);
-                CanvasScroll.Offset = new Vector(x, CanvasScroll.Offset.Y);
-                e.Handled = true;
-            }
+            // Shift+wheel horizontal panning now runs through SmoothScroll (attached above) so it
+            // eases like every other scroll instead of jumping.
         }, RoutingStrategies.Tunnel);
         AddHandler(KeyDownEvent, (_, e) =>
         {

@@ -1211,6 +1211,7 @@ public sealed class NoteCanvas : Panel
             if (_doc is null || !_doc.Boxes.Contains(view.Box)) return;
             if (_pageStyle == PageStyles.Mindmap) return;   // mind-map bubbles persist even when empty
             if (!view.Box.IsEmpty || view.Box.Locked || view.IsKeyboardFocusWithin) return;
+            if (view.Manipulated) return;   // the user is working with it — only an explicit delete removes it
             DeleteBoxPermanently(view);
         }, DispatcherPriority.Background);
     }
@@ -1975,6 +1976,13 @@ internal sealed class NoteBoxView : Panel
     private (double X, double Y, double W, double H) _dragOrigin;
     private bool _dragging;
 
+    /// <summary>Set once the user has actually grabbed this container (move or resize). A brand-new
+    /// container is EMPTY, and grabbing it takes focus off its editor — which used to hand it straight
+    /// to the empty-box cleanup, so newly created containers vanished (with the pop particles) the
+    /// instant you tried to move or resize them. Containers with text were unaffected, which is why
+    /// only NEW ones appeared broken.</summary>
+    internal bool Manipulated { get; private set; }
+
     private void WireDrag(Control handle, Edge edges)
     {
         handle.PointerPressed += (_, e) =>
@@ -1985,6 +1993,7 @@ internal sealed class NoteBoxView : Panel
             // Height origin = what's on screen now, so the first drag pixel moves from there.
             _dragOrigin = (Box.X, Box.Y, Box.Width, Box.H > 0 ? Box.H : Bounds.Height);
             _dragging = true;
+            Manipulated = true;   // never let the empty-box cleanup swallow a container being moved/resized
             if (edges == Edge.None && _canvas.IsSelected(this)) _canvas.BeginGroupDrag();   // move the whole selection
             RefreshChrome();                          // lock the border visible for the whole drag
             e.Pointer.Capture(handle);

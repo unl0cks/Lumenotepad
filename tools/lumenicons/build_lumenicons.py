@@ -48,7 +48,9 @@ ICONS = {
     0xE80F: ("home", ["Home"], "home"),
     0xE81C: ("history", ["History"], "history"),
     0xE82F: ("lightbulb", ["Lightbulb"], "lightbulb"),
-    0xE897: ("question_circle", ["Question Circle"], "question_circle"),
+    # Segoe's E897 is a BARE question mark - the app draws its own circle around it, so a
+    # "question in a circle" glyph rendered as a circle inside a circle on macOS.
+    0xE897: ("question", ["Question"], "question"),
     0xE8A1: ("panel_left", ["Panel Left"], "panel_left"),
     0xE8A5: ("document", ["Document"], "document"),
     0xE8BB: ("dismiss_chrome", ["Dismiss"], "dismiss"),          # window close: same shape as E711

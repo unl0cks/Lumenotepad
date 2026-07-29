@@ -50,13 +50,12 @@ public static class WinChrome
     {
         if (!OperatingSystem.IsWindows())
         {
+            // Small code-built dialogs (confirm / input / reorder / crop) are the only windows left
+            // here; the five real secondary windows take the native mac frame instead. Keep these
+            // OPAQUE: they use SizeToContent, and re-parenting their content into a rounding wrapper
+            // left them fully see-through on macOS (tester report). Square but visible beats invisible.
             if (round && window.WindowDecorations == WindowDecorations.None)
-            {
-                // Clear glass, not frost: the blur layer is a square NSVisualEffectView filling the
-                // whole window, which pokes out from behind the rounded content as a hard-edged slab.
-                Services.ThemeManager.ApplyMacGlass(window, Services.ThemeManager.MacGlass.Clear);
-                Services.ThemeManager.RoundMacChildWindow(window);
-            }
+                Services.ThemeManager.ApplyMacGlass(window, Services.ThemeManager.MacGlass.Opaque);
             return;
         }
         var handle = window.TryGetPlatformHandle();

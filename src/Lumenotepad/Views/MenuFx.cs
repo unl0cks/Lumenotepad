@@ -78,6 +78,10 @@ public static class MenuFx
         try
         {
             if (TopLevel.GetTopLevel(anyInPopup) is not { } tl) return;
+            // Windows-only from here: the blur is DWM, and asking a macOS POPUP for transparency just
+            // makes it see-through with nothing behind it — menus vanished entirely (tester report).
+            // Off Windows the themed opaque MenuBackground is exactly what we want.
+            if (!OperatingSystem.IsWindows()) return;
             var hwnd = tl.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
             // Standard (8px) rounding, matching the content styles' CornerRadius 8 — mismatched
             // radii leave a wedge of popup surface visible in each corner (owner screenshot).
