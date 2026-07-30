@@ -1,3 +1,0 @@
-https://github.com/unl0cks/Lumenotepad/releases/download/v1.2.0/Lumenotepad-macOS-1.2.0-arm64.zip
-https://github.com/unl0cks/Lumenotepad/releases/download/v1.2.0/Lumenotepad-macOS-1.2.0-x64.zip
-https://github.com/unl0cks/Lumenotepad/releases/download/v1.2.0/Lumenotepad-1.2.0-win-x64-portable.zip
