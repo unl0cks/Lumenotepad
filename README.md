@@ -76,7 +76,7 @@ platform it grew up on.
 | Mind maps | Stable |
 | PDF annotation | Usable |
 | Export formats | Usable |
-| In-app updates (macOS) | New in 1.2.0, needs a release-to-release trial |
+| In-app updates | New in 1.2.0; verified end-to-end on Windows, untried on macOS |
 | Windows packaging | Portable zip, beta |
 | Code signing / notarization | Ad-hoc only — see [Install](#install) |
 
@@ -112,7 +112,9 @@ is a migration for existing portable copies rather than a packaging change.
 
 ## Updates
 
-**macOS** updates in place: Preferences → General → Updates → **Check now**.
+**Both platforms** update in place: Preferences → **About** → **Check for updates**. That opens the
+updater window, which finds the right build for whichever OS is running, downloads it with progress,
+verifies it, and restarts into it.
 
 This exists specifically to dodge Gatekeeper. An ad-hoc signature satisfies the kernel but not
 Gatekeeper, so any build macOS sees arrive from a browser or a chat client is quarantined and
@@ -125,7 +127,12 @@ Downloads are SHA-256 verified before anything is unpacked, and the bundle swap 
 detached script that waits for the app to exit and moves the old bundle aside rather than
 deleting it, so a failed swap rolls back instead of leaving nothing behind.
 
-**Windows** has no updater. Extract the new build and keep your `userdata` folder.
+On **Windows** the reason is different but the shape is the same: the build is portable, so updating
+means replacing the program files around the `userdata` folder and leaving it alone. The swap uses
+`robocopy` without `/MIR`, which is precisely what preserves your notebooks.
+
+A running executable cannot overwrite itself on either OS, so both hand the swap to a detached script
+that waits for the app to exit first.
 
 ## Requirements
 
@@ -161,7 +168,6 @@ Publishes both architectures, code-signs each `.app`, and writes to `dist/`:
 ```text
 Lumenotepad-macOS-<version>-arm64.zip
 Lumenotepad-macOS-<version>-x64.zip
-macos-latest.json                      # the in-app update manifest
 ```
 
 ```bash
@@ -170,8 +176,15 @@ tools/publish-windows.sh
 
 Writes `dist/Lumenotepad-<version>-win-x64-portable.zip`.
 
-For the in-app updater to find a release, both macOS zips **and** `macos-latest.json` have to be
-uploaded to it. `UpdateService.ManifestUrl` points at the newest non-prerelease GitHub release, so
+```bash
+python tools/publish-manifest.py
+```
+
+Writes `dist/latest.json` — one manifest covering every platform, hashed from whatever zips are in
+`dist/`. `UpdateService.PlatformKey` picks its own entry (`macos-arm64`, `macos-x64`, `win-x64`), so a
+single file on a single release serves both operating systems and nobody can be handed the wrong build.
+
+For the in-app updater to find a release, the zips **and** `latest.json` have to be uploaded to it. `UpdateService.ManifestUrl` points at the newest non-prerelease GitHub release, so
 publishing a Windows build as a *prerelease* deliberately keeps it out of the updater's path.
 Override the endpoints with `LUMENOTEPAD_RELEASE_BASE` when packing and `LUMENOTEPAD_UPDATE_URL`
 at runtime to test the whole flow against a local file server.

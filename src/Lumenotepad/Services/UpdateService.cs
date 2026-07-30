@@ -11,9 +11,9 @@ using System.Threading.Tasks;
 
 namespace Lumenotepad.Services;
 
-/// <summary>macOS in-app updates.
+/// <summary>In-app updates for macOS and Windows.
 ///
-/// The point of this is Gatekeeper, not convenience. Lumenotepad is not notarised, so ANY build macOS
+/// On macOS the point of this is Gatekeeper, not convenience. Lumenotepad is not notarised, so ANY build macOS
 /// sees arrive from a browser or a chat client is quarantined, and the first launch costs a trip through
 /// System Settings → Privacy &amp; Security → "Open Anyway". That toll is per-download, so it used to be
 /// payable on every single release.
@@ -22,7 +22,10 @@ namespace Lumenotepad.Services;
 /// fetches itself over HTTP is never marked, so it installs and relaunches with no Gatekeeper prompt at
 /// all. Pay the toll once on the very first install and never again.
 ///
-/// Windows has its own installer and is untouched by any of this.</summary>
+/// On Windows the reason is different but the shape is the same: the build is PORTABLE, keeping its
+/// notebooks in a `userdata` folder beside the executable, so updating means replacing the program files
+/// around that folder and leaving it alone. A running .exe cannot overwrite itself, so both platforms hand
+/// the actual swap to a detached script that waits for this process to exit.</summary>
 public static class UpdateService
 {
     /// <summary>Where the update manifest lives. Anything that serves the JSON below over HTTPS works;
@@ -32,7 +35,10 @@ public static class UpdateService
     public static string ManifestUrl =>
         Environment.GetEnvironmentVariable("LUMENOTEPAD_UPDATE_URL") is { Length: > 0 } custom
             ? custom
-            : "https://github.com/unl0cks/lumenotepad/releases/latest/download/macos-latest.json";
+            : "https://github.com/unl0cks/lumenotepad/releases/latest/download/latest.json";
+
+    /// <summary>The human-readable release page, for the "what changed" link.</summary>
+    public const string ReleasesPage = "https://github.com/unl0cks/lumenotepad/releases/latest";
 
     /// <summary>One downloadable build. <paramref name="Sha256"/> is verified before anything is
     /// unpacked — an interrupted or tampered download must never reach the bundle swap.</summary>
@@ -53,7 +59,7 @@ public static class UpdateService
             var manifest = JsonSerializer.Deserialize<Manifest>(json, JsonOpts);
             if (manifest?.Version is not { Length: > 0 } || manifest.Builds is null) return null;
             if (!AppVersion.IsNewerThanCurrent(manifest.Version)) return null;
-            if (!manifest.Builds.TryGetValue(ArchKey, out var build) || build.Url is not { Length: > 0 })
+            if (!manifest.Builds.TryGetValue(PlatformKey, out var build) || build.Url is not { Length: > 0 })
                 return null;
             return (manifest.Version, manifest.Notes, build);
         }
@@ -62,11 +68,11 @@ public static class UpdateService
 
     /// <summary>Download, verify, and stage the new build, then hand the swap to a detached script and
     /// quit. Returns false if anything went wrong BEFORE the point of no return, in which case the
-    /// running app is untouched.</summary>
+    /// running install is untouched.</summary>
     public static async Task<bool> DownloadAndApplyAsync(Build build, string version,
         IProgress<double>? progress = null, CancellationToken ct = default)
     {
-        if (BundlePath is not { } bundle) return false;
+        if (!IsSupported || InstallRoot is not { } target) return false;
         string work = Path.Combine(Path.GetTempPath(), "lumenotepad-update-" + version);
         try
         {
@@ -80,26 +86,52 @@ public static class UpdateService
 
         string unpacked = Path.Combine(work, "unpacked");
         Directory.CreateDirectory(unpacked);
-        ZipFile.ExtractToDirectory(zip, unpacked);
-        string? newBundle = FindBundle(unpacked);
-        if (newBundle is null) return false;
-        RestoreExecutableBits(newBundle);
+        try { ZipFile.ExtractToDirectory(zip, unpacked); }
+        catch { return false; }
 
-        // Sanity-check the payload before it is allowed to replace a working install.
-        string apphost = Path.Combine(newBundle, "Contents", "MacOS", "Lumenotepad");
-        if (!File.Exists(apphost) || new FileInfo(apphost).Length == 0) return false;
+        // Locate the payload root and prove it looks like a real build before it is allowed anywhere near
+        // a working install: a truncated or wrong-platform archive must fail here, not halfway through.
+        string? staged = OperatingSystem.IsMacOS() ? FindDir(unpacked, "Lumenotepad.app") : FindExeDir(unpacked);
+        if (staged is null) return false;
+        string exe = OperatingSystem.IsMacOS()
+            ? Path.Combine(staged, "Contents", "MacOS", "Lumenotepad")
+            : Path.Combine(staged, "Lumenotepad.exe");
+        if (!File.Exists(exe) || new FileInfo(exe).Length == 0) return false;
+        if (OperatingSystem.IsMacOS()) RestoreExecutableBits(staged);
 
-        LaunchSwap(bundle, newBundle);
+        if (OperatingSystem.IsMacOS()) LaunchMacSwap(target, staged);
+        else LaunchWindowsSwap(target, staged);
         return true;
     }
 
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
-    /// <summary>Updating only makes sense for a macOS .app that we can actually write to. A dev build
-    /// running out of bin/Debug has no bundle, and a copy in a read-only location would fail the swap
-    /// halfway.</summary>
-    public static bool IsSupported =>
-        OperatingSystem.IsMacOS() && BundlePath is { } b && CanWrite(Directory.GetParent(b)?.FullName);
+    /// <summary>Whether this install can update itself in place. It must be a real packaged build sitting
+    /// somewhere writable — a dev build out of bin/ would be clobbered by its own updater, and a copy in a
+    /// read-only location would fail the swap halfway. Set LUMENOTEPAD_UPDATE_FORCE=1 to test against a
+    /// dev tree deliberately.</summary>
+    public static bool IsSupported
+    {
+        get
+        {
+            if (!OperatingSystem.IsMacOS() && !OperatingSystem.IsWindows()) return false;
+            if (InstallRoot is not { } root) return false;
+            if (Environment.GetEnvironmentVariable("LUMENOTEPAD_UPDATE_FORCE") == "1") return true;
+            if (IsDevTree(root)) return false;
+            // macOS replaces the whole bundle, so the writable thing is its PARENT; Windows writes files
+            // inside the app folder itself.
+            return CanWrite(OperatingSystem.IsMacOS() ? Directory.GetParent(root)?.FullName : root);
+        }
+    }
+
+    /// <summary>What gets replaced: the .app bundle on macOS, the portable program folder on Windows.</summary>
+    public static string? InstallRoot => OperatingSystem.IsMacOS()
+        ? BundlePath
+        : OperatingSystem.IsWindows() ? AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar) : null;
+
+    /// <summary>A build running straight out of bin/Debug or bin/Release is a checkout, not an install.</summary>
+    private static bool IsDevTree(string path) =>
+        path.Replace('\\', '/').Contains("/bin/", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The /Applications/Lumenotepad.app the running process lives in, or null when this is not
     /// a bundled build. BaseDirectory is …/Lumenotepad.app/Contents/MacOS/.</summary>
@@ -119,8 +151,16 @@ public static class UpdateService
         }
     }
 
-    private static string ArchKey =>
-        RuntimeInformation.OSArchitecture == Architecture.Arm64 ? "arm64" : "x64";
+    /// <summary>Which build in the manifest is for this machine. Platform AND architecture, because a
+    /// manifest carries every build and handing macOS a Windows zip would be worse than finding nothing.</summary>
+    public static string PlatformKey
+    {
+        get
+        {
+            string arch = RuntimeInformation.OSArchitecture == Architecture.Arm64 ? "arm64" : "x64";
+            return OperatingSystem.IsMacOS() ? $"macos-{arch}" : $"win-{arch}";
+        }
+    }
 
     private static bool CanWrite(string? dir)
     {
@@ -172,12 +212,23 @@ public static class UpdateService
         return actual == expected.Trim().ToLowerInvariant();
     }
 
-    private static string? FindBundle(string root)
+    /// <summary>Find a named directory at the archive root, or anywhere below it.</summary>
+    private static string? FindDir(string root, string name)
     {
-        if (Directory.Exists(Path.Combine(root, "Lumenotepad.app")))
-            return Path.Combine(root, "Lumenotepad.app");
-        foreach (var dir in Directory.EnumerateDirectories(root, "Lumenotepad.app", SearchOption.AllDirectories))
+        string direct = Path.Combine(root, name);
+        if (Directory.Exists(direct)) return direct;
+        foreach (var dir in Directory.EnumerateDirectories(root, name, SearchOption.AllDirectories))
             return dir;
+        return null;
+    }
+
+    /// <summary>Find the folder holding Lumenotepad.exe. The Windows zip wraps everything in one
+    /// version-named folder so extracting never scatters 200 loose files, so this is normally one level in.</summary>
+    private static string? FindExeDir(string root)
+    {
+        if (File.Exists(Path.Combine(root, "Lumenotepad.exe"))) return root;
+        foreach (var exe in Directory.EnumerateFiles(root, "Lumenotepad.exe", SearchOption.AllDirectories))
+            return Path.GetDirectoryName(exe);
         return null;
     }
 
@@ -202,7 +253,7 @@ public static class UpdateService
     /// <summary>A process cannot reliably replace the bundle it is executing from, so the swap is done by
     /// a detached script that waits for us to exit first (the approach Sparkle uses). Nothing here is
     /// quarantined — we downloaded it ourselves — so the relaunch raises no Gatekeeper prompt.</summary>
-    private static void LaunchSwap(string currentBundle, string newBundle)
+    private static void LaunchMacSwap(string currentBundle, string newBundle)
     {
         string script = Path.Combine(Path.GetTempPath(), "lumenotepad-swap-" + Guid.NewGuid().ToString("N") + ".sh");
         int pid = Environment.ProcessId;
@@ -239,4 +290,35 @@ public static class UpdateService
 
     /// <summary>Single-quote a path for the shell (paths can contain spaces — /Applications always could).</summary>
     private static string Quote(string s) => "'" + s.Replace("'", "'\\''") + "'";
+
+    /// <summary>Windows equivalent. A running .exe cannot be overwritten, so wait for this process to exit
+    /// first, then robocopy the new files OVER the program folder. Copy, not mirror, deliberately: the
+    /// `userdata` folder is not in the archive, and not mirroring is exactly what leaves the user's
+    /// notebooks in place.
+    ///
+    /// PowerShell and robocopy both ship with Windows, so this needs nothing installed.</summary>
+    private static void LaunchWindowsSwap(string target, string staged)
+    {
+        string script = Path.Combine(Path.GetTempPath(), "lumenotepad-swap-" + Guid.NewGuid().ToString("N") + ".ps1");
+        string exe = Path.Combine(target, "Lumenotepad.exe");
+        int pid = Environment.ProcessId;
+        File.WriteAllText(script, $"""
+            # Replace the installed Lumenotepad files once the running copy has exited.
+            Wait-Process -Id {pid} -Timeout 60 -ErrorAction SilentlyContinue
+            # /E copies all subdirectories. NO /MIR on purpose - anything already in the target and absent
+            # from the new build (the userdata folder) has to survive.
+            robocopy "{staged}" "{target}" /E /NFL /NDL /NJH /NJS /NP | Out-Null
+            Start-Process -FilePath "{exe}" -WorkingDirectory "{target}"
+            Remove-Item -LiteralPath "{script}" -Force -ErrorAction SilentlyContinue
+            """);
+
+        using var proc = new System.Diagnostics.Process();
+        proc.StartInfo = new System.Diagnostics.ProcessStartInfo("powershell.exe",
+            new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script })
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        proc.Start();
+    }
 }

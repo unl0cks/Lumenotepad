@@ -8,8 +8,6 @@
 # put notebooks somewhere a non-admin process cannot write and saving would fail. An MSI/Inno installer
 # would first require moving the Windows data directory to %APPDATA%, which is a migration for anyone
 # already running a portable copy - a decision, not a packaging detail.
-import hashlib
-import json
 import os
 import re
 import sys
@@ -54,9 +52,13 @@ WHERE YOUR NOTES GO
   your notes would fail to save.
 
 HOW TO UPDATE
-  Extract the new version, then copy your old "userdata" folder into it.
-  (Or extract the new build over the top of the old folder and keep the
-  existing userdata folder in place.)
+  Preferences > About > "Check for updates". Lumenotepad downloads the new
+  version, replaces its own program files, and restarts - your "userdata"
+  folder is left exactly where it is.
+
+  By hand, if you prefer: extract the new version and copy your old
+  "userdata" folder into it (or extract over the top of the old folder and
+  leave the existing userdata folder in place).
 
 HOW TO UNINSTALL
   Delete the folder. That is all - there is nothing else on your system.
@@ -67,14 +69,6 @@ BETA
   Back up anything you would be upset to lose:
   Preferences > General > Saving has a backup folder setting.
 """
-
-
-def sha256(path: str) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
 
 
 def main() -> None:
@@ -96,7 +90,7 @@ def main() -> None:
         zf.writestr(f"{FOLDER}/README.txt", README)
     size = os.path.getsize(out)
     print(f"  win-x64: {count} files, {size / 1024 / 1024:.1f} MB -> {os.path.basename(out)}")
-    print(f"  sha256:  {sha256(out)}")
+    print("Now run:  python tools/publish-manifest.py   (writes the shared update manifest)")
 
 
 if __name__ == "__main__":

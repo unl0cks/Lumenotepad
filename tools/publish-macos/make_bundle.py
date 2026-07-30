@@ -4,7 +4,8 @@
 #         assets/macos-iconset/icon_{16..1024}.png                        (created by tools/icongen)
 # Output: dist/Lumenotepad-macOS-<version>-arm64.zip   (Apple Silicon)
 #         dist/Lumenotepad-macOS-<version>-x64.zip     (Intel)
-#         dist/macos-latest.json                       (in-app update manifest)
+#         (the update manifest is written separately by tools/publish-manifest.py, which covers
+#          every platform in one file)
 #
 # The bundle is STAGED ON DISK and code-signed here with rcodesign (the cross-platform Apple signer,
 # `cargo install apple-codesign`) rather than by a script on the user's Mac. Apple Silicon refuses to
@@ -19,8 +20,6 @@
 #
 # Zips are written with unix modes (create_system=3) so the app host and dylibs stay executable through
 # macOS Archive Utility - a plain Windows zip drops the exec bit and the app will not start.
-import hashlib
-import json
 import os
 import plistlib
 import re
@@ -44,11 +43,6 @@ def csproj_version() -> str:
 
 
 VERSION = sys.argv[1] if len(sys.argv) > 1 else csproj_version()
-# Where the zips will be reachable once uploaded. The manifest needs absolute URLs, and they have to be
-# known at pack time; override with LUMENOTEPAD_RELEASE_BASE when hosting somewhere else.
-RELEASE_BASE = os.environ.get(
-    "LUMENOTEPAD_RELEASE_BASE",
-    f"https://github.com/unl0cks/lumenotepad/releases/download/v{VERSION}")
 RIDS = {"arm64": "osx-arm64", "x64": "osx-x64"}
 ICONSET = os.path.join(ROOT, "assets", "macos-iconset")
 DIST = os.path.join(ROOT, "dist")
@@ -140,7 +134,7 @@ THE FIRST TIME YOU OPEN IT, macOS WILL REFUSE:
    sign anything is wrong. Any small independent app does this.)
 
 AFTER THAT, UPDATES ARE ONE CLICK:
-  Preferences > General > Updates > "Check now". The app downloads new versions
+  Preferences > About > "Check for updates". The app downloads new versions
   itself, so macOS does NOT ask you to approve them again. You never need to
   repeat the steps above, and you never need this zip again.
 
@@ -209,39 +203,20 @@ def write_file(zf: zipfile.ZipFile, arcname: str, data: bytes, mode: int) -> Non
     zf.writestr(zi, data)
 
 
-def sha256(path: str) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
 def main() -> None:
     icns = build_icns()
     plist = info_plist()
     os.makedirs(DIST, exist_ok=True)
-    builds = {}
     for arch, rid in RIDS.items():
         app = stage_bundle(arch, rid, icns, plist)
         sign_bundle(app)
         out = os.path.join(DIST, f"Lumenotepad-macOS-{VERSION}-{arch}.zip")
         n = zip_bundle(app, out)
         size = os.path.getsize(out)
-        builds[arch] = {
-            "url": f"{RELEASE_BASE}/Lumenotepad-macOS-{VERSION}-{arch}.zip",
-            "sha256": sha256(out),
-            "size": size,
-        }
         print(f"  {arch}: signed, {n} files, {size / 1024 / 1024:.1f} MB -> {os.path.basename(out)}")
 
-    manifest = os.path.join(DIST, "macos-latest.json")
-    with open(manifest, "w", encoding="utf-8") as f:
-        json.dump({"version": VERSION, "notes": "", "builds": builds}, f, indent=2)
     shutil.rmtree(os.path.join(DIST, "stage"), ignore_errors=True)
-    print(f"wrote {manifest}")
-    print("Upload BOTH zips and macos-latest.json to the release named "
-          f"v{VERSION} for the in-app updater to find them.")
+    print("Now run:  python tools/publish-manifest.py   (writes the shared update manifest)")
 
 
 if __name__ == "__main__":

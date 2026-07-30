@@ -7,6 +7,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Input.Platform;   // SetTextAsync is an IClipboard extension, not a member
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
 using Avalonia.Media;
@@ -43,6 +44,7 @@ public partial class PreferencesWindow : Window
             ["fonts"] = FontsPanel,
             ["bullets"] = BulletsPanel,
             ["data"] = DataPanel,
+            ["about"] = AboutPanel,
         };
 
         Opened += (_, _) =>
@@ -115,373 +117,61 @@ public partial class PreferencesWindow : Window
             StartupRow.IsVisible = false;
             SummonRow.IsVisible = false;
         }
-        WireUpdates();
+        WireAbout();
     }
 
-    private (string Version, Services.UpdateService.Build Build)? _pendingUpdate;
-
-    /// <summary>The UPDATES section. Only meaningful for a macOS .app we can write to — a dev build has no
-    /// bundle to replace, and Windows has its own installer.</summary>
-    private void WireUpdates()
+    /// <summary>The About page: identity, build facts, and the hand-off to the updater window. This is where
+    /// updating lives now - the same place Lumen puts it.</summary>
+    private void WireAbout()
     {
-        UpdatesSection.IsVisible = Services.UpdateService.IsSupported;
-        if (!UpdatesSection.IsVisible) return;
-        UpdateStatus.Text = $"Lumenotepad {Services.AppVersion.Current}";
+        AboutName.Text = Services.AppInfo.Name;
+        AboutTagline.Text = Services.AppInfo.Tagline;
+        AboutVersion.Text = $"Version {Services.AppInfo.Version}  ·  Build {Services.AppInfo.Build}"
+            + (Services.AppInfo.Commit is { } sha ? $"  ·  {sha}" : "");
+        AboutDetails.Text = Services.AppInfo.Details();
 
-        UpdateCheckBtn.Click += async (_, _) => await CheckForUpdate(quiet: false);
-        UpdateInstallBtn.Click += async (_, _) =>
-        {
-            if (_pendingUpdate is not { } pending) return;
-            UpdateInstallBtn.IsEnabled = UpdateCheckBtn.IsEnabled = false;
-            var progress = new Progress<double>(p =>
-                UpdateStatus.Text = $"Downloading {pending.Version}… {(int)(p * 100)}%");
-            UpdateStatus.Text = $"Downloading {pending.Version}…";
-            bool ok = await Services.UpdateService.DownloadAndApplyAsync(pending.Build, pending.Version, progress);
-            if (ok)
-            {
-                // The swap script is already waiting on this process to exit.
-                UpdateStatus.Text = "Restarting…";
-                if (Application.Current?.ApplicationLifetime
-                    is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime d)
-                    d.Shutdown();
-                return;
-            }
-            UpdateStatus.Text = "That download didn't finish cleanly — nothing was changed. Try again?";
-            UpdateInstallBtn.IsEnabled = UpdateCheckBtn.IsEnabled = true;
-        };
+        bool canUpdate = Services.UpdateService.IsSupported;
+        AboutUpdateBtn.IsEnabled = canUpdate;
+        AboutAutoRow.IsVisible = canUpdate;
+        AboutUpdateNote.Text = canUpdate
+            ? (OperatingSystem.IsMacOS()
+                ? "Updates download inside the app, so macOS does not ask you to approve them the way it did "
+                  + "the first install. Your notebooks are never touched."
+                : "This is a portable build: updating replaces the program files and leaves your userdata "
+                  + "folder alone.")
+            : "This copy cannot update itself in place - it is running from a development tree, or from a "
+              + "folder it cannot write to. Download builds from the releases page instead.";
+        ToolTip.SetTip(AboutUpdateBtn, canUpdate
+            ? "Opens the updater: finds the right build for this computer, downloads it, and restarts into it."
+            : AboutUpdateNote.Text);
 
-        // Launch-time check: quiet, so a version behind a flaky connection says nothing at all.
-        if (Vm is { AutoCheckUpdates: true }) _ = CheckForUpdate(quiet: true);
-    }
+        AboutUpdateBtn.Click += (_, _) => new UpdaterWindow().ShowDialog(this);
 
-    private async System.Threading.Tasks.Task CheckForUpdate(bool quiet)
-    {
-        if (!quiet) { UpdateCheckBtn.IsEnabled = false; UpdateStatus.Text = "Checking…"; }
-        var found = await Services.UpdateService.CheckAsync();
-        UpdateCheckBtn.IsEnabled = true;
-        if (found is not { } f)
+        AboutCopyBtn.Click += async (_, _) =>
         {
-            if (!quiet) UpdateStatus.Text = $"Lumenotepad {Services.AppVersion.Current} — up to date.";
-            return;
-        }
-        _pendingUpdate = (f.Version, f.Build);
-        UpdateInstallBtn.IsVisible = true;
-        UpdateStatus.Text = f.Notes is { Length: > 0 }
-            ? $"Version {f.Version} is available — {f.Notes}"
-            : $"Version {f.Version} is available.";
-        // Sliders no longer snap-to-tick (the thumb glides with the cursor) — snap the STORED value
-        // and the label to the tick here instead. Autosave: 100ms steps.
-        AutosaveSlider.ValueChanged += (_, e) =>
-        {
-            int v = (int)(Math.Round(e.NewValue / 100) * 100);
-            if (Vm is { } vm && vm.AutosaveMs != v) vm.AutosaveMs = v;
-            AutosaveValue.Text = $"{v / 1000.0:0.#}s";
-        };
-        RecentCountSlider.ValueChanged += (_, e) =>
-        {
-            int v = (int)Math.Round(e.NewValue);
-            if (Vm is { } vm && vm.RecentCount != v) vm.RecentCount = v;
-            RecentCountValue.Text = v.ToString();
-        };
-
-        NavList.SelectionChanged += async (_, _) =>
-        {
-            if (_navGuard) return;
-            if (NavList.SelectedItem is not ListBoxItem { Tag: string key }) return;
-            if (IsGated(key) && Vm is { AdvancedUnlocked: false } vm)
-            {
-                _navGuard = true;
-                bool ok;
-                try
-                {
-                    ok = await ConfirmDialog.Show(this, "Unlock advanced settings?",
-                        "Advanced settings change how notes are stored, exported, and rendered. " +
-                        "They're meant for power users — the defaults are right for most people.",
-                        "Unlock", danger: false);
-                }
-                finally { _navGuard = false; }
-                if (!ok) { NavList.SelectedItem = _lastNav; return; }
-                vm.AdvancedUnlocked = true;
-                UpdateGateVisuals();
-            }
-            _lastNav = NavList.SelectedItem;
-            if (_searching) SearchBox.Text = "";   // clicking a category leaves search (restores rows)
-            if (key == "data") RefreshDataPanel();
-            if (key == "fonts") RefreshFontChoices();
-            if (key == "shortcuts") BuildShortcutRows();
-            ShowPanel(key);
-        };
-        NavList.SelectedIndex = 0;
-        _lastNav = NavList.SelectedItem;
-        SetupSettingsSearch();
-
-        FontSearchBtn.Click += async (_, _) => await RunFontSearch();
-        FontSearchBox.KeyDown += async (_, e) =>
-        {
-            if (e.Key == Key.Enter) { e.Handled = true; await RunFontSearch(); }
-        };
-        // Clearing the box wipes the results (owner request) — no stale hits left hanging.
-        FontSearchBox.GetObservable(TextBox.TextProperty).Subscribe(new Avalonia.Reactive.AnonymousObserver<string?>(t =>
-        {
-            if (string.IsNullOrWhiteSpace(t))
-            {
-                FontResults.Children.Clear();
-                SetFontStatus(null);
-            }
-        }));
-        FontBrowseBtn.Click += (_, _) =>
-        {
-            var browser = new FontBrowserWindow();
-            browser.Show(this);
-        };
-
-        OpenDataBtn.Click += (_, _) =>
-        {
-            if (Vm?.SettingsDir is not { } d) return;
-            // Shell-open the folder itself: Explorer on Windows, Finder on macOS, the default file
-            // manager on Linux — no hard-coded explorer.exe, which crashes off Windows.
             try
             {
-                System.Diagnostics.Process.Start(
-                    new System.Diagnostics.ProcessStartInfo { FileName = d, UseShellExecute = true });
-            }
-            catch { /* a missing handler shouldn't take the prefs window down */ }
-        };
-        ResetShortcutsBtn.Click += (_, _) =>
-        {
-            Vm?.ResetKeyBindings();
-            BuildShortcutRows();
-        };
-        ResetBtn.Click += async (_, _) =>
-        {
-            if (Vm is not { } vm) return;
-            if (!await ConfirmDialog.Show(this, "Reset settings?",
-                "Every preference returns to its default. Your notebooks and notes are not touched.",
-                "Reset")) return;
-            vm.ResetSettingsToDefaults();
-            SyncFromVm();
-            UpdateGateVisuals();
-            _navGuard = true; NavList.SelectedIndex = 0; _navGuard = false;
-            _lastNav = NavList.SelectedItem;
-            ShowPanel("general");
-        };
-        RelockBtn.Click += (_, _) =>
-        {
-            if (Vm is not { } vm) return;
-            vm.AdvancedUnlocked = false;
-            UpdateGateVisuals();
-            _navGuard = true; NavList.SelectedIndex = 0; _navGuard = false;
-            _lastNav = NavList.SelectedItem;
-            ShowPanel("general");
-        };
-
-        BackupEveryBox.ItemsSource = BackupIntervals.Select(b => b.Label).ToArray();
-        BackupEveryBox.SelectionChanged += (_, _) =>
-        {
-            if (Vm is { } vm && BackupEveryBox.SelectedIndex is >= 0 and var i && i < BackupIntervals.Length
-                && vm.BackupEveryDays != BackupIntervals[i].Days) vm.BackupEveryDays = BackupIntervals[i].Days;
-        };
-        BackupKeepSlider.ValueChanged += (_, e) =>
-        {
-            int v = (int)Math.Round(e.NewValue);
-            if (Vm is { } vm && vm.BackupKeep != v) vm.BackupKeep = v;
-            BackupKeepValue.Text = v.ToString();
-        };
-        BackupFolderBtn.Click += async (_, _) =>
-        {
-            if (StorageProvider is not { } sp) return;
-            var picks = await sp.OpenFolderPickerAsync(new FolderPickerOpenOptions
-            {
-                Title = "Choose a backup folder", AllowMultiple = false,
-            });
-            if (picks.Count > 0 && picks[0].TryGetLocalPath() is { } path && Vm is { } vm)
-            {
-                vm.BackupFolder = path;
-                RefreshDataPanel();
-            }
-        };
-        BackupClearBtn.Click += (_, _) => { if (Vm is { } vm) { vm.BackupFolder = null; RefreshDataPanel(); } };
-        BackupNowBtn.Click += async (_, _) =>
-        {
-            if (Vm is not { } vm) return;
-            if (string.IsNullOrEmpty(vm.BackupFolder)) { DataStatusText.Text = "Choose a backup folder first."; return; }
-            BackupNowBtn.IsEnabled = false;
-            DataStatusText.Text = "Backing up…";
-            vm.FlushDirtyDocs();                            // UI thread — capture edits before the off-thread zip
-            var path = await System.Threading.Tasks.Task.Run(vm.RunBackupNow);
-            BackupNowBtn.IsEnabled = true;
-            RefreshDataPanel();
-            DataStatusText.Text = path is null ? "Backup failed." : $"Backed up to {path}";
-        };
-        ExportBtn.Click += async (_, _) =>
-        {
-            if (Vm is not { } vm || StorageProvider is not { } sp) return;
-            var picks = await sp.OpenFolderPickerAsync(new FolderPickerOpenOptions
-            {
-                Title = "Export all notebooks to…", AllowMultiple = false,
-            });
-            if (picks.Count == 0 || picks[0].TryGetLocalPath() is not { } dest) return;
-            ExportBtn.IsEnabled = false;
-            DataStatusText.Text = "Exporting…";
-            var snapshot = vm.SnapshotExport();            // UI thread — flush + snapshot the live tree
-            int n = await System.Threading.Tasks.Task.Run(() => vm.WriteExport(snapshot, dest));
-            ExportBtn.IsEnabled = true;
-            DataStatusText.Text = $"Exported {n} page{(n == 1 ? "" : "s")} to {dest}";
-        };
-        ImportBtn.Click += async (_, _) =>
-        {
-            if (Vm is not { } vm || StorageProvider is not { } sp) return;
-            if (vm.SelectedSection is null) { DataStatusText.Text = "Open a notebook section first."; return; }
-            var files = await sp.OpenFilePickerAsync(new FilePickerOpenOptions
-            {
-                Title = "Import a text file", AllowMultiple = false,
-                FileTypeFilter = new[]
+                if (Clipboard is { } cb)
                 {
-                    new FilePickerFileType("Text & Markdown") { Patterns = new[] { "*.txt", "*.md" } },
-                },
-            });
-            if (files.Count == 0 || files[0].TryGetLocalPath() is not { } path) return;
-            string text; try { text = File.ReadAllText(path); } catch { DataStatusText.Text = "Could not read the file."; return; }
-            var page = vm.ImportTextAsPage(Path.GetFileNameWithoutExtension(path), text);
-            DataStatusText.Text = page is null ? "Import failed." : $"Imported “{page.Title}” into the current section.";
-        };
-
-        AccentHexBox.KeyDown += (_, e) =>
-        {
-            if (e.Key != Key.Enter || Vm is not { } vm) return;
-            if (string.IsNullOrWhiteSpace(AccentHexBox.Text)) vm.CustomAccent = null;
-            else if (ThemePalettes.NormalizeHex(AccentHexBox.Text) is { } norm) vm.CustomAccent = norm;
-            AccentHexBox.Text = vm.CustomAccent ?? "";
-        };
-        GlassTintSlider.ValueChanged += (_, e) =>
-        {
-            double v = Math.Round(e.NewValue / 0.05) * 0.05;
-            if (Vm is { } vm && Math.Abs(vm.GlassTint - v) > 1e-6) vm.GlassTint = v;
-            GlassTintValue.Text = $"{(int)Math.Round(v * 100)}%";
-        };
-        RoundnessSlider.ValueChanged += (_, e) =>
-        {
-            double v = Math.Round(e.NewValue / 0.05) * 0.05;
-            if (Vm is { } vm && Math.Abs(vm.CornerRoundness - v) > 1e-6) vm.CornerRoundness = v;
-            RoundnessValue.Text = $"{(int)Math.Round(v * 100)}%";
-        };
-        MacMaterialRow.IsVisible = !OperatingSystem.IsWindows();
-        MacMaterialBox.SelectionChanged += (_, _) =>
-        {
-            if (Vm is { } vm && MacMaterialBox.SelectedIndex >= 0) vm.MacGlassMaterial = MacMaterialBox.SelectedIndex;
-        };
-        MotionSpeedBox.ItemsSource = new[] { "Calm", "Normal", "Snappy" };
-        MotionSpeedBox.SelectionChanged += (_, _) =>
-        {
-            if (Vm is { } vm && MotionSpeedBox.SelectedItem is string speed) vm.MotionSpeed = speed;
-        };
-
-        foreach (var (box, get, set) in new (ComboBox, Func<MainViewModel, bool?>, Action<MainViewModel, bool?>)[]
-        {
-            (NumBoldBox, vm => vm.NumBoldDefault, (vm, v) => vm.NumBoldDefault = v),
-            (NumItalicBox, vm => vm.NumItalicDefault, (vm, v) => vm.NumItalicDefault = v),
-            (NumUnderlineBox, vm => vm.NumUnderlineDefault, (vm, v) => vm.NumUnderlineDefault = v),
-            (NumStrikeBox, vm => vm.NumStrikeDefault, (vm, v) => vm.NumStrikeDefault = v),
-        })
-        {
-            box.ItemsSource = new[] { "Match text", "Always on", "Always off" };
-            box.SelectionChanged += (_, _) =>
-            {
-                if (Vm is { } vm && box.SelectedItem is string s)
-                {
-                    bool? v = s switch { "Always on" => true, "Always off" => false, _ => null };
-                    if (get(vm) != v) set(vm, v);
+                    await cb.SetTextAsync(Services.AppInfo.Details());
+                    AboutCopyBtn.Content = "Copied";
+                    await System.Threading.Tasks.Task.Delay(1400);
+                    AboutCopyBtn.Content = "Copy build details";
                 }
-            };
-        }
-        CaretColorBox.KeyDown += (_, e) =>
-        {
-            if (e.Key != Key.Enter || Vm is not { } vm) return;
-            if (string.IsNullOrWhiteSpace(CaretColorBox.Text)) vm.CaretColor = null;
-            else if (ThemePalettes.NormalizeHex(CaretColorBox.Text) is { } norm) vm.CaretColor = norm;
-            CaretColorBox.Text = vm.CaretColor ?? "";
-        };
-        CaretWidthSlider.ValueChanged += (_, e) =>
-        {
-            double v = Math.Round(e.NewValue / 0.1) * 0.1;
-            if (Vm is { } vm && Math.Abs(vm.CaretWidth - v) > 1e-6) vm.CaretWidth = v;
-            CaretWidthValue.Text = $"{v:0.0}";
-        };
-        BuildHighlightChoices();
-        DateFormatBox.ItemsSource = DateFormats.Select(f => DateTime.Now.ToString(f)).ToArray();
-        DateFormatBox.SelectionChanged += (_, _) =>
-        {
-            if (Vm is { } vm && DateFormatBox.SelectedIndex is >= 0 and var i && i < DateFormats.Length
-                && vm.DateFormat != DateFormats[i]) vm.DateFormat = DateFormats[i];
-        };
-        UserNameBox.KeyDown += (_, e) =>
-        {
-            if (e.Key == Key.Enter && Vm is { } vm) vm.UserName = UserNameBox.Text ?? "";
-        };
-        UserNameBox.LostFocus += (_, _) => { if (Vm is { } vm) vm.UserName = UserNameBox.Text ?? ""; };
-        CardSizeBox.ItemsSource = new[] { "Small", "Medium", "Large" };
-        CardSizeBox.SelectionChanged += (_, _) =>
-        {
-            if (Vm is { } vm && CardSizeBox.SelectedItem is string cs && vm.CardSize != cs) vm.CardSize = cs;
-        };
-        NewNoteWidthSlider.ValueChanged += (_, e) =>
-        {
-            double v = Math.Round(e.NewValue / 20) * 20;
-            if (Vm is { } vm && Math.Abs(vm.NewNoteWidth - v) > 0.5) vm.NewNoteWidth = v;
-            NewNoteWidthValue.Text = ((int)v).ToString();
-        };
-        PageGridBox.ItemsSource = new[] { "None", "Ruled", "Grid", "Dots" };
-        PageGridBox.SelectionChanged += (_, _) =>
-        {
-            if (Vm is { } vm && PageGridBox.SelectedItem is string g && vm.PageGrid != g) vm.PageGrid = g;
-        };
-        TidyLayoutBox.ItemsSource = new[] { "Radial", "Hybrid", "Top-down" };
-        TidyLayoutBox.SelectionChanged += (_, _) =>
-        {
-            if (Vm is { } vm && TidyLayoutBox.SelectedItem is string s)
-            {
-                var stored = s switch { "Hybrid" => "Hybrid", "Top-down" => "TopDown", _ => "Radial" };
-                if (vm.MindmapTidyLayout != stored) vm.MindmapTidyLayout = stored;
             }
+            catch { /* no clipboard on this platform */ }
         };
 
-        // ItemsSource is (re)built in RefreshEditorFontList — the ctor runs before the DataContext
-        // lands, so building it here would permanently miss the Extended-fonts master switch.
-        EditorFontBox.SelectionChanged += (_, _) =>
-        {
-            if (Vm is { } vm && EditorFontBox.SelectedItem is string f)
-            {
-                var v = f == "(Default)" ? null : f;
-                if (vm.EditorFont != v) vm.EditorFont = v;
-            }
-        };
-        WireScaleSlider(EditorFontSizeSlider, EditorFontSizeValue, v => v.ToString("0"),
-            vm => vm.EditorFontSize, (vm, v) => vm.EditorFontSize = v, 1);
-        WireScaleSlider(LineSpacingSlider, LineSpacingValue, v => $"{v:0.0}×",
-            vm => vm.LineSpacingScale, (vm, v) => vm.LineSpacingScale = v, 0.1);
-        WireScaleSlider(ParaSpacingSlider, ParaSpacingValue, v => $"{v:0.0}×",
-            vm => vm.ParagraphSpacingScale, (vm, v) => vm.ParagraphSpacingScale = v, 0.1);
-        WireScaleSlider(IndentScaleSlider, IndentScaleValue, v => $"{v:0.0}×",
-            vm => vm.IndentScale, (vm, v) => vm.IndentScale = v, 0.1);
-        WirePaletteEditor(TextPaletteChips, TextPaletteHexBox, TextPaletteReset, highlight: false);
-        WirePaletteEditor(HighlightPaletteChips, HighlightPaletteHexBox, HighlightPaletteReset, highlight: true);
+        // Launch-time check: quiet, so a version behind a flaky connection says nothing at all. Only the
+        // note changes; nothing pops up over the user's work.
+        if (canUpdate && Vm is { AutoCheckUpdates: true }) _ = QuietCheck();
+    }
 
-        // Dropdown treatment (shared with the wizard): rise-in, rounded/blurred popup window, and
-        // eased wheel scrolling inside the popup's list. Null-safe throughout.
-        foreach (var combo in new[] { LaunchTargetBox, MotionSpeedBox, CardSizeBox, DateFormatBox,
-                                      EditorFontBox, ToolbarPosBox, ToolbarScopeBox, PageGridBox, TidyLayoutBox,
-                                      BackupEveryBox, NumBoldBox, NumItalicBox, NumUnderlineBox, NumStrikeBox })
-            MenuFx.AttachDropDown(combo);
-
-        DataContextChanged += (_, _) => HookVmChanges();
-        HookVmChanges();
-        // The window subscribes to the long-lived VM; unhook on close or the VM pins the dead
-        // window (and keeps invoking its handler) until the next prefs open re-hooks.
-        Closed += (_, _) =>
-        {
-            if (_hookedVm is not null) _hookedVm.PropertyChanged -= OnVmChanged;
-            _hookedVm = null;
-        };
+    private async System.Threading.Tasks.Task QuietCheck()
+    {
+        if (await Services.UpdateService.CheckAsync() is not { } f) return;
+        AboutUpdateNote.Text = $"Version {f.Version} is available — press “Check for updates” to install it.";
+        AboutUpdateBtn.Content = $"Update to {f.Version}";
     }
 
     private bool _navGuard;
