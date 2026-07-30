@@ -39,6 +39,9 @@ internal static class MacVibrancy
     private static extern nint MsgCount(IntPtr receiver, IntPtr selector);
 
     [DllImport(Objc, EntryPoint = "objc_msgSend")]
+    private static extern nint MsgGetLong(IntPtr receiver, IntPtr selector);
+
+    [DllImport(Objc, EntryPoint = "objc_msgSend")]
     [return: MarshalAs(UnmanagedType.I1)]
     private static extern bool MsgIsKind(IntPtr receiver, IntPtr selector, IntPtr cls);
 
@@ -59,7 +62,9 @@ internal static class MacVibrancy
     /// Values are documented NSVisualEffectMaterial constants (10.14+, all still valid on macOS 26);
     /// only ones from that fixed list are ever assigned, because an out-of-range material is one of the
     /// few things here that AppKit can raise on.</summary>
-    public static nint Material;
+    /// Starts on the preference's own default (hudWindow) so windows built before settings load already
+    /// frost correctly; MainViewModel overwrites it once the saved value is known.
+    public static nint Material = 13;
 
     /// <summary>Resolve the NSWindow behind an Avalonia window (the handle is normally the top-level
     /// NSView, but accept an NSWindow too). Zero when it cannot be resolved.</summary>
@@ -94,9 +99,10 @@ internal static class MacVibrancy
         catch { /* interop must never take the window down */ }
     }
 
-    /// <summary>Keep the window's frost at full strength even when it is not the key window.
+    /// <summary>Keep the window's frost at full strength even when it is not the key window, and put it
+    /// on <paramref name="material"/> (null = the global preference, 0 = leave Avalonia's choice).
     /// Safe to call repeatedly.</summary>
-    public static void KeepFrostActive(TopLevel window)
+    public static void KeepFrostActive(TopLevel window, nint? material = null)
     {
         if (!OperatingSystem.IsMacOS()) return;
         try
@@ -112,7 +118,30 @@ internal static class MacVibrancy
             // The frost usually sits BESIDE the content view under the window's theme frame, so start
             // from the superview when there is one — that covers both layouts.
             IntPtr root = Msg(content, Sel("superview"));
-            Pin(root != IntPtr.Zero ? root : content, effectCls, isKindSel, 0, 0);
+            Pin(root != IntPtr.Zero ? root : content, effectCls, isKindSel, 0, 0, material ?? Material);
+        }
+        catch { /* interop must never take the window (or the app) down */ }
+    }
+
+    /// <summary>Take native full-screen off this window, so the green traffic light ZOOMS it instead.
+    ///
+    /// Not cosmetic: a natively full-screen macOS window gets its own Space with nothing behind it, and
+    /// behind-window vibrancy has no source to sample — the frost necessarily collapses to the flat
+    /// material colour (tester: "transparency and blur is not functioning in fullscreen"). There is no
+    /// API that fixes that; the window has to stay on the desktop Space to have anything to blur. Zoomed
+    /// still fills the screen, minus the menu bar and Dock.</summary>
+    public static void DisableNativeFullScreen(Window window)
+    {
+        if (!OperatingSystem.IsMacOS()) return;
+        try
+        {
+            IntPtr nsWindow = NSWindowOf(window);
+            if (nsWindow == IntPtr.Zero) return;
+            const nint Primary = 1 << 7, Auxiliary = 1 << 8, None = 1 << 9;   // NSWindowCollectionBehavior*
+            // MERGE, don't overwrite: Avalonia sets collectionBehavior itself, and clobbering the whole
+            // mask would take its other bits (Spaces behaviour, managed-window) with it.
+            nint behavior = MsgGetLong(nsWindow, Sel("collectionBehavior"));
+            MsgSetLong(nsWindow, Sel("setCollectionBehavior:"), (behavior & ~(Primary | Auxiliary)) | None);
         }
         catch { /* interop must never take the window (or the app) down */ }
     }
@@ -137,7 +166,7 @@ internal static class MacVibrancy
             IntPtr content = Msg(nsWindow, Sel("contentView"));
             if (content == IntPtr.Zero) return 0;
             IntPtr root = Msg(content, Sel("superview"));
-            return Pin(root != IntPtr.Zero ? root : content, effectCls, Sel("isKindOfClass:"), 0, 0);
+            return Pin(root != IntPtr.Zero ? root : content, effectCls, Sel("isKindOfClass:"), 0, 0, 0);
         }
         catch { return 0; }
     }
@@ -149,7 +178,7 @@ internal static class MacVibrancy
     /// layers: clear the window surface, then round the content view AND every frost layer, since the
     /// NSVisualEffectView is a square pane that Avalonia parks beside the content view rather than
     /// inside it.</summary>
-    public static void RoundPopup(TopLevel topLevel, double radius)
+    public static void RoundPopup(TopLevel topLevel, double radius, nint? material = null)
     {
         if (!OperatingSystem.IsMacOS()) return;
         try
@@ -171,9 +200,10 @@ internal static class MacVibrancy
             IntPtr effectCls = GetClass("NSVisualEffectView");
             if (effectCls == IntPtr.Zero) return;
             IntPtr isKindSel = Sel("isKindOfClass:");
-            Pin(content, effectCls, isKindSel, 0, radius);
+            nint mat = material ?? Material;
+            Pin(content, effectCls, isKindSel, 0, radius, mat);
             IntPtr root = Msg(content, Sel("superview"));
-            if (root != IntPtr.Zero) Pin(root, effectCls, isKindSel, 0, radius);
+            if (root != IntPtr.Zero) Pin(root, effectCls, isKindSel, 0, radius, mat);
         }
         catch { /* interop must never take the window (or the app) down */ }
     }
@@ -192,14 +222,14 @@ internal static class MacVibrancy
     /// <summary>Depth-limited walk: pin every NSVisualEffectView in the subtree to the active state,
     /// apply the chosen material, and (when <paramref name="radius"/> is set) round its layer.
     /// Returns how many were found.</summary>
-    private static int Pin(IntPtr view, IntPtr effectCls, IntPtr isKindSel, int depth, double radius)
+    private static int Pin(IntPtr view, IntPtr effectCls, IntPtr isKindSel, int depth, double radius, nint material)
     {
         if (view == IntPtr.Zero || depth > 6) return 0;
         int found = 0;
         if (MsgIsKind(view, isKindSel, effectCls))
         {
             MsgSetLong(view, Sel("setState:"), StateActive);
-            if (Material > 0) MsgSetLong(view, Sel("setMaterial:"), Material);
+            if (material > 0) MsgSetLong(view, Sel("setMaterial:"), material);
             RoundLayer(view, radius);
             found = 1;
         }
@@ -209,7 +239,7 @@ internal static class MacVibrancy
         nint count = MsgCount(subviews, Sel("count"));
         IntPtr atIndex = Sel("objectAtIndex:");
         for (nint i = 0; i < count && i < 64; i++)
-            found += Pin(MsgIndex(subviews, atIndex, i), effectCls, isKindSel, depth + 1, radius);
+            found += Pin(MsgIndex(subviews, atIndex, i), effectCls, isKindSel, depth + 1, radius, material);
         return found;
     }
 }

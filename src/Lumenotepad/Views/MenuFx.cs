@@ -104,7 +104,7 @@ public static class MenuFx
     {
         // Square popup corners poke out from behind the rounded menu content; macOS rounds neither the
         // popup window nor its frost pane for us, so cut the radius into the layers ourselves.
-        Platform.MacVibrancy.RoundPopup(tl, 8);
+        Platform.MacVibrancy.RoundPopup(tl, 8, Platform.MacVibrancy.Material);
 
         string bg = ThemeManager.Current.MenuBackground;
         var opaque = new SolidColorBrush(Color.Parse(bg.Length == 9 ? "#FF" + bg[^6..] : bg));
@@ -124,7 +124,11 @@ public static class MenuFx
         // when it services the window, which is not guaranteed to have happened by the next frame.
         DispatcherTimer.RunOnce(() =>
         {
-            if (Platform.MacVibrancy.HasFrostLayer(tl)) { Platform.MacVibrancy.RoundPopup(tl, 8); return; }
+            if (Platform.MacVibrancy.HasFrostLayer(tl))
+            {
+                Platform.MacVibrancy.RoundPopup(tl, 8, Platform.MacVibrancy.Material);
+                return;
+            }
             tl.TransparencyLevelHint = MacOff;                // no frost: let the opaque fallback paint
         }, TimeSpan.FromMilliseconds(90));
     }

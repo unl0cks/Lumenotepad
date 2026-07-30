@@ -228,6 +228,9 @@ public partial class MainViewModel : ObservableObject
             CustomAccent = _settings.CustomAccent;
             GlassTint = _settings.GlassTint;
             MacGlassMaterial = _settings.MacGlassMaterial;
+            // Explicitly, not via the change hook: the saved value is usually the default, so assigning
+            // it fires nothing and the static would keep whatever it started as.
+            Platform.MacVibrancy.Material = MacMaterialOf(MacGlassMaterial);
             CornerRoundness = _settings.CornerRoundness;
             SectionsSidebar = _settings.SectionsSidebar;
             _singleMode = _settings.SingleMode;   // field, not property: the saved tree is already in this shape — don't restructure on load
@@ -433,15 +436,21 @@ public partial class MainViewModel : ObservableObject
         _settings.Save(_settingsDir);
     }
 
-    /// <summary>Preference index → NSVisualEffectMaterial. Only documented constants, and only ones
-    /// that have existed since 10.14, so nothing here can be an out-of-range material.</summary>
+    /// <summary>Preference index → NSVisualEffectMaterial, for the main window, the menus and the
+    /// message dialogs. Only documented constants, and only ones that have existed since 10.14, so
+    /// nothing here can be an out-of-range material.
+    ///
+    /// macOS exposes no blur RADIUS — the material IS the blur recipe, so this is the only lever there
+    /// is for how tight or how wide the frost reads. The default is deliberately not Avalonia's own
+    /// choice: that one blurs wide and pale, which is what let the desktop stay readable through the
+    /// main window.</summary>
     internal static nint MacMaterialOf(int choice) => choice switch
     {
-        1 => 13,   // hudWindow            — darkest / densest, closest to the Windows acrylic
-        2 => 21,   // underWindowBackground
-        3 => 7,    // sidebar
-        4 => 6,    // popover              — most see-through
-        _ => 0,    // Automatic: leave Avalonia's own choice alone
+        1 => 21,   // underWindowBackground — deeper, wider
+        2 => 7,    // sidebar               — balanced
+        3 => 6,    // popover               — sheerest
+        4 => 0,    // System                — whatever Avalonia picks
+        _ => 13,   // hudWindow             — Standard: dense and tight, nearest the Windows acrylic
     };
 
     partial void OnSectionsSidebarChanged(bool value)

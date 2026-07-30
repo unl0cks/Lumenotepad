@@ -74,7 +74,7 @@ public static class ThemeManager
         string childSurface = t.FrostedWindow ? "#D8" + t.WindowBackground[^6..] : t.WindowBackground;
         Brush("ChildSurfaceBrush", childSurface);
         Brush("WindowSurfaceBrush", childSurface);
-        Brush("MenuBackgroundBrush", t.MenuBackground);
+        Brush("MenuBackgroundBrush", MacMenuFill(t.MenuBackground));
         Brush("MenuBorderBrush", t.MenuBorder);
 
         r["AccentGradientBrush"] = new LinearGradientBrush
@@ -179,12 +179,14 @@ public static class ThemeManager
         if (titleBar is not null) titleBar.Margin = new Thickness(72, 0, 0, 0);
         // The traffic lights now close the window, so our own caption button is a duplicate.
         if (window.FindControl<Button>("CloseBtn") is { } close) close.IsVisible = false;
-        _macChildWindows.Add(new System.WeakReference<Window>(window));
+        // Material 0 = keep Avalonia's own: these sit over the main window rather than the desktop, so
+        // they blur a dark near-uniform surface and already read the way the owner wants.
+        _macChildWindows.Add((new System.WeakReference<Window>(window), 0));
         ApplyMacGlass(window, ChildGlass);
         window.Opened += (_, _) =>
         {
             ApplyMacGlass(window, ChildGlass);
-            Platform.MacVibrancy.KeepFrostActive(window);
+            Platform.MacVibrancy.KeepFrostActive(window, 0);
         };
     }
 
@@ -199,30 +201,64 @@ public static class ThemeManager
         window.WindowDecorations = WindowDecorations.Full;
         window.ExtendClientAreaToDecorationsHint = true;
         window.ExtendClientAreaTitleBarHeightHint = 0;   // no titlebar band: the dialog owns the whole sheet
-        _macChildWindows.Add(new System.WeakReference<Window>(window));
+        // The dialogs hard-set an OPAQUE fill (on Windows a chromeless transparent window paints its
+        // unpainted ring black, so they must not be see-through there). On mac that fill sat straight
+        // on top of the frost, which is why the delete prompt came back as a flat grey slab. Swap it
+        // for the translucent surface under a glass theme — the frost is doing the work now.
+        if (Current.FrostedWindow) window.Background = new SolidColorBrush(Color.Parse(SurfaceFill));
+        _macChildWindows.Add((new System.WeakReference<Window>(window), SurfaceMaterial));
         ApplyMacGlass(window, ChildGlass);
         window.Opened += (_, _) =>
         {
             ApplyMacGlass(window, ChildGlass);
             Platform.MacVibrancy.HideTrafficLights(window);
-            Platform.MacVibrancy.KeepFrostActive(window);
+            Platform.MacVibrancy.KeepFrostActive(window, SurfaceMaterial);
         };
+    }
+
+    /// <summary>The material for the surfaces the owner asked to match each other — main window, menus,
+    /// and the small message dialogs. Null means "whatever the preference says"; the preference's own
+    /// default is a dense, tight-blur material rather than Avalonia's wide, pale one.
+    ///
+    /// The bigger secondary windows (Preferences, the notebook wizard) deliberately do NOT use this:
+    /// they sit on top of the main window, so they are blurring a dark, near-uniform surface instead of
+    /// the desktop, and the owner likes how they read already.</summary>
+    private static nint SurfaceMaterial => Platform.MacVibrancy.Material;
+
+    /// <summary>Translucent sheet fill for a frosted mac dialog — the frame colour at ~72%.</summary>
+    private static string SurfaceFill => "#B8" + Current.WindowBackground[^6..];
+
+    /// <summary>macOS frosts noticeably brighter than the DWM acrylic the Windows build sits on, so the
+    /// glass theme's ~25%-opaque menu fill — tuned against that darker backdrop — reads washed out
+    /// there ("the tint of the menus is a bit too bright"). Deepen it on mac only, and only for the
+    /// translucent variant; the opaque themes are already correct.</summary>
+    private static string MacMenuFill(string menuBackground)
+    {
+        if (System.OperatingSystem.IsWindows() || menuBackground.Length != 9) return menuBackground;
+        return System.Convert.ToInt32(menuBackground.Substring(1, 2), 16) >= 0xF0
+            ? menuBackground
+            : "#73" + menuBackground[^6..];
     }
 
     /// <summary>Secondary windows wearing the native mac frame, so a theme switch can re-run their
     /// glass (Lumen frosts; every other theme is an opaque sheet). Weak, and pruned as it is walked.</summary>
-    private static readonly List<System.WeakReference<Window>> _macChildWindows = new();
+    /// <summary>Each entry carries the material that surface should frost with: the message dialogs
+    /// follow the main window and menus, the bigger secondary windows keep Avalonia's own choice.</summary>
+    private static readonly List<(System.WeakReference<Window> Window, nint Material)> _macChildWindows = new();
 
     internal static void RefreshMacChildGlass()
     {
         for (int i = _macChildWindows.Count - 1; i >= 0; i--)
         {
-            if (_macChildWindows[i].TryGetTarget(out var w) && w.IsVisible)
+            if (_macChildWindows[i].Window.TryGetTarget(out var w) && w.IsVisible)
             {
+                if (Current.FrostedWindow && w.WindowDecorations != WindowDecorations.None &&
+                    w.ExtendClientAreaTitleBarHeightHint == 0)
+                    w.Background = new SolidColorBrush(Color.Parse(SurfaceFill));
                 ApplyMacGlass(w, ChildGlass);
-                Platform.MacVibrancy.KeepFrostActive(w);
+                Platform.MacVibrancy.KeepFrostActive(w, _macChildWindows[i].Material);
             }
-            else if (!_macChildWindows[i].TryGetTarget(out _))
+            else if (!_macChildWindows[i].Window.TryGetTarget(out _))
             {
                 _macChildWindows.RemoveAt(i);
             }

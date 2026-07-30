@@ -133,6 +133,11 @@ public partial class MainWindow : Window
             // Re-assert the frost NOW that the native window exists — a transparency hint applied
             // before the handle is created can be dropped, leaving an opaque window.
             RearmMacGlass();
+            // A natively full-screen window owns its Space and has NOTHING behind it, so the frost has
+            // no source and collapses to flat grey — unfixable while the window is really full screen.
+            // Turning native full screen off makes the green button zoom instead: still fills the
+            // screen, still on the desktop, glass intact.
+            MacVibrancy.DisableNativeFullScreen(this);
             DispatcherTimer.RunOnce(RearmMacGlass, TimeSpan.FromMilliseconds(200));
             DispatcherTimer.RunOnce(WriteMacChromeDiagnostics, TimeSpan.FromMilliseconds(1200));
         }
@@ -146,6 +151,9 @@ public partial class MainWindow : Window
             ? Services.ThemeManager.MacGlass.Frost
             : Services.ThemeManager.MacGlass.Opaque);
         MacVibrancy.KeepFrostActive(this);
+        // Avalonia writes collectionBehavior itself, so keep re-asserting ours — this runs on every
+        // window-state change, which is exactly when it would be overwritten.
+        MacVibrancy.DisableNativeFullScreen(this);
     }
 
     /// <summary>Record what the OS actually granted, so a "still not transparent" report can be
