@@ -203,6 +203,12 @@
                     BorderThickness="0,0,1,0" Padding="8,4">
                 <ListBox x:Name="NavList" Classes="prefnav" Background="Transparent"
                          BorderThickness="0" Padding="0">
+                    <ListBoxItem IsEnabled="False" Margin="0,2,0,2" Padding="10,2">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="GENERAL" FontSize="10.5" FontWeight="SemiBold" LetterSpacing="1"
+                                       Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
                     <ListBoxItem Tag="general">
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <TextBlock Classes="navicon" Text="&#xE713;"/>
@@ -215,6 +221,12 @@
                             <TextBlock Classes="label" Text="Appearance" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
+                    <ListBoxItem IsEnabled="False" Margin="0,14,0,2" Padding="10,2">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="WORKSPACE" FontSize="10.5" FontWeight="SemiBold" LetterSpacing="1"
+                                       Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
                     <ListBoxItem Tag="layout">
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <TextBlock Classes="navicon" Text="&#xE8A1;"/>
@@ -225,6 +237,12 @@
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <TextBlock Classes="navicon" Text="&#xE80A;"/>
                             <TextBlock Classes="label" Text="Canvas" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem IsEnabled="False" Margin="0,14,0,2" Padding="10,2">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="WRITING" FontSize="10.5" FontWeight="SemiBold" LetterSpacing="1"
+                                       Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
                     <ListBoxItem Tag="editor">
@@ -266,7 +284,13 @@
                             <TextBlock Classes="label" Text="Data &amp; tools" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
-                    <ListBoxItem Tag="about" Margin="0,12,0,0">
+                    <ListBoxItem IsEnabled="False" Margin="0,14,0,2" Padding="10,2">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="SYSTEM" FontSize="10.5" FontWeight="SemiBold" LetterSpacing="1"
+                                       Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="about">
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <TextBlock Classes="navicon" Text="&#xE82F;"/>
                             <TextBlock Classes="label" Text="About" VerticalAlignment="Center"/>

@@ -17,6 +17,10 @@
         <!-- App-wide button press feedback: a quick opacity dip. Opacity animates in this build
              (RenderTransform does not — see the motion spec), so this is declarative and global. -->
         <Style Selector="Button">
+            <!-- App-wide rounding. Plain Buttons otherwise inherit Fluent's near-square default, which
+                 read as hard corners next to everything else here (owner: "too square"). Matches the
+                 LumenButton theme so a themed and an untouched button sit together. -->
+            <Setter Property="CornerRadius" Value="10"/>
             <Setter Property="Transitions">
                 <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.11"/></Transitions>
             </Setter>

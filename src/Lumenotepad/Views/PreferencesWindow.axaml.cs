@@ -159,7 +159,7 @@ public partial class PreferencesWindow : Window
             if (key == "shortcuts") BuildShortcutRows();
             ShowPanel(key);
         };
-        NavList.SelectedIndex = 0;
+        SelectNav("general");
         _lastNav = NavList.SelectedItem;
         GroupIntoCards();
         SetupSettingsSearch();
@@ -211,7 +211,7 @@ public partial class PreferencesWindow : Window
             vm.ResetSettingsToDefaults();
             SyncFromVm();
             UpdateGateVisuals();
-            _navGuard = true; NavList.SelectedIndex = 0; _navGuard = false;
+            _navGuard = true; SelectNav("general"); _navGuard = false;
             _lastNav = NavList.SelectedItem;
             ShowPanel("general");
         };
@@ -220,7 +220,7 @@ public partial class PreferencesWindow : Window
             if (Vm is not { } vm) return;
             vm.AdvancedUnlocked = false;
             UpdateGateVisuals();
-            _navGuard = true; NavList.SelectedIndex = 0; _navGuard = false;
+            _navGuard = true; SelectNav("general"); _navGuard = false;
             _lastNav = NavList.SelectedItem;
             ShowPanel("general");
         };
@@ -487,6 +487,15 @@ public partial class PreferencesWindow : Window
         if (await Services.UpdateService.CheckAsync() is not { } f) return;
         AboutUpdateNote.Text = $"Version {f.Version} is available — press “Check for updates” to install it.";
         AboutUpdateBtn.Content = $"Update to {f.Version}";
+    }
+
+    /// <summary>Select a category by TAG, never by index. The nav now carries disabled group headers
+    /// (GENERAL / WORKSPACE / WRITING / ADVANCED / SYSTEM), so index 0 is a header rather than the first
+    /// real tab and selecting it would land on nothing.</summary>
+    private void SelectNav(string tag)
+    {
+        foreach (var item in NavList.Items.OfType<ListBoxItem>())
+            if ((item.Tag as string) == tag) { NavList.SelectedItem = item; return; }
     }
 
     private bool _navGuard;
