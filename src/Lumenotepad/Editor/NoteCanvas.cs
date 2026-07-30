@@ -724,7 +724,11 @@ public sealed class NoteCanvas : Panel
     private Point _labelPos;
 
     private readonly System.Collections.Generic.HashSet<NoteBoxView> _selection = new();
-    private readonly Border _rubber = new() { IsVisible = false, IsHitTestVisible = false, BorderThickness = new Thickness(1) };
+    private readonly Border _rubber = new()
+    {
+        IsVisible = false, IsHitTestVisible = false, BorderThickness = new Thickness(1.5),
+        CornerRadius = new CornerRadius(9),
+    };
     private Point _rubberStart, _rubberCur;
     private bool _rubbering, _rubberDown;
     private System.Collections.Generic.Dictionary<NoteBox, (double X, double Y)>? _groupOrigins;
@@ -897,7 +901,9 @@ public sealed class NoteCanvas : Panel
         if (!_rubbering && (Math.Abs(_rubberCur.X - _rubberStart.X) > 4 || Math.Abs(_rubberCur.Y - _rubberStart.Y) > 4))
         {
             _rubbering = true;
+            _rubber.Opacity = 0;
             _rubber.IsVisible = true;
+            Views.Motion.FadeIn(_rubber, 110);
         }
         if (_rubbering) InvalidateArrange();
     }
@@ -911,7 +917,7 @@ public sealed class NoteCanvas : Panel
         if (_rubbering)
         {
             _rubbering = false;
-            _rubber.IsVisible = false;
+            Views.Motion.FadeOut(_rubber, 150, () => _rubber.IsVisible = false);
             var rect = new Rect(Math.Min(_rubberStart.X, _rubberCur.X), Math.Min(_rubberStart.Y, _rubberCur.Y),
                                 Math.Abs(_rubberStart.X - _rubberCur.X), Math.Abs(_rubberStart.Y - _rubberCur.Y));
             if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift)) ClearSelection();
