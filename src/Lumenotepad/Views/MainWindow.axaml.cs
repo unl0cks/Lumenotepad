@@ -186,6 +186,14 @@ public partial class MainWindow : Window
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
+        // macOS 26 tiling ("Fill", the halves and quarters in the green button's menu) resizes the
+        // window WITHOUT flipping WindowState, so the state-change path below never runs for it. Catch
+        // the resize itself as well, or a tiled window keeps whatever inset and layout it had.
+        if (change.Property == ClientSizeProperty && !OperatingSystem.IsWindows())
+        {
+            RelayoutMac();
+            return;
+        }
         if (change.Property != WindowStateProperty) return;
 
         var state = change.GetNewValue<WindowState>();
@@ -211,8 +219,10 @@ public partial class MainWindow : Window
             // transition is animated (~1s), so a single immediate re-arm lands too early and is thrown
             // away with the old window; re-arm across the whole animation instead.
             RearmMacGlass();
+            RelayoutMac();
             foreach (var ms in new[] { 150, 500, 950, 1500 })
-                DispatcherTimer.RunOnce(RearmMacGlass, TimeSpan.FromMilliseconds(ms));
+                DispatcherTimer.RunOnce(() => { RearmMacGlass(); RelayoutMac(); },
+                    TimeSpan.FromMilliseconds(ms));
         }
 
         // Native Aero Snap maximizes a WS_THICKFRAME window to (-7,-7) + a 14px oversize — a ~7px overhang past
@@ -250,6 +260,13 @@ public partial class MainWindow : Window
     /// Zero inset when floating or cleanly maximized. Computed geometry — Avalonia's OffScreenMargin stays 0 here.</summary>
     private void SyncMaximizeMargin()
     {
+        // WINDOWS ONLY. Aero Snap's ~7px-per-edge overhang is a Win32 WS_THICKFRAME artefact; nothing
+        // off Windows overhangs, so there is nothing to compensate for. Worse, the geometry this relies
+        // on does not mean the same thing on macOS — WorkingArea, Position and ClientSize do not all
+        // agree on logical vs physical units on a Retina screen — so a zoomed window produced a bogus
+        // inset hundreds of points deep and squeezed the whole UI into the top-left corner, scrollbars
+        // and all (tester report on zoom/tile).
+        if (!OperatingSystem.IsWindows()) { Host.Margin = default; return; }
         if (WindowState != WindowState.Maximized ||
             (Screens.ScreenFromWindow(this) ?? Screens.Primary) is not { } scr)
         {
@@ -257,14 +274,19 @@ public partial class MainWindow : Window
             return;
         }
 
-        var work = scr.WorkingArea;                              // physical px
-        double s = RenderScaling <= 0 ? 1 : RenderScaling;
-        double physW = ClientSize.Width * s, physH = ClientSize.Height * s;
-        double left   = Math.Max(0, work.X - Position.X);
-        double top    = Math.Max(0, work.Y - Position.Y);
-        double right  = Math.Max(0, (Position.X + physW) - (work.X + work.Width));
-        double bottom = Math.Max(0, (Position.Y + physH) - (work.Y + work.Height));
-        Host.Margin = new Thickness(left / s, top / s, right / s, bottom / s);
+        Host.Margin = WindowGeometry.MaximizeInset(scr.WorkingArea, Position, ClientSize, RenderScaling);
+    }
+
+    /// <summary>Drop any content inset and force a fresh layout pass against the window's CURRENT size.
+    /// macOS resizes the window itself when it zooms or tiles — the app never asks — and the content was
+    /// left laid out to the old size, crammed into a corner with scrollbars along where the previous
+    /// window edge had been. Cheap and idempotent, so it is safe to fire repeatedly through the resize
+    /// animation alongside the glass re-arm.</summary>
+    private void RelayoutMac()
+    {
+        Host.Margin = default;
+        Host.InvalidateMeasure();
+        Host.InvalidateArrange();
     }
 
     /// <summary>Re-apply all native chrome that a state change can silently reset: sizing styles (snap),
