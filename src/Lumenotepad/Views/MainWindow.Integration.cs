@@ -26,18 +26,25 @@ public partial class MainWindow
     private void EnsureTray()
     {
         if (_tray is not null) return;
-        var open = new NativeMenuItem("Open Lumenotepad");
-        open.Click += (_, _) => RestoreFromTray();
-        var exit = new NativeMenuItem("Exit");
-        exit.Click += (_, _) => ExitApp();
-        var menu = new NativeMenu();
-        menu.Add(open);
-        menu.Add(exit);
-        _tray = new TrayIcon
+        // The tray is an NSStatusItem on macOS and a notification-area icon on Windows. Wrapped because
+        // a platform that declines to create one must cost the user a missing icon, not the app: this
+        // runs from a preference toggle, so a throw here would take the window down mid-click.
+        try
         {
-            Icon = BuildTrayIcon(), ToolTipText = "Lumenotepad", IsVisible = true, Menu = menu,
-        };
-        _tray.Clicked += (_, _) => RestoreFromTray();     // left-click opens
+            var open = new NativeMenuItem("Open Lumenotepad");
+            open.Click += (_, _) => RestoreFromTray();
+            var exit = new NativeMenuItem("Exit");
+            exit.Click += (_, _) => ExitApp();
+            var menu = new NativeMenu();
+            menu.Add(open);
+            menu.Add(exit);
+            _tray = new TrayIcon
+            {
+                Icon = BuildTrayIcon(), ToolTipText = "Lumenotepad", IsVisible = true, Menu = menu,
+            };
+            _tray.Clicked += (_, _) => RestoreFromTray();     // left-click opens
+        }
+        catch { _tray = null; }
     }
 
     private void DisposeTray()

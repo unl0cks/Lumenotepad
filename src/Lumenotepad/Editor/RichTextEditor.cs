@@ -683,7 +683,11 @@ public sealed class RichTextEditor : Control
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
-        bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        // Two different modifiers on macOS, one on Windows. `cmd` is the COMMAND key (Cmd there, Ctrl
+        // here) — copy/paste/undo/select-all. `ctrl` is the WORD-WISE motion modifier, which on macOS is
+        // Option, not Command. On Windows both resolve to Ctrl, so nothing changes there.
+        bool cmd = Services.Keymap.HasCommand(e.KeyModifiers);
+        bool ctrl = OperatingSystem.IsMacOS() ? e.KeyModifiers.HasFlag(KeyModifiers.Alt) : cmd;
         bool shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
         // Rebindable formatting shortcuts (Keymap, M8 Part 6) run FIRST so custom combos win.
@@ -694,6 +698,10 @@ public sealed class RichTextEditor : Control
 
         switch (e.Key)
         {
+            // Cmd+Arrow is line-wise on macOS (Option+Arrow is the word-wise case below).
+            case Key.Left or Key.Right when cmd && OperatingSystem.IsMacOS():
+                MoveCaret(LineEdge(_caret, start: e.Key == Key.Left), shift);
+                break;
             case Key.Left or Key.Right when !ctrl:
                 MoveCaret(_doc.Move(_caret, e.Key == Key.Right ? 1 : -1), shift);
                 break;
@@ -746,24 +754,29 @@ public sealed class RichTextEditor : Control
                 }
                 AfterEdit();
                 break;
-            case Key.A when ctrl:
+            case Key.A when cmd:
                 _anchor = new DocPos(0, 0); _caret = _doc.End;
                 InvalidateVisual();
                 RaiseSelectionChanged();
                 break;
-            case Key.Z when ctrl:
-                Undo(); AfterEdit(pushedUndo: false);
-                break;
-            case Key.Y when ctrl:
+            // Shift+Z is the redo combo everywhere except Windows, where Ctrl+Y is the convention. Both
+            // are accepted; this case must stay above the plain Z one or redo would undo instead.
+            case Key.Z when cmd && shift:
                 Redo(); AfterEdit(pushedUndo: false);
                 break;
-            case Key.C when ctrl:
+            case Key.Z when cmd:
+                Undo(); AfterEdit(pushedUndo: false);
+                break;
+            case Key.Y when cmd:
+                Redo(); AfterEdit(pushedUndo: false);
+                break;
+            case Key.C when cmd:
                 _ = CopyAsync(cut: false);
                 break;
-            case Key.X when ctrl:
+            case Key.X when cmd:
                 _ = CopyAsync(cut: true);
                 break;
-            case Key.V when ctrl:
+            case Key.V when cmd:
                 _ = PasteAsync();
                 break;
             default:
@@ -1252,7 +1265,7 @@ public sealed class RichTextEditor : Control
         }
 
         // Ctrl+click a hyperlink opens it (plain click still places the caret so links stay editable).
-        if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && LinkAt(pos) is { } url)
+        if (Services.Keymap.HasCommandStrict(e.KeyModifiers) && LinkAt(pos) is { } url)
         {
             OpenLink(url);
             e.Handled = true;
@@ -1352,7 +1365,7 @@ public sealed class RichTextEditor : Control
         // A clean click (no drag-select) on a link opens it — the discoverable path most note apps use;
         // Ctrl+click already handled it on press, so skip when a modifier is down to avoid double-opening.
         var pt = e.GetPosition(this);
-        if (!HasSelection && !e.KeyModifiers.HasFlag(KeyModifiers.Control) &&
+        if (!HasSelection && !Services.Keymap.HasCommandStrict(e.KeyModifiers) &&
             Math.Abs(pt.X - _pressPoint.X) < 4 && Math.Abs(pt.Y - _pressPoint.Y) < 4 &&
             LinkAt(PosFromPoint(pt)) is { } url)
             OpenLink(url);

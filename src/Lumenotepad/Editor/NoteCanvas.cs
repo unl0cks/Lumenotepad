@@ -1551,7 +1551,7 @@ internal sealed class NoteBoxView : Panel
     /// duplicates. Both are swallowed so the editor doesn't also act on the key.</summary>
     private void OnBubbleKey(object? sender, KeyEventArgs e)
     {
-        if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.D)
+        if (e.Key == Key.D && Services.Keymap.HasCommand(e.KeyModifiers) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
         {
             _canvas.DuplicateBox(this);
             e.Handled = true;

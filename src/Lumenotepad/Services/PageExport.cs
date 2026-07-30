@@ -616,10 +616,25 @@ public static class PageExport
             IsAntialias = true,
             Color = link ? new SkiaSharp.SKColor(0x2F, 0x6F, 0xC4) : SkiaSharp.SKColors.Black,
         },
-        new SkiaSharp.SKFont(SkiaSharp.SKTypeface.FromFamilyName("Segoe UI",
-            new SkiaSharp.SKFontStyle(bold ? SkiaSharp.SKFontStyleWeight.Bold : SkiaSharp.SKFontStyleWeight.Normal,
-                SkiaSharp.SKFontStyleWidth.Normal,
-                italic ? SkiaSharp.SKFontStyleSlant.Italic : SkiaSharp.SKFontStyleSlant.Upright)), size));
+        new SkiaSharp.SKFont(ExportTypeface(bold, italic), size));
+
+    /// <summary>The face the drawn-PDF/PNG export writes with. "Segoe UI" does not exist off Windows,
+    /// where the lookup falls through to Skia's default — legible, but not a face anyone chose. Try the
+    /// platform's own UI font first and keep Segoe as the Windows answer.</summary>
+    private static SkiaSharp.SKTypeface ExportTypeface(bool bold, bool italic)
+    {
+        var style = new SkiaSharp.SKFontStyle(
+            bold ? SkiaSharp.SKFontStyleWeight.Bold : SkiaSharp.SKFontStyleWeight.Normal,
+            SkiaSharp.SKFontStyleWidth.Normal,
+            italic ? SkiaSharp.SKFontStyleSlant.Italic : SkiaSharp.SKFontStyleSlant.Upright);
+        string[] families = OperatingSystem.IsWindows()
+            ? new[] { "Segoe UI", "Arial" }
+            : new[] { "SF Pro Text", "Helvetica Neue", "Helvetica", "Arial" };
+        foreach (var family in families)
+            if (SkiaSharp.SKTypeface.FromFamilyName(family, style) is { } tf)
+                return tf;
+        return SkiaSharp.SKTypeface.Default;
+    }
 
     // ---- DOCX (minimal OOXML) ----
 

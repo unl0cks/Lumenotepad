@@ -51,7 +51,7 @@ public sealed class SmoothScroll
     private void OnWheel(object? sender, PointerWheelEventArgs e)
     {
         // Ctrl+wheel (zoom intent) and inner scrollables keep native handling.
-        if (e.KeyModifiers.HasFlag(KeyModifiers.Control) || OverInnerScrollable(e.Source)) return;
+        if (Services.Keymap.HasCommandStrict(e.KeyModifiers) || OverInnerScrollable(e.Source)) return;
 
         // Shift turns the wheel into a HORIZONTAL pan; it eases through the same frame-locked glide
         // so sideways scrolling feels identical to vertical instead of jumping.

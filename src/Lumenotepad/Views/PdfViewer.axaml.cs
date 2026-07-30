@@ -1318,7 +1318,7 @@ public partial class PdfViewer : UserControl
     private void OnKey(object? sender, KeyEventArgs e)
     {
         if (e.Source is TextBox or RichTextEditor) return;   // typing in a note: the editor owns its keys
-        bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        bool ctrl = Services.Keymap.HasCommand(e.KeyModifiers);   // Cmd on macOS
         bool shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         if (ctrl && e.Key == Key.Z && !shift) { Undo(); e.Handled = true; return; }
         if (ctrl && (e.Key == Key.Y || (e.Key == Key.Z && shift))) { Redo(); e.Handled = true; return; }

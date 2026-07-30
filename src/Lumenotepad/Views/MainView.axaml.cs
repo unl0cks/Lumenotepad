@@ -180,7 +180,7 @@ public partial class MainView : UserControl
         // canvas horizontally. Tunnel so the ScrollViewer never also scrolls vertically on the same notch.
         CanvasScroll.AddHandler(PointerWheelChangedEvent, (_, e) =>
         {
-            if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+            if (Services.Keymap.HasCommandStrict(e.KeyModifiers))
             {
                 SetCanvasZoom(_canvasZoom * (e.Delta.Y > 0 ? 1.1 : 1 / 1.1));
                 e.Handled = true;
@@ -190,7 +190,7 @@ public partial class MainView : UserControl
         }, RoutingStrategies.Tunnel);
         AddHandler(KeyDownEvent, (_, e) =>
         {
-            if ((e.Key is Key.D0 or Key.NumPad0) && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+            if ((e.Key is Key.D0 or Key.NumPad0) && Services.Keymap.HasCommand(e.KeyModifiers))
             { SetCanvasZoom(1.0); e.Handled = true; }
         }, RoutingStrategies.Tunnel);
 
