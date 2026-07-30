@@ -86,13 +86,41 @@
             <Setter Property="CornerRadius" Value="9"/>
         </Style>
         <!-- left category nav -->
+        <!-- Settings cards. A soft recess rather than a hard box, so it groups without shouting -
+             the same read as Lumen's preference cards. -->
+        <Style Selector="Border.prefcard">
+            <Setter Property="Background" Value="#1F000000"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource FrameBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="16,13,16,14"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+        <!-- The section label is the card's own title, so it loses its old free-floating top margin. -->
+        <Style Selector="Border.prefcard > StackPanel > TextBlock.section">
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
         <Style Selector="ListBox.prefnav ListBoxItem">
-            <Setter Property="CornerRadius" Value="9"/>
-            <Setter Property="Padding" Value="10,7"/>
-            <Setter Property="Margin" Value="0,1"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="11,8"/>
+            <Setter Property="Margin" Value="0,1.5"/>
+        </Style>
+        <!-- Nav glyphs. Muted at rest, accent when the row is selected, so the tab reads as a unit. -->
+        <Style Selector="ListBox.prefnav TextBlock.navicon">
+            <Setter Property="FontFamily" Value="{StaticResource IconFont}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Width" Value="17"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        </Style>
+        <Style Selector="ListBox.prefnav ListBoxItem:selected TextBlock.navicon">
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="ListBox.prefnav ListBoxItem:selected TextBlock.label">
+            <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
         <Style Selector="ListBox.prefnav ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="CornerRadius" Value="9"/>
+            <Setter Property="CornerRadius" Value="10"/>
         </Style>
         <Style Selector="ListBox.prefnav ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
@@ -168,20 +196,50 @@
                      PlaceholderText="Search settings…"/>
         </Border>
 
-        <Grid ColumnDefinitions="158,*">
+        <Grid ColumnDefinitions="186,*">
 
             <!-- category nav -->
             <Border Grid.Column="0" BorderBrush="{DynamicResource FrameBorderBrush}"
                     BorderThickness="0,0,1,0" Padding="8,4">
                 <ListBox x:Name="NavList" Classes="prefnav" Background="Transparent"
                          BorderThickness="0" Padding="0">
-                    <ListBoxItem Tag="general"><TextBlock Classes="label" Text="General"/></ListBoxItem>
-                    <ListBoxItem Tag="appearance"><TextBlock Classes="label" Text="Appearance"/></ListBoxItem>
-                    <ListBoxItem Tag="layout"><TextBlock Classes="label" Text="Layout"/></ListBoxItem>
-                    <ListBoxItem Tag="canvas"><TextBlock Classes="label" Text="Canvas"/></ListBoxItem>
-                    <ListBoxItem Tag="editor"><TextBlock Classes="label" Text="Editor"/></ListBoxItem>
-                    <ListBoxItem Tag="shortcuts"><TextBlock Classes="label" Text="Shortcuts"/></ListBoxItem>
-                    <ListBoxItem IsEnabled="False" Margin="0,10,0,0" Padding="10,2">
+                    <ListBoxItem Tag="general">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Classes="navicon" Text="&#xE713;"/>
+                            <TextBlock Classes="label" Text="General" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="appearance">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Classes="navicon" Text="&#xE790;"/>
+                            <TextBlock Classes="label" Text="Appearance" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="layout">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Classes="navicon" Text="&#xE8A1;"/>
+                            <TextBlock Classes="label" Text="Layout" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="canvas">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Classes="navicon" Text="&#xE80A;"/>
+                            <TextBlock Classes="label" Text="Canvas" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="editor">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Classes="navicon" Text="&#xE70F;"/>
+                            <TextBlock Classes="label" Text="Editor" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="shortcuts">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Classes="navicon" Text="&#xE8EC;"/>
+                            <TextBlock Classes="label" Text="Shortcuts" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem IsEnabled="False" Margin="0,12,0,2" Padding="10,2">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <TextBlock x:Name="GateLock" Text="&#xE72E;" FontFamily="{StaticResource IconFont}"
                                        FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
@@ -190,16 +248,39 @@
                                        Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
-                    <ListBoxItem Tag="fonts"><TextBlock Classes="label" Text="Fonts"/></ListBoxItem>
-                    <ListBoxItem Tag="bullets"><TextBlock Classes="label" Text="Bullets &amp; numbers"/></ListBoxItem>
-                    <ListBoxItem Tag="data"><TextBlock Classes="label" Text="Data &amp; tools"/></ListBoxItem>
-                    <ListBoxItem Tag="about" Margin="0,10,0,0"><TextBlock Classes="label" Text="About"/></ListBoxItem>
+                    <ListBoxItem Tag="fonts">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Classes="navicon" Text="&#xE8D2;"/>
+                            <TextBlock Classes="label" Text="Fonts" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="bullets">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Classes="navicon" Text="&#xE8FD;"/>
+                            <TextBlock Classes="label" Text="Bullets &amp; numbers" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="data">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Classes="navicon" Text="&#xE81C;"/>
+                            <TextBlock Classes="label" Text="Data &amp; tools" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="about" Margin="0,12,0,0">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Classes="navicon" Text="&#xE82F;"/>
+                            <TextBlock Classes="label" Text="About" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
                 </ListBox>
             </Border>
 
             <!-- category panels (one visible at a time; ShowPanel swaps + animates).
                  x:Name so SmoothScroll can attach wheel-eased scrolling in the code-behind. -->
-            <ScrollViewer x:Name="PrefsScroll" Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
+            <Grid Grid.Column="1" RowDefinitions="Auto,*">
+            <TextBlock x:Name="PageTitle" Grid.Row="0" FontSize="21" FontWeight="SemiBold"
+                       Margin="20,6,20,10" Foreground="{DynamicResource TextPrimaryBrush}"/>
+            <ScrollViewer x:Name="PrefsScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel x:Name="PanelsHost" Spacing="14" Margin="20,4,20,18">
                     <TextBlock x:Name="SearchEmptyNote" Classes="hint" IsVisible="False"
                                Text="No settings match your search." Margin="0,8,0,0"/>
@@ -1004,6 +1085,7 @@
 
                 </StackPanel>
             </ScrollViewer>
+            </Grid>
         </Grid>
     </DockPanel>
     <!-- top-most: thin edge/corner grips that make the chromeless window resizable -->

@@ -35,10 +35,10 @@ public static class UpdateService
     public static string ManifestUrl =>
         Environment.GetEnvironmentVariable("LUMENOTEPAD_UPDATE_URL") is { Length: > 0 } custom
             ? custom
-            : "https://github.com/unl0cks/lumenotepad/releases/latest/download/latest.json";
+            : "https://github.com/unl0cks/Lumenotepad/releases/latest/download/latest.json";
 
     /// <summary>The human-readable release page, for the "what changed" link.</summary>
-    public const string ReleasesPage = "https://github.com/unl0cks/lumenotepad/releases/latest";
+    public const string ReleasesPage = "https://github.com/unl0cks/Lumenotepad/releases/latest";
 
     /// <summary>One downloadable build. <paramref name="Sha256"/> is verified before anything is
     /// unpacked — an interrupted or tampered download must never reach the bundle swap.</summary>
@@ -52,7 +52,7 @@ public static class UpdateService
     {
         try
         {
-            if (!IsSupported) return null;
+            if (!CanCheck) return null;
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
             http.DefaultRequestHeaders.UserAgent.ParseAdd($"Lumenotepad/{AppVersion.Current}");
             var json = await http.GetStringAsync(ManifestUrl, ct);
@@ -72,7 +72,7 @@ public static class UpdateService
     public static async Task<bool> DownloadAndApplyAsync(Build build, string version,
         IProgress<double>? progress = null, CancellationToken ct = default)
     {
-        if (!IsSupported || InstallRoot is not { } target) return false;
+        if (!CanApply || InstallRoot is not { } target) return false;
         string work = Path.Combine(Path.GetTempPath(), "lumenotepad-update-" + version);
         try
         {
@@ -106,11 +106,16 @@ public static class UpdateService
 
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
-    /// <summary>Whether this install can update itself in place. It must be a real packaged build sitting
+    /// <summary>Whether CHECKING is possible. Deliberately separate from installing: a check writes nothing,
+    /// so a dev build should still be able to look. Gating the button on installability is what made
+    /// "Check for updates" permanently dead in a checkout.</summary>
+    public static bool CanCheck => OperatingSystem.IsMacOS() || OperatingSystem.IsWindows();
+
+    /// <summary>Whether this install can REPLACE ITSELF in place. It must be a real packaged build sitting
     /// somewhere writable — a dev build out of bin/ would be clobbered by its own updater, and a copy in a
     /// read-only location would fail the swap halfway. Set LUMENOTEPAD_UPDATE_FORCE=1 to test against a
     /// dev tree deliberately.</summary>
-    public static bool IsSupported
+    public static bool CanApply
     {
         get
         {

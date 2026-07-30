@@ -161,6 +161,7 @@ public partial class PreferencesWindow : Window
         };
         NavList.SelectedIndex = 0;
         _lastNav = NavList.SelectedItem;
+        GroupIntoCards();
         SetupSettingsSearch();
         WireAbout();
 
@@ -443,9 +444,11 @@ public partial class PreferencesWindow : Window
             + (Services.AppInfo.Commit is { } sha ? $"  ·  {sha}" : "");
         AboutDetails.Text = Services.AppInfo.Details();
 
-        bool canUpdate = Services.UpdateService.IsSupported;
-        AboutUpdateBtn.IsEnabled = canUpdate;
-        AboutAutoRow.IsVisible = canUpdate;
+        // Checking always works; only INSTALLING needs a real writable install. Gating the button on the
+        // latter is what left it permanently greyed out in a checkout.
+        bool canUpdate = Services.UpdateService.CanApply;
+        AboutUpdateBtn.IsEnabled = true;
+        AboutAutoRow.IsVisible = true;
         AboutUpdateNote.Text = canUpdate
             ? (OperatingSystem.IsMacOS()
                 ? "Updates download inside the app, so macOS does not ask you to approve them the way it "
@@ -454,9 +457,8 @@ public partial class PreferencesWindow : Window
                   + "folder alone.")
             : "This copy cannot update itself in place — it is running from a development tree, or from a "
               + "folder it cannot write to. Download builds from the releases page instead.";
-        ToolTip.SetTip(AboutUpdateBtn, canUpdate
-            ? "Opens the updater: finds the right build for this computer, downloads it, and restarts into it."
-            : AboutUpdateNote.Text);
+        ToolTip.SetTip(AboutUpdateBtn,
+            "Opens the updater: finds the right build for this computer, downloads it, and restarts into it.");
 
         AboutUpdateBtn.Click += (_, _) => new UpdaterWindow().ShowDialog(this);
 
@@ -477,7 +479,7 @@ public partial class PreferencesWindow : Window
 
         // Launch-time check: quiet, so a version behind a flaky connection says nothing at all. Only the
         // note changes; nothing pops up over the user's work.
-        if (canUpdate && Vm is { AutoCheckUpdates: true }) _ = QuietCheck();
+        if (Vm is { AutoCheckUpdates: true }) _ = QuietCheck();
     }
 
     private async System.Threading.Tasks.Task QuietCheck()
@@ -1061,8 +1063,48 @@ public partial class PreferencesWindow : Window
     {
         if (!_panels.TryGetValue(key, out var panel)) return;
         foreach (var (k, p) in _panels) p.IsVisible = k == key;
+        PageTitle.Text = CategoryNames.GetValueOrDefault(key, key);
+        PageTitle.IsVisible = true;
         Motion.RiseIn(panel, Motion.Fast);
     }
+
+    /// <summary>Wrap each SECTION and the rows beneath it in a rounded card, the way Lumen's preferences
+    /// group theirs. Purely a re-parent of controls already in the panel — every name, binding and event
+    /// handler survives, because the controls themselves are untouched.
+    ///
+    /// Anything before the first section header stays where it is (the About page's identity block).</summary>
+    private void GroupIntoCards()
+    {
+        foreach (var (_, control) in _panels)
+        {
+            if (control is not Panel panel) continue;
+            var src = panel.Children.OfType<Control>().ToList();
+            if (!src.Any(IsSectionHeader)) continue;
+
+            panel.Children.Clear();
+            StackPanel? current = null;
+            foreach (var child in src)
+            {
+                if (IsSectionHeader(child))
+                {
+                    current = new StackPanel { Spacing = 6 };
+                    current.Children.Add(child);
+                    panel.Children.Add(new Border
+                    {
+                        Tag = CardTag,
+                        Classes = { "prefcard" },
+                        Child = current,
+                    });
+                }
+                else if (current is null) panel.Children.Add(child);
+                else current.Children.Add(child);
+            }
+        }
+    }
+
+    private const string CardTag = "prefcard";
+
+    private static bool IsSectionHeader(Control c) => c is TextBlock tb && tb.Classes.Contains("section");
 
     // ---- settings search (declutter): filter every category at once ------------------------------
 
@@ -1071,6 +1113,7 @@ public partial class PreferencesWindow : Window
         ["general"] = "General", ["appearance"] = "Appearance", ["layout"] = "Layout",
         ["canvas"] = "Canvas", ["editor"] = "Editor", ["shortcuts"] = "Shortcuts",
         ["fonts"] = "Fonts", ["bullets"] = "Bullets & numbers", ["data"] = "Data & tools",
+        ["about"] = "About",
     };
 
     private readonly List<(string Key, Panel Panel, TextBlock Header)> _searchIndex = new();
@@ -1133,29 +1176,33 @@ public partial class PreferencesWindow : Window
     /// panel + its category heading hide entirely when nothing matched.</summary>
     private int FilterPanel(Panel panel, TextBlock catHeader, string q)
     {
-        var kids = panel.Children;
-        int n = kids.Count, matches = 0;
-        var isSection = new bool[n];
-        var rowMatched = new bool[n];
-
-        for (int i = 0; i < n; i++)
+        int matches = 0;
+        foreach (var child in panel.Children)
         {
-            var child = kids[i];
             if (ReferenceEquals(child, catHeader)) continue;
-            if (child is TextBlock { } tb && tb.Classes.Contains("section")) { isSection[i] = true; continue; }
-            if (!OrigVisible(child)) { SetSearchVis(child, false); continue; }  // never reveal a designed-hidden row
-            bool m = MatchesQuery(child, q);
-            rowMatched[i] = m;
-            SetSearchVis(child, m);
-            if (m) matches++;
-        }
-        for (int i = 0; i < n; i++)
-        {
-            if (!isSection[i]) continue;
-            bool any = false;
-            for (int j = i + 1; j < n && !isSection[j]; j++)
-                if (rowMatched[j]) { any = true; break; }
-            SetSearchVis(kids[i], any);
+            // Rows live inside cards now, so a card is shown when any row in it matches and hidden when
+            // none do — the section header inside it comes along for free.
+            if (child is Border { Tag: CardTag, Child: StackPanel inner })
+            {
+                int hits = 0;
+                foreach (var row in inner.Children)
+                {
+                    if (row is Control rc && IsSectionHeader(rc)) continue;
+                    if (!OrigVisible(row)) { SetSearchVis(row, false); continue; }
+                    bool m = MatchesQuery(row, q);
+                    SetSearchVis(row, m);
+                    if (m) hits++;
+                }
+                SetSearchVis(child, hits > 0);
+                matches += hits;
+            }
+            else
+            {
+                if (!OrigVisible(child)) { SetSearchVis(child, false); continue; }
+                bool m = MatchesQuery(child, q);
+                SetSearchVis(child, m);
+                if (m) matches++;
+            }
         }
         catHeader.IsVisible = matches > 0;
         panel.IsVisible = matches > 0;

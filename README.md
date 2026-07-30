@@ -322,6 +322,9 @@ Later:
 
 ## License
 
-No license file is present yet. One is needed before this repository is made public — without
-it, the default is exclusive copyright, which is probably not the intent. Third-party
-attributions are already recorded in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+[GNU General Public License v3.0](LICENSE). In short: you may use, study, share and modify
+Lumenotepad, but anything you distribute that is built from it has to carry the same freedoms and
+ship its source. There is no warranty.
+
+Every dependency is permissively licensed (MIT or BSD), so nothing here conflicts. Third-party
+attributions are recorded in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

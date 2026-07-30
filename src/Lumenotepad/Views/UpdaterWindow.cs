@@ -115,25 +115,17 @@ public sealed class UpdaterWindow : Window
     private void ShowIdle()
     {
         _headline.Text = $"Lumenotepad {Services.AppInfo.Version}";
-        _detail.Text = Services.UpdateService.IsSupported
-            ? "Checking for a newer version…"
-            : NotSupportedReason();
-        _action.IsEnabled = Services.UpdateService.IsSupported;
+        _detail.Text = "Checking for a newer version…";
+        _action.IsEnabled = true;
     }
 
-    /// <summary>Say plainly why updating is unavailable rather than offering a button that cannot work.</summary>
-    private static string NotSupportedReason()
-    {
-        if (!OperatingSystem.IsMacOS() && !OperatingSystem.IsWindows())
-            return "In-app updates are only available on macOS and Windows.";
-        if (Services.UpdateService.InstallRoot is null)
-            return "This build is not installed as an app, so there is nothing to update in place.";
-        return OperatingSystem.IsMacOS()
-            ? "This copy is running from a development tree or a location it cannot write to. "
-              + "Move Lumenotepad.app into Applications and try again."
-            : "This copy is running from a development tree or a folder it cannot write to. "
-              + "Move the Lumenotepad folder somewhere writable and try again.";
-    }
+    /// <summary>Why this copy cannot install an update itself. Checking always works — only replacing the
+    /// files needs a real, writable install — so this explains the gap rather than disabling the button.</summary>
+    private static string CannotInstallReason() => OperatingSystem.IsMacOS()
+        ? "This copy is running from a development tree, or from somewhere it cannot write to, so it "
+          + "cannot replace itself. Move Lumenotepad.app into Applications, or download the build by hand."
+        : "This copy is running from a development tree, or from a folder it cannot write to, so it "
+          + "cannot replace itself. Move the Lumenotepad folder somewhere writable, or download by hand.";
 
     private async Task OnAction()
     {
@@ -143,7 +135,6 @@ public sealed class UpdaterWindow : Window
 
     private async Task Check()
     {
-        if (!Services.UpdateService.IsSupported) return;
         _action.IsEnabled = false;
         _headline.Text = "Checking for updates…";
         _detail.Text = $"You have {Services.AppInfo.Version}.";
