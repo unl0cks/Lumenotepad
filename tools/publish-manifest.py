@@ -34,16 +34,24 @@ def csproj_version() -> str:
 
 
 VERSION = sys.argv[1] if len(sys.argv) > 1 else csproj_version()
-RELEASE_BASE = os.environ.get(
-    "LUMENOTEPAD_RELEASE_BASE",
-    f"https://github.com/unl0cks/Lumenotepad/releases/download/v{VERSION}")
+REPO = os.environ.get("LUMENOTEPAD_REPO", "unl0cks/Lumenotepad")
 
-# manifest key -> zip filename
+# manifest key -> (zip filename, release tag it is attached to)
+#
+# Platforms can ship under DIFFERENT tags. Windows is published as a prerelease under its own tag so it
+# cannot become GitHub's "latest" and hijack the macOS update check - which means its download URL is not
+# the macOS one, and assuming a single shared tag put a dead 404 in the manifest.
+WIN_TAG = os.environ.get("LUMENOTEPAD_WIN_TAG", f"v{VERSION}-win-beta")
 BUILDS = {
-    "macos-arm64": f"Lumenotepad-macOS-{VERSION}-arm64.zip",
-    "macos-x64": f"Lumenotepad-macOS-{VERSION}-x64.zip",
-    "win-x64": f"Lumenotepad-{VERSION}-win-x64-portable.zip",
+    "macos-arm64": (f"Lumenotepad-macOS-{VERSION}-arm64.zip", f"v{VERSION}"),
+    "macos-x64": (f"Lumenotepad-macOS-{VERSION}-x64.zip", f"v{VERSION}"),
+    "win-x64": (f"Lumenotepad-{VERSION}-win-x64-portable.zip", WIN_TAG),
 }
+
+
+def asset_url(tag: str, name: str) -> str:
+    base = os.environ.get("LUMENOTEPAD_RELEASE_BASE")
+    return f"{base}/{name}" if base else f"https://github.com/{REPO}/releases/download/{tag}/{name}"
 
 
 def sha256(path: str) -> str:
@@ -69,13 +77,13 @@ def main() -> None:
                   f"- the updater will show no description")
 
     builds, missing = {}, []
-    for key, name in BUILDS.items():
+    for key, (name, tag) in BUILDS.items():
         path = os.path.join(DIST, name)
         if not os.path.isfile(path):
             missing.append(name)
             continue
         builds[key] = {
-            "url": f"{RELEASE_BASE}/{name}",
+            "url": asset_url(tag, name),
             "sha256": sha256(path),
             "size": os.path.getsize(path),
         }
