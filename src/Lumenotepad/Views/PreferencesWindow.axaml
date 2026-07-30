@@ -204,6 +204,34 @@
                                Text="No settings match your search." Margin="0,8,0,0"/>
 
                     <StackPanel x:Name="GeneralPanel" Spacing="6">
+                        <!-- macOS only: Windows has its own installer, so there is nothing to update from
+                             here. Shown first because it is the row she will actually come looking for. -->
+                        <StackPanel x:Name="UpdatesSection" Spacing="6" IsVisible="False">
+                            <TextBlock Classes="section" Text="UPDATES" Margin="0,4,0,2"/>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Classes="label" Text="Version"/>
+                                        <Border Classes="qmark" ToolTip.Tip="Updates download inside the app, so macOS does not ask you to approve them the way it did the first install. Your notebooks are never touched."><TextBlock/></Border>
+                                    </StackPanel>
+                                    <TextBlock x:Name="UpdateStatus" Classes="hint" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                    <Button x:Name="UpdateCheckBtn" Content="Check now" FontSize="12.5" Padding="12,6"/>
+                                    <Button x:Name="UpdateInstallBtn" Content="Update" FontSize="12.5"
+                                            Padding="12,6" IsVisible="False"/>
+                                </StackPanel>
+                            </Grid>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Classes="label" Text="Check on launch"/>
+                                    <Border Classes="qmark" ToolTip.Tip="Quietly looks for a newer version each time the app starts. It never installs anything on its own — you always get to press Update."><TextBlock/></Border>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoCheckUpdates, Mode=TwoWay}"
+                                              VerticalAlignment="Center"/>
+                            </Grid>
+                        </StackPanel>
+
                         <TextBlock Classes="section" Text="STARTUP" Margin="0,4,0,2"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">

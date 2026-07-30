@@ -1,13 +1,24 @@
 #!/bin/bash
-# Builds the macOS installer zip from Windows (or anywhere with the .NET SDK).
-#   tools/publish-macos.sh [version]        e.g.  tools/publish-macos.sh 1.0.1
+# Builds the macOS distribution from Windows (or anywhere with the .NET SDK + rcodesign).
+#   tools/publish-macos.sh              # version comes from <Version> in Lumenotepad.csproj
+#   tools/publish-macos.sh 1.2.1        # explicit override
 #
-# Publishes self-contained builds for Apple Silicon + Intel, then packs both into
-# dist/Lumenotepad-macOS-<version>.zip with the arch-detecting installer script.
-# Prereq once per icon change: dotnet run --project tools/icongen  (emits assets/macos-iconset).
+# Publishes self-contained builds for Apple Silicon + Intel, code-signs each .app with rcodesign, and
+# emits one zip per architecture plus the in-app update manifest:
+#   dist/Lumenotepad-macOS-<version>-arm64.zip
+#   dist/Lumenotepad-macOS-<version>-x64.zip
+#   dist/macos-latest.json
+#
+# Prereqs:
+#   cargo install apple-codesign                    (once - the cross-platform Apple code signer)
+#   dotnet run --project tools/icongen              (once per icon change - emits assets/macos-iconset)
 set -e
 cd "$(dirname "$0")/.."
-VERSION="${1:-1.0.0}"
+
+command -v rcodesign >/dev/null || {
+  echo "rcodesign not found. Install it with:  cargo install apple-codesign" >&2
+  exit 1
+}
 
 for RID in osx-arm64 osx-x64; do
   echo "== publish $RID =="
@@ -18,4 +29,4 @@ for RID in osx-arm64 osx-x64; do
     --self-contained true -p:UseAppHost=true -v q --nologo
 done
 
-python tools/publish-macos/make_bundle.py "$VERSION"
+python tools/publish-macos/make_bundle.py "$@"

@@ -2,6 +2,10 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
+    <!-- THE version. The in-app updater compares against it and the macOS packaging script reads it
+         straight out of this file, so a release can never ship a bundle whose Info.plist and update
+         manifest disagree with the binary. -->
+    <Version>1.2.0</Version>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

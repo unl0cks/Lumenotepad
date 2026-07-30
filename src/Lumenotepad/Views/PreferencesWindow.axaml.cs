@@ -115,6 +115,60 @@ public partial class PreferencesWindow : Window
             StartupRow.IsVisible = false;
             SummonRow.IsVisible = false;
         }
+        WireUpdates();
+    }
+
+    private (string Version, Services.UpdateService.Build Build)? _pendingUpdate;
+
+    /// <summary>The UPDATES section. Only meaningful for a macOS .app we can write to — a dev build has no
+    /// bundle to replace, and Windows has its own installer.</summary>
+    private void WireUpdates()
+    {
+        UpdatesSection.IsVisible = Services.UpdateService.IsSupported;
+        if (!UpdatesSection.IsVisible) return;
+        UpdateStatus.Text = $"Lumenotepad {Services.AppVersion.Current}";
+
+        UpdateCheckBtn.Click += async (_, _) => await CheckForUpdate(quiet: false);
+        UpdateInstallBtn.Click += async (_, _) =>
+        {
+            if (_pendingUpdate is not { } pending) return;
+            UpdateInstallBtn.IsEnabled = UpdateCheckBtn.IsEnabled = false;
+            var progress = new Progress<double>(p =>
+                UpdateStatus.Text = $"Downloading {pending.Version}… {(int)(p * 100)}%");
+            UpdateStatus.Text = $"Downloading {pending.Version}…";
+            bool ok = await Services.UpdateService.DownloadAndApplyAsync(pending.Build, pending.Version, progress);
+            if (ok)
+            {
+                // The swap script is already waiting on this process to exit.
+                UpdateStatus.Text = "Restarting…";
+                if (Application.Current?.ApplicationLifetime
+                    is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime d)
+                    d.Shutdown();
+                return;
+            }
+            UpdateStatus.Text = "That download didn't finish cleanly — nothing was changed. Try again?";
+            UpdateInstallBtn.IsEnabled = UpdateCheckBtn.IsEnabled = true;
+        };
+
+        // Launch-time check: quiet, so a version behind a flaky connection says nothing at all.
+        if (Vm is { AutoCheckUpdates: true }) _ = CheckForUpdate(quiet: true);
+    }
+
+    private async System.Threading.Tasks.Task CheckForUpdate(bool quiet)
+    {
+        if (!quiet) { UpdateCheckBtn.IsEnabled = false; UpdateStatus.Text = "Checking…"; }
+        var found = await Services.UpdateService.CheckAsync();
+        UpdateCheckBtn.IsEnabled = true;
+        if (found is not { } f)
+        {
+            if (!quiet) UpdateStatus.Text = $"Lumenotepad {Services.AppVersion.Current} — up to date.";
+            return;
+        }
+        _pendingUpdate = (f.Version, f.Build);
+        UpdateInstallBtn.IsVisible = true;
+        UpdateStatus.Text = f.Notes is { Length: > 0 }
+            ? $"Version {f.Version} is available — {f.Notes}"
+            : $"Version {f.Version} is available.";
         // Sliders no longer snap-to-tick (the thumb glides with the cursor) — snap the STORED value
         // and the label to the tick here instead. Autosave: 100ms steps.
         AutosaveSlider.ValueChanged += (_, e) =>

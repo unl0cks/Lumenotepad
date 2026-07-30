@@ -81,6 +81,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string? _customAccent;             // prefs: accent override; null = theme's own
     [ObservableProperty] private double _glassTint;                 // prefs: -1..1 glass veil; 0 = off
     [ObservableProperty] private int _macGlassMaterial;             // prefs: macOS frost density; 0 = system default
+    [ObservableProperty] private bool _autoCheckUpdates = true;     // prefs: macOS launch-time update check
     [ObservableProperty] private double _cornerRoundness = 1.0;     // prefs: 0.5..1.5 corner-radius scale
     [ObservableProperty] private bool _sectionsSidebar;             // prefs: sections as their own sidebar
     [ObservableProperty] private bool _singleMode;                  // prefs: notebooks hold pages directly (no sections)
@@ -228,6 +229,7 @@ public partial class MainViewModel : ObservableObject
             CustomAccent = _settings.CustomAccent;
             GlassTint = _settings.GlassTint;
             MacGlassMaterial = _settings.MacGlassMaterial;
+            AutoCheckUpdates = _settings.AutoCheckUpdates;
             // Explicitly, not via the change hook: the saved value is usually the default, so assigning
             // it fires nothing and the static would keep whatever it started as.
             Platform.MacVibrancy.Material = MacMaterialOf(MacGlassMaterial);
@@ -425,6 +427,13 @@ public partial class MainViewModel : ObservableObject
     {
         if (_settings is null || _settingsDir is null) return;
         _settings.GlassTint = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnAutoCheckUpdatesChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.AutoCheckUpdates = value;
         _settings.Save(_settingsDir);
     }
 
@@ -972,6 +981,7 @@ public partial class MainViewModel : ObservableObject
         CustomAccent = d.CustomAccent;
         GlassTint = d.GlassTint;
         MacGlassMaterial = d.MacGlassMaterial;
+        AutoCheckUpdates = d.AutoCheckUpdates;
         CornerRoundness = d.CornerRoundness;
         SectionsSidebar = d.SectionsSidebar;
         ReduceMotion = d.ReduceMotion; MotionSpeed = d.MotionSpeed;

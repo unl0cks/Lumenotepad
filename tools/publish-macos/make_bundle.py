@@ -1,24 +1,54 @@
-# Assembles the macOS installer zip from `dotnet publish` output - runs fine on Windows (stdlib only).
+# Assembles the macOS distribution from `dotnet publish` output - runs on Windows.
 #
 # Input:  src/Lumenotepad/bin/Release/net10.0/{osx-arm64,osx-x64}/publish  (created by publish-macos.sh)
 #         assets/macos-iconset/icon_{16..1024}.png                        (created by tools/icongen)
-# Output: dist/Lumenotepad-macOS-<version>.zip containing
-#           payload/arm64/Lumenotepad.app     (Apple Silicon)
-#           payload/x64/Lumenotepad.app       (Intel)
-#           Install Lumenotepad.command       (auto-detects arch, replaces /Applications copy)
-#           README.txt
+# Output: dist/Lumenotepad-macOS-<version>-arm64.zip   (Apple Silicon)
+#         dist/Lumenotepad-macOS-<version>-x64.zip     (Intel)
+#         dist/macos-latest.json                       (in-app update manifest)
 #
-# The zip is written with unix modes (create_system=3) so the .command and the apphosts come out
-# executable after macOS Archive Utility extracts them - a plain Windows zip would drop the exec
-# bit and the installer would not double-click-run. The install script still chmods defensively.
+# The bundle is STAGED ON DISK and code-signed here with rcodesign (the cross-platform Apple signer,
+# `cargo install apple-codesign`) rather than by a script on the user's Mac. Apple Silicon refuses to
+# execute unsigned Mach-O, and `dotnet publish` leaves ~220 unsigned dylibs, so something has to sign
+# them; doing it at build time is what lets the download be a plain drag-into-Applications app instead
+# of a Terminal installer.
+#
+# The signature is AD-HOC, which satisfies the kernel but not Gatekeeper - the first launch of any
+# downloaded build still needs one trip through System Settings > Privacy & Security. Every update after
+# that is prompt-free because the app fetches those itself (see Services/UpdateService.cs), and nothing
+# an app downloads is quarantined. Notarising with a real Developer ID would remove even the first trip.
+#
+# Zips are written with unix modes (create_system=3) so the app host and dylibs stay executable through
+# macOS Archive Utility - a plain Windows zip drops the exec bit and the app will not start.
+import hashlib
+import json
 import os
 import plistlib
+import re
+import shutil
 import struct
+import subprocess
 import sys
 import zipfile
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-VERSION = sys.argv[1] if len(sys.argv) > 1 else "1.0.0"
+CSPROJ = os.path.join(ROOT, "src", "Lumenotepad", "Lumenotepad.csproj")
+
+
+def csproj_version() -> str:
+    """<Version> in the csproj is the single source of truth - the binary, the Info.plist and the update
+    manifest all have to agree or the updater would offer a build that says it is already installed."""
+    m = re.search(r"<Version>([^<]+)</Version>", open(CSPROJ, encoding="utf-8").read())
+    if not m:
+        sys.exit("no <Version> in Lumenotepad.csproj")
+    return m.group(1).strip()
+
+
+VERSION = sys.argv[1] if len(sys.argv) > 1 else csproj_version()
+# Where the zips will be reachable once uploaded. The manifest needs absolute URLs, and they have to be
+# known at pack time; override with LUMENOTEPAD_RELEASE_BASE when hosting somewhere else.
+RELEASE_BASE = os.environ.get(
+    "LUMENOTEPAD_RELEASE_BASE",
+    f"https://github.com/unl0cks/lumenotepad/releases/download/v{VERSION}")
 RIDS = {"arm64": "osx-arm64", "x64": "osx-x64"}
 ICONSET = os.path.join(ROOT, "assets", "macos-iconset")
 DIST = os.path.join(ROOT, "dist")
@@ -93,85 +123,81 @@ def info_plist() -> bytes:
     })
 
 
-INSTALL_CMD = """#!/bin/bash
-# Lumenotepad installer / updater. Double-click me.
-# First run on macOS 15+: click Done on the warning, then System Settings > Privacy & Security >
-# "Open Anyway". (macOS 13/14: right-click this file > Open works as a shortcut.)
-set -e
-cd "$(dirname "$0")"
-
-ARCH="$(uname -m)"
-if [ "$ARCH" = "arm64" ]; then SRC="payload/arm64/Lumenotepad.app"; else SRC="payload/x64/Lumenotepad.app"; fi
-
-DEST="/Applications"
-if [ ! -w "$DEST" ]; then DEST="$HOME/Applications"; mkdir -p "$DEST"; fi
-
-echo "Installing Lumenotepad ($ARCH) into $DEST ..."
-# quit a running copy so the bundle can be replaced cleanly.
-# (no Apple events: osascript would LAUNCH the app when it isn't running, and triggers a TCC
-# Automation prompt when it is - a remembered "Don't Allow" would make the quit fail silently
-# forever. Plain signals need no permission; .NET exits cleanly on SIGTERM.)
-pkill -x Lumenotepad 2>/dev/null || true
-for i in 1 2 3 4 5; do pgrep -x Lumenotepad >/dev/null || break; sleep 1; done
-pgrep -x Lumenotepad >/dev/null && pkill -9 -x Lumenotepad 2>/dev/null || true
-rm -rf "$DEST/Lumenotepad.app"
-cp -R "$SRC" "$DEST/Lumenotepad.app"
-
-# zips made on Windows can lose the exec bit - restore it defensively
-chmod +x "$DEST/Lumenotepad.app/Contents/MacOS/Lumenotepad" 2>/dev/null || true
-
-# clear the download quarantine, then ad-hoc sign every native library and the bundle so
-# Gatekeeper on Apple Silicon (which requires signatures) lets it launch. codesign ships
-# with macOS itself - no developer tools needed.
-xattr -cr "$DEST/Lumenotepad.app" 2>/dev/null || true
-find "$DEST/Lumenotepad.app/Contents/MacOS" -name "*.dylib" -exec codesign --force -s - {} \\; >/dev/null 2>&1 || true
-codesign --force -s - "$DEST/Lumenotepad.app" >/dev/null 2>&1 || true
-
-echo "Done - launching Lumenotepad."
-open "$DEST/Lumenotepad.app"
-"""
-
 README = f"""Lumenotepad for macOS  (v{VERSION})
 =====================================
 
-HOW TO INSTALL (also how to UPDATE - it replaces the old version, your notes are kept):
+TO INSTALL, OR TO UPDATE BY HAND:
+  Drag Lumenotepad.app into your Applications folder (replace the old one if asked).
 
-  1. Unzip this file (double-click it).
-  2. Double-click "Install Lumenotepad.command".
-     macOS will say it could not verify it - click "Done" (NOT "Move to Trash").
-  3. Open System Settings > Privacy & Security, scroll down to the message about
-     "Install Lumenotepad.command" being blocked, and click "Open Anyway"
-     (you may need your password or Touch ID).
-  4. In the final dialog, click "Open Anyway" / "Open" - the installer then runs
-     in a Terminal window.
+THE FIRST TIME YOU OPEN IT, macOS WILL REFUSE:
+  1. Double-click Lumenotepad - you get "Apple could not verify Lumenotepad".
+     Click "Done".
+  2. Open System Settings > Privacy & Security and scroll down. There is a line
+     about Lumenotepad being blocked - click "Open Anyway", then confirm.
+  3. It opens. You only ever have to do this once.
 
-  (On macOS 13 or 14 there is a shortcut: right-click the .command file and
-   choose "Open", then "Open" again.)
+  (That is macOS being cautious about an app not bought from the App Store - not a
+   sign anything is wrong. Any small independent app does this.)
 
-  IF NOTHING WORKS: open the Terminal app, type  bash  followed by a space,
-  then drag "Install Lumenotepad.command" into the window and press Return.
+AFTER THAT, UPDATES ARE ONE CLICK:
+  Preferences > General > Updates > "Check now". The app downloads new versions
+  itself, so macOS does NOT ask you to approve them again. You never need to
+  repeat the steps above, and you never need this zip again.
 
-The installer picks the right build for this Mac (Apple Silicon or Intel), puts
-Lumenotepad.app into Applications, and launches it.
-
-Your notebooks are stored in ~/Library/Application Support/Lumenotepad - they are
-NEVER touched by installing or updating the app.
-
-If the app doesn't open from Launchpad the very first time: right-click the app in
-Applications and choose "Open" once. After that it opens normally.
+YOUR NOTES:
+  Stored in ~/Library/Application Support/Lumenotepad and never touched by
+  installing or updating.
 """
 
 
-def add_tree(zf: zipfile.ZipFile, src_dir: str, arc_prefix: str, exe_names: set) -> int:
+def stage_bundle(arch: str, rid: str, icns: bytes, plist: bytes) -> str:
+    """Lay the .app out on disk so it can be signed as a real bundle."""
+    pub = os.path.join(ROOT, "src", "Lumenotepad", "bin", "Release", "net10.0", rid, "publish")
+    if not os.path.isdir(pub):
+        sys.exit(f"missing publish output: {pub} - run dotnet publish -r {rid} first")
+    app = os.path.join(DIST, "stage", arch, "Lumenotepad.app")
+    shutil.rmtree(os.path.dirname(app), ignore_errors=True)
+    contents = os.path.join(app, "Contents")
+    os.makedirs(os.path.join(contents, "Resources"), exist_ok=True)
+    shutil.copytree(pub, os.path.join(contents, "MacOS"))
+    with open(os.path.join(contents, "Info.plist"), "wb") as f:
+        f.write(plist)
+    with open(os.path.join(contents, "Resources", "lumenotepad.icns"), "wb") as f:
+        f.write(icns)
+    return app
+
+
+def sign_bundle(app: str) -> None:
+    """Ad-hoc sign the bundle (and, recursively, every Mach-O inside it) with rcodesign.
+
+    Not optional on Apple Silicon: the kernel kills unsigned arm64 code, so without this the app simply
+    would not launch after a drag-install. Ad-hoc is as far as we can go without a paid Developer ID -
+    it makes the app RUNNABLE, not Gatekeeper-approved."""
+    exe = shutil.which("rcodesign")
+    if not exe:
+        sys.exit("rcodesign not found - install it with:  cargo install apple-codesign")
+    r = subprocess.run([exe, "sign", app], capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.exit("rcodesign failed:\n" + r.stdout + "\n" + r.stderr)
+    # Prove a signature actually landed rather than trusting the exit code.
+    if not os.path.isdir(os.path.join(app, "Contents", "_CodeSignature")):
+        sys.exit("rcodesign reported success but wrote no _CodeSignature - refusing to ship it")
+
+
+def zip_bundle(app: str, out: str) -> int:
+    """Zip the signed bundle with unix modes intact. Signatures cover file CONTENT, not mode, so setting
+    the exec bit here cannot invalidate them."""
     count = 0
-    for base, _, files in os.walk(src_dir):
-        for name in files:
-            full = os.path.join(base, name)
-            rel = os.path.relpath(full, src_dir).replace("\\", "/")
-            arc = f"{arc_prefix}/{rel}"
-            mode = 0o755 if (name in exe_names or name.endswith(".dylib")) else 0o644
-            write_file(zf, arc, open(full, "rb").read(), mode)
-            count += 1
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+        root = os.path.dirname(app)
+        for base, _, files in os.walk(app):
+            for name in files:
+                full = os.path.join(base, name)
+                arc = os.path.relpath(full, root).replace("\\", "/")
+                mode = 0o755 if (name == "Lumenotepad" or name.endswith(".dylib")) else 0o644
+                write_file(zf, arc, open(full, "rb").read(), mode)
+                count += 1
+        write_file(zf, "README.txt", README.encode(), 0o644)
     return count
 
 
@@ -183,24 +209,39 @@ def write_file(zf: zipfile.ZipFile, arcname: str, data: bytes, mode: int) -> Non
     zf.writestr(zi, data)
 
 
+def sha256(path: str) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def main() -> None:
     icns = build_icns()
     plist = info_plist()
     os.makedirs(DIST, exist_ok=True)
-    out = os.path.join(DIST, f"Lumenotepad-macOS-{VERSION}.zip")
-    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
-        for arch, rid in RIDS.items():
-            pub = os.path.join(ROOT, "src", "Lumenotepad", "bin", "Release", "net10.0", rid, "publish")
-            if not os.path.isdir(pub):
-                sys.exit(f"missing publish output: {pub} - run dotnet publish -r {rid} first")
-            app = f"payload/{arch}/Lumenotepad.app/Contents"
-            n = add_tree(zf, pub, f"{app}/MacOS", exe_names={"Lumenotepad"})
-            write_file(zf, f"{app}/Info.plist", plist, 0o644)
-            write_file(zf, f"{app}/Resources/lumenotepad.icns", icns, 0o644)
-            print(f"  packed {arch}: {n} files")
-        write_file(zf, "Install Lumenotepad.command", INSTALL_CMD.encode(), 0o755)
-        write_file(zf, "README.txt", README.encode(), 0o644)
-    print(f"wrote {out} ({os.path.getsize(out) / 1024 / 1024:.1f} MB)")
+    builds = {}
+    for arch, rid in RIDS.items():
+        app = stage_bundle(arch, rid, icns, plist)
+        sign_bundle(app)
+        out = os.path.join(DIST, f"Lumenotepad-macOS-{VERSION}-{arch}.zip")
+        n = zip_bundle(app, out)
+        size = os.path.getsize(out)
+        builds[arch] = {
+            "url": f"{RELEASE_BASE}/Lumenotepad-macOS-{VERSION}-{arch}.zip",
+            "sha256": sha256(out),
+            "size": size,
+        }
+        print(f"  {arch}: signed, {n} files, {size / 1024 / 1024:.1f} MB -> {os.path.basename(out)}")
+
+    manifest = os.path.join(DIST, "macos-latest.json")
+    with open(manifest, "w", encoding="utf-8") as f:
+        json.dump({"version": VERSION, "notes": "", "builds": builds}, f, indent=2)
+    shutil.rmtree(os.path.join(DIST, "stage"), ignore_errors=True)
+    print(f"wrote {manifest}")
+    print("Upload BOTH zips and macos-latest.json to the release named "
+          f"v{VERSION} for the in-app updater to find them.")
 
 
 if __name__ == "__main__":
