@@ -36,7 +36,7 @@ def csproj_version() -> str:
 VERSION = sys.argv[1] if len(sys.argv) > 1 else csproj_version()
 RELEASE_BASE = os.environ.get(
     "LUMENOTEPAD_RELEASE_BASE",
-    f"https://github.com/unl0cks/lumenotepad/releases/download/v{VERSION}")
+    f"https://github.com/unl0cks/Lumenotepad/releases/download/v{VERSION}")
 
 # manifest key -> zip filename
 BUILDS = {
@@ -56,15 +56,17 @@ def sha256(path: str) -> str:
 
 def main() -> None:
     notes_path = os.path.join(ROOT, "docs", f"release-notes-{VERSION}.md")
-    # The manifest's "notes" is the one line the updater window shows before downloading, so take the
-    # release notes' first real sentence rather than dumping the whole document into a dialog.
+    # The manifest's "notes" is the ONE line the updater window shows before downloading. Read it from an
+    # explicit marker rather than guessing at the prose: a "first real sentence" heuristic happily picked
+    # the tail of a wrapped line and put half a sentence in the dialog.
     notes = ""
     if os.path.isfile(notes_path):
-        for line in open(notes_path, encoding="utf-8"):
-            line = line.strip()
-            if line and not line.startswith(("#", "-", "*", ">", "|", "**Install")):
-                notes = line
-                break
+        m = re.search(r"<!--\s*summary:(.*?)-->", open(notes_path, encoding="utf-8").read(), re.S)
+        if m:
+            notes = " ".join(m.group(1).split())
+        else:
+            print(f"  WARNING: no '<!-- summary: ... -->' in {os.path.basename(notes_path)} "
+                  f"- the updater will show no description")
 
     builds, missing = {}, []
     for key, name in BUILDS.items():

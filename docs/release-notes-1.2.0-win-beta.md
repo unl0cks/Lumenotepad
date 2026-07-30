@@ -1,8 +1,9 @@
+<!-- summary: First Windows portable build, and the same fixes as the macOS release. -->
 # Lumenotepad 1.2.0 — Windows portable (beta)
 
 **This is a beta.** Same codebase as the macOS release and it gets the same fixes, but the Windows
 packaging itself has had far less real-world mileage. Back up anything you would mind losing —
-Preferences → General → Saving has a backup folder setting.
+Preferences → Data & tools has a backup folder setting.
 
 ## Install
 
@@ -24,8 +25,8 @@ the registry and nothing is installed system-wide.
 - **Keep it writable.** `C:\Program Files` blocks normal programs from writing, so your notes would
   fail to save there.
 
-There is no in-app updater on Windows; that is a macOS feature, where it exists to work around
-Gatekeeper.
+Windows has an in-app updater too: Preferences → **About** → *Check for updates*. It downloads the
+new build, replaces the program files, and restarts — leaving your `userdata` folder alone.
 
 ## Why portable rather than an installer
 

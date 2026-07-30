@@ -1,3 +1,4 @@
+<!-- summary: Updates now install from inside the app, so macOS only asks you to approve Lumenotepad once - ever. Installing is a drag-and-drop, keyboard shortcuts work, and the window behaves in full screen. -->
 # Lumenotepad 1.2.0 — macOS
 
 **Install:** download the zip for your Mac — `arm64` for Apple Silicon, `x64` for Intel — and drag
@@ -11,7 +12,7 @@ Privacy & Security**, scroll down, and click **Open Anyway**. That is a one-time
 
 ## Updates no longer cost you anything
 
-Preferences → General → **Updates** → *Check now*.
+Preferences → **About** → *Check for updates*.
 
 macOS quarantines anything a browser or chat client downloads, which is what forces the System
 Settings trip — and that toll is per download, so it used to be payable on every single release.
