@@ -8,23 +8,14 @@ using System.Threading.Tasks;
 
 namespace Lumenotepad.Services;
 
-/// <summary>The browsable font index behind the Font Browser (M11): the full Google Fonts catalog
-/// (~1900 families), the Fontshare library (~100), and Fontsource's non-Google open fonts (~120) —
-/// all fetched keyless from their public endpoints, deduped by name, and tagged with friendly
-/// categories. Metadata only — a family's file is downloaded lazily for preview/install. Fetched
-/// once per session and cached; a failed source is skipped, never fatal.</summary>
 public static class FontCatalog
 {
     public const string Google = "Google Fonts";
     public const string Fontshare = "Fontshare";
     public const string Fontsource = "Fontsource";
 
-    /// <summary><paramref name="Id"/> is the download key for the source (Google: family name;
-    /// Fontshare: slug; Fontsource: id).</summary>
     public sealed record CatalogFont(string Name, string Source, string Id, string Category, string Stroke, int Popularity);
 
-    /// <summary>The category chips, in display order. "all" is the implicit first filter; the rest are
-    /// multi-selectable and combine with AND (each narrows the results further).</summary>
     public static readonly IReadOnlyList<(string Key, string Label)> Categories = new[]
     {
         ("all", "All"),
@@ -41,29 +32,23 @@ public static class FontCatalog
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30) };
     private static IReadOnlyList<CatalogFont>? _cache;
 
-    /// <summary>Load the combined catalog (cached after the first success). Google is sorted
-    /// most-popular-first; Fontshare + Fontsource families are spread THROUGH that list so they're
-    /// discoverable while scrolling, not buried at the end.</summary>
     public static async Task<IReadOnlyList<CatalogFont>> LoadAsync(CancellationToken ct = default)
     {
         if (_cache is { Count: > 0 }) return _cache;
         var google = new List<CatalogFont>();
         var extras = new List<CatalogFont>();
         try { google.AddRange(ParseGoogle(await Http.GetStringAsync("https://fonts.google.com/metadata/fonts", ct))); }
-        catch { /* offline / shape change → no Google */ }
+        catch {  }
         try { extras.AddRange(ParseFontshare(await Http.GetStringAsync("https://api.fontshare.com/v2/fonts?limit=500", ct))); }
-        catch { /* skip Fontshare */ }
+        catch {  }
         try { extras.AddRange(ParseFontsource(await Http.GetStringAsync("https://api.fontsource.org/v1/fonts", ct))); }
-        catch { /* skip Fontsource */ }
+        catch {  }
 
         if (google.Count == 0 && extras.Count == 0) return Array.Empty<CatalogFont>();
         _cache = Merge(google, extras);
         return _cache;
     }
 
-    /// <summary>Pure: interleave the extra-source families into the popularity-sorted Google list by
-    /// giving each a synthetic popularity spread across Google's range, and drop names Google already
-    /// has (Google wins duplicates).</summary>
     public static IReadOnlyList<CatalogFont> Merge(IReadOnlyList<CatalogFont> google, IReadOnlyList<CatalogFont> extras)
     {
         var seen = new HashSet<string>(google.Select(g => g.Name), StringComparer.OrdinalIgnoreCase);
@@ -80,7 +65,6 @@ public static class FontCatalog
             .ToList();
     }
 
-    /// <summary>Pure: parse the Google metadata JSON (Latin subset, popularity kept for sorting).</summary>
     public static IReadOnlyList<CatalogFont> ParseGoogle(string json)
     {
         var list = new List<CatalogFont>();
@@ -105,8 +89,6 @@ public static class FontCatalog
         return list;
     }
 
-    /// <summary>Pure: parse the Fontshare fonts JSON, normalizing its category strings to the
-    /// Google-style category + stroke the heuristics expect.</summary>
     public static IReadOnlyList<CatalogFont> ParseFontshare(string json)
     {
         var list = new List<CatalogFont>();
@@ -127,8 +109,6 @@ public static class FontCatalog
         return list;
     }
 
-    /// <summary>Pure: parse the Fontsource fonts JSON, keeping only its NON-Google ("other") fonts
-    /// (the Google ones would just duplicate the Google source), Latin subset.</summary>
     public static IReadOnlyList<CatalogFont> ParseFontsource(string json)
     {
         var list = new List<CatalogFont>();
@@ -138,7 +118,7 @@ public static class FontCatalog
             if (doc.RootElement.ValueKind != JsonValueKind.Array) return list;
             foreach (var f in doc.RootElement.EnumerateArray())
             {
-                if (f.TryGetProperty("type", out var t) && t.GetString() == "google") continue;   // dedupe against Google source
+                if (f.TryGetProperty("type", out var t) && t.GetString() == "google") continue;
                 if (!f.TryGetProperty("id", out var idEl) || idEl.GetString() is not { Length: > 0 } id) continue;
                 if (!f.TryGetProperty("family", out var famEl) || famEl.GetString() is not { Length: > 0 } name) continue;
                 if (f.TryGetProperty("subsets", out var subs) && subs.ValueKind == JsonValueKind.Array &&
@@ -152,7 +132,6 @@ public static class FontCatalog
         return list;
     }
 
-    /// <summary>Pure: map a Fontshare category label to the Google-style (category, stroke) pair.</summary>
     public static (string Category, string Stroke) NormalizeFontshareCategory(string raw)
     {
         string r = raw.ToLowerInvariant();
@@ -166,7 +145,6 @@ public static class FontCatalog
         return ("Display", "");
     }
 
-    /// <summary>Pure: map a Fontsource lowercase category ("sans-serif", "handwriting"…) to Google-style.</summary>
     public static string NormalizeFontsourceCategory(string raw) => raw.ToLowerInvariant() switch
     {
         "sans-serif" => "Sans Serif",
@@ -177,8 +155,6 @@ public static class FontCatalog
         _ => "Display",
     };
 
-    /// <summary>Pure: does a font belong to a category chip? Categories overlap by design (they're
-    /// filters, not a partition), so a slab face is both "Serif" and "Slab".</summary>
     public static bool MatchesCategory(CatalogFont f, string categoryKey)
     {
         if (categoryKey == "all") return true;
@@ -232,8 +208,6 @@ public static class FontCatalog
         };
     }
 
-    /// <summary>Pure: filter by a SET of category chips (AND — each further narrows) plus the name
-    /// query. "all" (or an empty set) applies no category filter.</summary>
     public static IReadOnlyList<CatalogFont> Filter(
         IReadOnlyList<CatalogFont> catalog, IReadOnlyCollection<string> categoryKeys, string? query)
     {

@@ -12,15 +12,15 @@
   <img alt="Tests" src="https://img.shields.io/badge/tests-307%20passing-3FB950?style=for-the-badge">
 </p>
 
-Lumenotepad is a freeform note organizer for macOS and Windows, built with Avalonia. Notes
-are not documents in a list — every page is a canvas you drop containers onto, anywhere you
-like, the way OneNote works. Each container holds its own rich text, and pages can also carry
-tables, images, file attachments, annotated PDFs, and mind maps.
+Lumenotepad is a freeform note organizer for macOS and Windows, built with Avalonia.
 
-It is a native app by design. There is no browser engine anywhere in it: PDF pages are
-rasterized with native PDFium, text is laid out through Skia and HarfBuzz, and the window
-chrome is real platform chrome — DWM acrylic on Windows, `NSVisualEffectView` vibrancy on
-macOS.
+Notes aren't documents in a list. Every page is a canvas, and you drop containers onto it wherever
+you want, the way OneNote works. Each container holds its own rich text, and pages can also carry
+tables, images, file attachments, annotated PDFs and mind maps.
+
+It's a native app. There's no browser engine in it anywhere: PDF pages go through native PDFium, text
+is laid out with Skia and HarfBuzz, and the window chrome is the real thing on both platforms, DWM
+acrylic on Windows and `NSVisualEffectView` vibrancy on macOS.
 
 ## Contents
 
@@ -41,106 +41,102 @@ macOS.
 
 ## Highlights
 
-- **Freeform pages.** Click anywhere to start a container; drag, resize, and stack them.
+- **Freeform pages.** Click anywhere to start a container, then drag, resize and stack them.
   Containers you create and never type into tidy themselves away.
-- **Notebooks → sections → pages**, or a flat notebooks → pages mode if sections are more
-  structure than you want.
-- **Rich text** with its own editor: styles, highlights, bullet and numbered lists with
+- **Notebooks, sections, pages.** Or a flat notebooks-to-pages mode if sections are more structure
+  than you want.
+- **Rich text** in a purpose-built editor: styles, highlights, bullet and numbered lists with
   configurable furniture, links, and per-notebook paper styles and templates.
-- **Mind maps** with typed bubbles (title pill, information squircle, callout), labelled
-  connectors, a nominated central bubble, and three auto-arrange layouts (radial, hybrid,
-  top-down).
-- **PDF viewing and annotation** through native PDFium — highlights and notes over the page,
-  with a flattened-copy export.
-- **Export** to Markdown, HTML, RTF, PDF, DOCX, PNG, and EPUB.
-- **Five themes** — Lumen (glass), Dark, Light, Pink, Light blue — with accent overrides, an
-  optional accent that follows the open notebook, and adjustable corner roundness.
-- **Real platform glass.** Acrylic on Windows; on macOS the system vibrancy materials, with a
-  material picker because macOS exposes no blur-strength setting of its own.
-- **Font browser and installer** that fetches faces from Google Fonts and Fontshare into the
-  app's own font folder, no system install required.
+- **Mind maps** with typed bubbles (title pill, information squircle, callout), labelled connectors,
+  a nominated central bubble, and three auto-arrange layouts.
+- **PDF viewing and annotation** through native PDFium, with highlights and notes over the page and a
+  flattened-copy export.
+- **Export** to Markdown, HTML, RTF, PDF, DOCX, PNG and EPUB.
+- **Five themes.** Lumen (glass), Dark, Light, Pink and Light blue, with accent overrides, an optional
+  accent that follows the open notebook, and adjustable corner roundness.
+- **Real platform glass.** Acrylic on Windows, the system vibrancy materials on macOS, with a material
+  picker because macOS has no blur-strength setting of its own.
+- **Font browser and installer** that pulls faces from Google Fonts and Fontshare into the app's own
+  font folder. Nothing gets installed system-wide.
 - **Deleted-container history** per page, restorable by dragging back onto the canvas.
 - **Automatic backups** to a folder you choose, with a retention count.
 
 ## Project Status
 
-Actively developed. macOS is the newer target and the one under active test; Windows is the
-platform it grew up on.
+Under active development. Windows is the platform it grew up on. macOS is newer and gets most of the
+testing attention right now.
 
 | Area | Status |
 | --- | --- |
-| Windows desktop | Stable, the primary development platform |
-| macOS (Apple Silicon) | Working, under active testing |
-| macOS (Intel) | Built and signed, untested on hardware |
+| Windows desktop | Stable, the main development platform |
+| macOS (Apple Silicon) | Working, actively tested |
+| macOS (Intel) | Built and signed, not tested on hardware |
 | Editor, canvas, notebooks | Stable |
 | Mind maps | Stable |
 | PDF annotation | Usable |
 | Export formats | Usable |
-| In-app updates | New in 1.2.0; verified end-to-end on Windows, untried on macOS |
+| In-app updates | New in 1.2.0. Verified end to end on Windows, untried on macOS |
 | Windows packaging | Portable zip, beta |
-| Code signing / notarization | Ad-hoc only — see [Install](#install) |
+| Code signing | Ad-hoc only, see [Install](#install) |
 
 ## Install
 
 ### macOS
 
-Download the zip for your Mac (`arm64` for Apple Silicon, `x64` for Intel), then drag
+Download the zip for your Mac, `arm64` for Apple Silicon or `x64` for Intel, and drag
 `Lumenotepad.app` into Applications.
 
-The first launch is blocked, because the app is signed ad-hoc rather than with a paid Apple
+The first launch gets blocked, because the app is signed ad-hoc rather than with a paid Apple
 Developer ID:
 
-1. Double-click Lumenotepad → "Apple could not verify Lumenotepad" → **Done**.
-2. System Settings → Privacy & Security → scroll down → **Open Anyway**, then confirm.
-3. It opens. This is a one-time step, not once per launch.
+1. Double-click Lumenotepad. You get "Apple could not verify Lumenotepad". Click **Done**.
+2. Open System Settings, go to Privacy & Security, scroll down and click **Open Anyway**, then
+   confirm.
+3. It opens. That's a one-time step, not once per launch.
 
-Builds are code-signed at package time with [rcodesign](https://github.com/indygreg/apple-platform-rs),
-which matters more than it sounds: Apple Silicon refuses to execute unsigned Mach-O, and a
-self-contained .NET publish ships around 220 unsigned dylibs. Signing them during packaging is
-what makes a plain drag-install possible at all.
+Builds are code-signed at package time with [rcodesign](https://github.com/indygreg/apple-platform-rs).
+That matters more than it sounds: Apple Silicon refuses to execute unsigned Mach-O, and a
+self-contained .NET publish ships around 220 unsigned dylibs. Signing them during packaging is what
+makes a plain drag-install possible at all.
 
 ### Windows (beta)
 
-Download the portable zip, extract the folder anywhere **writable**, and run
-`Lumenotepad.exe`. SmartScreen will warn the first time — "More info" → "Run anyway".
+Download the portable zip, extract the folder somewhere **writable**, and run `Lumenotepad.exe`.
+SmartScreen warns the first time, so click "More info" then "Run anyway".
 
-It is portable on purpose. All user data lives in a `userdata` folder beside the executable,
-nothing touches the registry, and uninstalling means deleting the folder. Do not extract it
-into `C:\Program Files`: Windows blocks normal processes from writing there, and saving would
-fail. An installer would first require moving the Windows data directory to `%APPDATA%`, which
-is a migration for existing portable copies rather than a packaging change.
+It's portable on purpose. All user data lives in a `userdata` folder beside the executable, nothing
+touches the registry, and uninstalling means deleting the folder. Don't extract it into
+`C:\Program Files`, because Windows blocks normal processes from writing there and saving would fail.
+An installer would first need the Windows data directory moved to `%APPDATA%`, which is a migration
+for anyone already running a portable copy rather than a packaging change.
 
 ## Updates
 
-**Both platforms** update in place: Preferences → **About** → **Check for updates**. That opens the
-updater window, which finds the right build for whichever OS is running, downloads it with progress,
-verifies it, and restarts into it.
+Both platforms update in place from Preferences, under **About**, with **Check for updates**. That
+opens the updater window, which finds the right build for whichever OS is running, downloads it with
+progress, verifies it and restarts into it.
 
-This exists specifically to dodge Gatekeeper. An ad-hoc signature satisfies the kernel but not
-Gatekeeper, so any build macOS sees arrive from a browser or a chat client is quarantined and
-costs another trip through System Settings — and that toll is per download, meaning per
-release. The quarantine flag is applied by the *downloading* application, though, not by the
-network, so a build the app fetches itself is never marked. Pay the toll once on first install
-and never again.
+On macOS this exists to get around Gatekeeper. An ad-hoc signature satisfies the kernel but not
+Gatekeeper, so any build macOS sees arrive from a browser or a chat client is quarantined and costs
+another trip through System Settings. That toll is per download, which means per release. The
+quarantine flag is set by the application doing the downloading, not by the network, so a build the
+app fetches itself is never marked. You pay the toll once on first install and never again.
 
-Downloads are SHA-256 verified before anything is unpacked, and the bundle swap runs from a
-detached script that waits for the app to exit and moves the old bundle aside rather than
-deleting it, so a failed swap rolls back instead of leaving nothing behind.
-
-On **Windows** the reason is different but the shape is the same: the build is portable, so updating
+On Windows the reason is different but the shape is the same. The build is portable, so updating
 means replacing the program files around the `userdata` folder and leaving it alone. The swap uses
-`robocopy` without `/MIR`, which is precisely what preserves your notebooks.
+`robocopy` without `/MIR`, which is exactly what preserves your notebooks.
 
-A running executable cannot overwrite itself on either OS, so both hand the swap to a detached script
-that waits for the app to exit first.
+Downloads are SHA-256 verified before anything is unpacked. A running executable can't overwrite
+itself on either OS, so both hand the swap to a detached script that waits for the app to exit first.
+On macOS the old bundle is moved aside rather than deleted, so a failed swap rolls back.
 
 ## Requirements
 
-- **Running:** macOS 13+, or Windows 10/11 x64. Nothing else to install — builds are
+- **Running:** macOS 13+, or Windows 10/11 x64. Nothing else to install, the builds are
   self-contained.
 - **Building:** .NET 10 SDK.
-- **Packaging macOS builds:** `cargo install apple-codesign` (provides `rcodesign`). Works from
-  Windows or Linux; no Mac required.
+- **Packaging macOS builds:** `cargo install apple-codesign`, which provides `rcodesign`. Runs on
+  Windows or Linux, no Mac needed.
 - **Regenerating icons:** `dotnet run --project tools/icongen`.
 - **Regenerating the icon font:** Python with `fonttools`, then
   `python tools/lumenicons/build_lumenicons.py`.
@@ -155,9 +151,9 @@ dotnet run --project src/Lumenotepad/Lumenotepad.csproj
 
 ## Publishing
 
-Both scripts read the version from `<Version>` in `src/Lumenotepad/Lumenotepad.csproj`, which is
-the single source of truth — the binary, the macOS `Info.plist`, and the update manifest cannot
-drift apart.
+All three scripts read the version from `<Version>` in `src/Lumenotepad/Lumenotepad.csproj`. That's
+the single source of truth, so the binary, the macOS `Info.plist` and the update manifest can't drift
+apart.
 
 ```bash
 tools/publish-macos.sh
@@ -180,14 +176,16 @@ Writes `dist/Lumenotepad-<version>-win-x64-portable.zip`.
 python tools/publish-manifest.py
 ```
 
-Writes `dist/latest.json` — one manifest covering every platform, hashed from whatever zips are in
-`dist/`. `UpdateService.PlatformKey` picks its own entry (`macos-arm64`, `macos-x64`, `win-x64`), so a
-single file on a single release serves both operating systems and nobody can be handed the wrong build.
+Writes `dist/latest.json`, one manifest covering every platform, hashed from whatever zips are sitting
+in `dist/`. `UpdateService.PlatformKey` picks its own entry (`macos-arm64`, `macos-x64`, `win-x64`), so
+a single file on a single release serves both operating systems and nobody can be handed the wrong
+build.
 
-For the in-app updater to find a release, the zips **and** `latest.json` have to be uploaded to it. `UpdateService.ManifestUrl` points at the newest non-prerelease GitHub release, so
-publishing a Windows build as a *prerelease* deliberately keeps it out of the updater's path.
-Override the endpoints with `LUMENOTEPAD_RELEASE_BASE` when packing and `LUMENOTEPAD_UPDATE_URL`
-at runtime to test the whole flow against a local file server.
+Platforms can ship under different tags. Windows goes out as a prerelease under its own tag so it
+can't become GitHub's "latest" and hijack the macOS update check, and the manifest records that. For
+the updater to find a release, the zips and `latest.json` both have to be uploaded to it. Override the
+endpoints with `LUMENOTEPAD_RELEASE_BASE` when packing and `LUMENOTEPAD_UPDATE_URL` at runtime to test
+the whole flow against a local file server.
 
 ## User Data
 
@@ -196,16 +194,16 @@ at runtime to test the whole flow against a local file server.
 | macOS | `~/Library/Application Support/Lumenotepad` |
 | Windows | `userdata` beside `Lumenotepad.exe` (portable) |
 
-They differ for a reason: the macOS app ships as a bundle that gets replaced wholesale on every
-update, so data cannot live inside it.
+They differ for a reason. The macOS app ships as a bundle that gets replaced wholesale on every
+update, so data can't live inside it.
 
 Either way it holds `settings.json`, the `notebooks` tree, installed `fonts`, and nothing else.
 Installing or updating never touches it.
 
 ## Keyboard Shortcuts
 
-Shortcuts use **Cmd on macOS** and **Ctrl on Windows**. The formatting ones are rebindable in
-Preferences → Shortcuts; the structural ones are fixed.
+Shortcuts use **Cmd on macOS** and **Ctrl on Windows**. The formatting ones are rebindable under
+Preferences, in Shortcuts. The structural ones are fixed.
 
 | Action | Shortcut |
 | --- | --- |
@@ -218,11 +216,11 @@ Preferences → Shortcuts; the structural ones are fixed.
 | Undo | `Cmd/Ctrl` + `Z` |
 | Redo | `Cmd/Ctrl` + `Shift` + `Z`, or `Ctrl` + `Y` |
 | Select all | `Cmd/Ctrl` + `A` |
-| Word-wise motion | `Option` + `←`/`→` (macOS), `Ctrl` + `←`/`→` (Windows) |
-| Line start / end | `Cmd` + `←`/`→` (macOS), `Home` / `End` |
+| Word-wise motion | `Option` + `←`/`→` on macOS, `Ctrl` + `←`/`→` on Windows |
+| Line start / end | `Cmd` + `←`/`→` on macOS, `Home` / `End` |
 | Duplicate bubble | `Cmd/Ctrl` + `D` |
 | New linked child bubble | `Tab` on a focused bubble |
-| Open a hyperlink | `Cmd`-click (macOS), `Ctrl`-click (Windows) |
+| Open a hyperlink | `Cmd`-click on macOS, `Ctrl`-click on Windows |
 | Zoom the canvas | `Cmd/Ctrl` + wheel, `Cmd/Ctrl` + `0` to reset |
 | Pan horizontally | `Shift` + wheel |
 | Summon the window (Windows) | `Ctrl` + `Alt` + `N`, if enabled |
@@ -235,19 +233,19 @@ src/Lumenotepad/
   Views/       windows, the main view, dialogs, popup effects, animation helpers
   ViewModels/  MainViewModel and the notebook draft model (CommunityToolkit.Mvvm)
   Services/    settings, themes, export, fonts, PDF rendering, backups, updates
-  Platform/    the OS boundary — DWM acrylic, Win32 chrome, macOS vibrancy, window geometry
+  Platform/    the OS boundary: DWM acrylic, Win32 chrome, macOS vibrancy, window geometry
   Themes/      the Fluent-derived theme and control styles
 tools/         icon generation, the icon-font builder, publishing scripts
-tests/         xUnit coverage of the model, services, and pure geometry
+tests/         xUnit coverage of the model, services and pure geometry
 ```
 
 Two conventions worth knowing before changing anything:
 
 - **`Platform/` is the only place with OS-specific code.** Every Win32 P/Invoke is guarded with
-  `OperatingSystem.IsWindows()`, and the macOS side reaches AppKit through the Objective-C
-  runtime because Avalonia does not surface what the glass needs.
-- **Animation goes through `Views/Motion`**, not XAML transitions. Declarative transform
-  transitions did not run reliably in this build; `Motion` drives them from a clock instead.
+  `OperatingSystem.IsWindows()`, and the macOS side reaches AppKit through the Objective-C runtime
+  because Avalonia doesn't surface what the glass needs.
+- **Animation goes through `Views/Motion`,** not XAML transitions. Declarative transform transitions
+  didn't run reliably in this build, so `Motion` drives them from a clock instead.
 
 ## Testing
 
@@ -255,19 +253,19 @@ Two conventions worth knowing before changing anything:
 dotnet test
 ```
 
-307 tests covering the document model, canvas persistence, export formats, theme palettes,
-settings, fonts, the keymap, PDF annotations, and pure geometry. They are deliberately
-platform-agnostic: no test needs a window, so the suite runs the same on either OS.
+307 tests covering the document model, canvas persistence, export formats, theme palettes, settings,
+fonts, the keymap, PDF annotations and pure geometry. They're deliberately platform-agnostic. No test
+needs a window, so the suite runs the same on either OS.
 
-What tests cannot cover is the platform chrome — glass, vibrancy, window tiling, Gatekeeper.
-Those need a real machine on each OS.
+What tests can't cover is the platform chrome: glass, vibrancy, window tiling, Gatekeeper. Those need
+a real machine on each OS.
 
 ## Troubleshooting
 
-### macOS: the app will not open at all
+### macOS: the app won't open at all
 
-If it bounces or dies immediately rather than showing the Gatekeeper dialog, the ad-hoc
-signature is the thing to suspect. Check what macOS actually objected to:
+If it bounces or dies immediately instead of showing the Gatekeeper dialog, suspect the ad-hoc
+signature. Check what macOS actually objected to:
 
 ```bash
 log show --predicate 'process == "Lumenotepad"' --last 5m
@@ -275,34 +273,33 @@ log show --predicate 'process == "Lumenotepad"' --last 5m
 
 ### macOS: the glass looks flat grey, or opaque
 
-First check Accessibility → Display → **Reduce transparency** is off; it disables vibrancy
+First check that Accessibility, Display, **Reduce transparency** is off. It disables vibrancy
 system-wide and produces exactly this.
 
-The app writes a diagnostics file on every launch that says whether macOS actually granted a
-frost layer:
+The app writes a diagnostics file on every launch saying whether macOS actually granted a frost layer:
 
 ```bash
 cat ~/Library/Application\ Support/Lumenotepad/macos-chrome-diagnostics.txt
 ```
 
-`frostLayers = 0` means the OS declined the frost, which is a different problem from the app
-requesting it wrongly.
+`frostLayers = 0` means the OS declined the frost, which is a different problem from the app asking
+for it wrongly.
 
 ### macOS: glass disappears in full screen
 
-Expected, and unfixable while the window is genuinely full screen: a native full-screen window
-owns its Space and has nothing behind it, so behind-window vibrancy has no source to sample.
-Native full screen is therefore disabled — the green button zooms instead, which keeps the
-window on the desktop and the glass intact.
+Expected, and unfixable while the window is genuinely full screen. A native full-screen window owns
+its Space and has nothing behind it, so behind-window vibrancy has no source to sample. Native full
+screen is therefore disabled, and the green button zooms instead, which keeps the window on the
+desktop and the glass intact.
 
 ### macOS: the glass is too bright, or too blurred
 
-macOS has no blur-radius API; the `NSVisualEffectMaterial` *is* the recipe. Preferences → Glass
-→ **Glass material** switches between them, and the glass tint slider layers on top.
+macOS has no blur-radius API. The `NSVisualEffectMaterial` is the recipe. Preferences, Glass,
+**Glass material** switches between them, and the glass tint slider layers on top.
 
-### Windows: notes will not save
+### Windows: notes won't save
 
-The folder is not writable — most likely it was extracted into `C:\Program Files`. Move it
+The folder isn't writable, most likely because it was extracted into `C:\Program Files`. Move it
 somewhere under your user profile.
 
 ## Roadmap
@@ -310,8 +307,7 @@ somewhere under your user profile.
 Near-term:
 
 - Prove the macOS update path over a real release-to-release hop.
-- Notarize with an Apple Developer ID, which would remove the first-launch Gatekeeper step
-  entirely.
+- Notarize with an Apple Developer ID, which would remove the first-launch Gatekeeper step entirely.
 - Screenshots in this README once the macOS chrome settles.
 - A signed Windows installer, which needs the data directory moved to `%APPDATA%` first.
 
@@ -322,9 +318,9 @@ Later:
 
 ## License
 
-[GNU General Public License v3.0](LICENSE). In short: you may use, study, share and modify
-Lumenotepad, but anything you distribute that is built from it has to carry the same freedoms and
-ship its source. There is no warranty.
+[GNU General Public License v3.0](LICENSE). In short: you can use, study, share and modify
+Lumenotepad, but anything you distribute that's built from it has to carry the same freedoms and ship
+its source. There's no warranty.
 
-Every dependency is permissively licensed (MIT or BSD), so nothing here conflicts. Third-party
-attributions are recorded in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+Every dependency is permissively licensed, MIT or BSD, so nothing here conflicts. Third-party
+attributions are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

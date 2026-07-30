@@ -18,17 +18,13 @@ using Lumenotepad.Services;
 
 namespace Lumenotepad.Views;
 
-/// <summary>The Font Browser (M11): scroll and search the full Google Fonts catalog with LIVE
-/// previews rendered in each face, a custom preview string, bold/italic/underline/strike toggles,
-/// and friendly category chips. Previews download lazily per visible row (virtualized list) and
-/// render via SkiaSharp — installing reuses the same download path as the inline quick-search.</summary>
 public partial class FontBrowserWindow : Window
 {
     private const string DefaultPreview = "The quick brown fox jumps over the lazy dog";
 
     private IReadOnlyList<FontCatalog.CatalogFont> _catalog = Array.Empty<FontCatalog.CatalogFont>();
     private List<FontRow> _rows = new();
-    private readonly HashSet<string> _selectedCategories = new();   // empty = "All"; multi-select ANDs
+    private readonly HashSet<string> _selectedCategories = new();
     private DispatcherTimer? _searchDebounce, _previewDebounce;
     private uint _textColorArgb = 0xFFECECEC;
     private float _previewSize = 30f;
@@ -67,11 +63,11 @@ public partial class FontBrowserWindow : Window
 
         Opened += async (_, _) =>
         {
-            Services.ThemeManager.UseMacNativeChrome(this, BrowserTitleBar);   // mac: native frame = rounded + frosted
+            Services.ThemeManager.UseMacNativeChrome(this, BrowserTitleBar);
             WinChrome.RoundCorners(this, true);
-            Services.ThemeManager.ApplyChildChrome(this);   // acrylic frost when the theme is glass (Lumen)
+            Services.ThemeManager.ApplyChildChrome(this);
             if (Content is Control root) Motion.ScaleIn(root, 0.96, 180);
-            // The ListBox's inner ScrollViewer only exists once templated — attach smooth scroll then.
+
             Dispatcher.UIThread.Post(() =>
             {
                 if (FontList.FindDescendantOfType<ScrollViewer>() is { } sv) SmoothScroll.Attach(sv);
@@ -120,8 +116,6 @@ public partial class FontBrowserWindow : Window
         }
     }
 
-    /// <summary>Multi-select: "All" clears every other chip; any specific chip toggles independently
-    /// and the results must match ALL that are lit. Clearing the last one falls back to "All".</summary>
     private void ToggleCategory(string key)
     {
         if (key == "all") _selectedCategories.Clear();
@@ -142,11 +136,10 @@ public partial class FontBrowserWindow : Window
         FontList.ItemsSource = _rows;
         CountLabel.Text = _rows.Count == 0 ? "" : $"{_rows.Count} fonts";
         SetStatus(_rows.Count == 0 ? "No fonts match. Try another word or fewer categories." : null);
-        // Scroll back to the top so a new filter starts at its first result.
+
         if (_rows.Count > 0) FontList.ScrollIntoView(0);
     }
 
-    /// <summary>Load a row's font bytes (once) and render its preview with the current settings.</summary>
     private async Task EnsureRow(FontRow row)
     {
         if (row.Bytes is null)
@@ -168,9 +161,6 @@ public partial class FontBrowserWindow : Window
             UnderToggle.IsChecked == true, StrikeToggle.IsChecked == true, _textColorArgb, _previewSize);
     }
 
-    /// <summary>Re-render every REALIZED (on-screen) row with the current preview text/style — bytes
-    /// are cached, so this is a cheap Skia redraw, no re-download. Off-screen rows re-render with the
-    /// live settings when they scroll back in.</summary>
     private void ReRenderVisible()
     {
         foreach (var c in FontList.GetRealizedContainers())
@@ -204,8 +194,6 @@ public partial class FontBrowserWindow : Window
             header.Children.Add(name);
             header.Children.Add(category);
 
-            // Stretch=None → the bitmap shows at its rendered size (which tracks the size slider) and
-            // is never squashed, so the metrics-correct bitmap keeps descenders intact.
             var preview = new Image { Stretch = Stretch.None, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left };
             preview.Bind(Image.SourceProperty, new Avalonia.Data.Binding(nameof(FontRow.Preview)));
             var loading = new TextBlock
@@ -229,7 +217,7 @@ public partial class FontBrowserWindow : Window
             };
             install.Bind(ContentControl.ContentProperty, new Avalonia.Data.Binding(nameof(FontRow.InstallLabel)));
             install.Bind(InputElement.IsEnabledProperty, new Avalonia.Data.Binding(nameof(FontRow.InstallEnabled)));
-            install.Click += async (_, e) => { e.Handled = true; await InstallRow(row); };   // don't open detail
+            install.Click += async (_, e) => { e.Handled = true; await InstallRow(row); };
 
             var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
             grid.Children.Add(left);
@@ -264,8 +252,6 @@ public partial class FontBrowserWindow : Window
         if (_detailRow == row) SyncDetailInstallButton(row);
     }
 
-    /// <summary>Download + register one catalog font; true when a usable file landed. Shared by the
-    /// list row and the detail view; the source/id route to the right download path.</summary>
     private static async Task<bool> InstallFontFile(FontCatalog.CatalogFont font)
     {
         try
@@ -277,8 +263,6 @@ public partial class FontBrowserWindow : Window
         }
         catch { return false; }
     }
-
-    // ---- font detail view (a big sample + a full character map) ----
 
     private FontRow? _detailRow;
     private static readonly (string Label, string Chars)[] CharGroups =
@@ -298,21 +282,20 @@ public partial class FontBrowserWindow : Window
         SyncDetailInstallButton(row);
         DetailBigPreview.Source = null;
         DetailCharGroups.Children.Clear();
-        // Hide the list underneath so the (frosted) overlay never shows it bleeding through.
+
         ListHeader.IsVisible = false;
         FontList.IsVisible = false;
         DetailOverlay.IsVisible = true;
         Motion.RiseIn(DetailOverlay, Motion.Fast);
         DetailScroll.Offset = new Vector(0, 0);
 
-        // Make sure this font's bytes are loaded (reuses the row cache), then draw the samples.
         if (row.Bytes is null && !row.Loading)
         {
             row.Loading = true;
             row.Bytes = await FontPreviewRenderer.GetBytesAsync(row.Font);
             row.Loading = false;
         }
-        if (_detailRow != row) return;                 // user backed out while it downloaded
+        if (_detailRow != row) return;
         if (row.Bytes is null)
         {
             DetailCharGroups.Children.Add(new TextBlock
@@ -339,8 +322,7 @@ public partial class FontBrowserWindow : Window
 
     private Control BuildCharCell(byte[] bytes, string ch, bool b, bool i, bool u, bool s)
     {
-        // A tight-to-ink glyph bitmap, capped to fit the cell, centered both ways — narrow glyphs
-        // ('.', 'i') and tall descenders ('g', 'y') all sit centered without clipping.
+
         var img = new Image
         {
             Source = FontPreviewRenderer.RenderGlyph(bytes, ch, b, i, _textColorArgb, 34f),
@@ -391,19 +373,16 @@ public partial class FontBrowserWindow : Window
         timer.Start();
     }
 
-    /// <summary>A minimal IObserver so we can react to a TextBox's Text without pulling in Rx.</summary>
     private sealed class Observer : IObserver<string?>
     {
         private readonly Action _onNext;
         private bool _primed;
         public Observer(Action onNext) => _onNext = onNext;
-        public void OnNext(string? value) { if (_primed) _onNext(); else _primed = true; }  // skip the initial push
+        public void OnNext(string? value) { if (_primed) _onNext(); else _primed = true; }
         public void OnCompleted() { }
         public void OnError(Exception error) { }
     }
 
-    /// <summary>One catalog row's live state: cached font bytes, the rendered preview, and the
-    /// install-button label/enabled flags. Notifies so the virtualized template updates in place.</summary>
     private sealed class FontRow : INotifyPropertyChanged
     {
         public FontCatalog.CatalogFont Font { get; }
@@ -419,7 +398,6 @@ public partial class FontBrowserWindow : Window
             set { _preview = value; Raise(nameof(Preview)); Raise(nameof(ShowFallback)); }
         }
         public bool ShowFallback => _preview is null;
-
 
         public void MarkPreviewFailed() { Raise(nameof(ShowFallback)); }
 

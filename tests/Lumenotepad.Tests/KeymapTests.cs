@@ -33,9 +33,9 @@ public class KeymapTests
         Assert.True(Keymap.Matches("bold", Ev(Key.B, KeyModifiers.Control | KeyModifiers.Alt)));
         Assert.False(Keymap.Matches("bold", Ev(Key.B, KeyModifiers.Control)));
         Assert.False(Keymap.IsDefault("bold"));
-        Assert.True(Keymap.Matches("italic", Ev(Key.I, KeyModifiers.Control)));   // invalid → default
+        Assert.True(Keymap.Matches("italic", Ev(Key.I, KeyModifiers.Control)));
         Assert.True(Keymap.IsDefault("italic"));
-        Keymap.SetOverrides(null);                        // leave the statics clean for other tests
+        Keymap.SetOverrides(null);
     }
 
     [Fact]
@@ -51,10 +51,10 @@ public class KeymapTests
     {
         Assert.Equal("Ctrl+Shift+H", Keymap.FromEvent(Ev(Key.H, KeyModifiers.Control | KeyModifiers.Shift)));
         Assert.Equal("Ctrl+Alt+D5", Keymap.FromEvent(Ev(Key.D5, KeyModifiers.Control | KeyModifiers.Alt)));
-        Assert.Equal("F6", Keymap.FromEvent(Ev(Key.F6, KeyModifiers.None)));       // F-keys may bind bare
-        Assert.Null(Keymap.FromEvent(Ev(Key.LeftCtrl, KeyModifiers.Control)));     // bare modifier
-        Assert.Null(Keymap.FromEvent(Ev(Key.K, KeyModifiers.None)));               // would break typing
-        Assert.Null(Keymap.FromEvent(Ev(Key.K, KeyModifiers.Shift)));              // Shift alone too
+        Assert.Equal("F6", Keymap.FromEvent(Ev(Key.F6, KeyModifiers.None)));
+        Assert.Null(Keymap.FromEvent(Ev(Key.LeftCtrl, KeyModifiers.Control)));
+        Assert.Null(Keymap.FromEvent(Ev(Key.K, KeyModifiers.None)));
+        Assert.Null(Keymap.FromEvent(Ev(Key.K, KeyModifiers.Shift)));
     }
 
     [Fact]

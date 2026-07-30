@@ -39,9 +39,8 @@
                     Content="&#xE8BB;" VerticalAlignment="Center" Margin="0,0,3,0"/>
         </Grid>
 
-        <!-- footer: step indicator left, actions right -->
         <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="20,10,20,16">
-            <TextBlock x:Name="StepLabel" Classes="hint" VerticalAlignment="Center" Text="Step 1 of 2 — Notebook"/>
+            <TextBlock x:Name="StepLabel" Classes="hint" VerticalAlignment="Center" Text="Step 1 of 2: Notebook"/>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                 <Button x:Name="CancelBtn" Theme="{StaticResource LumenButtonGray}" Content="Cancel" FontSize="13"/>
                 <Button x:Name="BackBtn" Theme="{StaticResource LumenButtonGray}" Content="Back" FontSize="13" IsVisible="False"/>
@@ -60,7 +59,6 @@
 
                     <TextBlock Classes="section" Text="COLOR"/>
                     <WrapPanel x:Name="ColorSwatches"/>
-                    <!-- the picked family's five shades, like the right-click Color menu -->
                     <WrapPanel x:Name="ShadeSwatches" Margin="0,2,0,0"/>
 
                     <TextBlock Classes="section" Text="COVER IMAGE"/>
@@ -75,7 +73,7 @@
                     <TextBlock Classes="hint" Text="Without an image the cover shows the color above."/>
 
                     <TextBlock Classes="section" Text="SECTIONS"/>
-                    <TextBlock Classes="hint" Text="The tabs inside the notebook. Add as many as you like — pages come next."/>
+                    <TextBlock Classes="hint" Text="The tabs inside the notebook. Add as many as you like. Pages come next."/>
                     <StackPanel x:Name="SectionRows" Spacing="6" Margin="0,4,0,0"/>
                     <Button x:Name="AddSectionBtn" Theme="{StaticResource LumenButton}" Content="Add section" FontSize="12.5" Padding="12,5" HorizontalAlignment="Left"/>
                 </StackPanel>
@@ -88,11 +86,11 @@
                     <TextBlock Classes="section" Text="APPLY AS"/>
                     <StackPanel x:Name="ModeRadios" Spacing="4">
                         <RadioButton x:Name="ModeGuides" GroupName="mode" FontSize="12.5" IsChecked="True"
-                                     Content="Guides + starter notes — lines on the paper plus labelled note boxes"/>
+                                     Content="Guides and starter notes: lines on the paper plus labelled note boxes"/>
                         <RadioButton x:Name="ModeStarters" GroupName="mode" FontSize="12.5"
-                                     Content="Starter notes only — just the labelled boxes, no lines"/>
+                                     Content="Starter notes only: just the labelled boxes, no lines"/>
                         <RadioButton x:Name="ModeRigid" GroupName="mode" FontSize="12.5"
-                                     Content="Rigid — the boxes are locked in place and can't be moved"/>
+                                     Content="Rigid: the boxes are locked in place and can't be moved"/>
                     </StackPanel>
 
                     <TextBlock Classes="section" Text="GRID STYLE"/>

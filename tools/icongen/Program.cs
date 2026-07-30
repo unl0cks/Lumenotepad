@@ -1,7 +1,3 @@
-// Lumenotepad app-icon generator (owner spec: a STANDALONE notebook + pencil — not a squircle
-// badge — with the "lumen" lightbulb glowing in a folded page corner). Draws the master at 256px
-// with SkiaSharp, resizes to every ICO size, and writes a multi-res .ico (PNG-compressed entries;
-// fine on Windows 10/11) straight into the app's Assets. Run: dotnet run --project tools/icongen
 using SkiaSharp;
 
 const int Master = 256;
@@ -32,13 +28,11 @@ WriteIco(outIco, sizes, pngs);
 File.WriteAllBytes(outPng, pngs[^1]);
 Console.WriteLine($"wrote {outIco} ({new FileInfo(outIco).Length} bytes) + {outPng}");
 
-// ---- macOS iconset: re-draw at a 1024px master (vector code scales cleanly, no upsampling) and
-// emit the PNG sizes tools/publish-macos.sh packs into lumenotepad.icns for the .app bundle. ----
 string macDir = Path.Combine(root, "assets", "macos-iconset");
 Directory.CreateDirectory(macDir);
 using (var big = SKSurface.Create(new SKImageInfo(1024, 1024, SKColorType.Bgra8888, SKAlphaType.Premul)))
 {
-    big.Canvas.Scale(4f);          // Draw() works in 256-space; 4x = a true 1024 master
+    big.Canvas.Scale(4f);
     Draw(big.Canvas);
     using var bigImg = big.Snapshot();
     foreach (int s in new[] { 16, 32, 64, 128, 256, 512, 1024 })
@@ -49,9 +43,7 @@ using (var big = SKSurface.Create(new SKImageInfo(1024, 1024, SKColorType.Bgra88
         using var img = SKImage.FromBitmap(resized);
         using var data = img.Encode(SKEncodedImageFormat.Png, 100);
         File.WriteAllBytes(Path.Combine(macDir, $"icon_{s}.png"), data.ToArray());
-        // The 16/32px slots ALSO go out as raw straight-alpha RGBA: macOS scrambles PNG payloads in
-        // the small icns entry types when used as an APP icon (non-Retina 1x contexts), so
-        // make_bundle.py packs these into Apple's native ARGB ic04/ic05 chunks instead.
+
         if (s is 16 or 32)
         {
             using var straight = new SKBitmap(new SKImageInfo(s, s, SKColorType.Rgba8888, SKAlphaType.Unpremul));
@@ -72,29 +64,21 @@ static string FindRepoRoot()
 
 static void Draw(SKCanvas c)
 {
-    // LUMEN identity pass (owner feedback): the LIGHT is the hero. Dark-glass cover (the family's
-    // #0B0C10 base), accent-blue rim light, and one BIG white-hot bulb glowing from the cover —
-    // readable as a bulb at 32px and as a glowing mark even at 16px. The pencil turns sleek and
-    // dark (no more generic yellow), eraser squared where it meets the ferrule.
+
     c.Clear(SKColors.Transparent);
 
-    // Fill the frame AND centre it: the artwork spans y:30–234 (the pencil tip pokes below the
-    // cover), so its true vertical centre is ~132, not 128 — scaling about 128 left more empty
-    // space up top. Scale up 1.18× about the real content centre (128,132) so margins are even.
     c.Translate(128f, 128f);
     c.Scale(1.18f, 1.18f);
     c.Translate(-128f, -132f);
 
     var accent = new SKColor(0x4D, 0xA6, 0xFF);
 
-    // soft drop shadow under everything
     using (var shadow = new SKPaint { Color = new SKColor(0, 0, 0, 80), IsAntialias = true })
     {
         shadow.MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 10);
         c.DrawRoundRect(new SKRect(52, 42, 212, 232), 26, 26, shadow);
     }
 
-    // ---- dark-glass notebook cover, top-right corner genuinely CUT for the fold ----
     var cover = new SKRect(46, 30, 210, 226);
     var coverPath = new SKPath();
     coverPath.AddRoundRect(new SKRoundRect(cover, 26, 26));
@@ -108,14 +92,14 @@ static void Draw(SKCanvas c)
             new[] { new SKColor(0x1C, 0x21, 0x2C), new SKColor(0x0B, 0x0C, 0x10) }, SKShaderTileMode.Clamp);
         c.DrawPath(cutCover, fill);
     }
-    // accent rim light around the glass edge (the Lumen glow signature)
+
     using (var rim = new SKPaint
     {
         Color = accent.WithAlpha(0x66), IsAntialias = true,
         Style = SKPaintStyle.Stroke, StrokeWidth = 2.5f,
     })
         c.DrawPath(cutCover, rim);
-    // spine: a slim accent light-strip down the left edge
+
     using (var spine = new SKPaint { IsAntialias = true })
     {
         spine.Shader = SKShader.CreateLinearGradient(
@@ -124,7 +108,6 @@ static void Draw(SKCanvas c)
         c.DrawRoundRect(new SKRect(58, 46, 65, 210), 3.5f, 3.5f, spine);
     }
 
-    // ---- folded corner: dark glass folding over, lit by the bulb below it ----
     using (var fold = new SKPaint { IsAntialias = true })
     {
         fold.Shader = SKShader.CreateLinearGradient(
@@ -141,7 +124,6 @@ static void Draw(SKCanvas c)
     })
         c.DrawLine(152, 30, 210, 88, foldEdge);
 
-    // ---- THE bulb: big, white-hot core with an accent halo spilling over the dark glass ----
     var bulbAt = new SKPoint(122, 116);
     using (var halo = new SKPaint { IsAntialias = true })
     {
@@ -157,7 +139,7 @@ static void Draw(SKCanvas c)
             new float[] { 0, 0.55f, 1 }, SKShaderTileMode.Clamp);
         c.DrawCircle(bulbAt, 34, globe);
     }
-    // filament: a clear dark V inside the globe (what makes it read as a BULB, not a dot)
+
     using (var fil = new SKPaint
     {
         Color = new SKColor(0x14, 0x2A, 0x4A), IsAntialias = true,
@@ -167,7 +149,7 @@ static void Draw(SKCanvas c)
         c.DrawLine(bulbAt.X - 11, bulbAt.Y - 4, bulbAt.X, bulbAt.Y + 10, fil);
         c.DrawLine(bulbAt.X + 11, bulbAt.Y - 4, bulbAt.X, bulbAt.Y + 10, fil);
     }
-    // neck + base bars (screw cap)
+
     using (var neck = new SKPaint { Color = new SKColor(0x9A, 0xC4, 0xEE), IsAntialias = true })
     {
         var p = new SKPath();
@@ -184,10 +166,9 @@ static void Draw(SKCanvas c)
         c.DrawRoundRect(new SKRect(bulbAt.X - 9, bulbAt.Y + 52, bulbAt.X + 9, bulbAt.Y + 58), 2, 2, cap);
     }
 
-    // ---- sleek pencil: dark body, accent band, squared-on eraser ----
     c.Save();
     c.RotateDegrees(-38, 138, 186);
-    float top = 173, bot = 199;                       // slimmer 26px body
+    float top = 173, bot = 199;
     using (var wood = new SKPaint { Color = new SKColor(0xC9, 0xD4, 0xE4), IsAntialias = true })
     {
         var tip = new SKPath();
@@ -208,10 +189,10 @@ static void Draw(SKCanvas c)
         c.DrawRect(new SKRect(84, top, 208, bot), body);
     }
     using (var band = new SKPaint { Color = accent, IsAntialias = true })
-        c.DrawRect(new SKRect(196, top, 208, bot), band);       // accent band = the ferrule
+        c.DrawRect(new SKRect(196, top, 208, bot), band);
     using (var eraser = new SKPaint { Color = new SKColor(0x8E, 0x9B, 0xAE), IsAntialias = true })
     {
-        // FLAT against the band (owner: a rounded base read as detached) — outer corners only
+
         var p = new SKPath();
         p.MoveTo(208, top);
         p.LineTo(219, top); p.ArcTo(new SKRect(219, top, 229, top + 10), 270, 90, false);

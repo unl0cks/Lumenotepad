@@ -16,25 +16,17 @@ using Avalonia.Threading;
 using Lumenotepad.Editor;
 using Lumenotepad.Platform;
 using Lumenotepad.Services;
-using Shapes = Avalonia.Controls.Shapes;   // `Path` clashes with System.IO.Path; alias the shape set
+using Shapes = Avalonia.Controls.Shapes;
 
 namespace Lumenotepad.Views;
 
-/// <summary>The embeddable PDF viewer + annotator (M11): renders pages with native PDFium (never a
-/// browser engine) and lets the user highlight regions, drop notes, write free text, and draw arrows
-/// over them. Notes and text boxes carry the SAME rich formatting as the note canvas — a full
-/// <see cref="RichTextEditor"/> driven by the shared <see cref="FormatToolbar"/> (fonts, sizes,
-/// colors, super/subscript, alignment, bullets, links). Annotations live in a sidecar JSON next to the
-/// PDF — the source file is never touched — and the whole thing can be flattened into a NEW pdf with
-/// every mark baked in. Hosted both in <see cref="PdfViewerWindow"/> and inline in the page canvas.
-/// Geometry is normalized to each page so it survives zoom and re-render.</summary>
 public partial class PdfViewer : UserControl
 {
     private enum Tool { Select, Highlight, Note, Text, Arrow }
 
     private const float BaseDpi = 110f;
     private static readonly double PxPerPoint = BaseDpi / 72.0;
-    private const float ExportDpi = 150f;              // page raster resolution in the flattened copy
+    private const float ExportDpi = 150f;
 
     private string _pdfPath = "";
     private string _sidecarPath = "";
@@ -42,7 +34,7 @@ public partial class PdfViewer : UserControl
     private PdfAnnotationDoc _annos = new();
 
     private Tool _tool = Tool.Select;
-    private string _color = "#FFF5E3A3";      // solid #FFRRGGBB; per-kind alpha derived at use sites
+    private string _color = "#FFF5E3A3";
     private double _zoom = 1.0;
 
     private sealed record PageView(int Index, double WPt, double HPt, Border Frame, Canvas Overlay, Image Img);
@@ -50,28 +42,19 @@ public partial class PdfViewer : UserControl
     private PdfAnnotation? _selected;
     private DispatcherTimer? _saveDebounce;
 
-    // Live rich content per note/text annotation: one RichDocument (source of truth, serialized into
-    // the annotation's sidecar on change) and the editor control currently showing it (rebuilt on each
-    // RedrawPage, so this maps to the LATEST instance — the format toolbar + focus target read it).
     private readonly Dictionary<PdfAnnotation, RichDocument> _docs = new();
     private readonly Dictionary<PdfAnnotation, RichTextEditor> _editors = new();
-    private PdfAnnotation? _justAdded;                 // set on create so its box pops in once
+    private PdfAnnotation? _justAdded;
 
-    // Move/resize drag state (any tool): which annotation, which handle (0=whole, 1=start, 2=end,
-    // 3=width, 4=height, 5=corner, 6/7/8 = arrow control points), the pointer origin, and the
-    // annotation's original geometry (endpoints + the three curve control points).
     private PdfAnnotation? _drag;
     private int _dragHandle;
     private Point _dragStartPt;
     private (double X, double Y, double W, double H, double X2, double Y2) _dragOrig;
     private (double C1x, double C1y, double C2x, double C2y, double C3x, double C3y) _dragOrigC;
 
-    // Snap annotations to a grid (toolbar toggle). Static so it sticks across page switches + both
-    // hosts for the app session.
     public static bool SnapToGrid;
-    private const double GridStep = 14;      // unzoomed page px between grid lines
+    private const double GridStep = 14;
 
-    // New-arrow defaults (set from the Arrow options flyout; also applied to a selected arrow).
     private bool _arrowCurved;
     private double _arrowHeadScale = 1.0;
     private string _arrowHeadStyle = "triangle";
@@ -79,9 +62,9 @@ public partial class PdfViewer : UserControl
     public PdfViewer()
     {
         InitializeComponent();
-        Focusable = true;               // Delete / Ctrl+Z land here when no note editor has focus
+        Focusable = true;
         BuildSwatches();
-        FmtBar.SetCompact();                            // hide the canvas-only furniture
+        FmtBar.SetCompact();
         FmtBar.SetPlacement(Dock.Top, pageScope: false);
         HighlightTool.Click += (_, _) => SetTool(Tool.Highlight);
         NoteTool.Click += (_, _) => SetTool(Tool.Note);
@@ -98,33 +81,20 @@ public partial class PdfViewer : UserControl
 
     private IBrush AccentBrush => this.FindResource("AccentBrush") as IBrush ?? Brushes.DodgerBlue;
 
-    /// <summary>Selection ring for marks: the theme accent at ~70% alpha — clearly visible over a
-    /// white page while still softer than a raw accent wire.</summary>
     private IBrush NoteFocusBrush => new SolidColorBrush(Color.Parse(
         Services.ThemePalettes.Alpha(Services.ThemeManager.Current.Accent, 0xB3)));
 
-    // Bumped on every Load; the async pipeline checks it after each await so a superseded load can
-    // never keep adding page frames. Without this, rapid page switches (or a double-fired selection
-    // event) interleaved two/three loads: each cleared the host, then EACH appended its own set of
-    // frames — the same page stacked multiple times, "1 page" in the status but three on screen, and
-    // every annotation seemingly on all of them.
     private int _loadGen;
-    // True only once LoadAsync has the sidecar in memory. EVERY save is gated on it: between "viewer
-    // cleared for a new file" and "sidecar read", _annos is an empty list, and a save fired in that
-    // window (a re-entrant Load's Flush, a detach, a stray debounce tick) would overwrite the user's
-    // saved marks with nothing — which is exactly the data loss the owner hit.
+
     private bool _loaded;
 
-    /// <summary>Load a PDF (and its sidecar annotations) and render it. Flushes any previous edits.
-    /// Re-entrancy-safe: a newer call supersedes an in-flight one, and loading the already-shown OR
-    /// already-loading file is a no-op.</summary>
     public async void Load(string pdfPath, bool doubleClickCreate)
     {
-        _ = doubleClickCreate;             // PDF notes/text are ALWAYS double-click-create now
-        if (pdfPath == _pdfPath) return;   // already showing (or mid-loading) this PDF
-        Flush();                           // persist the outgoing document's marks
+        _ = doubleClickCreate;
+        if (pdfPath == _pdfPath) return;
+        Flush();
         int gen = ++_loadGen;
-        _loaded = false;                   // block every save until THIS load has read the sidecar
+        _loaded = false;
         _pdfPath = pdfPath;
         _sidecarPath = PdfAnnotationDoc.SidecarPath(pdfPath);
         _pages.Clear();
@@ -143,7 +113,6 @@ public partial class PdfViewer : UserControl
         await LoadAsync(gen);
     }
 
-    /// <summary>Persist any pending annotation edits now (host calls this before the view goes away).</summary>
     public void Flush() => SaveNow();
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -156,11 +125,9 @@ public partial class PdfViewer : UserControl
     {
         base.OnDetachedFromVisualTree(e);
         PdfAnnotationHub.Changed -= OnHubChanged;
-        SaveNow();      // window closing / view swapped out — never lose the last debounced edit
+        SaveNow();
     }
 
-    /// <summary>Another viewer saved changes to the same PDF (e.g. the attachment popup while this
-    /// page shows it embedded): drop the per-annotation caches and repaint so both stay in step.</summary>
     private void OnHubChanged(string path, object? sender)
     {
         if (ReferenceEquals(sender, this) || !_loaded) return;
@@ -177,18 +144,17 @@ public partial class PdfViewer : UserControl
         byte[] bytes;
         try { bytes = await File.ReadAllBytesAsync(_pdfPath); }
         catch { if (gen == _loadGen) StatusLabel.Text = "Couldn't read this file."; return; }
-        if (gen != _loadGen) return;                     // superseded mid-await
+        if (gen != _loadGen) return;
         _pdfBytes = bytes;
 
         string? sidecarJson = null;
         if (File.Exists(_sidecarPath))
         {
             try { sidecarJson = await File.ReadAllTextAsync(_sidecarPath); }
-            catch { /* unreadable sidecar → start empty */ }
+            catch {  }
             if (gen != _loadGen) return;
         }
-        // Through the hub: if another viewer already has this PDF open, we get ITS doc — both
-        // viewers mutate the same instance, so neither can overwrite the other's marks on save.
+
         _annos = PdfAnnotationHub.Get(_pdfPath, sidecarJson);
 
         int count = PdfRenderer.PageCount(bytes);
@@ -199,9 +165,8 @@ public partial class PdfViewer : UserControl
             return;
         }
         StatusLabel.Text = count == 1 ? "1 page" : $"{count} pages";
-        _loaded = true;                    // sidecar is in memory — saving is safe from here on
+        _loaded = true;
 
-        // Build every page frame first (so scrolling/layout is immediate), then fill in the bitmaps.
         for (int i = 0; i < count; i++)
         {
             var (wpt, hpt) = sizes[i];
@@ -213,7 +178,7 @@ public partial class PdfViewer : UserControl
         {
             int page = i;
             var bmp = await Task.Run(() => PdfRenderer.RenderPage(bytes, page, BaseDpi));
-            if (gen != _loadGen) return;                 // switched PDFs while a page was rendering
+            if (gen != _loadGen) return;
             if (bmp is not null) _pages[page].Img.Source = bmp;
             RedrawPage(_pages[page]);
         }
@@ -230,7 +195,7 @@ public partial class PdfViewer : UserControl
         {
             Background = Brushes.White, Child = panel,
             BoxShadow = BoxShadows.Parse("0 4 18 0 #55000000"),
-            // A hairline edge keeps a white page distinct from a light backdrop (Lumen light paper).
+
             BorderBrush = new SolidColorBrush(Color.Parse("#33000000")), BorderThickness = new Thickness(1),
             HorizontalAlignment = HorizontalAlignment.Center,
         };
@@ -243,7 +208,6 @@ public partial class PdfViewer : UserControl
         return pv;
     }
 
-    /// <summary>"Rounded PDF corners" preference (on by default) — pushed by MainView's prefs apply.</summary>
     public static bool RoundedPagePref = true;
 
     private void LayoutPages()
@@ -256,13 +220,12 @@ public partial class PdfViewer : UserControl
             pv.Frame.Width = w; pv.Frame.Height = h;
             pv.Overlay.Width = w; pv.Overlay.Height = h;
             pv.Frame.CornerRadius = new CornerRadius(rad);
-            // Border only rounds its own background — the rendered page Image needs a matching clip.
+
             if (pv.Frame.Child is Control inner)
                 inner.Clip = rad > 0 ? RoundedRect(w, h, rad) : null;
         }
     }
 
-    /// <summary>Re-apply chrome preferences (page corner rounding) to an already-open PDF.</summary>
     public void RefreshChrome()
     {
         LayoutPages();
@@ -287,10 +250,6 @@ public partial class PdfViewer : UserControl
         return g;
     }
 
-    // ---- tools ----
-    // There is NO Select tool: a single click always selects/moves, whatever is armed. The buttons
-    // arm gestures on top of that (drag = highlight/arrow, double-click = note/text), and clicking
-    // the armed tool again disarms it back to plain clicking (Tool.Select is that internal none-state).
     private void SetTool(Tool t)
     {
         _tool = _tool == t ? Tool.Select : t;
@@ -308,10 +267,6 @@ public partial class PdfViewer : UserControl
         foreach (var pv in _pages) RedrawPage(pv);
     }
 
-    /// <summary>The color strip: one button per hue FAMILY (reusing the notebook palette — 9 families,
-    /// 5 shades each). Each button shows its base shade and opens a flyout of that family's shades,
-    /// exactly like the gallery's Color menu. Picking a shade sets the active color (and recolors the
-    /// selected mark). The family whose shade is active wears an accent ring.</summary>
     private void BuildSwatches()
     {
         void AddFamily(string family, (string Name, string Hex)[] shades, IBrush swatch)
@@ -324,7 +279,7 @@ public partial class PdfViewer : UserControl
                 BorderBrush = this.FindResource("FrameBorderBrush") as IBrush,
                 Cursor = new Cursor(StandardCursorType.Hand), Tag = family,
             };
-            ToolTip.SetTip(btn, $"{family} — pick a shade");
+            ToolTip.SetTip(btn, $"{family}: pick a shade");
 
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(2) };
             var flyout = new Flyout { Content = row, Placement = PlacementMode.Bottom };
@@ -348,12 +303,11 @@ public partial class PdfViewer : UserControl
         }
 
         foreach (var (family, shades) in ViewModels.MainViewModel.NotebookPalette)
-            AddFamily(family, shades, new SolidColorBrush(Color.Parse(shades[2].Hex)));   // middle = family swatch
-        AddFamily("Neutral", ViewModels.MainViewModel.GrayscaleShades, NeutralSwatch());   // white → black ramp
+            AddFamily(family, shades, new SolidColorBrush(Color.Parse(shades[2].Hex)));
+        AddFamily("Neutral", ViewModels.MainViewModel.GrayscaleShades, NeutralSwatch());
         RefreshSwatchRings();
     }
 
-    /// <summary>The grayscale family's swatch: a white→black diagonal so it reads as "neutrals".</summary>
     private static IBrush NeutralSwatch() => new LinearGradientBrush
     {
         StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
@@ -361,16 +315,12 @@ public partial class PdfViewer : UserControl
         GradientStops = { new GradientStop(Colors.White, 0), new GradientStop(Color.Parse("#111418"), 1) },
     };
 
-    // ---- arrow options (curved toggle + arrowhead shape & size) ----
     private static readonly (string Key, string Glyph, string Name)[] HeadStyles =
     {
         ("triangle", "➤", "Filled"), ("open", "❯", "Open"), ("diamond", "◆", "Diamond"),
         ("circle", "●", "Dot"), ("none", "—", "None"),
     };
 
-    /// <summary>Open the arrow-style flyout. Reflects the selected arrow's settings when one is
-    /// selected, else the defaults for new arrows; changes apply to the selected arrow AND become the
-    /// new default. Rebuilt fresh on each open so its controls always mirror the current state.</summary>
     private void ShowArrowOptions()
     {
         var arr = _selected is { Kind: PdfAnnotation.Arrow } a ? a : null;
@@ -433,8 +383,6 @@ public partial class PdfViewer : UserControl
         flyout.ShowAt(ArrowOptsBtn);
     }
 
-    /// <summary>Apply an arrow-property change to the selected arrow (undoable) and record it as the
-    /// default for future arrows.</summary>
     private void ApplyArrow(Action<PdfAnnotation> mutate, Action setDefault)
     {
         setDefault();
@@ -447,7 +395,6 @@ public partial class PdfViewer : UserControl
         }
     }
 
-    /// <summary>Ring the family button whose shades contain the active color.</summary>
     private void RefreshSwatchRings()
     {
         var accent = this.FindResource("AccentBrush") as IBrush;
@@ -465,8 +412,6 @@ public partial class PdfViewer : UserControl
         }
     }
 
-    /// <summary>Set the active color (stored solid) and recolor the selected mark. Picking a color
-    /// NEVER switches tools — it's the color for the next mark and for whatever's selected now.</summary>
     private void PickColor(string solidHex)
     {
         _color = solidHex;
@@ -476,30 +421,25 @@ public partial class PdfViewer : UserControl
             PushUndo();
             cur.Color = cur.Kind switch
             {
-                PdfAnnotation.Arrow => SolidHex(solidHex),        // solid
-                PdfAnnotation.Highlight => "#66" + Rgb(solidHex), // translucent highlighter
-                _ => solidHex,                                    // note/text: the solid color itself
+                PdfAnnotation.Arrow => SolidHex(solidHex),
+                PdfAnnotation.Highlight => "#66" + Rgb(solidHex),
+                _ => solidHex,
             };
             foreach (var pv in _pages) RedrawPage(pv);
             SaveNow();
         }
     }
 
-    // ---- color helpers ----
-    /// <summary>The six-digit "RRGGBB" of any #AARRGGBB / #RRGGBB hex.</summary>
     private static string Rgb(string hex) { var c = Color.Parse(hex); return $"{c.R:X2}{c.G:X2}{c.B:X2}"; }
-    /// <summary>The active color as a translucent highlighter fill.</summary>
+
     private string HighlightHex => "#66" + Rgb(_color);
-    /// <summary>True when a color is light enough to need DARK ink on top (luminance heuristic).</summary>
+
     private static bool IsLight(string rgb)
     {
         var c = Color.Parse(rgb.StartsWith('#') ? rgb : "#FF" + rgb);
         return 0.299 * c.R + 0.587 * c.G + 0.114 * c.B > 150;
     }
 
-    /// <summary>Whether a note of this colour needs DARK ink (bright colours ⇒ black text). Applies
-    /// under glass too — a bright colour veiling the frosted page is still bright — but with a higher
-    /// threshold there, since the veil darkens mid colours enough that white ink still reads on them.</summary>
     private static bool DarkNoteInk(string noteRgb, bool glassTheme)
     {
         var c = Color.Parse("#FF" + noteRgb);
@@ -507,9 +447,8 @@ public partial class PdfViewer : UserControl
         return lum > (glassTheme ? 183 : 150);
     }
 
-    // ---- overlay pointer interaction ----
     private Point _dragStart;
-    private Border? _dragPreview;                 // highlight rubber-band
+    private Border? _dragPreview;
     private Avalonia.Controls.Shapes.Line? _arrowPreview;
 
     private void OnOverlayPressed(PageView pv, PointerPressedEventArgs e)
@@ -536,14 +475,14 @@ public partial class PdfViewer : UserControl
                 e.Pointer.Capture(pv.Overlay); e.Handled = true;
                 break;
             default:
-                Select(null, focusEditor: false);   // a plain click on bare page clears the selection
+                Select(null, focusEditor: false);
                 break;
         }
     }
 
     private void OnOverlayDoubleTapped(PageView pv, TappedEventArgs e)
     {
-        if (!ReferenceEquals(e.Source, pv.Overlay)) return;   // double-click ON a mark must not spawn another
+        if (!ReferenceEquals(e.Source, pv.Overlay)) return;
         var p = e.GetPosition(pv.Overlay);
         if (_tool == Tool.Note) { CreateTextAnno(pv, p, PdfAnnotation.Note); e.Handled = true; }
         else if (_tool == Tool.Text) { CreateTextAnno(pv, p, PdfAnnotation.TextBox); e.Handled = true; }
@@ -552,12 +491,12 @@ public partial class PdfViewer : UserControl
     private void OnOverlayMoved(PageView pv, PointerEventArgs e)
     {
         var p = e.GetPosition(pv.Overlay);
-        if (_drag is { } a)                              // moving / resizing a selected annotation
+        if (_drag is { } a)
         {
             double dx = (p.X - _dragStartPt.X) / pv.Overlay.Width;
             double dy = (p.Y - _dragStartPt.Y) / pv.Overlay.Height;
             ApplyDrag(a, _dragHandle, dx, dy);
-            RedrawPage(pv);                              // capture is on the overlay, so this is safe
+            RedrawPage(pv);
             return;
         }
         if (_dragPreview is not null)
@@ -581,7 +520,7 @@ public partial class PdfViewer : UserControl
             _drag = null; e.Pointer.Capture(null);
             if (_dragUndoSnap is { } snap && snap != _annos.ToJson())
             {
-                _undoStack.Push(snap);     // a real move/resize — undoable
+                _undoStack.Push(snap);
                 _redoStack.Clear();
             }
             _dragUndoSnap = null;
@@ -606,7 +545,7 @@ public partial class PdfViewer : UserControl
                 });
                 RedrawPage(pv); SaveNow();
             }
-            else Select(null, focusEditor: false);     // a plain click on empty page clears selection
+            else Select(null, focusEditor: false);
         }
         else if (_arrowPreview is not null)
         {
@@ -628,7 +567,7 @@ public partial class PdfViewer : UserControl
                 _annos.Items.Add(arrow);
                 RedrawPage(pv); SaveNow();
             }
-            else Select(null, focusEditor: false);     // a plain click on empty page clears selection
+            else Select(null, focusEditor: false);
         }
     }
 
@@ -641,20 +580,18 @@ public partial class PdfViewer : UserControl
         {
             Page = pv.Index, Kind = kind, X = SnapNorm(p.X / w, w0), Y = SnapNorm(p.Y / h, h0),
             W = 200 / w0, H = 54 / h0, Text = "",
-            Color = kind == PdfAnnotation.Note ? _color : "#00000000",   // note takes the active color
+            Color = kind == PdfAnnotation.Note ? _color : "#00000000",
         };
         PushUndo();
         _annos.Items.Add(a);
-        _justAdded = a;                  // makes DrawTextAnno pop it in
-        // The tool stays armed — creation needs a DOUBLE-click, so plain clicks can't spawn boxes.
-        Select(a, focusEditor: true);    // rebuilds, then focuses the fresh editor
+        _justAdded = a;
+
+        Select(a, focusEditor: true);
         SaveNow();
     }
 
-    // Normalized floors so a resize can't collapse a mark into nothing.
     private const double MinW = 0.03, MinH = 0.012;
 
-    /// <summary>Seed a curved arrow's three control points at the straight 25/50/75% positions.</summary>
     private static void InitCurve(PdfAnnotation a)
     {
         static double L(double x1, double x2, double t) => x1 + (x2 - x1) * t;
@@ -663,14 +600,9 @@ public partial class PdfViewer : UserControl
         a.C3x = L(a.X, a.X2, 0.75); a.C3y = L(a.Y, a.Y2, 0.75);
     }
 
-    /// <summary>Snap a normalized coordinate to the grid (no-op when snap is off). <paramref name="pageDimPx"/>
-    /// is the unzoomed page dimension, so the grid stays fixed in page space across any zoom.</summary>
     private static double SnapNorm(double norm, double pageDimPx) =>
         !SnapToGrid || pageDimPx <= 0 ? norm : Math.Round(norm * pageDimPx / GridStep) * GridStep / pageDimPx;
 
-    /// <summary>Move (handle 0), drag an arrow endpoint (1 = start, 2 = end), or resize (3 = width,
-    /// 4 = height, 5 = both, from the right/bottom/corner); geometry clamped to the page and, when
-    /// snap-to-grid is on, snapped to the grid.</summary>
     private void ApplyDrag(PdfAnnotation a, int handle, double dx, double dy)
     {
         var page = _pages.FirstOrDefault(p => p.Index == a.Page);
@@ -679,7 +611,7 @@ public partial class PdfViewer : UserControl
         double CY(double v) => SnapNorm(Math.Clamp(v, 0, 1), h0);
         if (a.Kind == PdfAnnotation.Arrow)
         {
-            // Whole-arrow move (0) shifts endpoints AND control points together so the curve rides along.
+
             if (handle == 0)
             {
                 a.X = CX(_dragOrig.X + dx); a.Y = CY(_dragOrig.Y + dy);
@@ -696,9 +628,7 @@ public partial class PdfViewer : UserControl
             if (handle == 2) { a.X2 = CX(_dragOrig.X2 + dx); a.Y2 = CY(_dragOrig.Y2 + dy); }
             if (handle is 6 or 7 or 8)
             {
-                // The three control dots work TOGETHER (owner request): dragging one pulls the others
-                // along by a smooth falloff of their distance in t, so the shaft bends as ONE curve
-                // instead of kinking at a single dot. The dragged dot (t == tH) gets the full delta.
+
                 double tH = handle == 6 ? 0.25 : handle == 7 ? 0.50 : 0.75;
                 double Wt(double tk) => Math.Exp(-Math.Pow((tk - tH) / 0.34, 2));
                 a.C1x = CX(_dragOrigC.C1x + dx * Wt(0.25)); a.C1y = CY(_dragOrigC.C1y + dy * Wt(0.25));
@@ -728,7 +658,7 @@ public partial class PdfViewer : UserControl
     private void StartDrag(PageView pv, PdfAnnotation a, int handle, PointerPressedEventArgs e)
     {
         Select(a, focusEditor: false);
-        _dragUndoSnap = _annos.ToJson();   // pushed on release, and only if the drag actually moved it
+        _dragUndoSnap = _annos.ToJson();
         _drag = a; _dragHandle = handle;
         _dragStartPt = e.GetPosition(pv.Overlay);
         _dragOrig = (a.X, a.Y, a.W, a.H, a.X2, a.Y2);
@@ -737,7 +667,6 @@ public partial class PdfViewer : UserControl
         e.Handled = true;
     }
 
-    // ---- drawing annotations onto a page overlay ----
     private void RedrawPage(PageView pv)
     {
         pv.Overlay.Children.Clear();
@@ -777,7 +706,7 @@ public partial class PdfViewer : UserControl
         if (selected)
         {
             AddDeleteButton(pv, a.X * w + a.W * w, a.Y * h, a);
-            // bottom-right resize dot (same look as the arrow endpoint handles)
+
             var dot = new Avalonia.Controls.Shapes.Ellipse
             {
                 Width = 12, Height = 12, Fill = AccentBrush,
@@ -791,35 +720,23 @@ public partial class PdfViewer : UserControl
         }
     }
 
-    /// <summary>A note/text annotation. NOTES are Lumen frosted-glass cards: the backdrop samples the
-    /// page's OWN pixels for the region the card covers, blurred, under a dark bluish smoke tint plus
-    /// a veil of the note's color — with a real drop shadow and a hairline edge (the clip lives on an
-    /// inner border precisely so the shadow survives). TEXT is bare: rich text written straight onto
-    /// the page — dark ink, no card, no shadow — with a quiet outline + grip only while selected or
-    /// hovered. Both embed the full canvas rich-text editor, laid out at page-native pixels and scaled
-    /// by the current zoom so formatting scales together.</summary>
     private void DrawTextAnno(PageView pv, PdfAnnotation a, bool sticky)
     {
         double w = pv.Overlay.Width, h = pv.Overlay.Height;
-        double w0 = pv.WPt * PxPerPoint, h0 = pv.HPt * PxPerPoint;   // unzoomed page pixels
+        double w0 = pv.WPt * PxPerPoint, h0 = pv.HPt * PxPerPoint;
         bool selected = ReferenceEquals(a, _selected);
         bool glassTheme = Services.ThemeManager.Current.GlassWindow;
 
-        // A note's body IS its chosen color: opaque on solid themes, a strong veil over the frosted
-        // page under Lumen. Ink (text + chrome) flips to dark on light colors so it stays readable;
-        // under glass the frost keeps things dark, so white ink is used there. Text boxes are bare.
         string noteRgb = sticky ? Rgb(a.Color) : "10151E";
-        bool darkInk = sticky && DarkNoteInk(noteRgb, glassTheme);      // dark ink on a bright note
-        bool whiteChrome = sticky && !darkInk;                          // white furniture (dark notes)
+        bool darkInk = sticky && DarkNoteInk(noteRgb, glassTheme);
+        bool whiteChrome = sticky && !darkInk;
         var inkBrush = new SolidColorBrush(Color.Parse(
             sticky ? (darkInk ? "#1A1D26" : "#F2FFFFFF") : "#E610151E"));
 
         var editor = BuildNoteEditor(a, inkBrush);
-        if (_editors.TryGetValue(a, out var stale)) stale.Document = new RichDocument();  // unbind the old instance from the shared doc
+        if (_editors.TryGetValue(a, out var stale)) stale.Document = new RichDocument();
         _editors[a] = editor;
 
-        // Grip strip: the Lumen pill bar, same furniture as canvas notes. On bare text everything is
-        // invisible until the box is selected/hovered so the page stays clean.
         string pillHex = !sticky ? "#4D10151E"
             : whiteChrome ? (selected ? "#52FFFFFF" : "#30FFFFFF")
             : (selected ? "#59000000" : "#33000000");
@@ -842,7 +759,6 @@ public partial class PdfViewer : UserControl
         content.Children.Add(grip);
         content.Children.Add(editor);
 
-        // ✕ in the top-right corner (the canvas note-box pattern): quiet until hovered, then red.
         string closeHex = !sticky ? "#8C10151E" : whiteChrome ? "#8CFFFFFF" : "#8C000000";
         var closeGlyph = new Avalonia.Controls.Shapes.Path
         {
@@ -860,10 +776,9 @@ public partial class PdfViewer : UserControl
         };
         close.PointerEntered += (_, _) => { close.Background = new SolidColorBrush(Color.Parse("#66E81123")); closeGlyph.Stroke = Brushes.White; };
         close.PointerExited += (_, _) => { close.Background = Brushes.Transparent; closeGlyph.Stroke = new SolidColorBrush(Color.Parse(closeHex)); };
-        close.PointerPressed += (_, e) => e.Handled = true;      // don't fall through to select/drag
+        close.PointerPressed += (_, e) => e.Handled = true;
         close.PointerReleased += (_, e) => { Delete(a); e.Handled = true; };
 
-        // Invisible resize strips along the right/bottom edges + corner — the canvas note-box pattern.
         var resizeRight = new Border
         {
             Width = 8, HorizontalAlignment = HorizontalAlignment.Right,
@@ -884,9 +799,6 @@ public partial class PdfViewer : UserControl
         };
         resizeCorner.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, 5, e); };
 
-        // The card's ONLY edge, drawn INSIDE the clip at the card's exact corner radius: a quiet
-        // hairline at rest (notes), the accent ring when selected. The outer border is GONE entirely,
-        // so nothing — no white line, no gap — can ever sit outside the ring (owner report).
         Border MakeRing(double radius, string? hairHex) => new()
         {
             CornerRadius = new CornerRadius(radius),
@@ -901,9 +813,7 @@ public partial class PdfViewer : UserControl
         Border box;
         if (sticky)
         {
-            // The note body IS its color. Under Lumen it's a strong color veil over the blurred page
-            // (frost peeks through, still clearly the color); on solid themes it's the OPAQUE color —
-            // accurate to the swatch, no dark smoke muddying it (owner: colors were too dark/dull).
+
             var layers = new Panel();
             if (glassTheme)
             {
@@ -918,7 +828,7 @@ public partial class PdfViewer : UserControl
                 layers.Children.Add(new Border
                 {
                     CornerRadius = new CornerRadius(10),
-                    Background = new SolidColorBrush(Color.Parse("#B3" + noteRgb)),   // strong color, frost shows
+                    Background = new SolidColorBrush(Color.Parse("#B3" + noteRgb)),
                     IsHitTestVisible = false,
                 });
             }
@@ -926,7 +836,7 @@ public partial class PdfViewer : UserControl
                 layers.Children.Add(new Border
                 {
                     CornerRadius = new CornerRadius(10),
-                    Background = new SolidColorBrush(Color.Parse("#FF" + noteRgb)),   // opaque, accurate
+                    Background = new SolidColorBrush(Color.Parse("#FF" + noteRgb)),
                     IsHitTestVisible = false,
                 });
             layers.Children.Add(content);
@@ -934,15 +844,15 @@ public partial class PdfViewer : UserControl
             layers.Children.Add(resizeBottom);
             layers.Children.Add(resizeCorner);
             layers.Children.Add(MakeRing(10, whiteChrome ? "#33FFFFFF" : "#33000000"));
-            layers.Children.Add(close);        // close stays on top where the right strip overlaps it
-            // The clip lives on an INNER border so the outer shadow isn't clipped away.
+            layers.Children.Add(close);
+
             var clip = new Border { CornerRadius = new CornerRadius(10), ClipToBounds = true, Child = layers };
             box = new Border
             {
                 Width = a.W * w0, MinHeight = a.H * h0,
                 CornerRadius = new CornerRadius(10), Child = clip,
                 BoxShadow = BoxShadows.Parse(selected ? "0 9 28 0 #80000000" : "0 4 16 0 #59000000"),
-                BorderThickness = new Thickness(0),   // no outer stroke ever — the edge lives inside
+                BorderThickness = new Thickness(0),
                 Transitions = new Transitions
                 {
                     new BoxShadowsTransition { Property = Border.BoxShadowProperty, Duration = TimeSpan.FromMilliseconds(140) },
@@ -951,8 +861,7 @@ public partial class PdfViewer : UserControl
         }
         else
         {
-            // Bare text: ink straight on the page — no card, no shadow, no chrome. A slim accent
-            // outline while selected (faint on hover) keeps it findable without dressing it up.
+
             var layers = new Panel();
             layers.Children.Add(content);
             layers.Children.Add(resizeRight);
@@ -990,14 +899,11 @@ public partial class PdfViewer : UserControl
         };
         box.PointerPressed += (_, e) =>
         {
-            // Click anywhere on the card selects it — and stops the press falling through to the
-            // overlay (where an armed Note/Text tool would spawn ANOTHER box on top of this one).
+
             if (!ReferenceEquals(_selected, a)) Select(a, focusEditor: false);
             e.Handled = true;
         };
 
-        // The frost must sample exactly the page region under the card; the card's height depends on
-        // its content, so sync the brush's source rect after each layout pass.
         if (backdropBrush is not null)
         {
             var bb = backdropBrush;
@@ -1013,7 +919,7 @@ public partial class PdfViewer : UserControl
         }
 
         pv.Overlay.Children.Add(box);
-        if (a == _justAdded) { _justAdded = null; Motion.ScaleIn(box, 0.9, 100); }   // quick pop-in on create
+        if (a == _justAdded) { _justAdded = null; Motion.ScaleIn(box, 0.9, 100); }
     }
 
     private void DrawArrow(PageView pv, PdfAnnotation a)
@@ -1023,13 +929,12 @@ public partial class PdfViewer : UserControl
         var brush = new SolidColorBrush(SolidColor(a.Color));
         double thick = ArrowThickness;
 
-        var pts = ArrowPoints(a, w, h);                    // straight = [s,en]; curved = sampled spline
+        var pts = ArrowPoints(a, w, h);
         var s = pts[0]; var en = pts[^1];
-        var from = pts.Count >= 2 ? pts[^2] : s;           // tangent into the head
+        var from = pts.Count >= 2 ? pts[^2] : s;
         string style = string.IsNullOrEmpty(a.HeadStyle) ? "triangle" : a.HeadStyle!;
         double headLen = ArrowHeadLen * (a.HeadScale <= 0 ? 1.0 : a.HeadScale);
 
-        // A fat transparent copy under the visible shaft gives it a grabbable hit area.
         var hit = new Shapes.Path
         {
             Data = PolyGeometry(pts), Stroke = Brushes.Transparent, StrokeThickness = Math.Max(16, thick * 5),
@@ -1038,7 +943,6 @@ public partial class PdfViewer : UserControl
         };
         hit.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, 0, e); };
 
-        // Pull the shaft's tip back under a filled head so it doesn't poke through it.
         var shaftPts = new List<Point>(pts);
         if (style is "triangle" or "diamond" or "circle" && pts.Count >= 2)
         {
@@ -1068,10 +972,6 @@ public partial class PdfViewer : UserControl
         }
     }
 
-    /// <summary>The arrow's shaft points in overlay pixels: two for a straight arrow, or — for a
-    /// curved one — a QUARTIC BÉZIER (Paint.NET-style) whose control points are the three dots. The
-    /// curve is PULLED toward the dots rather than forced through them, so it stays graceful and never
-    /// kinks the way a pass-through spline does. Collinear dots ⇒ a straight line.</summary>
     private static List<Point> ArrowPoints(PdfAnnotation a, double w, double h)
     {
         var p0 = new Point(a.X * w, a.Y * h);
@@ -1103,8 +1003,6 @@ public partial class PdfViewer : UserControl
         return g;
     }
 
-    /// <summary>The arrowhead shape at the tip, oriented along the incoming tangent. Styles: triangle
-    /// (filled), open (chevron strokes), diamond, circle, none.</summary>
     private static Control? ArrowHeadShape(string style, Point tip, Point from, double len, double thick, IBrush brush)
     {
         if (style == "none") return null;
@@ -1138,7 +1036,7 @@ public partial class PdfViewer : UserControl
                 Canvas.SetLeft(el, tip.X - d / 2); Canvas.SetTop(el, tip.Y - d / 2);
                 return el;
             }
-            default:   // triangle
+            default:
                 return new Shapes.Polygon
                 {
                     Fill = brush, IsHitTestVisible = false,
@@ -1147,13 +1045,9 @@ public partial class PdfViewer : UserControl
         }
     }
 
-    /// <summary>Arrow shaft thickness + arrowhead length track the zoom so arrows stay proportional to
-    /// the page. Heads default much chunkier than before (base 22, not 13) and scale with HeadScale.</summary>
     private double ArrowThickness => Math.Clamp(3 * _zoom, 2.0, 10.0);
     private double ArrowHeadLen => Math.Clamp(22 * _zoom, 15.0, 64.0);
 
-    /// <summary>An arrow drag handle: a solid accent dot (endpoints) or a hollow white-ringed dot
-    /// (curve control points), both grabbable.</summary>
     private Control Handle(PageView pv, PdfAnnotation a, Point at, int handle, bool control)
     {
         double d = control ? 13 : 12;
@@ -1169,9 +1063,6 @@ public partial class PdfViewer : UserControl
         return dot;
     }
 
-    /// <summary>Delete chip for highlights and arrows (notes carry their ✕ inside the card instead):
-    /// a small rounded-square of dark Lumen glass — the app's icon-button shape — with a quiet drawn ✕
-    /// that turns red only on hover, a hairline edge, vignette, and drop shadow.</summary>
     private void AddDeleteButton(PageView pv, double x, double y, PdfAnnotation a)
     {
         const double d = 22;
@@ -1200,10 +1091,6 @@ public partial class PdfViewer : UserControl
         pv.Overlay.Children.Add(btn);
     }
 
-    // ---- rich note editors ----
-
-    /// <summary>Build (and wire) the rich editor for a note/text annotation. Focus selects the
-    /// annotation and points the format toolbar at this editor.</summary>
     private RichTextEditor BuildNoteEditor(PdfAnnotation a, IBrush foreground)
     {
         var editor = NewNoteEditor(DocFor(a), foreground);
@@ -1219,7 +1106,7 @@ public partial class PdfViewer : UserControl
     {
         Document = doc,
         Margin = new Thickness(10, 4, 10, 8),
-        Foreground = foreground,        // chosen for contrast against the note's own color
+        Foreground = foreground,
         CaretBrush = AccentBrush,
         LinkBrush = AccentBrush,
         SelectionBrush = new SolidColorBrush(Color.Parse("#554DA6FF")),
@@ -1227,9 +1114,6 @@ public partial class PdfViewer : UserControl
         FontSize = 13,
     };
 
-    /// <summary>The live rich document for a note/text annotation. Migrates a legacy plain-text +
-    /// whole-box-flags annotation into a real document on first touch, and keeps the sidecar in sync on
-    /// every edit (plain <see cref="PdfAnnotation.Text"/> mirror kept for exports/back-compat).</summary>
     private RichDocument DocFor(PdfAnnotation a)
     {
         if (_docs.TryGetValue(a, out var d)) return d;
@@ -1248,7 +1132,7 @@ public partial class PdfViewer : UserControl
     {
         var doc = new RichDocument();
         var text = a.Text ?? "";
-        if (text.Length == 0) return doc;                     // fresh, single empty paragraph
+        if (text.Length == 0) return doc;
         doc.Paragraphs.Clear();
         foreach (var line in text.Replace("\r\n", "\n").Split('\n'))
         {
@@ -1261,13 +1145,9 @@ public partial class PdfViewer : UserControl
         return doc;
     }
 
-    // The strip stays in the layout permanently (no show/hide jumping) — it just dims and disables
-    // while nothing text-like is selected.
     private void ShowFmtBar(RichTextEditor editor) { FmtBar.Target = editor; FmtBar.IsEnabled = true; FmtBar.Opacity = 1; }
     private void HideFmtBar() { FmtBar.Target = null; FmtBar.IsEnabled = false; FmtBar.Opacity = 0.45; }
 
-    /// <summary>Delete a mark: the model + sidecar update immediately (data-safe), while its visuals
-    /// collapse out (the same scale+fade family as the create pop-in) before the page redraws.</summary>
     private void Delete(PdfAnnotation a)
     {
         PushUndo();
@@ -1288,8 +1168,7 @@ public partial class PdfViewer : UserControl
         {
             if (t is Border { Child: Control inner } card && card.RenderTransform is not null)
             {
-                // A zoomed note card: collapse its INNER content so the zoom transform stays put,
-                // and drop the shadow/edge up front so they don't linger at full strength.
+
                 card.BoxShadow = default;
                 card.BorderBrush = Brushes.Transparent;
                 Motion.CollapseOut(inner, 90);
@@ -1311,14 +1190,14 @@ public partial class PdfViewer : UserControl
         else
         {
             HideFmtBar();
-            if (a is not null) Focus();   // highlights/arrows: keyboard (Delete, Ctrl+Z) targets the viewer
+            if (a is not null) Focus();
         }
     }
 
     private void OnKey(object? sender, KeyEventArgs e)
     {
-        if (e.Source is TextBox or RichTextEditor) return;   // typing in a note: the editor owns its keys
-        bool ctrl = Services.Keymap.HasCommand(e.KeyModifiers);   // Cmd on macOS
+        if (e.Source is TextBox or RichTextEditor) return;
+        bool ctrl = Services.Keymap.HasCommand(e.KeyModifiers);
         bool shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         if (ctrl && e.Key == Key.Z && !shift) { Undo(); e.Handled = true; return; }
         if (ctrl && (e.Key == Key.Y || (e.Key == Key.Z && shift))) { Redo(); e.Handled = true; return; }
@@ -1329,12 +1208,9 @@ public partial class PdfViewer : UserControl
         }
     }
 
-    // ---- annotation-level undo/redo (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z) ----
-    // Snapshot-based over the whole annotation set (create/move/resize/recolor/delete). Text typed
-    // INSIDE a note keeps the rich editor's own finer-grained undo while the note has focus.
     private readonly Stack<string> _undoStack = new();
     private readonly Stack<string> _redoStack = new();
-    private string? _dragUndoSnap;      // the pre-drag state; pushed on release only if something moved
+    private string? _dragUndoSnap;
 
     private void PushUndo()
     {
@@ -1358,12 +1234,11 @@ public partial class PdfViewer : UserControl
 
     private void RestoreSnapshot(string json)
     {
-        // Mutate IN PLACE — _annos is the hub-shared instance; replacing it would silently fork
-        // this viewer away from any other viewer showing the same PDF.
+
         var restored = PdfAnnotationDoc.FromJson(json);
         _annos.Items.Clear();
         _annos.Items.AddRange(restored.Items);
-        _docs.Clear();                  // the caches point at the replaced annotation objects
+        _docs.Clear();
         _editors.Clear();
         _selected = null;
         _drag = null;
@@ -1372,11 +1247,6 @@ public partial class PdfViewer : UserControl
         SaveNow();
     }
 
-    // ---- flatten / export: a NEW pdf with every mark baked in ----
-
-    /// <summary>Save a flattened copy: each page is rasterized (native PDFium) and the highlights,
-    /// arrows, notes, and text are drawn on top into a fresh SkiaSharp PDF. The marks become part of
-    /// the page image, so the copy opens anywhere — nothing needs Lumenotepad to read it.</summary>
     private async Task ExportFlattenedAsync()
     {
         if (_pages.Count == 0 || _pdfBytes.Length == 0) return;
@@ -1442,12 +1312,12 @@ public partial class PdfViewer : UserControl
     {
         using var p = new SkiaSharp.SKPaint { Color = SkColor(a.Color), IsAntialias = true, Style = SkiaSharp.SKPaintStyle.Fill };
         var r = new SkiaSharp.SKRect((float)a.X * wpt, (float)a.Y * hpt, (float)(a.X + a.W) * wpt, (float)(a.Y + a.H) * hpt);
-        c.DrawRoundRect(r, 3.5f, 3.5f, p);   // ~the on-screen 5px corner at page scale
+        c.DrawRoundRect(r, 3.5f, 3.5f, p);
     }
 
     private static void FlattenArrow(SkiaSharp.SKCanvas c, PdfAnnotation a, float wpt, float hpt)
     {
-        var pts = ArrowPoints(a, wpt, hpt);                // point-space (straight or sampled spline)
+        var pts = ArrowPoints(a, wpt, hpt);
         var tip = pts[^1]; var from = pts.Count >= 2 ? pts[^2] : pts[0];
         var col = SkColor(SolidHex(a.Color));
         const float thick = 2.4f;
@@ -1524,9 +1394,6 @@ public partial class PdfViewer : UserControl
         float left = (float)a.X * wpt, top = (float)a.Y * hpt;
         var rect = new SkiaSharp.SKRect(left, top, left + (float)widthPts, top + heightPts);
 
-        // Bake the frosted-glass backdrop (notes only — bare text has no card, and the frost is a
-        // Lumen-theme look): re-draw the page region under the card blurred, clipped to its rounded
-        // rect, then lay the card image over it. On solid themes the translucent card bakes as-is.
         if (sticky && pageBmp is not null && Services.ThemeManager.Current.GlassWindow)
         {
             c.Save();
@@ -1536,16 +1403,10 @@ public partial class PdfViewer : UserControl
             c.DrawBitmap(pageBmp, new SkiaSharp.SKRect(0, 0, wpt, hpt), blur);
             c.Restore();
         }
-        // Cubic (Mitchell) resampling — the note is supersampled then drawn smaller here; the default
-        // nearest/linear sampling left it faintly blurry. Cubic keeps the downscaled text crisp.
+
         c.DrawImage(img, rect, new SkiaSharp.SKSamplingOptions(SkiaSharp.SKCubicResampler.Mitchell));
     }
 
-    /// <summary>Render a note/text card to a PNG (its exact on-screen glass look, minus the live
-    /// frost — the flatten path blurs the page beneath instead) at page-native pixels, so the
-    /// flattened copy carries the same fonts, colors, and layout. The PNG keeps its alpha: the glass
-    /// tints stay translucent so the blurred page shows through in the export. Independent doc —
-    /// never touches the live editor. Returns null if the page went away.</summary>
     private byte[]? RenderNoteImage(PdfAnnotation a, bool sticky, out double pxW, out double pxH)
     {
         pxW = pxH = 0;
@@ -1555,14 +1416,13 @@ public partial class PdfViewer : UserControl
         pxW = Math.Max(8, a.W * w0);
         bool glassTheme = Services.ThemeManager.Current.GlassWindow;
         string noteRgb = sticky ? Rgb(a.Color) : "10151E";
-        bool darkInk = sticky && DarkNoteInk(noteRgb, glassTheme);      // match the live card's ink choice
+        bool darkInk = sticky && DarkNoteInk(noteRgb, glassTheme);
         bool whiteChrome = sticky && !darkInk;
         var inkBrush = new SolidColorBrush(Color.Parse(
             sticky ? (darkInk ? "#1A1D26" : "#F2FFFFFF") : "#E610151E"));
         var doc = !string.IsNullOrEmpty(a.Rich) ? RichDocJson.FromJson(a.Rich) : LegacyDoc(a);
         var editor = NewNoteEditor(doc, inkBrush);
 
-        // Same 16px grip band as on screen (transparent for bare text) so the text lands identically.
         var grip = new Border
         {
             Height = 16, CornerRadius = new CornerRadius(10, 10, 0, 0),
@@ -1584,9 +1444,7 @@ public partial class PdfViewer : UserControl
         Border box;
         if (sticky)
         {
-            // Matches the on-screen card: under Lumen a TRANSLUCENT color veil (FlattenNote draws the
-            // blurred page behind this PNG, which shows through the leftover alpha); on solid themes
-            // the OPAQUE color — accurate to the swatch.
+
             var layers = new Panel();
             layers.Children.Add(new Border
             {
@@ -1605,19 +1463,15 @@ public partial class PdfViewer : UserControl
         }
         else
         {
-            // Bare text: just the ink, fully transparent around it — exactly like on screen.
+
             box = new Border { Width = pxW, Child = content };
         }
-        // Grayscale AA, NOT subpixel/LCD: subpixel text rasterized onto a TRANSPARENT bitmap bakes
-        // colored fringing that shows up as garbled glyphs once the PNG is composited into the exported
-        // PDF (on screen it looks fine because it composites against a real backdrop). Forcing Antialias
-        // keeps the alpha clean.
+
         Avalonia.Media.TextOptions.SetTextRenderingMode(box, Avalonia.Media.TextRenderingMode.Antialias);
         box.Measure(new Size(pxW, double.PositiveInfinity));
         pxH = Math.Max(8, Math.Ceiling(box.DesiredSize.Height));
         box.Arrange(new Rect(0, 0, pxW, pxH));
-        // Supersample: the note is laid out at ~110 DPI but the page raster is 150 DPI, so render the
-        // card at a higher pixel density and let the PDF downsample — crisp text instead of a blur.
+
         const double ss = 3.5;
         var px = new PixelSize((int)Math.Ceiling(pxW * ss), (int)Math.Ceiling(pxH * ss));
         using var rtb = new RenderTargetBitmap(px, new Vector(96 * ss, 96 * ss));
@@ -1627,11 +1481,10 @@ public partial class PdfViewer : UserControl
         return mm.ToArray();
     }
 
-    // ---- small geometry/color helpers ----
     private static bool Left(PointerPressedEventArgs e, PageView pv) =>
         e.GetCurrentPoint(pv.Overlay).Properties.IsLeftButtonPressed;
     private static double Dist(Point a, Point b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
-    /// <summary>A fully-opaque version of a possibly-translucent hex (arrows/text read solid).</summary>
+
     private static Color SolidColor(string hex) => Color.Parse(hex);
     private static string SolidHex(string hex)
     {
@@ -1645,7 +1498,6 @@ public partial class PdfViewer : UserControl
         return new SkiaSharp.SKColor(c.R, c.G, c.B, c.A);
     }
 
-    // ---- persistence (sidecar next to the PDF) ----
     private void SaveDebounced()
     {
         _saveDebounce?.Stop();
@@ -1657,9 +1509,9 @@ public partial class PdfViewer : UserControl
     private void SaveNow()
     {
         _saveDebounce?.Stop();
-        if (!_loaded || _sidecarPath.Length == 0) return;   // never save before the sidecar was read
+        if (!_loaded || _sidecarPath.Length == 0) return;
         try { File.WriteAllText(_sidecarPath, _annos.ToJson()); }
-        catch { /* read-only location → annotations just aren't persisted */ }
-        PdfAnnotationHub.NotifyChanged(_pdfPath, this);     // other viewers on this PDF repaint
+        catch {  }
+        PdfAnnotationHub.NotifyChanged(_pdfPath, this);
     }
 }

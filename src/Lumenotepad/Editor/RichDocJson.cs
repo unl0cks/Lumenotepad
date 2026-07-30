@@ -5,10 +5,6 @@ using System.Text.Json.Serialization;
 
 namespace Lumenotepad.Editor;
 
-/// <summary>JSON mapping for <see cref="RichDocument"/> content. The v1 page format was a bare
-/// document (<c>{"v":1,"paras":[…]}</c>); pages now persist as a canvas of boxes via
-/// <see cref="CanvasDocJson"/>, which reuses these DTOs per box. Human-readable, defaults omitted
-/// so files stay small: <c>{"runs":[{"t":"hello","b":true}]}</c></summary>
 public static class RichDocJson
 {
     internal sealed class RunDto
@@ -65,7 +61,6 @@ public static class RichDocJson
             }).ToList(),
         }).ToList();
 
-    /// <summary>Rebuild a document from para DTOs; always yields at least one paragraph.</summary>
     internal static RichDocument FromDtos(List<ParaDto>? paras)
     {
         var doc = new RichDocument();
@@ -95,7 +90,6 @@ public static class RichDocJson
     public static string ToJson(RichDocument doc) =>
         JsonSerializer.Serialize(new DocDto { Paras = ToDtos(doc) }, Options);
 
-    /// <summary>Parse a v1 document; null/corrupt input yields a fresh empty document (never throws).</summary>
     public static RichDocument FromJson(string? json)
     {
         if (string.IsNullOrWhiteSpace(json)) return new RichDocument();

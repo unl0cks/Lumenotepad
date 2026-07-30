@@ -6,9 +6,6 @@ using Lumenotepad.Editor;
 
 namespace Lumenotepad.Services;
 
-/// <summary>Assembles a page's freeform canvas into plain, readable Markdown (UTF-8, portable — not a
-/// perfect round-trip). Pure and unit-tested; the store/UI layer handles files. Boxes are emitted in
-/// reading order (top-to-bottom, then left-to-right); empty boxes are skipped.</summary>
 public static class MarkdownExport
 {
     public static string PageToMarkdown(string title, CanvasDocument doc)
@@ -25,7 +22,7 @@ public static class MarkdownExport
     private static string BoxToMarkdown(NoteBox box)
     {
         var lines = new List<string>();
-        int num = 0;                                     // running count within a "num" block
+        int num = 0;
         foreach (var p in box.Doc.Paragraphs)
         {
             if (p.Bullet == "num") num++; else num = 0;
@@ -39,11 +36,9 @@ public static class MarkdownExport
         null => "",
         "num" => $"{num}. ",
         "check" => p.Checked ? "- [x] " : "- [ ] ",
-        _ => "- ",                                       // every cute glyph bullet → a Markdown bullet
+        _ => "- ",
     };
 
-    /// <summary>Concatenate the paragraph's runs, wrapping bold/italic/strike in Markdown markers.
-    /// Emphasis markers hug the non-space core so " hi " stays " **hi** " (renderers reject "** hi **").</summary>
     private static string Inline(Paragraph p) => string.Concat(p.Runs.Select(Run));
 
     private static string Run(RichRun r)
@@ -58,12 +53,10 @@ public static class MarkdownExport
 
         int a = 0; while (a < text.Length && char.IsWhiteSpace(text[a])) a++;
         int b = text.Length; while (b > a && char.IsWhiteSpace(text[b - 1])) b--;
-        if (a >= b) return text;                         // all whitespace: never wrap
+        if (a >= b) return text;
         return text[..a] + open + text[a..b] + close + text[b..];
     }
 
-    /// <summary>A readable, filesystem-safe file/folder name: keep letters/digits/space/(-_.), turn any
-    /// other run into a single dash, trim, collapse repeats; empty/symbol-only → "Untitled".</summary>
     public static string SafeName(string raw)
     {
         var sb = new StringBuilder();

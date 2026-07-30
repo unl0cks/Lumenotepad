@@ -4,10 +4,6 @@ using Avalonia.Media;
 
 namespace Lumenotepad.Editor;
 
-/// <summary>The canvas's bottom layer: paints the grid-style paper background (tiled brush) and the
-/// page-style guide lines/boxes in one Render pass. A plain Control (Panel.Render is sealed — the
-/// same lesson as the Part-3 Border layer this replaces, but guides need real draw calls, and a
-/// Control CAN override Render: RichTextEditor proves it).</summary>
 public sealed class GuideLayer : Control
 {
     private string _gridStyle = PageStyles.Blank;
@@ -17,13 +13,8 @@ public sealed class GuideLayer : Control
 
     public GuideLayer() => IsHitTestVisible = false;
 
-    /// <summary>The viewport (visible page area) — divider positions anchor to it, not the growing
-    /// canvas. Pushed by MainView from the ScrollViewer.</summary>
     public Size Viewport { get; set; }
 
-    /// <summary>The bottom of the REAL content (lowest container), pushed by NoteCanvas on measure.
-    /// The canvas Bounds carry a big trailing breathing-room pad, so styles that dock to the page
-    /// foot (Cornell's summary band) use this instead — it hugs the content and descends with it.</summary>
     public double ContentBottom
     {
         get => _contentBottom;
@@ -31,9 +22,6 @@ public sealed class GuideLayer : Control
     }
     private double _contentBottom;
 
-    /// <summary>Chip-preview instances set this (wizard + customize dialogs): styles whose real
-    /// page draws NOTHING (Mindmap — bubbles + links only) still get a little illustrative motif
-    /// so their chip isn't a blank square. The live canvas leaves it false.</summary>
     public bool PreviewMotif { get; set; }
 
     public void SetStyles(string gridStyle, string pageStyle, int mode)
@@ -44,7 +32,6 @@ public sealed class GuideLayer : Control
         Refresh();
     }
 
-    /// <summary>Rebuild the theme-derived brush + repaint (theme changes arrive via canvas Rebuild).</summary>
     public void Refresh()
     {
         _gridBrush = BuildGridBrush(_gridStyle);
@@ -56,7 +43,7 @@ public sealed class GuideLayer : Control
         var size = Bounds.Size;
         if (_gridBrush is not null) ctx.FillRectangle(_gridBrush, new Rect(size));
         if (PreviewMotif && _pageStyle == PageStyles.Mindmap) { RenderMindmapMotif(ctx, size); return; }
-        if (_mode == PageStyles.ModeStartersOnly) return;          // starters-only: no guides
+        if (_mode == PageStyles.ModeStartersOnly) return;
         var set = PageStyleGuides.For(_pageStyle, Viewport, size, _contentBottom);
         if (set.Lines.Count == 0 && set.Boxes.Count == 0) return;
         var pen = new Pen(new SolidColorBrush(
@@ -65,7 +52,6 @@ public sealed class GuideLayer : Control
         foreach (var r in set.Boxes) ctx.DrawRectangle(null, pen, r, 10, 10);
     }
 
-    /// <summary>The Mindmap chip illustration: a central bubble with two linked branches.</summary>
     private static void RenderMindmapMotif(DrawingContext ctx, Size size)
     {
         var t = Services.ThemeManager.Current;
@@ -81,15 +67,12 @@ public sealed class GuideLayer : Control
         ctx.DrawEllipse(null, ring, right, size.Width * 0.09, size.Height * 0.11);
     }
 
-    // ---- grid-style paper backgrounds (tiled brushes — one cell, GPU-repeated) ----
-
     private static IBrush? BuildGridBrush(string style)
     {
         var t = Services.ThemeManager.Current;
         if (style == PageStyles.Dots)
         {
-            // Full dots at all four tile corners: each is clipped to its quarter inside the cell
-            // and the neighbouring tiles complete it — whole dots exactly on the 20px lattice.
+
             var g = new GeometryGroup();
             foreach (var (x, y) in new[] { (0.0, 0.0), (GridMath.Cell, 0.0), (0.0, GridMath.Cell), (GridMath.Cell, GridMath.Cell) })
                 g.Children.Add(new EllipseGeometry(new Rect(x - 1.1, y - 1.1, 2.2, 2.2)));
@@ -120,7 +103,7 @@ public sealed class GuideLayer : Control
                 Pen = new Pen(new SolidColorBrush(Color.Parse(Services.ThemePalettes.Alpha(t.PaperText, 0x1E)))),
             }, PageStyleGuides.RuleSpacing);
         }
-        return null;                                              // Blank
+        return null;
     }
 
     private static DrawingBrush Tile(Drawing cell, double size) => new()

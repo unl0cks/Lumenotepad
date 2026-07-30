@@ -32,7 +32,7 @@ public class WorkspaceStoreTests
 
             Assert.Equal(2, loaded.Notebooks.Count);
             Assert.Equal("Biology", loaded.Notebooks[0].Name);
-            Assert.Equal("Work", loaded.Notebooks[1].Name);          // order preserved
+            Assert.Equal("Work", loaded.Notebooks[1].Name);
             Assert.Equal("#3E9C6B", loaded.Notebooks[0].Color);
             Assert.Equal("Cells", loaded.Notebooks[0].Sections[0].Name);
             Assert.Equal(2, loaded.Notebooks[0].Sections[0].Pages.Count);
@@ -74,7 +74,7 @@ public class WorkspaceStoreTests
             Assert.Equal("My Notebook", seeded.Notebooks[0].Name);
             Assert.Equal("Welcome", seeded.Notebooks[0].Sections[0].Pages[0].Title);
 
-            var reloaded = new WorkspaceStore(dir).Load();   // persisted, not re-seeded
+            var reloaded = new WorkspaceStore(dir).Load();
             Assert.Single(reloaded.Notebooks);
             Assert.Equal("My Notebook", reloaded.Notebooks[0].Name);
         }

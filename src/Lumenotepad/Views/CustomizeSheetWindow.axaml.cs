@@ -9,11 +9,6 @@ using Lumenotepad.ViewModels;
 
 namespace Lumenotepad.Views;
 
-/// <summary>The section/page customization dialog (M9 Part 4) — replaces the temporary context-menu
-/// pickers. PAGE mode edits one page's name + style/grid overrides (newly explicit styles follow
-/// the same stamping flow the old picker used: empty page stamps silently, a page with content asks
-/// first). SECTION mode renames the section and can BULK-apply a style/grid to all its pages — the
-/// leading "Keep current" choice (the default) leaves the pages' own overrides alone.</summary>
 public partial class CustomizeSheetWindow : Window
 {
     private readonly MainViewModel _vm;
@@ -67,7 +62,7 @@ public partial class CustomizeSheetWindow : Window
 
         Opened += (_, _) =>
         {
-            Services.ThemeManager.UseMacNativeChrome(this, SheetTitleBar);   // mac: native frame = rounded + frosted
+            Services.ThemeManager.UseMacNativeChrome(this, SheetTitleBar);
             WinChrome.RoundCorners(this, true);
             if (Content is Control root) Motion.ScaleIn(root, 0.96, 180);
             NameBox.Focus();
@@ -124,7 +119,7 @@ public partial class CustomizeSheetWindow : Window
             var layer = new Editor.GuideLayer
             {
                 Width = 104, Height = 62, Viewport = new Avalonia.Size(104, 62),
-                PreviewMotif = true,  // styles with no real-page guides (Mindmap) still illustrate
+                PreviewMotif = true,
             };
             layer.SetStyles(Editor.PageStyles.Blank, key, Editor.PageStyles.ModeGuides);
             preview = layer;
@@ -181,7 +176,7 @@ public partial class CustomizeSheetWindow : Window
             if (name.Length > 0) sec.Name = name;
             bool setStyle = _pick != PickKeep;
             string? style = _pick == PickInherit ? null : _pick;
-            bool setGrid = GridBox.SelectedIndex > 0;                 // 0 = Keep current
+            bool setGrid = GridBox.SelectedIndex > 0;
             string? grid = GridBox.SelectedIndex <= 1 ? null : GridBox.SelectedItem as string;
             _vm.ApplySectionStyle(sec, setStyle, setStyle ? style : null, mode, setGrid, grid);
             Close();

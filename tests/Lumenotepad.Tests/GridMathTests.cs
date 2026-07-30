@@ -5,8 +5,7 @@ namespace Lumenotepad.Tests;
 
 public class GridMathTests
 {
-    // No exact midpoints (10, 30, …) — Math.Round uses banker's rounding there and the
-    // pointer never delivers a perfect .5 anyway.
+
     [Theory]
     [InlineData(0, 0)]
     [InlineData(9, 0)]

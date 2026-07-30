@@ -10,12 +10,10 @@ using Lumenotepad.Platform;
 
 namespace Lumenotepad.Views;
 
-/// <summary>A tiny modal for reordering a list (sections or pages): each row has up/down buttons that
-/// call back into the owner's collection. Chromeless + Lumen-styled like the app's other dialogs.</summary>
 public sealed class ReorderDialog : Window
 {
     private readonly List<string> _names;
-    private readonly Action<int, int> _move;   // (from, to) — mutates the real collection live
+    private readonly Action<int, int> _move;
     private readonly StackPanel _rows = new() { Spacing = 4 };
 
     private ReorderDialog(string title, IReadOnlyList<string> names, Action<int, int> move)
@@ -26,7 +24,7 @@ public sealed class ReorderDialog : Window
         Title = title;
         Width = 360; Height = 460; MinWidth = 300; MinHeight = 300;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        Services.ThemeManager.ConfigureDialogChrome(this);   // mac: native rounding + frost, no traffic lights
+        Services.ThemeManager.ConfigureDialogChrome(this);
         ShowInTaskbar = false;
         Background = this.FindResource("WindowSurfaceBrush") as IBrush;
         TransparencyLevelHint = new[] { WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent };
@@ -111,7 +109,7 @@ public sealed class ReorderDialog : Window
     private void Move(int from, int to)
     {
         if (to < 0 || to >= _names.Count) return;
-        _move(from, to);                                  // reorder the real collection
+        _move(from, to);
         (_names[from], _names[to]) = (_names[to], _names[from]);
         Rebuild();
     }

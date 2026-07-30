@@ -21,16 +21,12 @@
             <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
             <Setter Property="Margin" Value="0,14,0,2"/>
         </Style>
-        <!-- Category heading shown atop each panel while a search is active -->
         <Style Selector="TextBlock.searchcat">
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
             <Setter Property="Margin" Value="0,6,0,0"/>
         </Style>
-        <!-- Inline code/text fields + secondary buttons across the panels wear the app's themed
-             controls (raw Fluent defaults clashed — owner report). Explicitly-themed controls keep
-             their own theme (a local Theme= beats these Style setters). -->
         <Style Selector="TextBox.field">
             <Setter Property="Theme" Value="{StaticResource RoundedFieldTextBox}"/>
             <Setter Property="MinHeight" Value="34"/>
@@ -56,13 +52,10 @@
             <Setter Property="OnContent" Value="{x:Null}"/>
             <Setter Property="OffContent" Value="{x:Null}"/>
             <Setter Property="MinWidth" Value="0"/>
-            <!-- Interaction motion: Opacity/Brush transitions animate in this build (RenderTransform
-                 does not — see App.axaml + the motion spec); the knob slide is Fluent's own. -->
             <Setter Property="Transitions">
                 <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.12"/></Transitions>
             </Setter>
         </Style>
-        <!-- Smooth press feedback for the prefs comboboxes + sliders (Fluent drives the popup/thumb). -->
         <Style Selector="ComboBox">
             <Setter Property="Transitions">
                 <Transitions>
@@ -79,15 +72,11 @@
                 <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.12"/></Transitions>
             </Setter>
         </Style>
-        <!-- theme picker chips -->
         <Style Selector="ListBox.themepick ListBoxItem">
             <Setter Property="Padding" Value="10,6"/>
             <Setter Property="Margin" Value="0,0,6,6"/>
             <Setter Property="CornerRadius" Value="9"/>
         </Style>
-        <!-- left category nav -->
-        <!-- Settings cards. A soft recess rather than a hard box, so it groups without shouting -
-             the same read as Lumen's preference cards. -->
         <Style Selector="Border.prefcard">
             <Setter Property="Background" Value="#1F000000"/>
             <Setter Property="BorderBrush" Value="{DynamicResource FrameBorderBrush}"/>
@@ -96,7 +85,6 @@
             <Setter Property="Padding" Value="16,13,16,14"/>
             <Setter Property="Margin" Value="0,0,0,4"/>
         </Style>
-        <!-- The section label is the card's own title, so it loses its old free-floating top margin. -->
         <Style Selector="Border.prefcard > StackPanel > TextBlock.section">
             <Setter Property="Margin" Value="0,0,0,4"/>
         </Style>
@@ -105,7 +93,6 @@
             <Setter Property="Padding" Value="11,8"/>
             <Setter Property="Margin" Value="0,1.5"/>
         </Style>
-        <!-- Nav glyphs. Muted at rest, accent when the row is selected, so the tab reads as a unit. -->
         <Style Selector="ListBox.prefnav TextBlock.navicon">
             <Setter Property="FontFamily" Value="{StaticResource IconFont}"/>
             <Setter Property="FontSize" Value="14"/>
@@ -131,7 +118,6 @@
         <Style Selector="ListBox.prefnav ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
         </Style>
-        <!-- fonts checklist rows: plain checkbox rows, no selection fill -->
         <Style Selector="ListBox.fontcheck ListBoxItem">
             <Setter Property="Padding" Value="4,2"/>
         </Style>
@@ -141,9 +127,6 @@
         <Style Selector="ListBox.fontcheck ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="Transparent"/>
         </Style>
-        <!-- Hover help: a small ring the Border draws itself (so glyph and circle are always
-             concentric), with the help glyph tiny inside it. Ring + glyph both sweep to the accent
-             on hover via brush transitions — RenderTransform styles are dead in this build. -->
         <Style Selector="Border.qmark">
             <Setter Property="Width" Value="14"/>
             <Setter Property="Height" Value="14"/>
@@ -180,7 +163,6 @@
 
     <Grid>
     <DockPanel>
-        <!-- mini title bar — same height + close-button margin as the main window -->
         <Grid DockPanel.Dock="Top" Height="38" ColumnDefinitions="*,Auto" x:Name="PrefsTitleBar"
               Background="Transparent">
             <TextBlock Text="Preferences" FontSize="13" FontWeight="SemiBold"
@@ -189,7 +171,6 @@
                     Content="&#xE8BB;" VerticalAlignment="Center" Margin="0,0,3,0"/>
         </Grid>
 
-        <!-- Search across every category (declutter): type to filter all settings at once. -->
         <Border DockPanel.Dock="Top" Padding="16,0,16,8">
             <TextBox x:Name="SearchBox" Theme="{StaticResource RoundedFieldTextBox}" FontSize="13"
                      MinHeight="34" Padding="10,8" VerticalContentAlignment="Center"
@@ -198,7 +179,6 @@
 
         <Grid ColumnDefinitions="186,*">
 
-            <!-- category nav -->
             <Border Grid.Column="0" BorderBrush="{DynamicResource FrameBorderBrush}"
                     BorderThickness="0,0,1,0" Padding="8,4">
                 <ListBox x:Name="NavList" Classes="prefnav" Background="Transparent"
@@ -299,8 +279,6 @@
                 </ListBox>
             </Border>
 
-            <!-- category panels (one visible at a time; ShowPanel swaps + animates).
-                 x:Name so SmoothScroll can attach wheel-eased scrolling in the code-behind. -->
             <Grid Grid.Column="1" RowDefinitions="Auto,*">
             <TextBlock x:Name="PageTitle" Grid.Row="0" FontSize="21" FontWeight="SemiBold"
                        Margin="20,6,20,10" Foreground="{DynamicResource TextPrimaryBrush}"/>
@@ -445,7 +423,7 @@
                     <StackPanel x:Name="AppearancePanel" Spacing="6" IsVisible="False">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Classes="section" Text="THEME" Margin="0,4,0,2"/>
-                            <Border Classes="qmark" Margin="6,2,0,0" ToolTip.Tip="Pick the overall look of Lumenotepad. Click a theme to switch to it right away — the other appearance options below adjust to match."><TextBlock/></Border>
+                            <Border Classes="qmark" Margin="6,2,0,0" ToolTip.Tip="Pick the overall look of Lumenotepad. Click a theme to switch to it straight away. The other appearance options below adjust to match."><TextBlock/></Border>
                         </StackPanel>
                         <ListBox x:Name="ThemeList" Classes="themepick" Background="Transparent" BorderThickness="0" Padding="0">
                             <ListBox.ItemsPanel>
@@ -517,12 +495,10 @@
                         <Slider x:Name="GlassTintSlider" Minimum="-1" Maximum="1"
                                 TickFrequency="0.05"/>
 
-                        <!-- macOS only: macOS picks the frost recipe, not the app, and its default is far
-                             paler than the Windows acrylic. Shown only where it does something. -->
                         <Grid x:Name="MacMaterialRow" ColumnDefinitions="*,Auto" IsVisible="False" Margin="0,10,0,0">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Classes="label" Text="Glass material"/>
-                                <Border Classes="qmark" ToolTip.Tip="macOS only. Which of the system's frosted-glass recipes the main window, the menus and the message boxes sit on. macOS has no separate blur-strength setting — this is it. Standard is the tightest and most like the Windows look; Sheer lets the most through."><TextBlock/></Border>
+                                <Border Classes="qmark" ToolTip.Tip="macOS only. Which of the system's frosted-glass recipes the main window, the menus and the message boxes sit on. macOS has no separate blur-strength setting, so this is it. Standard is the tightest and closest to the Windows look. Sheer lets the most through."><TextBlock/></Border>
                             </StackPanel>
                             <ComboBox x:Name="MacMaterialBox" Grid.Column="1" Width="150" FontSize="12.5">
                                 <ComboBoxItem Content="Standard"/>
@@ -587,7 +563,7 @@
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Classes="label" Text="Toolbar position"/>
-                                <Border Classes="qmark" ToolTip.Tip="Which edge of the window the formatting toolbar sits against — top, bottom, left, or right."><TextBlock/></Border>
+                                <Border Classes="qmark" ToolTip.Tip="Which edge of the window the formatting toolbar sits against: top, bottom, left, or right."><TextBlock/></Border>
                             </StackPanel>
                             <ComboBox x:Name="ToolbarPosBox" Grid.Column="1" Width="120"/>
                         </Grid>
@@ -888,7 +864,7 @@
 
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Classes="section" Text="GET MORE FONTS"/>
-                            <Border Classes="qmark" Margin="6,14,0,4" ToolTip.Tip="Search free fonts from Google Fonts and Fontshare, then download them straight into Lumenotepad. They are saved in the app's own folder — nothing is installed into Windows, and no account is needed."><TextBlock/></Border>
+                            <Border Classes="qmark" Margin="6,14,0,4" ToolTip.Tip="Search free fonts from Google Fonts and Fontshare, then download them straight into Lumenotepad. They go into the app's own folder, so nothing is installed into Windows and you don't need an account."><TextBlock/></Border>
                         </StackPanel>
                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                             <TextBox x:Name="FontSearchBox" Classes="field" Grid.Column="0"
@@ -902,11 +878,6 @@
                         <StackPanel x:Name="FontResults" Spacing="6" Margin="0,2,0,0"/>
 
                         <TextBlock Classes="section" Text="OFFERED FONTS"/>
-                        <!-- A bounded Height still virtualizes the list inside the outer ScrollViewer
-                             (which measures with infinite height) — without one, all-installed mode
-                             realizes 500+ typeface previews at once. The bound is now set from
-                             code-behind (PrefsScroll.SizeChanged) so it tracks the window's viewport
-                             instead of a fixed 300px. Keep it bounded. -->
                         <ListBox x:Name="FontsList" Classes="fontcheck" Margin="0,4,0,0"
                                  Background="Transparent" BorderThickness="0" Padding="0"/>
                     </StackPanel>
@@ -950,8 +921,6 @@
                     </StackPanel>
 
                     <StackPanel x:Name="AboutPanel" Spacing="6" IsVisible="False">
-                        <!-- Identity block, then the update + build-details actions. Populated in the
-                             code-behind so the version, packaging and OS facts come from AppInfo. -->
                         <Grid ColumnDefinitions="Auto,*" Margin="2,0,0,16">
                             <Image Source="avares://Lumenotepad/Assets/lumenotepad-icon-256.png"
                                    Width="60" Height="60" Margin="0,0,16,0" VerticalAlignment="Top"/>
@@ -1020,9 +989,9 @@
                             <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,10,0">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Classes="label" Text="Backup folder"/>
-                                    <Border Classes="qmark" ToolTip.Tip="Where your automatic backup copies are saved. Pick a folder outside this computer's app folder — for example a cloud-synced one."><TextBlock/></Border>
+                                    <Border Classes="qmark" ToolTip.Tip="Where your automatic backup copies are saved. Pick a folder outside the app's own, like a cloud-synced one."><TextBlock/></Border>
                                 </StackPanel>
-                                <TextBlock x:Name="BackupFolderText" Classes="hint" Text="Not set — automatic backups are off."/>
+                                <TextBlock x:Name="BackupFolderText" Classes="hint" Text="Not set. Automatic backups are off."/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                 <Button x:Name="BackupFolderBtn" Classes="secondary" Content="Choose…"
@@ -1112,7 +1081,6 @@
             </Grid>
         </Grid>
     </DockPanel>
-    <!-- top-most: thin edge/corner grips that make the chromeless window resizable -->
     <controls:WindowResizeBorder/>
     </Grid>
 </Window>

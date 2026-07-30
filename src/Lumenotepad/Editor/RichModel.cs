@@ -5,10 +5,8 @@ using System.Text;
 
 namespace Lumenotepad.Editor;
 
-/// <summary>Vertical baseline shift for a run (M10): normal, superscript, or subscript.</summary>
 public enum Baseline { Normal, Super, Sub }
 
-/// <summary>One contiguous stretch of identically-formatted text inside a paragraph.</summary>
 public sealed class RichRun
 {
     public string Text = "";
@@ -16,12 +14,12 @@ public sealed class RichRun
     public bool Italic;
     public bool Underline;
     public bool Strike;
-    public string? Highlight;   // hex ("#FFD666") or null = none
-    public string? Color;       // hex or null = theme default
-    public double? Size;        // null = editor default
-    public string? Font;        // family name or null = editor default
-    public Baseline Baseline;   // super/subscript (M10)
-    public string? Link;        // hyperlink URL, or null = plain text (M10)
+    public string? Highlight;
+    public string? Color;
+    public double? Size;
+    public string? Font;
+    public Baseline Baseline;
+    public string? Link;
 
     public RichRun Clone() => new()
     {
@@ -44,23 +42,15 @@ public sealed class RichRun
     }
 }
 
-/// <summary>A complete character format — what the caret "carries" and what runs store.</summary>
 public readonly record struct RunFormat(
     bool Bold, bool Italic, bool Underline, bool Strike,
     string? Highlight, string? Color, double? Size, string? Font,
     Baseline Baseline = Baseline.Normal, string? Link = null);
 
-/// <summary>Paragraph horizontal alignment (M10).</summary>
 public enum TextAlign { Left, Center, Right, Justify }
 
-/// <summary>Paragraph "text type" (M10): a named style that sets a base size + weight. Body is the
-/// default; the editor's own font size is the Body size, and headings scale from it.</summary>
 public enum ParaStyle { Body, Title, Subtitle, Heading1, Heading2, Heading3 }
 
-/// <summary>A paragraph = an ordered list of runs (zero runs = an empty paragraph).</summary>
-/// <summary>The OneNote-style tag set (M11): key → glyph/color/name. Lives here — NOT on the
-/// editor control — so headless consumers (exports, tests) never touch Avalonia platform statics.
-/// Monochrome symbols only: color-emoji glyphs ignore the brush, so they could never tint.</summary>
 public static class TagStyles
 {
     public static readonly IReadOnlyList<(string Key, string Glyph, string Color, string Name)> All =
@@ -73,7 +63,6 @@ public static class TagStyles
         ("flag", "⚑", "#F09B4C", "Follow up"),
     };
 
-    /// <summary>Glyph + color for a tag key (toolbar, editor, and exports all read this), or null.</summary>
     public static (string Glyph, string Color)? Info(string key)
     {
         foreach (var t in All)
@@ -86,36 +75,20 @@ public sealed class Paragraph
 {
     public List<RichRun> Runs = new();
 
-    /// <summary>Bumped by RichDocument on every mutation of this paragraph, so views can cache a
-    /// per-paragraph layout and rebuild only what changed (keystroke cost stays O(1), not O(document)).</summary>
     public int Version;
 
-    /// <summary>Bullet style key: null = none; "dot" | "arrow" | "star" | "heart" | "flower" | "spark"
-    /// (cute glyph bullets), "num" (numbered), "check" (checkbox).</summary>
     public string? Bullet;
 
-    /// <summary>Ticked state for "check" bullets.</summary>
     public bool Checked;
 
-    /// <summary>OneNote-style tag key (M11): null = none; "important" | "question" | "idea" |
-    /// "star" | "flag" — a colored marker glyph in the paragraph's left gutter that reads as
-    /// "come back to this". Does not carry across an Enter split.</summary>
     public string? Tag;
 
-    /// <summary>Style overrides for the NUMBER of a "num" paragraph. null = inherit the corresponding
-    /// flag from the paragraph's first text run (numbers match their text by default; a future
-    /// preferences/context UI can override them independently).</summary>
     public bool? NumBold, NumItalic, NumUnderline, NumStrike;
 
-    /// <summary>Horizontal alignment (M10).</summary>
     public TextAlign Align;
 
-    /// <summary>Text type / named paragraph style (M10): Body default, or a heading/title.</summary>
     public ParaStyle Style;
 
-    /// <summary>A footnote entry line (M10): appended at the bottom of the box, rendered smaller +
-    /// muted, with a divider above the first. Its leading superscript marker matches an in-text
-    /// reference. Excluded from the count of "content" paragraphs.</summary>
     public bool Footnote;
 
     public int Length => Runs.Sum(r => r.Text.Length);
@@ -131,8 +104,6 @@ public sealed class Paragraph
         Align = Align, Style = Style, Footnote = Footnote,
     };
 
-    /// <summary>Ensure a run boundary exists exactly at <paramref name="offset"/>; returns the index of the
-    /// run that STARTS at that offset (== Runs.Count when offset == Length).</summary>
     public int SplitAt(int offset)
     {
         int acc = 0;
@@ -154,7 +125,6 @@ public sealed class Paragraph
         return Runs.Count;
     }
 
-    /// <summary>Merge adjacent same-format runs and drop empties.</summary>
     public void Normalize()
     {
         Runs.RemoveAll(r => r.Text.Length == 0);
@@ -169,7 +139,6 @@ public sealed class Paragraph
     }
 }
 
-/// <summary>A document position: paragraph index + character offset within it.</summary>
 public readonly record struct DocPos(int Para, int Off) : IComparable<DocPos>
 {
     public int CompareTo(DocPos o) => Para != o.Para ? Para.CompareTo(o.Para) : Off.CompareTo(o.Off);
@@ -179,19 +148,15 @@ public readonly record struct DocPos(int Para, int Off) : IComparable<DocPos>
     public static bool operator >=(DocPos a, DocPos b) => a.CompareTo(b) >= 0;
 }
 
-/// <summary>Immutable deep copy of a document, used for snapshot-based undo.</summary>
 public sealed class DocSnapshot
 {
     internal List<Paragraph> Paragraphs = new();
 }
 
-/// <summary>The rich document: paragraphs of formatted runs, plus the edit operations the editor needs.
-/// Pure model — no Avalonia dependencies, fully unit-testable.</summary>
 public sealed class RichDocument
 {
     public List<Paragraph> Paragraphs { get; } = new() { new Paragraph() };
 
-    /// <summary>Raised after any mutation, so views can re-layout.</summary>
     public event Action? Changed;
     private void OnChanged() => Changed?.Invoke();
 
@@ -205,7 +170,6 @@ public sealed class RichDocument
         p = new DocPos(para, Math.Clamp(p.Off, 0, Paragraphs[para].Length));
     }
 
-    /// <summary>Move a position one character left/right, crossing paragraph boundaries.</summary>
     public DocPos Move(DocPos p, int dir)
     {
         Clamp(ref p);
@@ -218,12 +182,9 @@ public sealed class RichDocument
         return p.Para > 0 ? new DocPos(p.Para - 1, Paragraphs[p.Para - 1].Length) : p;
     }
 
-    /// <summary>Insert text (may contain '\n' → paragraph splits) with bold/italic only (test/back-compat).</summary>
     public DocPos InsertText(DocPos pos, string text, bool bold = false, bool italic = false)
         => InsertText(pos, text, new RunFormat(bold, italic, false, false, null, null, null, null));
 
-    /// <summary>Insert text (may contain '\n' → paragraph splits) with the given formatting.
-    /// Returns the position after the inserted text.</summary>
     public DocPos InsertText(DocPos pos, string text, RunFormat fmt)
     {
         Clamp(ref pos);
@@ -248,7 +209,6 @@ public sealed class RichDocument
         return cur;
     }
 
-    /// <summary>Split the paragraph at the position (the Enter key). Returns the start of the new paragraph.</summary>
     public DocPos SplitParagraph(DocPos pos)
     {
         var r = SplitParagraphCore(pos);
@@ -261,16 +221,14 @@ public sealed class RichDocument
         Clamp(ref pos);
         var para = Paragraphs[pos.Para];
         int runIdx = para.SplitAt(pos.Off);
-        // The new paragraph continues the list + alignment; the tick state and TAG do not carry over
-        // (a tag marks that one thought), and a heading/title continues as Body (word-processor
-        // behavior: Enter after a heading starts body).
+
         var next = new Paragraph
         {
             Runs = para.Runs.Skip(runIdx).ToList(),
             Bullet = para.Bullet,
             Align = para.Align,
             Style = ParaStyle.Body,
-            Footnote = para.Footnote,          // a split footnote line stays a footnote line
+            Footnote = para.Footnote,
         };
         para.Runs.RemoveRange(runIdx, para.Runs.Count - runIdx);
         para.Version++;
@@ -278,7 +236,6 @@ public sealed class RichDocument
         return new DocPos(pos.Para + 1, 0);
     }
 
-    /// <summary>Delete everything between two positions (order-agnostic; merges paragraphs).</summary>
     public void DeleteRange(DocPos a, DocPos b)
     {
         Clamp(ref a); Clamp(ref b);
@@ -302,7 +259,7 @@ public sealed class RichDocument
             first.Runs.RemoveRange(i1, first.Runs.Count - i1);
             int i2 = last.SplitAt(b.Off);
             last.Runs.RemoveRange(0, i2);
-            first.Runs.AddRange(last.Runs);          // merge the tail of the last paragraph up
+            first.Runs.AddRange(last.Runs);
             Paragraphs.RemoveRange(a.Para + 1, b.Para - a.Para);
             first.Normalize();
             first.Version++;
@@ -310,8 +267,6 @@ public sealed class RichDocument
         OnChanged();
     }
 
-    /// <summary>Formatting of the character just before the position (what typing "continues"), or the
-    /// first run's format at paragraph start.</summary>
     public RunFormat FormatAt(DocPos pos)
     {
         Clamp(ref pos);
@@ -336,7 +291,6 @@ public sealed class RichDocument
         return any;
     }
 
-    /// <summary>Apply a format mutation to every run in the range (splitting runs at the edges).</summary>
     public void ApplyFormat(DocPos a, DocPos b, Action<RichRun> mutate)
     {
         Clamp(ref a); Clamp(ref b);
@@ -374,8 +328,6 @@ public sealed class RichDocument
         }
     }
 
-    /// <summary>Set (or clear, with null) the bullet style on every paragraph the range touches.
-    /// The tick state resets when the style changes away from "check".</summary>
     public void SetBullet(DocPos a, DocPos b, string? style)
     {
         Clamp(ref a); Clamp(ref b);
@@ -390,7 +342,6 @@ public sealed class RichDocument
         OnChanged();
     }
 
-    /// <summary>Set (or clear, with null) the tag on every paragraph the range touches (M11).</summary>
     public void SetTag(DocPos a, DocPos b, string? tag)
     {
         Clamp(ref a); Clamp(ref b);
@@ -403,7 +354,6 @@ public sealed class RichDocument
         OnChanged();
     }
 
-    /// <summary>Every paragraph in the range already has exactly this bullet style.</summary>
     public bool BulletAll(DocPos a, DocPos b, string? style)
     {
         Clamp(ref a); Clamp(ref b);
@@ -413,7 +363,6 @@ public sealed class RichDocument
         return true;
     }
 
-    /// <summary>Set the horizontal alignment on every paragraph the range touches (M10).</summary>
     public void SetAlign(DocPos a, DocPos b, TextAlign align)
     {
         Clamp(ref a); Clamp(ref b);
@@ -426,7 +375,6 @@ public sealed class RichDocument
         OnChanged();
     }
 
-    /// <summary>The shared alignment across the range, or null when it's mixed (M10).</summary>
     public TextAlign? AlignOf(DocPos a, DocPos b)
     {
         Clamp(ref a); Clamp(ref b);
@@ -437,7 +385,6 @@ public sealed class RichDocument
         return first;
     }
 
-    /// <summary>Set the text type / named paragraph style across the range (M10).</summary>
     public void SetParaStyle(DocPos a, DocPos b, ParaStyle style)
     {
         Clamp(ref a); Clamp(ref b);
@@ -450,7 +397,6 @@ public sealed class RichDocument
         OnChanged();
     }
 
-    /// <summary>The shared text type across the range, or null when it's mixed (M10).</summary>
     public ParaStyle? ParaStyleOf(DocPos a, DocPos b)
     {
         Clamp(ref a); Clamp(ref b);
@@ -461,14 +407,11 @@ public sealed class RichDocument
         return first;
     }
 
-    /// <summary>Insert a footnote (M10): a superscript reference marker "[n]" at <paramref name="pos"/>,
-    /// and an auto-numbered footnote line appended at the bottom. Returns the caret position just
-    /// after the marker. Numbering is insertion order (n = existing footnote lines + 1).</summary>
     public DocPos InsertFootnote(DocPos pos, string text)
     {
         int n = Paragraphs.Count(p => p.Footnote) + 1;
         var marker = new RunFormat(false, false, false, false, null, null, null, null, Baseline.Super, null);
-        var caretAfter = InsertText(pos, $"[{n}]", marker);      // fires Changed
+        var caretAfter = InsertText(pos, $"[{n}]", marker);
 
         var fp = new Paragraph { Footnote = true };
         fp.Runs.Add(new RichRun { Text = $"[{n}] ", Baseline = Baseline.Super });
@@ -478,7 +421,6 @@ public sealed class RichDocument
         return caretAfter;
     }
 
-    /// <summary>Flip a checkbox paragraph's ticked state.</summary>
     public void ToggleChecked(int paraIndex)
     {
         if (paraIndex < 0 || paraIndex >= Paragraphs.Count) return;
@@ -488,8 +430,6 @@ public sealed class RichDocument
         OnChanged();
     }
 
-    /// <summary>The contiguous run of "num" paragraphs containing <paramref name="paraIndex"/>
-    /// (start..end inclusive), or null when that paragraph isn't numbered.</summary>
     public (int Start, int End)? NumRunAt(int paraIndex)
     {
         if (paraIndex < 0 || paraIndex >= Paragraphs.Count || Paragraphs[paraIndex].Bullet != "num")
@@ -500,8 +440,6 @@ public sealed class RichDocument
         return (s, e);
     }
 
-    /// <summary>Set one number-style override ('b','i','u','s'; null = inherit) across the whole
-    /// numbered list containing <paramref name="paraIndex"/>. No-op outside a numbered list.</summary>
     public void SetNumFlag(int paraIndex, char flag, bool? value)
     {
         if (NumRunAt(paraIndex) is not { } run) return;
@@ -520,7 +458,6 @@ public sealed class RichDocument
         OnChanged();
     }
 
-    // ---- snapshots (undo/redo) ----
     public DocSnapshot TakeSnapshot() => new() { Paragraphs = Paragraphs.Select(p => p.Clone()).ToList() };
 
     public void Restore(DocSnapshot s)

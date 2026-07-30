@@ -54,8 +54,8 @@ public class FontCatalogTests
         Assert.Equal(3, fs.Count);
         var satoshi = fs.First(f => f.Name == "Satoshi");
         Assert.Equal(FontCatalog.Fontshare, satoshi.Source);
-        Assert.Equal("satoshi", satoshi.Id);           // slug is the download key
-        Assert.Equal("Sans Serif", satoshi.Category);  // "Sans" → "Sans Serif"
+        Assert.Equal("satoshi", satoshi.Id);
+        Assert.Equal("Sans Serif", satoshi.Category);
         Assert.Equal("Display", fs.First(f => f.Name == "Zodiak").Category);
         Assert.Equal("Blackletter", fs.First(f => f.Name == "Zodiak").Stroke);
     }
@@ -77,7 +77,7 @@ public class FontCatalogTests
         var merged = FontCatalog.Merge(g, f);
 
         Assert.Equal(g.Count + f.Count, merged.Count);
-        // Fontshare families are spread in, not all clustered at the end.
+
         int lastFontshareIndex = merged.Select((x, idx) => (x, idx))
             .Where(t => t.x.Source == FontCatalog.Fontshare).Max(t => t.idx);
         Assert.True(lastFontshareIndex < merged.Count - 1, "at least one Google font should follow the last Fontshare one");
@@ -118,7 +118,7 @@ public class FontCatalogTests
         ]
         """;
         var fs = FontCatalog.ParseFontsource(json);
-        Assert.DoesNotContain(fs, f => f.Name == "Roboto");   // google ones dropped (the Google source has them)
+        Assert.DoesNotContain(fs, f => f.Name == "Roboto");
         Assert.Equal(2, fs.Count);
         var aileron = fs.First(f => f.Name == "Aileron");
         Assert.Equal(FontCatalog.Fontsource, aileron.Source);
@@ -132,8 +132,8 @@ public class FontCatalogTests
         var g = FontCatalog.ParseGoogle(GoogleJson);
         var dupe = new[] { new FontCatalog.CatalogFont("Roboto", FontCatalog.Fontsource, "roboto", "Sans Serif", "", 0) };
         var merged = FontCatalog.Merge(g, dupe);
-        Assert.Single(merged, f => f.Name == "Roboto");                  // not duplicated
-        Assert.Equal(FontCatalog.Google, merged.First(f => f.Name == "Roboto").Source);  // Google wins
+        Assert.Single(merged, f => f.Name == "Roboto");
+        Assert.Equal(FontCatalog.Google, merged.First(f => f.Name == "Roboto").Source);
     }
 
     [Fact]
@@ -157,7 +157,7 @@ public class FontCatalogTests
             new("Merriweather", FontCatalog.Google, "Merriweather", "Serif", "", 2),
             new("Roboto", FontCatalog.Google, "Roboto", "Sans Serif", "", 3),
         };
-        // Serif AND Slab → only the slab serif, not the plain serif or the sans.
+
         var both = FontCatalog.Filter(cat, new[] { "serif", "slab" }, null);
         Assert.Single(both);
         Assert.Equal("Roboto Slab", both[0].Name);

@@ -11,16 +11,6 @@ using Lumenotepad.Platform;
 
 namespace Lumenotepad.Views;
 
-/// <summary>The update window — Lumenotepad's equivalent of Lumen Launcher, and reached the same way
-/// (About → "Check for updates"). It finds the right build for whichever OS is running, downloads it with
-/// progress, verifies it, and restarts into it.
-///
-/// Deliberately a window inside the app rather than a separate launcher executable, which is where this
-/// parts company with Lumen. Lumen needs a separate process because its Windows install goes into Program
-/// Files with an uninstaller and file associations, so the installer must run elevated and outside the app.
-/// Lumenotepad needs neither: on Windows it is portable (replace the files, keep `userdata`), and on macOS
-/// it is a bundle swap. Shipping a second macOS .app would also mean a SECOND unsigned app for the user to
-/// approve through System Settings — the exact friction the updater exists to remove.</summary>
 public sealed class UpdaterWindow : Window
 {
     private readonly TextBlock _headline;
@@ -32,7 +22,6 @@ public sealed class UpdaterWindow : Window
 
     private (string Version, UpdateBuild Build)? _pending;
 
-    /// <summary>Local alias so the record type does not leak the service namespace into the UI.</summary>
     private sealed record UpdateBuild(Services.UpdateService.Build Inner);
 
     public UpdaterWindow()
@@ -87,8 +76,6 @@ public sealed class UpdaterWindow : Window
         body.Children.Add(buttons);
         Content = body;
 
-        // Same chrome recipe as every other secondary window: chromeless + DWM rounding on Windows, the
-        // native frame (rounded, frosted, no traffic lights) on macOS.
         Services.ThemeManager.ConfigureDialogChrome(this);
         Opened += (_, _) =>
         {
@@ -96,7 +83,6 @@ public sealed class UpdaterWindow : Window
             Services.ThemeManager.ApplyChildChrome(this);
         };
 
-        // Dragging anywhere moves it — it has no title bar of its own.
         PointerPressed += (_, e) =>
         {
             if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) BeginMoveDrag(e);
@@ -105,7 +91,7 @@ public sealed class UpdaterWindow : Window
         Closed += (_, _) => _cts.Cancel();
 
         ShowIdle();
-        // Check immediately: nobody opens this window to then press "Check".
+
         _ = Check();
     }
 
@@ -119,8 +105,6 @@ public sealed class UpdaterWindow : Window
         _action.IsEnabled = true;
     }
 
-    /// <summary>Why this copy cannot install an update itself. Checking always works — only replacing the
-    /// files needs a real, writable install — so this explains the gap rather than disabling the button.</summary>
     private static string CannotInstallReason() => OperatingSystem.IsMacOS()
         ? "This copy is running from a development tree, or from somewhere it cannot write to, so it "
           + "cannot replace itself. Move Lumenotepad.app into Applications, or download the build by hand."
@@ -180,7 +164,7 @@ public sealed class UpdaterWindow : Window
             _bar.IsVisible = false;
             _headline.Text = "That didn't work";
             _detail.Text = "The download did not finish or did not verify, so nothing was changed. "
-                           + "Your current version is untouched — try again, or grab the build by hand from "
+                           + "Your current version is untouched. Try again, or grab the build by hand from "
                            + "the release page.";
             _action.Content = "Try again";
             _action.IsEnabled = true;
@@ -188,7 +172,6 @@ public sealed class UpdaterWindow : Window
             return;
         }
 
-        // The swap script is already waiting on this process to exit.
         _detail.Text = "Restarting…";
         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime d) d.Shutdown();
     }
@@ -202,6 +185,6 @@ public sealed class UpdaterWindow : Window
                 UseShellExecute = true,
             });
         }
-        catch { /* no browser, or a policy blocks it — the About page shows the URL as text anyway */ }
+        catch {  }
     }
 }

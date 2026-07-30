@@ -26,11 +26,11 @@ public class PageStylesTests
     {
         var nb = new Notebook();
         var pg = new Page();
-        Assert.Equal("Blank", PageStyles.EffectiveGrid(pg, nb, "None"));      // all inherit → global
+        Assert.Equal("Blank", PageStyles.EffectiveGrid(pg, nb, "None"));
         nb.DefaultGridStyle = "Ruled";
-        Assert.Equal("Ruled", PageStyles.EffectiveGrid(pg, nb, "None"));      // notebook wins
+        Assert.Equal("Ruled", PageStyles.EffectiveGrid(pg, nb, "None"));
         pg.GridStyle = "Dots";
-        Assert.Equal("Dots", PageStyles.EffectiveGrid(pg, nb, "None"));       // page wins
+        Assert.Equal("Dots", PageStyles.EffectiveGrid(pg, nb, "None"));
     }
 
     [Fact]
@@ -38,10 +38,10 @@ public class PageStylesTests
     {
         var nb = new Notebook { DefaultPageStyle = "Cornell", DefaultPageStyleMode = 2 };
         var pg = new Page();
-        Assert.Equal(("Cornell", 2), PageStyles.EffectiveStyle(pg, nb));      // inherit both
+        Assert.Equal(("Cornell", 2), PageStyles.EffectiveStyle(pg, nb));
         pg.PageStyle = "Boxing";
         pg.PageStyleMode = 1;
-        Assert.Equal(("Boxing", 1), PageStyles.EffectiveStyle(pg, nb));       // page wins both
+        Assert.Equal(("Boxing", 1), PageStyles.EffectiveStyle(pg, nb));
     }
 
     [Fact]

@@ -17,7 +17,6 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
         </Style>
-        <!-- style toggle buttons (B / I / U / S) -->
         <Style Selector="ToggleButton.style">
             <Setter Property="Width" Value="32"/>
             <Setter Property="Height" Value="32"/>
@@ -36,7 +35,6 @@
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
         </Style>
-        <!-- category chips -->
         <Style Selector="ToggleButton.chip">
             <Setter Property="Height" Value="28"/>
             <Setter Property="Padding" Value="13,0"/>
@@ -53,7 +51,6 @@
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
         </Style>
-        <!-- chromeless list rows: our own card Border is the visual, so no blue selection box -->
         <Style Selector="ListBox#FontList ListBoxItem">
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Margin" Value="0"/>
@@ -66,7 +63,6 @@
         <Style Selector="ListBox#FontList ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="Transparent"/>
         </Style>
-        <!-- the row card: subtle accent edge on hover, telling you it opens -->
         <Style Selector="Border.fontcard">
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
@@ -88,7 +84,6 @@
                     Content="&#xE8BB;" VerticalAlignment="Center" Margin="0,0,3,0"/>
         </Grid>
 
-        <!-- Controls header: search, preview text, style toggles, category chips -->
         <StackPanel x:Name="ListHeader" DockPanel.Dock="Top" Margin="22,4,22,10" Spacing="10">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                 <TextBox x:Name="SearchBox" Grid.Column="0" MinHeight="34"
@@ -126,17 +121,14 @@
             <WrapPanel x:Name="CategoryChips"/>
         </StackPanel>
 
-        <!-- Status / empty message -->
         <TextBlock x:Name="StatusLabel" DockPanel.Dock="Top" Margin="22,0,22,8"
                    Classes="section" TextWrapping="Wrap" IsVisible="False"/>
 
-        <!-- The scrolling font list -->
         <ListBox x:Name="FontList" Margin="16,0,16,14"
                  Background="Transparent" BorderThickness="0"
                  SelectionMode="Single" ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
     </DockPanel>
 
-    <!-- Font detail overlay: opened by clicking a row; a big sample + a full character map -->
     <Grid x:Name="DetailOverlay" Margin="0,38,0,0" IsVisible="False"
           Background="{DynamicResource WindowSurfaceBrush}">
         <DockPanel Margin="22,10,22,16">

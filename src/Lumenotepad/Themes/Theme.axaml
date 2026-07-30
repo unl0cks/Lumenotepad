@@ -2,9 +2,7 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:controls="using:Lumenotepad.Controls">
 
-    <!-- Palette (Lumen family tokens) -->
     <Color x:Key="AccentColor">#4DA6FF</Color>
-    <!-- Make Fluent controls (ListBox selection, etc.) use the brand accent instead of the OS accent. -->
     <Color x:Key="SystemAccentColor">#4DA6FF</Color>
     <Color x:Key="SystemAccentColorLight1">#73BAFF</Color>
     <Color x:Key="SystemAccentColorLight2">#96CCFF</Color>
@@ -22,9 +20,6 @@
     <SolidColorBrush x:Key="GlassBorderBrush" Color="#33FFFFFF"/>
     <SolidColorBrush x:Key="PanelTintBrush" Color="#8C16171C"/>
 
-    <!-- Theme-engine tokens (defaults = Lumen glass; ThemeManager overwrites them all at runtime,
-         DynamicResource consumers restyle live). Regions: FRAME (title bar/rails/nav), CANVAS
-         (body backdrop + homepage), PAPER (the page box + note containers). -->
     <SolidColorBrush x:Key="FrameBackgroundBrush" Color="#02FFFFFF"/>
     <SolidColorBrush x:Key="FrameBorderBrush" Color="#33FFFFFF"/>
     <SolidColorBrush x:Key="CanvasBackgroundBrush" Color="#00000000"/>
@@ -38,8 +33,6 @@
     <SolidColorBrush x:Key="PaperTextMutedBrush" Color="#80FFFFFF"/>
     <SolidColorBrush x:Key="FieldSelectionBrush" Color="#784DA6FF"/>
 
-    <!-- Corner-roundness defaults (M8 Part 6) — ThemeManager.PushRoundness rescales these.
-         Menus stay fixed at 8 (their popup windows use fixed DWM rounding). -->
     <CornerRadius x:Key="RadiusPage">14</CornerRadius>
     <CornerRadius x:Key="RadiusPageInner">13</CornerRadius>
     <SolidColorBrush x:Key="ScrollThumbBrush" Color="#2EFFFFFF"/>
@@ -51,17 +44,13 @@
     <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
     <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI</FontFamily>
 
-    <!-- Filled-button surfaces: top-lit vertical gradient + a deep same-hue border (nothing flat) -->
     <LinearGradientBrush x:Key="AccentGradientBrush" StartPoint="50%,0%" EndPoint="50%,100%">
         <GradientStop Offset="0" Color="#61B4FF"/>
         <GradientStop Offset="1" Color="#3B8BE6"/>
     </LinearGradientBrush>
     <SolidColorBrush x:Key="AccentDeepBrush" Color="#2B6CB8"/>
 
-    <!-- Prominent filled button: gradient fill, 1px deep border, hover veil, pressed shrink.
-         (Fluent's Button theme swaps Background on hover, killing custom fills — hence own template.) -->
     <ControlTheme x:Key="LumenButton" TargetType="Button">
-        <!-- accent fills always carry light text, whatever the theme -->
         <Setter Property="Foreground" Value="White"/>
         <Setter Property="Background" Value="{DynamicResource AccentGradientBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource AccentDeepBrush}"/>
@@ -96,25 +85,17 @@
         <Style Selector="^:disabled"><Setter Property="Opacity" Value="0.4"/></Style>
     </ControlTheme>
 
-    <!-- The accent button's NEUTRAL twin (Cancel/Back and other secondary actions): same shape,
-         press scale, and hover veil — just the quiet frame-family fill instead of the accent. -->
     <ControlTheme x:Key="LumenButtonGray" TargetType="Button" BasedOn="{StaticResource LumenButton}">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource FrameBorderBrush}"/>
     </ControlTheme>
 
-    <!-- Motion-driven toggle switch: Fluent's own knob slide only worked sometimes in this build
-         (transform styling is unreliable here — see the motion spec), so the knob is tweened by
-         ToggleFx from code while the track colors ride Brush transitions (those DO work). -->
     <ControlTheme x:Key="{x:Type ToggleSwitch}" TargetType="ToggleSwitch">
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
             <ControlTemplate>
                 <Panel>
-                    <!-- ToggleSwitch REQUIRES this part (compile-time check); it only feeds the
-                         control's built-in drag/slide logic, which our code-driven knob replaces —
-                         so it exists, invisibly, and does nothing. -->
                     <Panel x:Name="PART_MovingKnobs" Width="0" Height="0" IsVisible="False"/>
                     <Border x:Name="track" Width="42" Height="22" CornerRadius="11"
                             Background="{DynamicResource ControlPressedBrush}"
@@ -142,9 +123,6 @@
         <Style Selector="^:disabled"><Setter Property="Opacity" Value="0.4"/></Style>
     </ControlTheme>
 
-    <!-- Color swatch button: the button's Background IS the payload, so no state may repaint it
-         (the default Fluent theme's hover swaps in its gray brush — owner saw yellow turn gray).
-         Hover feedback is the accent ring from the callers' `.swatch` styles; press just dims. -->
     <ControlTheme x:Key="SwatchButton" TargetType="Button">
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Padding" Value="0"/>
@@ -159,8 +137,6 @@
                             <DoubleTransition Property="Opacity" Duration="0:0:0.08"/>
                         </Transitions>
                     </Border.Transitions>
-                    <!-- Fill the border and center the CONTENT (element alignment left the ∅ glyph
-                         off-center — owner report); content-alignment centers the glyph reliably. -->
                     <ContentPresenter x:Name="cp" Content="{TemplateBinding Content}"
                                       Foreground="{TemplateBinding Foreground}" FontSize="{TemplateBinding FontSize}"
                                       HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
@@ -170,7 +146,6 @@
         <Style Selector="^:pressed /template/ Border#bg"><Setter Property="Opacity" Value="0.72"/></Style>
     </ControlTheme>
 
-    <!-- Round icon button (title-bar app mark, generic actions) -->
     <ControlTheme x:Key="IconButton" TargetType="Button">
         <Setter Property="Focusable" Value="False"/>
         <Setter Property="FontFamily" Value="{StaticResource IconFont}"/>
@@ -201,17 +176,11 @@
         <Style Selector="^:disabled"><Setter Property="Opacity" Value="0.35"/></Style>
     </ControlTheme>
 
-    <!-- ============== Single-line text field with ROUNDED selection ============== -->
-    <!-- Minimal template around RoundedTextPresenter: real SelectionBrush is transparent (the stock
-         presenter has no corner-radius hook), the presenter paints rounded accent rects itself. -->
     <ControlTheme x:Key="RoundedFieldTextBox" TargetType="TextBox">
-        <!-- Standalone theme (no BasedOn) = Fluent's Cursor setter is lost; restore it. -->
         <Setter Property="Cursor" Value="IBeam"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}"/>
         <Setter Property="SelectionBrush" Value="Transparent"/>
-        <!-- A field should LOOK like a place to type: neutral gray-alpha fill + hairline reads
-             on light and dark surfaces alike, so no per-theme tokens are needed. -->
         <Setter Property="Background" Value="#1A808080"/>
         <Setter Property="BorderBrush" Value="#40808080"/>
         <Setter Property="BorderThickness" Value="1"/>
@@ -236,7 +205,6 @@
                             <TextBlock Name="watermark" Text="{TemplateBinding PlaceholderText}"
                                        Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"
                                        IsVisible="{TemplateBinding Text, Converter={x:Static StringConverters.IsNullOrEmpty}}"/>
-                            <!-- stock caret off (Transparent) — GlidingCaret paints the animated one -->
                             <TextPresenter Name="PART_TextPresenter"
                                 Text="{TemplateBinding Text, Mode=TwoWay}"
                                 CaretIndex="{TemplateBinding CaretIndex}"
@@ -260,10 +228,6 @@
         </Style>
     </ControlTheme>
 
-    <!-- ============== Slim glass scrollbars ============== -->
-    <!-- Full ControlTheme replacement: Fluent's scrollbar keeps its chunky expanded state (track
-         plate + arrow RepeatButtons) no matter what plain styles say, so the template is rebuilt
-         from just Track + pill Thumb. Clicking the empty track still pages via the PART buttons. -->
     <ControlTheme x:Key="SlimScrollPageButton" TargetType="RepeatButton">
         <Setter Property="Focusable" Value="False"/>
         <Setter Property="Template">
@@ -333,7 +297,6 @@
         </Style>
     </ControlTheme>
 
-    <!-- Caption (window) buttons -->
     <ControlTheme x:Key="CaptionButton" TargetType="Button">
         <Setter Property="Focusable" Value="False"/>
         <Setter Property="FontFamily" Value="{StaticResource IconFont}"/>

@@ -11,9 +11,6 @@ using Lumenotepad.Editor;
 
 namespace Lumenotepad.Views;
 
-/// <summary>The formatting toolbar: bold/italic/underline/strike, highlight + text-color swatches,
-/// font size, a font picker, and the dock menu (top/left/right/bottom). Drives a target
-/// <see cref="RichTextEditor"/> and mirrors its caret format via SelectionChanged.</summary>
 public partial class FormatToolbar : UserControl
 {
     private static readonly (string? Hex, string Name)[] Highlights =
@@ -30,9 +27,6 @@ public partial class FormatToolbar : UserControl
         ("#4DA6FF", "Blue"), ("#C9A0FF", "Purple"), ("#FF6B6B", "Red"),
     };
 
-    /// <summary>The built-in palettes (the "(none)" entry excluded) — prefs seeds edits from these.
-    /// MUST be declared after <see cref="Highlights"/>/<see cref="TextColors"/> — static field
-    /// initializers run in declaration order, so an earlier declaration would read null arrays.</summary>
     public static readonly string[] BuiltInHighlights =
         Highlights.Where(h => h.Hex is not null).Select(h => h.Hex!).ToArray();
     public static readonly string[] BuiltInTextColors =
@@ -41,31 +35,20 @@ public partial class FormatToolbar : UserControl
     private RichTextEditor? _target;
     private bool _syncing;
 
-    /// <summary>Raised when the user picks a dock side ("Top"/"Left"/"Right"/"Bottom").</summary>
     public event Action<string>? DockRequested;
 
-    /// <summary>Raised when the user picks a dock scope: "Window" (toolbar hugs the window edge)
-    /// or "Page" (toolbar lives inside the page box).</summary>
     public event Action<string>? ScopeRequested;
 
-    /// <summary>Raised by the far-end Customize button — MainView opens the notebook wizard in
-    /// edit mode for the selected notebook.</summary>
     public event Action? CustomizeRequested;
 
-    /// <summary>Raised by the image button — MainView picks a file and drops an image box on the page.</summary>
     public event Action? InsertImageRequested;
 
-    /// <summary>Raised by the divider button ("h"/"v") — MainView drops a line-divider box on the page.</summary>
     public event Action<string>? InsertDividerRequested;
 
-    /// <summary>Raised by the attach button — MainView picks a file and drops an attachment chip on the page.</summary>
     public event Action? InsertAttachmentRequested;
 
-    /// <summary>Raised by the table size picker (rows, cols) — MainView drops a table box on the page.</summary>
     public event Action<int, int>? InsertTableRequested;
 
-    /// <summary>Raised by the Insert menu's PDF entry — MainView picks a PDF, attaches it, and opens
-    /// the in-app viewer/annotator in one step.</summary>
     public event Action? InsertPdfRequested;
 
     public RichTextEditor? Target
@@ -84,11 +67,9 @@ public partial class FormatToolbar : UserControl
     {
         InitializeComponent();
 
-        // Picker flyouts rise in and wear the frosted-glass popup backdrop like the menus do.
         foreach (var btn in new[] { BulletBtn, HighlightBtn, ColorBtn, FontBtn, TypeBtn, AlignBtn, InsertBtn, TableBtn, TagBtn })
             if (btn.Flyout is { } f) MenuFx.AttachFlyout(f);
 
-        // The font list glides like every other list (its ScrollViewer only exists once opened).
         bool fontScrollSmoothed = false;
         if (FontBtn.Flyout is { } fontFly) fontFly.Opened += (_, _) =>
         {
@@ -129,15 +110,13 @@ public partial class FormatToolbar : UserControl
         BuildDockMenu();
     }
 
-    /// <summary>Reflow for the dock side + scope: orientation, breathing-room margins, and flyouts
-    /// opening away from the docked edge.</summary>
     public void SetPlacement(Dock dock, bool pageScope)
     {
         Classes.Set("onpaper", pageScope);
         bool vertical = dock is Dock.Left or Dock.Right;
         Panel.Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;
         SizeGroup.Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;
-        // Group dividers follow the strip: vertical hairlines in a row, horizontal ones in a column.
+
         foreach (var sep in Panel.Children.OfType<Border>().Where(b => b.Classes.Contains("toolsep")))
         {
             sep.Width = vertical ? 18 : 1;
@@ -145,7 +124,7 @@ public partial class FormatToolbar : UserControl
             sep.Margin = vertical ? new Thickness(0, 4) : new Thickness(4, 0);
             sep.HorizontalAlignment = vertical ? HorizontalAlignment.Center : HorizontalAlignment.Left;
         }
-        // Keep the "..." overflow + customize buttons at the opposite end of the strip for every dock.
+
         DockPanel.SetDock(DockBtn, vertical ? Dock.Bottom : Dock.Right);
         DockPanel.SetDock(CustomizeBtn, vertical ? Dock.Bottom : Dock.Right);
         Chrome.Padding = vertical ? new Thickness(2, 6) : new Thickness(6, 4);
@@ -161,8 +140,6 @@ public partial class FormatToolbar : UserControl
             if (b.Flyout is PopupFlyoutBase pf) pf.Placement = placement;
         if (DockBtn.Flyout is PopupFlyoutBase df) df.Placement = placement;
 
-        // Inside the page box the strip needs an inset from the rounded edge + a gap toward the content;
-        // on the window edges the vertical strips need air toward the neighboring panel.
         Margin = (pageScope, dock) switch
         {
             (true, Dock.Top) => new Thickness(14, 12, 14, 0),
@@ -174,10 +151,6 @@ public partial class FormatToolbar : UserControl
             _ => new Thickness(0),
         };
 
-        // Docked to the window, the strip is frame furniture: frame fill + a hairline toward the
-        // content, so its icons sit on the frame color on every theme. Inside the page it stays bare.
-        // The resource bindings MUST be disposed on scope change — a live binding survives
-        // ClearValue and re-paints the old chrome on the next theme switch.
         _chromeBgSub?.Dispose();
         _chromeBorderSub?.Dispose();
         _chromeBgSub = _chromeBorderSub = null;
@@ -198,7 +171,7 @@ public partial class FormatToolbar : UserControl
                 Dock.Bottom => new Thickness(0, 1, 0, 0),
                 _ => new Thickness(0, 0, 0, 1),
             };
-            Margin = new Thickness(0);   // flush with the window edge, like the panels
+            Margin = new Thickness(0);
         }
     }
 
@@ -208,7 +181,7 @@ public partial class FormatToolbar : UserControl
     {
         if (_target is null) return;
         action(_target);
-        _target.Focus();          // formatting shouldn't steal the caret
+        _target.Focus();
     }
 
     private void NudgeSize(int delta)
@@ -218,7 +191,6 @@ public partial class FormatToolbar : UserControl
         SetSize(cur + delta, focusEditor: true);
     }
 
-    /// <summary>Apply whatever number is typed in the size box (invalid input just re-syncs the display).</summary>
     private void ApplyTypedSize()
     {
         if (_target is null) return;
@@ -239,11 +211,6 @@ public partial class FormatToolbar : UserControl
         UpdateFromEditor();
     }
 
-    /// <summary>Highlight / text-color picker: the shared 9-family × 5-shade palette (the same colours
-    /// as the notebook Color menu and the PDF viewer's swatches). The flyout opens on the family
-    /// swatches; clicking one drills into that family's five shades (with a ‹ back), so every colour has
-    /// its own shade menu. Highlights apply the shade at ~40% alpha, text applies it solid. A leading
-    /// ∅ chip clears the highlight / resets to the default text colour.</summary>
     private void SetupColorPicker(StackPanel host, bool highlight, Action<string?> apply, Button owner)
     {
         void ShowFamilies(bool animate)
@@ -256,15 +223,15 @@ public partial class FormatToolbar : UserControl
             foreach (var (family, shades) in ViewModels.MainViewModel.NotebookPalette)
             {
                 var local = shades;
-                var fam = SwatchChip(22, new SolidColorBrush(Color.Parse(shades[2].Hex)), $"{family} — pick a shade");
+                var fam = SwatchChip(22, new SolidColorBrush(Color.Parse(shades[2].Hex)), $"{family}: pick a shade");
                 fam.PointerPressed += (_, _) => ShowShades(local);
                 host.Children.Add(fam);
             }
-            // Grayscale ramp (white → black) — greys the coloured families don't cover.
+
             var neutral = SwatchChip(22, NeutralBrush(), "White · gray · black");
             neutral.PointerPressed += (_, _) => ShowShades(ViewModels.MainViewModel.GrayscaleShades);
             host.Children.Add(neutral);
-            if (animate) Motion.ScaleIn(host, 1.06, Motion.Fast);   // zoom back out to the families
+            if (animate) Motion.ScaleIn(host, 1.06, Motion.Fast);
         }
         void ShowShades((string Name, string Hex)[] shades)
         {
@@ -280,13 +247,12 @@ public partial class FormatToolbar : UserControl
                 chip.PointerPressed += (_, _) => { apply(applied); owner.Flyout?.Hide(); ShowFamilies(animate: false); };
                 host.Children.Add(chip);
             }
-            Motion.ScaleIn(host, 0.9, Motion.Fast);                 // zoom in to the picked family's shades
+            Motion.ScaleIn(host, 0.9, Motion.Fast);
         }
         ShowFamilies(animate: false);
-        if (owner.Flyout is FlyoutBase fb) fb.Opened += (_, _) => ShowFamilies(animate: false);   // reopen on families
+        if (owner.Flyout is FlyoutBase fb) fb.Opened += (_, _) => ShowFamilies(animate: false);
     }
 
-    /// <summary>The grayscale family's swatch: a white→black diagonal so it reads as "neutrals".</summary>
     private static IBrush NeutralBrush() => new LinearGradientBrush
     {
         StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
@@ -321,9 +287,6 @@ public partial class FormatToolbar : UserControl
         return $"{c.R:X2}{c.G:X2}{c.B:X2}";
     }
 
-    /// <summary>Kept for the host call site. The highlight/text pickers now use the fixed 9-family shade
-    /// palette (<see cref="SetupColorPicker"/>), so per-notebook custom palette lists no longer drive
-    /// these swatches.</summary>
     public void SetPalettes(System.Collections.Generic.IReadOnlyList<string> highlights,
                             System.Collections.Generic.IReadOnlyList<string> textColors) { }
 
@@ -353,10 +316,6 @@ public partial class FormatToolbar : UserControl
         }
     }
 
-    // ---- M10: alignment, text type, link ----
-
-    // Icon-font glyph per alignment (Left/Center/Right are real Segoe glyphs; Justify has none, so
-    // its row leads with a bars symbol from the symbol font instead).
     private static readonly (TextAlign Align, string Glyph, string Name)[] Aligns =
     {
         (TextAlign.Left, "", "Left"), (TextAlign.Center, "", "Center"),
@@ -420,7 +379,6 @@ public partial class FormatToolbar : UserControl
         }
     }
 
-    // ---- table insert: a hover-to-size grid picker (rows × cols) ----
     private const int TblMaxRows = 6, TblMaxCols = 8;
     private Border[,]? _tblCells;
 
@@ -459,8 +417,6 @@ public partial class FormatToolbar : UserControl
         TableSizeLabel.Text = $"{r + 1} × {c + 1}";
     }
 
-    /// <summary>The Insert menu: link, image, file, PDF, footnote, and line dividers in one flyout
-    /// so the toolbar strip stays short.</summary>
     private void BuildInsertChoices()
     {
         var iconFont = (FontFamily)Application.Current!.FindResource("IconFont")!;
@@ -487,22 +443,17 @@ public partial class FormatToolbar : UserControl
         Add("", true, "Link", () => _ = AddLinkAsync());
         Add("", true, "Image", () => InsertImageRequested?.Invoke());
         Add("", true, "File attachment", () => InsertAttachmentRequested?.Invoke());
-        Add("", true, "PDF — view & annotate", () => InsertPdfRequested?.Invoke());
+        Add("", true, "PDF: view and annotate", () => InsertPdfRequested?.Invoke());
         Add("†", false, "Footnote", () => _ = AddFootnoteAsync());
         Add("─", false, "Horizontal line", () => InsertDividerRequested?.Invoke("h"));
         Add("│", false, "Vertical line", () => InsertDividerRequested?.Invoke("v"));
     }
 
-    /// <summary>Trim the strip for the PDF annotator (M11). Hides the canvas-only furniture —
-    /// tables, per-line tags, the dock menu, the customize button — and thins the Insert menu down
-    /// to Link + Footnote (its other entries drop boxes onto the note CANVAS, which has no meaning
-    /// inside a PDF note). Everything else stays: B/I/U/S, super/subscript, text type, alignment,
-    /// bullets, highlight, color, size, and font. Call once, right after construction.</summary>
     public void SetCompact()
     {
         foreach (var c in new Control[] { TableBtn, TagBtn, DockBtn, CustomizeBtn })
             c.IsVisible = false;
-        // Indices follow BuildInsertChoices' Add order: Link, Image, File, PDF, Footnote, H, V.
+
         for (int i = InsertChoices.Children.Count - 1; i >= 0; i--)
             if (i is not (0 or 4)) InsertChoices.Children.RemoveAt(i);
     }
@@ -517,7 +468,7 @@ public partial class FormatToolbar : UserControl
     {
         foreach (var (style, name) in TextTypes)
         {
-            // Preview the type at its own size/weight so the menu reads like a style gallery.
+
             double size = style switch
             {
                 ParaStyle.Title => 20, ParaStyle.Subtitle => 15.5, ParaStyle.Heading1 => 18,
@@ -540,8 +491,6 @@ public partial class FormatToolbar : UserControl
         }
     }
 
-    /// <summary>Add a hyperlink: link the selection (prompt for the URL only), or — with nothing
-    /// selected — prompt for both the text to show and the URL, then insert it.</summary>
     private async System.Threading.Tasks.Task AddLinkAsync()
     {
         if (_target is null || TopLevel.GetTopLevel(this) is not Window owner) return;
@@ -567,7 +516,6 @@ public partial class FormatToolbar : UserControl
         UpdateFromEditor();
     }
 
-    /// <summary>Prompt for the footnote text and insert a numbered marker + bottom entry.</summary>
     private async System.Threading.Tasks.Task AddFootnoteAsync()
     {
         if (_target is null || TopLevel.GetTopLevel(this) is not Window owner) return;
@@ -580,9 +528,6 @@ public partial class FormatToolbar : UserControl
 
     private Button? _numB, _numI, _numU, _numS;
 
-    /// <summary>The per-list number-style row: label + B/I/U/S toggles + "match text" reset. Lives in
-    /// the bullet flyout, visible only when the caret sits in a numbered list; the flyout stays open
-    /// so several flags can be flipped in a row.</summary>
     private void BuildNumStyleRow()
     {
         var label = new TextBlock
@@ -628,8 +573,6 @@ public partial class FormatToolbar : UserControl
     private bool _extendedFonts;
     private System.Collections.Generic.IReadOnlyCollection<string>? _disabledFonts;
 
-    /// <summary>Fonts prefs: the full installed list vs the curated shortlist, minus the
-    /// curation blocklist. Rebuilds the menu only when something actually changed.</summary>
     public void SetFontPrefs(bool extended, System.Collections.Generic.IReadOnlyCollection<string> disabled)
     {
         bool same = _extendedFonts == extended && _disabledFonts is not null
@@ -637,13 +580,13 @@ public partial class FormatToolbar : UserControl
             && _disabledFonts.SequenceEqual(disabled);
         if (same && FontList.ItemsSource is not null) return;
         _extendedFonts = extended;
-        _disabledFonts = disabled.ToList();               // snapshot — the VM list mutates in place
+        _disabledFonts = disabled.ToList();
         RefreshFontList();
     }
 
     private void BuildFontList()
     {
-        // Each entry previews in its own face (bundled fonts resolve via the embedded collection).
+
         FontList.ItemTemplate = new Avalonia.Controls.Templates.FuncDataTemplate<string?>((name, _) =>
             new TextBlock
             {
@@ -715,7 +658,7 @@ public partial class FormatToolbar : UserControl
                 _numU?.Classes.Set("on", ns.Underline);
                 _numS?.Classes.Set("on", ns.Strike);
             }
-            if (!SizeBox.IsFocused)                       // don't clobber a number mid-typing
+            if (!SizeBox.IsFocused)
                 SizeBox.Text = (f.Size ?? _target.FontSize).ToString("0");
             FontList.SelectedItem = f.Font ?? "(Default)";
         }

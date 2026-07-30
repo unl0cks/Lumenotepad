@@ -8,9 +8,6 @@ using Lumenotepad.Platform;
 
 namespace Lumenotepad.Views;
 
-/// <summary>Small Lumen-styled confirm prompt. A solid, opaque, DWM-rounded window (NOT a transparent
-/// one — a chromeless transparent window paints its unpainted area black, which showed as a dark square
-/// around the card). Cancel + a red destructive button; Enter confirms, Escape cancels, drag anywhere.</summary>
 public static class ConfirmDialog
 {
     public static async Task<bool> Show(Window owner, string title, string message,
@@ -23,10 +20,10 @@ public static class ConfirmDialog
             SizeToContent = SizeToContent.WidthAndHeight,
             CanResize = false,
             ShowInTaskbar = false,
-            Background = new SolidColorBrush(Color.Parse("#1B1D27")),   // opaque: no transparent ring to go black
+            Background = new SolidColorBrush(Color.Parse("#1B1D27")),
         };
         win.Opened += (_, _) => WinChrome.RoundCorners(win, true);
-        Services.ThemeManager.ConfigureDialogChrome(win);   // mac: native rounding + frost, no traffic lights
+        Services.ThemeManager.ConfigureDialogChrome(win);
 
         var titleText = new TextBlock
         {
@@ -38,7 +35,6 @@ public static class ConfirmDialog
             Foreground = new SolidColorBrush(Color.Parse("#B3FFFFFF")), Margin = new Thickness(0, 8, 0, 18),
         };
 
-        // Same top-lit gradient + deep border language as the rest of the filled buttons.
         var lumenTheme = Avalonia.Application.Current?.FindResource("LumenButton") as Avalonia.Styling.ControlTheme;
         Button MakeButton(string text, string top, string bottom, string border) => new()
         {
@@ -60,8 +56,8 @@ public static class ConfirmDialog
         var cancel = MakeButton(cancelText, "#33FFFFFF", "#1AFFFFFF", "#40FFFFFF");
         var t = Services.ThemeManager.Current;
         var confirm = danger
-            ? MakeButton(confirmText, "#D64258", "#A62A3C", "#7E1F2D")                  // destructive red
-            : MakeButton(confirmText, t.AccentGradTop, t.AccentGradBottom, t.AccentDeep); // affirmative accent
+            ? MakeButton(confirmText, "#D64258", "#A62A3C", "#7E1F2D")
+            : MakeButton(confirmText, t.AccentGradTop, t.AccentGradBottom, t.AccentDeep);
 
         var buttons = new StackPanel
         {
@@ -75,7 +71,6 @@ public static class ConfirmDialog
         stack.Children.Add(msgText);
         stack.Children.Add(buttons);
 
-        // A hairline top border reads as a lifted edge; the window itself carries the fill + rounded corners.
         var card = new Border
         {
             Background = Brushes.Transparent,
@@ -90,9 +85,8 @@ public static class ConfirmDialog
         };
 
         win.Content = card;
-        win.Opened += (_, _) => Motion.ScaleIn(card, 0.96, 160);   // quick fade + scale in
+        win.Opened += (_, _) => Motion.ScaleIn(card, 0.96, 160);
 
-        // Fade + shrink the card out, THEN close with the result (so the result survives).
         bool closing = false;
         void CloseWith(bool result)
         {

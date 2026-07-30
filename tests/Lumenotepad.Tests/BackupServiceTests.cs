@@ -10,9 +10,9 @@ namespace Lumenotepad.Tests;
 public class BackupServiceTests
 {
     [Theory]
-    [InlineData(0, null, false)]                         // every=0 → never
+    [InlineData(0, null, false)]
     [InlineData(-3, null, false)]
-    [InlineData(7, null, true)]                          // never backed up → due
+    [InlineData(7, null, true)]
     public void IsDue_offAndNeverCases(int everyDays, object? _, bool expected)
     {
         var now = new DateTime(2026, 7, 12, 0, 0, 0, DateTimeKind.Utc);
@@ -23,9 +23,9 @@ public class BackupServiceTests
     public void IsDue_respectsInterval()
     {
         var now = new DateTime(2026, 7, 12, 12, 0, 0, DateTimeKind.Utc);
-        Assert.False(BackupService.IsDue(now.AddDays(-3), 7, now));   // 3 days < 7
-        Assert.True(BackupService.IsDue(now.AddDays(-8), 7, now));    // 8 days ≥ 7
-        Assert.True(BackupService.IsDue(now.AddDays(-7), 7, now));    // exactly due
+        Assert.False(BackupService.IsDue(now.AddDays(-3), 7, now));
+        Assert.True(BackupService.IsDue(now.AddDays(-8), 7, now));
+        Assert.True(BackupService.IsDue(now.AddDays(-7), 7, now));
     }
 
     [Fact]
@@ -54,7 +54,6 @@ public class BackupServiceTests
             using (var z = ZipFile.OpenRead(zip))
                 Assert.Contains(z.Entries, e => e.FullName.EndsWith("settings.json"));
 
-            // Seed 6 more so there are 7 total, keep 5 → 2 oldest pruned.
             for (int i = 0; i < 6; i++)
                 File.WriteAllText(Path.Combine(dest, $"lumenotepad-backup-2026010{i}-000000.zip"), "x");
             BackupService.PruneBackups(dest, 5);

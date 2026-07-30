@@ -10,9 +10,6 @@ using Lumenotepad.Platform;
 
 namespace Lumenotepad.Views;
 
-/// <summary>A small Lumen-styled text-input prompt (same opaque, DWM-rounded shell as ConfirmDialog):
-/// one or more labelled fields, Enter confirms, Escape cancels. Returns the entered values in order,
-/// or null when cancelled. Used for the hyperlink prompt (M10) and other quick text asks.</summary>
 public static class InputDialog
 {
     public static async Task<string[]?> Show(Window owner, string title,
@@ -28,7 +25,7 @@ public static class InputDialog
             Background = new SolidColorBrush(Color.Parse("#1B1D27")),
         };
         win.Opened += (_, _) => WinChrome.RoundCorners(win, true);
-        Services.ThemeManager.ConfigureDialogChrome(win);   // mac: native rounding + frost, no traffic lights
+        Services.ThemeManager.ConfigureDialogChrome(win);
 
         var fieldTheme = Application.Current?.FindResource("RoundedFieldTextBox") as ControlTheme;
         var stack = new StackPanel { Margin = new Thickness(22, 18, 22, 16), Spacing = 8, Width = 320 };

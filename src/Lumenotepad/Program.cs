@@ -14,10 +14,7 @@ sealed class Program
             .ConfigureFonts(fonts => fonts.AddFontCollection(new Avalonia.Media.Fonts.EmbeddedFontCollection(
                 new System.Uri(Services.AppFonts.CollectionUri),
                 new System.Uri("avares://Lumenotepad/Assets/Fonts"))))
-            // Per-codepoint safety net: when the resolved face lacks a glyph (the Segoe icon fonts
-            // don't exist off Windows), the shaper consults this before giving up — so every PUA
-            // icon codepoint finds the bundled LumenIcons shapes even via hard-coded Segoe names.
-            // On Windows Segoe covers all icon codepoints, so this is never consulted for icons.
+
             .With(new Avalonia.Media.FontManagerOptions
             {
                 FontFallbacks = new[]

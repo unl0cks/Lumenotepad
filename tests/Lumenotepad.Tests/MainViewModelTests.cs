@@ -37,7 +37,7 @@ public class MainViewModelTests
             vm.AddNotebookCommand.Execute(null);
             Assert.Equal(2, vm.Notebooks.Count);
             Assert.Same(vm.Notebooks[1], vm.SelectedNotebook);
-            Assert.NotNull(vm.SelectedSection);   // cascaded into the new notebook's first section
+            Assert.NotNull(vm.SelectedSection);
             Assert.NotNull(vm.SelectedPage);
         }
         finally { Directory.Delete(dir, true); }
@@ -49,7 +49,7 @@ public class MainViewModelTests
         var vm = NewVm(out var dir);
         try
         {
-            Assert.True(vm.IsHomeVisible);                   // launch lands on the gallery
+            Assert.True(vm.IsHomeVisible);
 
             var nb = vm.Notebooks[0];
             vm.OpenNotebookCommand.Execute(nb);
@@ -59,7 +59,7 @@ public class MainViewModelTests
             vm.GoHomeCommand.Execute(null);
             Assert.True(vm.IsHomeVisible);
 
-            vm.AddNotebookCommand.Execute(null);             // a fresh notebook opens right away
+            vm.AddNotebookCommand.Execute(null);
             Assert.False(vm.IsHomeVisible);
         }
         finally { Directory.Delete(dir, true); }
@@ -80,7 +80,7 @@ public class MainViewModelTests
 
             var vm2 = new MainViewModel(new WorkspaceStore(dir));
             Assert.Equal("cover.png", vm2.Notebooks[0].Cover);
-            Assert.True(File.Exists(vm2.Notebooks[0].CoverPath));   // hydrated on load
+            Assert.True(File.Exists(vm2.Notebooks[0].CoverPath));
 
             vm2.ClearNotebookCover(vm2.Notebooks[0]);
             Assert.Equal("", vm2.Notebooks[0].Cover);
@@ -110,7 +110,7 @@ public class MainViewModelTests
         var vm = NewVm(out var dir);
         try
         {
-            vm.AddPageCommand.Execute(null);                 // 2 pages; selected = the new one
+            vm.AddPageCommand.Execute(null);
             var first = vm.SelectedSection!.Pages[0];
             var second = vm.SelectedPage!;
             vm.DeletePageCommand.Execute(second);
@@ -129,10 +129,10 @@ public class MainViewModelTests
             new AppSettings { StartRailVisible = false, StartPagesVisible = false }.Save(dir);
 
             var vm = new MainViewModel(new WorkspaceStore(dir), dir);
-            Assert.False(vm.IsRailVisible);      // ctor seeds live state from the persisted pref
+            Assert.False(vm.IsRailVisible);
             Assert.False(vm.IsPagesVisible);
 
-            vm.StartRailVisible = true;          // flipping the pref mirrors onto the live state
+            vm.StartRailVisible = true;
             Assert.True(vm.IsRailVisible);
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
@@ -171,7 +171,7 @@ public class MainViewModelTests
 
             vm.SetBulletColor("star", "#FF0000");
             Assert.Equal("#FF0000", vm.BulletColorFor("star"));
-            Assert.Equal("#FF0000", AppSettings.Load(dir).BulletColors["star"]);   // persisted
+            Assert.Equal("#FF0000", AppSettings.Load(dir).BulletColors["star"]);
 
             vm.SetBulletColor("star", null);
             Assert.Null(vm.BulletColorFor("star"));
@@ -196,8 +196,8 @@ public class MainViewModelTests
             Assert.True(vm.IsFontEnabled("Impact"));
 
             vm.SetFontEnabled("Impact", false);
-            Assert.False(vm.IsFontEnabled("impact"));                        // case-insensitive
-            Assert.Contains("Impact", AppSettings.Load(dir).DisabledFonts);  // persisted
+            Assert.False(vm.IsFontEnabled("impact"));
+            Assert.Contains("Impact", AppSettings.Load(dir).DisabledFonts);
 
             vm.SetFontEnabled("IMPACT", true);
             Assert.True(vm.IsFontEnabled("Impact"));
@@ -261,7 +261,7 @@ public class MainViewModelTests
         try
         {
             new AppSettings { RecentCount = 8 }.Save(dir);
-            var vm = new MainViewModel(new WorkspaceStore(dir), dir);   // must not throw
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
             Assert.Equal(8, vm.RecentCount);
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
@@ -274,12 +274,12 @@ public class MainViewModelTests
         try
         {
             new AppSettings { UserName = "Sam", ShowHomeStats = false }.Save(dir);
-            var vm = new MainViewModel(new WorkspaceStore(dir), dir);   // must not crash (ctor gotcha)
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
             Assert.Contains(", Sam —", vm.Greeting);
             Assert.DoesNotContain("notebook", vm.HomeSubtitle);
 
             vm.UserName = "";
-            Assert.DoesNotContain(",", vm.Greeting.Split('—')[0]);      // plain greeting again
+            Assert.DoesNotContain(",", vm.Greeting.Split('—')[0]);
 
             vm.ShowHomeStats = true;
             Assert.Contains("notebook", vm.HomeSubtitle);
@@ -299,13 +299,13 @@ public class MainViewModelTests
 
             vm.AddPaletteColor(false, "#CCC333", builtIns);
             Assert.Equal(new[] { "#AAA111", "#BBB222", "#CCC333" }, vm.PaletteFor(false, builtIns));
-            Assert.Equal(3, AppSettings.Load(dir).TextPalette.Count);      // seeded + persisted
+            Assert.Equal(3, AppSettings.Load(dir).TextPalette.Count);
 
-            vm.RemovePaletteColor(false, "#aaa111", builtIns);             // case-insensitive
+            vm.RemovePaletteColor(false, "#aaa111", builtIns);
             Assert.Equal(new[] { "#BBB222", "#CCC333" }, vm.PaletteFor(false, builtIns));
 
             vm.RemovePaletteColor(false, "#BBB222", builtIns);
-            vm.RemovePaletteColor(false, "#CCC333", builtIns);             // last chip survives
+            vm.RemovePaletteColor(false, "#CCC333", builtIns);
             Assert.Single(vm.PaletteFor(false, builtIns));
 
             vm.ResetPalette(false);
@@ -349,7 +349,7 @@ public class MainViewModelTests
 
             Assert.Equal("#8FC2EC", nb.PaperTint);
             var reloaded = new MainViewModel(new WorkspaceStore(dir), dir);
-            Assert.Equal("#8FC2EC", reloaded.Notebooks[0].PaperTint);   // Save() ran
+            Assert.Equal("#8FC2EC", reloaded.Notebooks[0].PaperTint);
 
             vm.SetNotebookPaperTint(nb, null);
             Assert.Null(nb.PaperTint);
@@ -419,11 +419,11 @@ public class MainViewModelTests
             vm.SelectedSection = s1;
 
             vm.SingleMode = true;
-            Assert.Single(nb.Sections);                         // one section holds everything
+            Assert.Single(nb.Sections);
             Assert.Equal(3, nb.Sections[0].Pages.Count);
 
             vm.SingleMode = false;
-            Assert.Equal(3, nb.Sections.Count);                 // one section per page
+            Assert.Equal(3, nb.Sections.Count);
             Assert.All(nb.Sections, s => Assert.Single(s.Pages));
         }
         finally { Directory.Delete(dir, true); }
@@ -465,7 +465,7 @@ public class MainViewModelTests
         try
         {
             var vm = new MainViewModel(new WorkspaceStore(dir), dir);
-            vm.ImportTextAsPage("Hello", "world");    // gives a page with real content, saved to disk
+            vm.ImportTextAsPage("Hello", "world");
 
             int pages = vm.ExportAllNotebooks(dest);
 
@@ -549,12 +549,12 @@ public class MainViewModelTests
             vm.AddPageCommand.Execute(null);
 
             var doc = vm.DocumentFor(vm.SelectedPage!);
-            Assert.Equal(3, doc.Boxes.Count);                   // Cue / Notes / Summary
+            Assert.Equal(3, doc.Boxes.Count);
             Assert.Equal("Cue", doc.Boxes[0].Doc.GetText());
 
             vm.SelectedNotebook!.DefaultPageStyle = "Freeform";
             vm.AddPageCommand.Execute(null);
-            Assert.Empty(vm.DocumentFor(vm.SelectedPage!).Boxes);   // Freeform stamps nothing
+            Assert.Empty(vm.DocumentFor(vm.SelectedPage!).Boxes);
         }
         finally { Directory.Delete(dir, true); }
     }
@@ -607,11 +607,11 @@ public class MainViewModelTests
             Assert.Equal(2, nb.Sections.Count);
             Assert.Equal(new[] { "Structure", "Mitosis" }, nb.Sections[0].Pages.Select(p => p.Title).ToArray());
             Assert.Single(nb.Sections[1].Pages);
-            Assert.Equal(3, vm.DocumentFor(nb.Sections[0].Pages[0]).Boxes.Count);   // Cornell starters
+            Assert.Equal(3, vm.DocumentFor(nb.Sections[0].Pages[0]).Boxes.Count);
             Assert.Same(nb, vm.SelectedNotebook);
             Assert.False(vm.IsHomeVisible);
 
-            var reloaded = new MainViewModel(new WorkspaceStore(dir), dir);         // persisted
+            var reloaded = new MainViewModel(new WorkspaceStore(dir), dir);
             var rnb = reloaded.Notebooks.First(n => n.Name == "Biology");
             Assert.Equal("Cornell", rnb.DefaultPageStyle);
             Assert.Equal(2, rnb.Sections.Count);
@@ -628,14 +628,14 @@ public class MainViewModelTests
             var vm = new MainViewModel(new WorkspaceStore(dir), dir);
             var draft = NotebookDraft.New();
             draft.Name = "  ";
-            draft.Sections.Clear();                                     // no sections at all
+            draft.Sections.Clear();
 
             var nb = vm.CreateNotebook(draft);
 
             Assert.Equal("New notebook", nb.Name);
-            var sec = Assert.Single(nb.Sections);                       // seeded fallback section
+            var sec = Assert.Single(nb.Sections);
             Assert.Equal("Notes", sec.Name);
-            Assert.Empty(vm.DocumentFor(sec.Pages[0]).Boxes);           // Freeform default: no starters
+            Assert.Empty(vm.DocumentFor(sec.Pages[0]).Boxes);
         }
         finally { Directory.Delete(dir, true); }
     }
@@ -692,28 +692,28 @@ public class MainViewModelTests
             draft.Name = "Bio II";
             draft.Sections[0].Name = "Cell biology";
             draft.Sections[0].PageTitles[0] = "Cell structure";
-            draft.Sections[0].RemovePageAt(1);                 // drop "Mitosis"
-            draft.Sections[0].AddPage("Meiosis");              // brand-new page
-            draft.Sections.RemoveAt(1);                        // drop "Genetics" entirely
+            draft.Sections[0].RemovePageAt(1);
+            draft.Sections[0].AddPage("Meiosis");
+            draft.Sections.RemoveAt(1);
             draft.Sections.Add(new SectionDraft { Name = "Exams" });
 
             vm.ApplyNotebookCustomization(nb, draft);
 
             Assert.Equal("Bio II", nb.Name);
             Assert.Equal(2, nb.Sections.Count);
-            Assert.Same(keptSection, nb.Sections[0]);          // identity survives the edit
+            Assert.Same(keptSection, nb.Sections[0]);
             Assert.Equal("Cell biology", keptSection.Name);
             Assert.Same(keptPage, keptSection.Pages[0]);
             Assert.Equal("Cell structure", keptPage.Title);
             Assert.Equal(new[] { "Cell structure", "Meiosis" }, keptSection.Pages.Select(p => p.Title).ToArray());
             Assert.Equal("Exams", nb.Sections[1].Name);
-            Assert.Equal(3, vm.DocumentFor(keptSection.Pages[1]).Boxes.Count);   // new page got Cornell starters
+            Assert.Equal(3, vm.DocumentFor(keptSection.Pages[1]).Boxes.Count);
 
-            Assert.Same(nb, vm.SelectedNotebook);              // selection re-validated
+            Assert.Same(nb, vm.SelectedNotebook);
             Assert.Contains(vm.SelectedSection, nb.Sections);
             Assert.Contains(vm.SelectedPage, vm.SelectedSection!.Pages);
 
-            var reloaded = new MainViewModel(new WorkspaceStore(dir), dir);      // persisted
+            var reloaded = new MainViewModel(new WorkspaceStore(dir), dir);
             var rnb = reloaded.Notebooks.First(n => n.Name == "Bio II");
             Assert.Equal(new[] { "Cell biology", "Exams" }, rnb.Sections.Select(s => s.Name).ToArray());
             Assert.Equal(new[] { "Cell structure", "Meiosis" }, rnb.Sections[0].Pages.Select(p => p.Title).ToArray());
@@ -734,16 +734,16 @@ public class MainViewModelTests
             vm.SetNotebookCover(nb, src);
             var coverPath = nb.CoverPath;
 
-            var draft = NotebookDraft.FromNotebook(nb);        // CoverSourcePath == current CoverPath
+            var draft = NotebookDraft.FromNotebook(nb);
             draft.Name = "   ";
             var oldName = nb.Name;
             vm.ApplyNotebookCustomization(nb, draft);
-            Assert.Equal(oldName, nb.Name);                    // blank keeps the old name
-            Assert.Equal(coverPath, nb.CoverPath);             // unchanged path leaves the cover alone
+            Assert.Equal(oldName, nb.Name);
+            Assert.Equal(coverPath, nb.CoverPath);
             Assert.True(File.Exists(nb.CoverPath));
 
             var draft2 = NotebookDraft.FromNotebook(nb);
-            draft2.CoverSourcePath = null;                     // "No cover"
+            draft2.CoverSourcePath = null;
             vm.ApplyNotebookCustomization(nb, draft2);
             Assert.Null(nb.CoverPath);
             Assert.Equal("", nb.Cover);
@@ -764,18 +764,18 @@ public class MainViewModelTests
             create.Sections.Add(new SectionDraft { Name = "Labs", PageTitles = { "Empty", "Full" } });
             var nb = vm.CreateNotebook(create);
             var sec = nb.Sections[0];
-            vm.DocumentFor(sec.Pages[1]).Boxes.Add(new Lumenotepad.Editor.NoteBox());   // "Full" has content
+            vm.DocumentFor(sec.Pages[1]).Boxes.Add(new Lumenotepad.Editor.NoteBox());
 
             vm.ApplySectionStyle(sec, setStyle: true, style: "Cornell", mode: 1, setGrid: true, grid: "Dots");
 
             Assert.All(sec.Pages, p => Assert.Equal("Cornell", p.PageStyle));
             Assert.All(sec.Pages, p => Assert.Equal(1, p.PageStyleMode));
             Assert.All(sec.Pages, p => Assert.Equal("Dots", p.GridStyle));
-            Assert.Equal(3, vm.DocumentFor(sec.Pages[0]).Boxes.Count);    // empty page got the starters
-            Assert.Equal(1, vm.DocumentFor(sec.Pages[1]).Boxes.Count);    // page with notes untouched
+            Assert.Equal(3, vm.DocumentFor(sec.Pages[0]).Boxes.Count);
+            Assert.Equal(1, vm.DocumentFor(sec.Pages[1]).Boxes.Count);
 
             vm.ApplySectionStyle(sec, setStyle: false, style: null, mode: 0, setGrid: false, grid: null);
-            Assert.All(sec.Pages, p => Assert.Equal("Cornell", p.PageStyle));   // no-op leaves overrides
+            Assert.All(sec.Pages, p => Assert.Equal("Cornell", p.PageStyle));
         }
         finally { Directory.Delete(dir, true); }
     }

@@ -14,8 +14,6 @@
         TextOptions.TextRenderingMode="Antialias"
         WindowDecorations="None">
     <Grid>
-        <!-- Starts invisible; Motion.ScaleIn animates it on Opened (the declarative transform
-             transition never ran in this build — transforms animate only via Motion). -->
         <views:MainView x:Name="Host" Opacity="0"/>
         <controls:WindowResizeBorder x:Name="ResizeBorder"/>
     </Grid>

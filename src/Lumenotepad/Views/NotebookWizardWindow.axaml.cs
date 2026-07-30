@@ -11,25 +11,20 @@ using Lumenotepad.ViewModels;
 
 namespace Lumenotepad.Views;
 
-/// <summary>The two-step notebook creation wizard (M9): Step 1 = identity (name/color/cover/
-/// sections), Step 2 = pages (styles, defaults, page titles per section). Everything edits a
-/// NotebookDraft — nothing real exists until Create. EDIT MODE (M9 Part 3): pass an existing
-/// notebook and the same window opens pre-filled as "Customize notebook"; Save applies the draft
-/// back through ApplyNotebookCustomization (row removals confirm at click time).</summary>
 public partial class NotebookWizardWindow : Window
 {
     private readonly MainViewModel _vm;
     private readonly Models.Notebook? _edit;
     private readonly NotebookDraft _draft;
-    private int _step;                       // 0 or 1
-    private string? _tempCover;              // cropped temp file; deleted on close if unused
+    private int _step;
+    private string? _tempCover;
 
     public NotebookWizardWindow(MainViewModel vm, Models.Notebook? edit = null)
     {
         _vm = vm;
         _edit = edit;
         _draft = edit is null ? NotebookDraft.New() : NotebookDraft.FromNotebook(edit);
-        // The color picker's family row must ring the family the draft's color belongs to.
+
         for (int i = 0; i < MainViewModel.NotebookPalette.Length; i++)
             if (MainViewModel.NotebookPalette[i].Shades.Any(s => string.Equals(s.Hex, _draft.Color, StringComparison.OrdinalIgnoreCase)))
             { _familyIx = i; break; }
@@ -45,7 +40,7 @@ public partial class NotebookWizardWindow : Window
 
         Opened += (_, _) =>
         {
-            Services.ThemeManager.UseMacNativeChrome(this, WizTitleBar);   // mac: native frame = rounded + frosted
+            Services.ThemeManager.UseMacNativeChrome(this, WizTitleBar);
             WinChrome.RoundCorners(this, true);
             if (Content is Control root) Motion.ScaleIn(root, 0.96, 180);
             NameBox.Focus();
@@ -80,14 +75,12 @@ public partial class NotebookWizardWindow : Window
         BuildSectionRows();
         RefreshCoverPreview();
 
-        SmoothScroll.Attach(WizScroll);      // same wheel easing as the preferences window
+        SmoothScroll.Attach(WizScroll);
         NextBtn.Click += (_, _) => ShowStep(1);
         BackBtn.Click += (_, _) => ShowStep(0);
         CreateBtn.Click += (_, _) => CreateAndClose();
-        BuildStep2();                        // no-op until Task 3 fills it in
+        BuildStep2();
     }
-
-    // ---- step switching ----
 
     private void ShowStep(int step)
     {
@@ -97,8 +90,8 @@ public partial class NotebookWizardWindow : Window
         BackBtn.IsVisible = step == 1;
         NextBtn.IsVisible = step == 0;
         CreateBtn.IsVisible = step == 1;
-        StepLabel.Text = step == 0 ? "Step 1 of 2 — Notebook" : "Step 2 of 2 — Pages";
-        if (step == 1) SyncStep2();          // section list may have changed since last visit
+        StepLabel.Text = step == 0 ? "Step 1 of 2: Notebook" : "Step 2 of 2: Pages";
+        if (step == 1) SyncStep2();
         Motion.RiseIn(step == 0 ? Step1Panel : Step2Panel, Motion.Fast);
     }
 
@@ -106,15 +99,11 @@ public partial class NotebookWizardWindow : Window
     {
         if (_edit is { } nb) _vm.ApplyNotebookCustomization(nb, _draft);
         else _vm.CreateNotebook(_draft);
-        CleanupTempCover();                  // SetNotebookCover COPIED the crop — delete our temp now
+        CleanupTempCover();
         Close();
     }
 
-    // ---- step 1: color ----
-
-    /// <summary>The picked FAMILY (big circles = the 9 family base colors); its 5 shades show as
-    /// small circles underneath, like the right-click Color menu (owner request).</summary>
-    private int _familyIx = 6;               // Blue — the family of the draft's initial color
+    private int _familyIx = 6;
 
     private void BuildColorSwatches()
     {
@@ -128,7 +117,7 @@ public partial class NotebookWizardWindow : Window
             b.PointerPressed += (_, _) =>
             {
                 _familyIx = ix;
-                _draft.Color = MainViewModel.NotebookPalette[ix].Shades[2].Hex;   // base shade selected
+                _draft.Color = MainViewModel.NotebookPalette[ix].Shades[2].Hex;
                 BuildColorSwatches();
                 RefreshCoverPreview();
             };
@@ -148,7 +137,7 @@ public partial class NotebookWizardWindow : Window
             };
             ShadeSwatches.Children.Add(b);
         }
-        Motion.FadeIn(ShadeSwatches, Motion.Fast);   // the shade row follows the family pick
+        Motion.FadeIn(ShadeSwatches, Motion.Fast);
     }
 
     private Border MakeSwatch(string hex, string tip, double size, bool ringed)
@@ -167,8 +156,6 @@ public partial class NotebookWizardWindow : Window
         ToolTip.SetTip(b, tip);
         return b;
     }
-
-    // ---- step 1: cover ----
 
     private async System.Threading.Tasks.Task PickCover()
     {
@@ -196,15 +183,13 @@ public partial class NotebookWizardWindow : Window
         {
             try
             {
-                // Decode DOWNSCALED to roughly the preview size. Loading a full-res cover (a phone photo
-                // can be 4000+ px) into this 96×64 border meant a huge bitmap held in memory and resampled
-                // on every repaint — that's what made the window lag and the scroll stutter/jump.
+
                 using var stream = System.IO.File.OpenRead(p);
                 var bmp = Avalonia.Media.Imaging.Bitmap.DecodeToWidth(stream, 320);
                 CoverPreview.Background = new ImageBrush(bmp) { Stretch = Stretch.UniformToFill };
                 return;
             }
-            catch { /* unreadable temp — fall through to the color */ }
+            catch {  }
         }
         CoverPreview.Background = new SolidColorBrush(Color.Parse(_draft.Color));
     }
@@ -214,8 +199,6 @@ public partial class NotebookWizardWindow : Window
         if (_tempCover is { } t) { try { System.IO.File.Delete(t); } catch { } }
         _tempCover = null;
     }
-
-    // ---- step 1: sections editor ----
 
     private void BuildSectionRows()
     {
@@ -234,12 +217,12 @@ public partial class NotebookWizardWindow : Window
                 Theme = (ControlTheme)this.FindResource("IconButton")!,
                 Width = 28, Height = 28, FontSize = 12, Content = "",
                 FontFamily = (FontFamily)this.FindResource("IconFont")!,
-                IsEnabled = _draft.Sections.Count > 1,       // at least one section stays
+                IsEnabled = _draft.Sections.Count > 1,
             };
             ToolTip.SetTip(remove, _draft.Sections.Count > 1 ? "Remove section" : "A notebook needs at least one section");
             remove.Click += async (_, _) =>
             {
-                if (sd.Source is { } real)   // edit mode: this row is a REAL section — ask first
+                if (sd.Source is { } real)
                 {
                     int n = sd.PageTitles.Count;
                     bool ok = await ConfirmDialog.Show(this, "Delete this section when you save?",
@@ -257,15 +240,11 @@ public partial class NotebookWizardWindow : Window
         }
     }
 
-    // ---- step 2: style previews, defaults, pages ----
-
     private void BuildStep2()
     {
         foreach (var style in Editor.PageStyles.Styles)
             StyleChips.Children.Add(MakeStyleChip(style));
 
-        // Seed every control FROM the draft before its handler attaches — a fresh draft seeds the
-        // same defaults the XAML declares, and an EDIT draft opens showing the notebook's truth.
         (_draft.DefaultPageStyleMode switch
         {
             Editor.PageStyles.ModeStartersOnly => ModeStarters,
@@ -298,7 +277,7 @@ public partial class NotebookWizardWindow : Window
             SizeValue.Text = v.ToString("0");
         };
 
-        MenuFx.AttachDropDown(GridBox);      // rise-in + rounded/blurred popup + eased list scroll
+        MenuFx.AttachDropDown(GridBox);
         MenuFx.AttachDropDown(FontBox);
         foreach (var radio in new[] { ModeGuides, ModeStarters, ModeRigid })
             radio.IsCheckedChanged += (s, _) =>
@@ -307,13 +286,12 @@ public partial class NotebookWizardWindow : Window
             };
     }
 
-    /// <summary>One selectable page-style chip: a live mini GuideLayer preview + the style name.</summary>
     private Control MakeStyleChip(string style)
     {
         var preview = new Editor.GuideLayer
         {
             Width = 120, Height = 72, Viewport = new Avalonia.Size(120, 72),
-            PreviewMotif = true,      // styles with no real-page guides (Mindmap) still illustrate
+            PreviewMotif = true,
         };
         preview.SetStyles(Editor.PageStyles.Blank, style, Editor.PageStyles.ModeGuides);
         var chip = new Border
@@ -349,7 +327,7 @@ public partial class NotebookWizardWindow : Window
             _draft.DefaultPageStyle = style;
             StyleChips.Children.Clear();
             foreach (var s in Editor.PageStyles.Styles) StyleChips.Children.Add(MakeStyleChip(s));
-            // pop the freshly selected chip (the rebuilt row loses the pressed element)
+
             if (StyleChips.Children.OfType<Border>().FirstOrDefault(c => Equals(c.Tag, style)) is { } picked)
                 Motion.ScaleIn(picked, 0.94, Motion.Fast);
         };
@@ -357,10 +335,6 @@ public partial class NotebookWizardWindow : Window
         return chip;
     }
 
-    /// <summary>Re-sync the per-section pages editors with Step 1's current section list. Each section is
-    /// a bold heading (with a divider above it, so it clearly reads as the SECTION even when its page
-    /// shares the section's name) over its page-title rows, closed by ONE "Add page" — the exact structure
-    /// of the Step 1 sections editor, repeated per section.</summary>
     private void SyncStep2()
     {
         PagesEditors.Children.Clear();
@@ -384,14 +358,14 @@ public partial class NotebookWizardWindow : Window
                     var remove = new Button
                     {
                         Theme = (ControlTheme)this.FindResource("IconButton")!,
-                        Width = 28, Height = 28, FontSize = 12, Content = "",   // the ✕ glyph (was blank)
+                        Width = 28, Height = 28, FontSize = 12, Content = "",
                         FontFamily = (FontFamily)this.FindResource("IconFont")!,
                         VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
                     };
                     ToolTip.SetTip(remove, "Remove page");
                     remove.Click += async (_, _) =>
                     {
-                        if (sd.SourceAt(idx) is { } real)   // edit mode: a REAL page — ask first
+                        if (sd.SourceAt(idx) is { } real)
                         {
                             bool ok = await ConfirmDialog.Show(this, "Delete this page when you save?",
                                 $"“{(string.IsNullOrWhiteSpace(real.Title) ? "Untitled page" : real.Title)}” and everything on it " +
@@ -406,7 +380,7 @@ public partial class NotebookWizardWindow : Window
                     row.Children.Add(remove);
                     rows.Children.Add(row);
                 }
-                // ONE "Add page" at the foot of this section's list — the exact analog of "Add section".
+
                 var add = new Button
                 {
                     Theme = (ControlTheme)this.FindResource("LumenButton")!,
@@ -420,9 +394,6 @@ public partial class NotebookWizardWindow : Window
             }
             Rebuild();
 
-            // A clear SECTION heading: a divider above it (except the first) plus the bold section name,
-            // so it reads as "this is the section" even when the section's page happens to share its name
-            // — then the page fields and the single Add page below it.
             var block = new StackPanel { Spacing = 6 };
             if (!first)
                 block.Children.Add(new Border

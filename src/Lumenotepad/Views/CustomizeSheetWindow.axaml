@@ -59,11 +59,11 @@
                 <TextBlock Classes="section" Text="APPLY AS"/>
                 <StackPanel x:Name="ModePanel" Spacing="6">
                     <RadioButton x:Name="ModeGuides" GroupName="sheetmode"
-                                 Content="Guides + starter notes — lines on the paper plus labelled note boxes"/>
+                                 Content="Guides and starter notes: lines on the paper plus labelled note boxes"/>
                     <RadioButton x:Name="ModeStarters" GroupName="sheetmode"
-                                 Content="Starter notes only — just the labelled boxes, no lines"/>
+                                 Content="Starter notes only: just the labelled boxes, no lines"/>
                     <RadioButton x:Name="ModeRigid" GroupName="sheetmode"
-                                 Content="Rigid — the boxes are locked in place and can't be moved"/>
+                                 Content="Rigid: the boxes are locked in place and can't be moved"/>
                 </StackPanel>
 
                 <TextBlock Classes="section" Text="GRID STYLE"/>

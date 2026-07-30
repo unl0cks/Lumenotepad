@@ -16,7 +16,7 @@ public class PageExportTests
         var box = canvas.AddBox(0, 0);
         var d = box.Doc;
         d.Paragraphs.Clear();
-        // "Big heading" as Heading1, a bold word, a link, a bullet, a checkbox
+
         var head = new Paragraph { Style = ParaStyle.Heading1, Align = TextAlign.Center };
         head.Runs.Add(new RichRun { Text = "Big heading" });
         var body = new Paragraph();
@@ -50,7 +50,7 @@ public class PageExportTests
     {
         var s = Text(PageExport.Export(ExportFormat.Markdown, "My Page", Page()));
         Assert.Contains("# My Page", s);
-        Assert.Contains("## Big heading", s);       // Heading1 → ##
+        Assert.Contains("## Big heading", s);
         Assert.Contains("**bold**", s);
         Assert.Contains("[site](https://x.test)", s);
         Assert.Contains("- [x] done", s);
@@ -65,8 +65,8 @@ public class PageExportTests
         Assert.Contains("<strong>bold</strong>", s);
         Assert.Contains("<a href=\"https://x.test\">site</a>", s);
         Assert.Contains("<ul>", s);
-        Assert.Contains("<input type=\"checkbox\" disabled checked>", s);   // the ticked "done" item
-        Assert.DoesNotContain("☑", s);                                      // no tofu-prone ballot glyphs
+        Assert.Contains("<input type=\"checkbox\" disabled checked>", s);
+        Assert.DoesNotContain("☑", s);
     }
 
     [Theory]
@@ -97,8 +97,8 @@ public class PageExportTests
         var s = Text(PageExport.Export(ExportFormat.Rtf, "My Page", Page()));
         Assert.StartsWith(@"{\rtf1", s);
         Assert.EndsWith("}", s);
-        Assert.Contains(@"\qc", s);         // centered heading
-        Assert.Contains(@"\b", s);          // bold run
+        Assert.Contains(@"\qc", s);
+        Assert.Contains(@"\b", s);
     }
 
     [Fact]
@@ -107,7 +107,7 @@ public class PageExportTests
         var b = PageExport.Export(ExportFormat.Pdf, "My Page", Page());
         Assert.True(b.Length > 400);
         Assert.Equal((byte)'%', b[0]);
-        Assert.Equal((byte)'P', b[1]);      // "%PDF"
+        Assert.Equal((byte)'P', b[1]);
         Assert.Equal((byte)'D', b[2]);
         Assert.Equal((byte)'F', b[3]);
     }
@@ -137,7 +137,7 @@ public class PageExportTests
             using var zip = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read);
             var first = zip.Entries[0];
             Assert.Equal("mimetype", first.FullName);
-            Assert.Equal(first.Length, first.CompressedLength);   // stored, not deflated
+            Assert.Equal(first.Length, first.CompressedLength);
         }
     }
 
@@ -183,7 +183,7 @@ public class PageExportTests
     {
         var s = Text(PageExport.Export(ExportFormat.Markdown, "T", TablePage()));
         Assert.Contains("| Name | Score |", s);
-        Assert.Contains("| --- | --- |", s);       // header separator row
+        Assert.Contains("| --- | --- |", s);
         Assert.Contains("| Ann | 42 |", s);
     }
 
@@ -202,14 +202,14 @@ public class PageExportTests
         var s = Text(PageExport.Export(ExportFormat.Txt, "T", TablePage()));
         Assert.Contains("Name", s);
         Assert.Contains("Score", s);
-        Assert.Contains("|", s);                    // pipe-bordered cells
+        Assert.Contains("|", s);
     }
 
     [Fact]
     public void Tables_pdfStaysValid()
     {
         var b = PageExport.Export(ExportFormat.Pdf, "T", TablePage());
-        Assert.Equal((byte)'%', b[0]);              // still a valid PDF with a drawn grid
+        Assert.Equal((byte)'%', b[0]);
         Assert.True(b.Length > 400);
     }
 
@@ -226,7 +226,7 @@ public class PageExportTests
     [Fact]
     public void Pdf_includesImagesAndDividers()
     {
-        // A real PNG on disk so the embed path actually runs.
+
         var root = Directory.CreateTempSubdirectory("lumexport").FullName;
         try
         {
@@ -246,10 +246,9 @@ public class PageExportTests
 
             var plain = PageExport.Export(ExportFormat.Pdf, "T", Page());
             var rich = PageExport.Export(ExportFormat.Pdf, "T", canvas, root);
-            Assert.Equal((byte)'%', rich[0]);                 // still a valid PDF
-            Assert.True(rich.Length > plain.Length + 100);    // the picture bytes actually embedded
+            Assert.Equal((byte)'%', rich[0]);
+            Assert.True(rich.Length > plain.Length + 100);
 
-            // A missing image file must not blow up the export.
             imgBox.ImagePath = "images/gone.png";
             var survived = PageExport.Export(ExportFormat.Pdf, "T", canvas, root);
             Assert.Equal((byte)'%', survived[0]);
@@ -262,16 +261,16 @@ public class PageExportTests
     {
         var one = PageExport.ToPdfMulti(new[] { ("Page 1", Page()) });
         var three = PageExport.ToPdfMulti(new[] { ("Page 1", Page()), ("Page 2", Page()), ("Page 3", Page()) });
-        Assert.Equal((byte)'%', three[0]);              // "%PDF"
+        Assert.Equal((byte)'%', three[0]);
         Assert.Equal((byte)'P', three[1]);
-        Assert.True(three.Length > one.Length);         // more pages → more bytes
+        Assert.True(three.Length > one.Length);
     }
 
     [Fact]
     public void EmptyBoxes_skipped_titleFallsBack()
     {
         var canvas = new CanvasDocument();
-        canvas.AddBox(0, 0);                    // empty box
+        canvas.AddBox(0, 0);
         var s = Text(PageExport.Export(ExportFormat.Markdown, "  ", canvas));
         Assert.Contains("# Untitled", s);
     }

@@ -13,20 +13,15 @@ using Avalonia.VisualTree;
 
 namespace Lumenotepad.Editor;
 
-/// <summary>A hand-built rich-text editor on Avalonia's text stack: one cached <see cref="TextLayout"/> per
-/// paragraph (an <see cref="ITextSource"/> of styled runs gives mixed bold/italic inside a paragraph),
-/// TextLayout hit-testing for caret/click/selection, OnTextInput typing, snapshot-based undo.
-/// M3 vertical slice: type, click+drag select, Ctrl+B/I, Ctrl+Z/Y, Enter/Backspace/Delete, arrows,
-/// Home/End, Ctrl+A, plain-text clipboard.</summary>
 public sealed class RichTextEditor : Control
 {
-    // ---- appearance (slice: plain CLR props; styled props when the toolbar lands) ----
+
     public FontFamily FontFamily { get; set; } = new("Segoe UI Variable Text, Segoe UI");
     public double FontSize { get; set; } = 15;
     public IBrush Foreground { get; set; } = Brushes.White;
     public IBrush SelectionBrush { get; set; } = new SolidColorBrush(Color.Parse("#554DA6FF"));
     public IBrush CaretBrush { get; set; } = new SolidColorBrush(Color.Parse("#4DA6FF"));
-    /// <summary>Color for hyperlink runs (M10) — set to the theme accent by the host container.</summary>
+
     public IBrush LinkBrush { get; set; } = new SolidColorBrush(Color.Parse("#4DA6FF"));
     public double ParagraphSpacing { get; set; } = 4;
 
@@ -46,32 +41,25 @@ public sealed class RichTextEditor : Control
         }
     }
 
-    // ---- caret / selection ----
     private DocPos _caret, _anchor;
-    private double _desiredX = -1;           // sticky column for up/down
-    private RunFormat _pending;              // format toggled at a collapsed caret → applies to next typed text
+    private double _desiredX = -1;
+    private RunFormat _pending;
     private bool _hasPending;
-    // Smooth caret: a ~60fps animation loop (while focused) glides the caret's display rect toward its
-    // target and pulses its opacity as a soft-fade blink. Redraws are gated to transitions only, so an
-    // idle caret between blink fades doesn't keep repainting.
+
     private readonly DispatcherTimer _anim = new() { Interval = TimeSpan.FromMilliseconds(16) };
     private Rect _caretDisplay;
     private bool _caretSeeded;
     private double _caretOpacity = 1, _blinkMs;
-    // Checkbox pop: paragraph index -> (progress 0..1, target checked). Progress eases the toggle in.
+
     private readonly Dictionary<int, (double P, bool On)> _checkAnim = new();
 
-    /// <summary>Raised when the caret/selection moves or formatting changes — toolbars refresh from this.</summary>
     public event Action? SelectionChanged;
     private void RaiseSelectionChanged() => SelectionChanged?.Invoke();
 
-    // ---- undo ----
     private readonly Stack<(DocSnapshot Snap, DocPos Caret, DocPos Anchor)> _undo = new();
     private readonly Stack<(DocSnapshot Snap, DocPos Caret, DocPos Anchor)> _redo = new();
     private bool _typingBurst;
 
-    // ---- layout cache: one TextLayout per paragraph, keyed by (paragraph, version, width) so a keystroke
-    // rebuilds ONLY the paragraph it touched (O(1) per edit, not O(document)) ----
     private readonly List<TextLayout> _layouts = new();
     private readonly Dictionary<Paragraph, (TextLayout Layout, int Version, double Width)> _cache = new();
     private double[] _tops = Array.Empty<double>();
@@ -92,8 +80,7 @@ public sealed class RichTextEditor : Control
 
     private void OnDocChanged()
     {
-        // Incremental relayout on the spot (only touched paragraphs rebuild), then invalidate measure ONLY
-        // if the content height actually changed — otherwise a full window layout pass runs per keystroke.
+
         if (_layoutWidth < 0) { InvalidateLayouts(); return; }
         double prevH = _contentHeight;
         _layoutsDirty = true;
@@ -109,8 +96,6 @@ public sealed class RichTextEditor : Control
         InvalidateVisual();
     }
 
-    // =========================== layout ===========================
-
     private void EnsureLayouts(double width)
     {
         double w = double.IsFinite(width) && width > 1 ? width : double.PositiveInfinity;
@@ -125,21 +110,20 @@ public sealed class RichTextEditor : Control
         {
             TextLayout layout;
             if (_cache.TryGetValue(p, out var e) && e.Version == p.Version && Math.Abs(e.Width - w) < 0.5)
-                layout = e.Layout;                                     // untouched paragraph → reuse
+                layout = e.Layout;
             else
             {
                 if (_cache.TryGetValue(p, out var stale)) stale.Layout.Dispose();
                 layout = BuildLayout(p, w);
             }
-            _cache.Remove(p);                                          // claimed (whatever's left is disposed below)
+            _cache.Remove(p);
             next[p] = (layout, p.Version, w);
             _layouts.Add(layout);
         }
-        foreach (var orphan in _cache.Values) orphan.Layout.Dispose();  // paragraphs deleted from the doc
+        foreach (var orphan in _cache.Values) orphan.Layout.Dispose();
         _cache.Clear();
         foreach (var kv in next) _cache[kv.Key] = kv.Value;
 
-        // cumulative paragraph tops (Render/hit-testing read these instead of re-walking heights)
         if (_tops.Length != _layouts.Count) _tops = new double[_layouts.Count];
         double y = 0;
         for (int i = 0; i < _layouts.Count; i++)
@@ -150,13 +134,10 @@ public sealed class RichTextEditor : Control
         _contentHeight = _layouts.Count > 0 ? y - ParagraphSpacing : 0;
     }
 
-    /// <summary>Base gutter width for bulleted/numbered/checkbox paragraphs (scales with the text size).</summary>
     private const double BulletIndent = 26;
-    /// <summary>Extra gutter a tagged paragraph adds LEFT of the bullet gutter (M11 tags).</summary>
+
     private const double TagIndent = 22;
 
-    /// <summary>How much bigger/smaller this paragraph's bullet should render, tracking its text size
-    /// (taken from the first run) relative to the editor default.</summary>
     private double ScaleOf(Paragraph p)
     {
         double eff = p.Runs.Count > 0 ? p.Runs[0].Size ?? FontSize : FontSize;
@@ -167,15 +148,12 @@ public sealed class RichTextEditor : Control
         p.Bullet is null ? 0 : BulletIndent * IndentScalePref * Math.Max(1, ScaleOf(p));
     private double TagIndentOf(Paragraph p) =>
         p.Tag is null ? 0 : TagIndent * Math.Max(1, ScaleOf(p));
-    /// <summary>The full text indent: tag gutter (left) + bullet gutter (right). Every consumer —
-    /// layout width, draw origin, caret, hit-testing — reads this one sum, so the gutters can never
-    /// drift apart.</summary>
+
     private double IndentOf(Paragraph p) => TagIndentOf(p) + BulletIndentOf(p);
 
     private double IndentOf(int pi) =>
         pi >= 0 && pi < _doc.Paragraphs.Count ? IndentOf(_doc.Paragraphs[pi]) : 0;
 
-    // ---- text types (M10): a named paragraph style sets a base size + weight; runs scale from it ----
     public static double BaseSizeFor(ParaStyle s, double bodySize) => s switch
     {
         ParaStyle.Title => bodySize * 2.0,
@@ -193,9 +171,6 @@ public sealed class RichTextEditor : Control
         _ => FontWeight.Normal,
     };
 
-    /// <summary>Display-only: render every paragraph centred WITHOUT changing the document's stored
-    /// alignment (mind-map title bubbles). Leaves the doc's real alignment untouched, so it never leaks
-    /// into the saved page or applies to non-bubble notes.</summary>
     private bool _forceCenter;
     public bool ForceCenter
     {
@@ -203,7 +178,6 @@ public sealed class RichTextEditor : Control
         set { if (_forceCenter == value) return; _forceCenter = value; InvalidateMeasure(); InvalidateVisual(); }
     }
 
-    /// <summary>Display-only: render all text bold (a central mind-map bubble) without touching run styles.</summary>
     private bool _forceBold;
     public bool ForceBold
     {
@@ -262,7 +236,7 @@ public sealed class RichTextEditor : Control
                         r.Italic ? FontStyle.Italic : FontStyle.Normal,
                         r.Bold ? FontWeight.Bold : baseWeight);
                     bool link = r.Link is { Length: > 0 };
-                    // A link always shows underlined (plus any explicit strike); otherwise honor the run flags.
+
                     bool underline = r.Underline || link;
                     TextDecorationCollection? deco =
                         (underline, r.Strike) switch
@@ -273,7 +247,7 @@ public sealed class RichTextEditor : Control
                             (false, true) => TextDecorations.Strikethrough,
                             _ => null,
                         };
-                    // Super/subscript: shrink and shift the baseline (M10).
+
                     double size = r.Size ?? baseSize;
                     if (r.Baseline != Baseline.Normal) size *= 0.72;
                     var baseline = r.Baseline switch
@@ -295,7 +269,6 @@ public sealed class RichTextEditor : Control
 
     private static readonly Dictionary<string, IBrush> _brushCache = new();
 
-    /// <summary>Parse-and-cache a hex color; null/invalid → null (caller falls back to the default).</summary>
     private static IBrush? BrushFor(string? hex)
     {
         if (string.IsNullOrEmpty(hex)) return null;
@@ -314,16 +287,12 @@ public sealed class RichTextEditor : Control
         return new Size(availableSize.Width, _contentHeight + 4);
     }
 
-    // =========================== rendering ===========================
-
     public override void Render(DrawingContext ctx)
     {
-        // A control with no rendered fill is NOT hit-testable — clicks would pass straight through and
-        // the editor could never take focus. Transparent still registers for hit-testing.
+
         ctx.FillRectangle(Brushes.Transparent, new Rect(Bounds.Size));
         EnsureLayouts(Bounds.Width);
 
-        // run highlights (drawn manually — guaranteed, no reliance on TextLayout background support)
         for (int pi = 0; pi < _layouts.Count && pi < _doc.Paragraphs.Count; pi++)
         {
             int acc = 0;
@@ -340,7 +309,6 @@ public sealed class RichTextEditor : Control
             }
         }
 
-        // selection highlight
         var (selA, selB) = SelOrdered();
         if (selA != selB)
         {
@@ -356,16 +324,15 @@ public sealed class RichTextEditor : Control
                 }
                 else if (_doc.Paragraphs[pi].Length == 0)
                 {
-                    // fully-selected empty paragraph → a thin stub so the selection reads continuously
+
                     ctx.FillRectangle(SelectionBrush, new Rect(IndentOf(pi), top, 6, _layouts[pi].Height), 3f);
                 }
             }
         }
 
-        // bullets + text
         for (int i = 0; i < _layouts.Count; i++)
         {
-            // A thin divider above the FIRST footnote line separates footnotes from the body (M10).
+
             if (i < _doc.Paragraphs.Count && _doc.Paragraphs[i].Footnote &&
                 (i == 0 || !_doc.Paragraphs[i - 1].Footnote))
             {
@@ -378,7 +345,6 @@ public sealed class RichTextEditor : Control
             _layouts[i].Draw(ctx, new Point(IndentOf(i), ParagraphTop(i)));
         }
 
-        // caret
         if (IsFocused && _caretOpacity > 0.01)
         {
             var r = _caretSeeded ? _caretDisplay : CaretRect();
@@ -387,39 +353,31 @@ public sealed class RichTextEditor : Control
         }
     }
 
-    // ---- prefs: bullet colors + number-style defaults (pushed by MainView.ApplyBulletPrefs) ----
-    /// <summary>Per-style bullet color overrides (style → hex); missing = the built-in default.</summary>
     public static readonly Dictionary<string, string> BulletColorOverrides = new();
-    /// <summary>Global number-style defaults; null = the number matches its line's text.</summary>
+
     public static bool? NumBoldDefault, NumItalicDefault, NumUnderlineDefault, NumStrikeDefault;
 
-    /// <summary>Number-style resolution: paragraph override, then the global default, then the run.</summary>
     public static bool NumFlag(bool? para, bool? global, bool run) => para ?? global ?? run;
 
-    // ---- prefs: caret + highlight + date insert (pushed by MainView.ApplyEditorPrefs) ----
-    /// <summary>Caret color override (null = the theme accent picked up at construction).</summary>
     public static string? CaretColorOverride;
     public static double CaretWidthPref = 1.6;
     public static bool CaretBlinkPref = true;
-    /// <summary>The Ctrl+Shift+H highlight color.</summary>
+
     public static string DefaultHighlightPref = "#66FFD666";
-    /// <summary>The Ctrl+Shift+T timestamp format.</summary>
+
     public static string DateFormatPref = "yyyy-MM-dd";
-    /// <summary>Width for freshly created note containers (height stays content-auto).</summary>
+
     public static double NewNoteWidthPref = 360;
 
-    /// <summary>Base font/size for note text (runs without their own font/size render in these).</summary>
     public static string? EditorFontPref;
     public static double EditorFontSizePref = 15;
-    /// <summary>Layout scales (read at construction; canvas rebuild applies changes).</summary>
+
     public static double LineSpacingScalePref = 1.0;
     public static double ParagraphSpacingScalePref = 1.0;
     public static double IndentScalePref = 1.0;
-    /// <summary>"1. "/"- "/"* " at a line start auto-starts a list.</summary>
+
     public static bool SmartListsPref = true;
 
-    /// <summary>Pure prefix→list-kind detection for smart lists: the text BEFORE the just-typed
-    /// space. Only exact "1." starts numbering (matching how lists renumber from 1).</summary>
     public static string? SmartListKind(string beforeCaret) => beforeCaret switch
     {
         "1." => "num",
@@ -427,15 +385,9 @@ public sealed class RichTextEditor : Control
         _ => null,
     };
 
-    /// <summary>Glyph + built-in color for a bullet style — the prefs UI reads this so the defaults
-    /// live in exactly one place.</summary>
     public static (string Glyph, string Color)? BulletGlyphInfo(string style) =>
         BulletGlyphs.TryGetValue(style, out var g) ? g : null;
 
-    // ---- bullet glyphs: style key → (glyph, color). "num" and "check" are drawn specially. ----
-    // No fixed size: every glyph has a different intrinsic design size (a ★ at 12pt is visually
-    // bigger than a ♥ at 12pt, and some fall back to a different symbol font), so sizes are
-    // auto-calibrated at draw time to a common INK height — the "same size" the owner asked for.
     private static readonly Dictionary<string, (string Glyph, string Color)> BulletGlyphs = new()
     {
         ["dot"] = ("●", "#4DA6FF"),
@@ -446,14 +398,8 @@ public sealed class RichTextEditor : Control
         ["spark"] = ("✦", "#FFD966"),
     };
 
-    // Tag glyphs live in TagStyles (RichModel.cs) — platform-free, shared with toolbar + exports.
-
     private static readonly FontFamily GlyphFont = new("Segoe UI Symbol, Segoe UI Emoji, Segoe UI");
 
-    /// <summary>Per-glyph calibration, measured once: the nominal font size that yields 1px of ink
-    /// height, plus the ink centre as a fraction of the font size (scale-invariant). Lets every
-    /// bullet render at an identical ink height and be centred on its actual ink, not its layout
-    /// box — glyphs like ♥ otherwise render smaller and sit low.</summary>
     private readonly record struct GlyphCal(double UnitSize, double CenterXFrac, double CenterYFrac);
     private static readonly Dictionary<string, GlyphCal> _glyphCal = new();
 
@@ -470,8 +416,6 @@ public sealed class RichTextEditor : Control
         return c;
     }
 
-    /// <summary>The editor foreground with adjusted opacity — bullet furniture (numbers, empty
-    /// checkboxes) must follow the paper's text color to stay visible on light paper.</summary>
     private IBrush ForegroundAlpha(double opacity)
     {
         var c = (Foreground as ISolidColorBrush)?.Color ?? Colors.White;
@@ -482,12 +426,10 @@ public sealed class RichTextEditor : Control
     {
         var p = _doc.Paragraphs[pi];
         if (p.Bullet is null && p.Tag is null) return;
-        double s = ScaleOf(p);                                // bullets track their paragraph's text size
+        double s = ScaleOf(p);
         double lineH = _layouts[pi].TextLines.Count > 0 ? _layouts[pi].TextLines[0].Height : FontSize * 1.35;
         double cy = top + lineH / 2;
 
-        // The tag marker sits in its own gutter LEFT of the bullet gutter, same ink-height
-        // calibration as the glyph bullets. "!"/"?" render bold so they read as markers, not text.
         if (p.Tag is not null && TagStyles.Info(p.Tag) is { } tg)
         {
             double tInk = 8.8 * s;
@@ -501,21 +443,21 @@ public sealed class RichTextEditor : Control
         }
 
         if (p.Bullet is null) return;
-        double indent = BulletIndentOf(p);                    // the bullet's own gutter…
-        double tagInd = TagIndentOf(p);                       // …starts after the tag gutter
+        double indent = BulletIndentOf(p);
+        double tagInd = TagIndentOf(p);
         double cx = tagInd + indent / 2 - 2 * s;
 
         if (p.Bullet == "check")
         {
-            // a = checked-ness 0..1 (animates the toggle in/out); pop = a brief size bump mid-toggle.
+
             bool anim = _checkAnim.TryGetValue(pi, out var ca);
             double a = anim ? (ca.On ? ca.P : 1 - ca.P) : (p.Checked ? 1 : 0);
             double pop = anim ? 1 + 0.18 * Math.Sin(Math.PI * ca.P) : 1;
             double half = 7.5 * s * pop, r = 4 * s;
             var box = new Rect(cx - half, cy - half, half * 2, half * 2);
-            if (a < 0.999)   // outline fades out as the accent fill comes in
+            if (a < 0.999)
                 ctx.DrawRectangle(null, new Pen(ForegroundAlpha(0.45 * (1 - a)), 1.5 * s), box, r, r);
-            if (a > 0.001)   // accent fill grows in + checkmark scales in from the box centre
+            if (a > 0.001)
             {
                 var fill = CaretBrush is ISolidColorBrush cb ? new SolidColorBrush(cb.Color, a) : CaretBrush;
                 ctx.DrawRectangle(fill, null, box, r, r);
@@ -532,13 +474,13 @@ public sealed class RichTextEditor : Control
         {
             int n = 1;
             for (int j = pi - 1; j >= 0 && _doc.Paragraphs[j].Bullet == "num"; j--) n++;
-            // The number inherits its text's bold/italic/underline/strike unless overridden per flag.
+
             var fr = p.Runs.Count > 0 ? p.Runs[0] : null;
             bool bold = NumFlag(p.NumBold, NumBoldDefault, fr?.Bold ?? false);
             bool italic = NumFlag(p.NumItalic, NumItalicDefault, fr?.Italic ?? false);
             bool under = NumFlag(p.NumUnderline, NumUnderlineDefault, fr?.Underline ?? false);
             bool strike = NumFlag(p.NumStrike, NumStrikeDefault, fr?.Strike ?? false);
-            var brush = ForegroundAlpha(0.8);   // follows the paper text color, not hardcoded white
+            var brush = ForegroundAlpha(0.8);
             var ft = new FormattedText($"{n}.", System.Globalization.CultureInfo.CurrentCulture,
                 FlowDirection.LeftToRight,
                 new Typeface(FontFamily, italic ? FontStyle.Italic : FontStyle.Normal,
@@ -558,13 +500,13 @@ public sealed class RichTextEditor : Control
 
         if (BulletGlyphs.TryGetValue(p.Bullet, out var g))
         {
-            double targetInk = 7.6 * s;                       // one ink height for every bullet style
+            double targetInk = 7.6 * s;
             var cal = Calibrate(g.Glyph);
             double size = cal.UnitSize * targetInk;
             var ft = new FormattedText(g.Glyph, System.Globalization.CultureInfo.InvariantCulture,
                 FlowDirection.LeftToRight, new Typeface(GlyphFont), size,
                 BrushFor(BulletColorOverrides.TryGetValue(p.Bullet, out var oc) ? oc : g.Color));
-            // centre the actual INK on (cx, cy), not the layout box
+
             ctx.DrawText(ft, new Point(cx - cal.CenterXFrac * size, cy - cal.CenterYFrac * size));
         }
     }
@@ -580,8 +522,6 @@ public sealed class RichTextEditor : Control
 
     private (DocPos a, DocPos b) SelOrdered() => _anchor <= _caret ? (_anchor, _caret) : (_caret, _anchor);
     public bool HasSelection => _anchor != _caret;
-
-    // =========================== hit testing ===========================
 
     private DocPos PosFromPoint(Point pt)
     {
@@ -601,11 +541,9 @@ public sealed class RichTextEditor : Control
         return _doc.End;
     }
 
-    // =========================== undo ===========================
-
     private void PushUndo(bool typing = false)
     {
-        if (typing && _typingBurst) return;                 // coalesce a typing burst into one undo step
+        if (typing && _typingBurst) return;
         _undo.Push((_doc.TakeSnapshot(), _caret, _anchor));
         _redo.Clear();
         _typingBurst = typing;
@@ -639,8 +577,6 @@ public sealed class RichTextEditor : Control
         var a = _anchor; _doc.Clamp(ref a); _anchor = a;
     }
 
-    // =========================== editing ===========================
-
     private void DeleteSelection()
     {
         var (a, b) = SelOrdered();
@@ -662,8 +598,6 @@ public sealed class RichTextEditor : Control
         _caret = _anchor = _doc.InsertText(_caret, text, fmt);
         _hasPending = false;
 
-        // Smart lists: a space completing "1."/"-"/"*" at the start of a plain paragraph turns
-        // it into a real list (its own undo step — Ctrl+Z restores the typed prefix).
         if (SmartListsPref && text == " " && _caret.Off >= 2)
         {
             var para = _doc.Paragraphs[_caret.Para];
@@ -683,22 +617,18 @@ public sealed class RichTextEditor : Control
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
-        // Two different modifiers on macOS, one on Windows. `cmd` is the COMMAND key (Cmd there, Ctrl
-        // here) — copy/paste/undo/select-all. `ctrl` is the WORD-WISE motion modifier, which on macOS is
-        // Option, not Command. On Windows both resolve to Ctrl, so nothing changes there.
+
         bool cmd = Services.Keymap.HasCommand(e.KeyModifiers);
         bool ctrl = OperatingSystem.IsMacOS() ? e.KeyModifiers.HasFlag(KeyModifiers.Alt) : cmd;
         bool shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
-        // Rebindable formatting shortcuts (Keymap, M8 Part 6) run FIRST so custom combos win.
-        // Structural keys (Ctrl+A/Z/Y/C/X/V, navigation) stay fixed in the switch below.
         if (HandleKeymapShortcut(e)) { e.Handled = true; return; }
 
         bool handled = true;
 
         switch (e.Key)
         {
-            // Cmd+Arrow is line-wise on macOS (Option+Arrow is the word-wise case below).
+
             case Key.Left or Key.Right when cmd && OperatingSystem.IsMacOS():
                 MoveCaret(LineEdge(_caret, start: e.Key == Key.Left), shift);
                 break;
@@ -723,7 +653,7 @@ public sealed class RichTextEditor : Control
             case Key.Enter:
                 PushUndo();
                 if (HasSelection) DeleteSelection();
-                // Enter on an EMPTY list item escapes the list instead of continuing it (standard behavior).
+
                 if (_doc.Paragraphs[_caret.Para].Bullet is not null && _doc.Paragraphs[_caret.Para].Length == 0)
                     _doc.SetBullet(_caret, _caret, null);
                 else
@@ -735,11 +665,11 @@ public sealed class RichTextEditor : Control
                 if (HasSelection) DeleteSelection();
                 else if (_caret.Off == 0 && _doc.Paragraphs[_caret.Para].Bullet is not null)
                 {
-                    _doc.SetBullet(_caret, _caret, null);   // Backspace at a list item's start clears the bullet first
+                    _doc.SetBullet(_caret, _caret, null);
                 }
                 else
                 {
-                    var prev = ctrl ? PrevWordPos(_caret) : _doc.Move(_caret, -1);   // Ctrl+Backspace = delete word
+                    var prev = ctrl ? PrevWordPos(_caret) : _doc.Move(_caret, -1);
                     if (prev != _caret) { _doc.DeleteRange(prev, _caret); _caret = _anchor = prev; }
                 }
                 AfterEdit();
@@ -749,7 +679,7 @@ public sealed class RichTextEditor : Control
                 if (HasSelection) DeleteSelection();
                 else
                 {
-                    var next = ctrl ? NextWordPos(_caret) : _doc.Move(_caret, 1);    // Ctrl+Delete = delete next word
+                    var next = ctrl ? NextWordPos(_caret) : _doc.Move(_caret, 1);
                     if (next != _caret) _doc.DeleteRange(_caret, next);
                 }
                 AfterEdit();
@@ -759,8 +689,7 @@ public sealed class RichTextEditor : Control
                 InvalidateVisual();
                 RaiseSelectionChanged();
                 break;
-            // Shift+Z is the redo combo everywhere except Windows, where Ctrl+Y is the convention. Both
-            // are accepted; this case must stay above the plain Z one or redo would undo instead.
+
             case Key.Z when cmd && shift:
                 Redo(); AfterEdit(pushedUndo: false);
                 break;
@@ -786,8 +715,6 @@ public sealed class RichTextEditor : Control
         if (handled) e.Handled = true;
     }
 
-    /// <summary>The Keymap-driven (rebindable) shortcuts: formatting, quick highlight, date
-    /// insert, list toggles. Returns true when the event matched one.</summary>
     private bool HandleKeymapShortcut(KeyEventArgs e)
     {
         if (Services.Keymap.Matches("bold", e)) ToggleBold();
@@ -802,8 +729,6 @@ public sealed class RichTextEditor : Control
         return true;
     }
 
-    /// <summary>The format the caret currently "carries" (pending toggles, or the char before the caret;
-    /// for a selection the boolean flags reflect whole-range state). Toolbars read this on SelectionChanged.</summary>
     public RunFormat CurrentFormat
     {
         get
@@ -822,7 +747,6 @@ public sealed class RichTextEditor : Control
         }
     }
 
-    /// <summary>Bullet style of the paragraph at the selection start (null = none) — for toolbar state.</summary>
     public string? CurrentBullet
     {
         get
@@ -833,8 +757,6 @@ public sealed class RichTextEditor : Control
         }
     }
 
-    /// <summary>Apply a bullet style to every paragraph the selection touches. Picking the style the
-    /// paragraphs already have (or null) clears it.</summary>
     public void ApplyBullet(string? style)
     {
         PushUndo();
@@ -845,8 +767,6 @@ public sealed class RichTextEditor : Control
         RaiseSelectionChanged();
     }
 
-    /// <summary>Effective number-style flags at the selection start when it sits in a numbered list
-    /// (override ?? global default ?? first text run), else null — drives the toolbar's number row.</summary>
     public (bool Bold, bool Italic, bool Underline, bool Strike)? CurrentNumStyle
     {
         get
@@ -863,8 +783,6 @@ public sealed class RichTextEditor : Control
         }
     }
 
-    /// <summary>Toggle one number-style flag ('b','i','u','s') for the whole numbered list at the
-    /// selection start — the override becomes the opposite of the current effective state.</summary>
     public void ToggleNumStyle(char flag)
     {
         if (CurrentNumStyle is not { } cur) return;
@@ -877,7 +795,6 @@ public sealed class RichTextEditor : Control
         RaiseSelectionChanged();
     }
 
-    /// <summary>Clear the list's overrides — numbers return to the global default / their text.</summary>
     public void ClearNumStyle()
     {
         if (CurrentBullet != "num") return;
@@ -889,9 +806,6 @@ public sealed class RichTextEditor : Control
         RaiseSelectionChanged();
     }
 
-    // ---- M10: super/subscript, alignment, text types, links ----
-
-    /// <summary>The baseline (super/sub/normal) the caret carries — pending, selection start, or caret.</summary>
     public Baseline CurrentBaseline =>
         _hasPending && !HasSelection ? _pending.Baseline : CurrentFormat.Baseline;
 
@@ -904,13 +818,11 @@ public sealed class RichTextEditor : Control
         ApplyValue(r => r.Baseline = next, f => f with { Baseline = next });
     }
 
-    /// <summary>Alignment of the paragraph at the selection start — for toolbar state.</summary>
     public TextAlign CurrentAlign
     {
         get { var (a, _) = SelOrdered(); _doc.Clamp(ref a); return _doc.Paragraphs[a.Para].Align; }
     }
 
-    /// <summary>Text type of the paragraph at the selection start — for toolbar state.</summary>
     public ParaStyle CurrentTextType
     {
         get { var (a, _) = SelOrdered(); _doc.Clamp(ref a); return _doc.Paragraphs[a.Para].Style; }
@@ -925,7 +837,6 @@ public sealed class RichTextEditor : Control
         RaiseSelectionChanged();
     }
 
-    /// <summary>Tag (or untag, with null) every paragraph the selection touches (M11).</summary>
     public void SetTag(string? tag)
     {
         PushUndo();
@@ -944,17 +855,14 @@ public sealed class RichTextEditor : Control
         RaiseSelectionChanged();
     }
 
-    /// <summary>The link URL at the selection start (null = not a link) — for toolbar state.</summary>
     public string? CurrentLink => CurrentFormat.Link;
 
-    /// <summary>Set/clear the hyperlink on the selection (blank clears), or pending at the caret.</summary>
     public void ApplyLink(string? url)
     {
         string? u = string.IsNullOrWhiteSpace(url) ? null : url!.Trim();
         ApplyValue(r => r.Link = u, f => f with { Link = u });
     }
 
-    /// <summary>Insert linked text at the caret (used when there's no selection to link).</summary>
     public void InsertLink(string text, string url)
     {
         if (string.IsNullOrEmpty(text) || string.IsNullOrWhiteSpace(url)) return;
@@ -965,8 +873,6 @@ public sealed class RichTextEditor : Control
         AfterEdit();
     }
 
-    /// <summary>Insert a footnote (M10): a superscript marker at the caret + an auto-numbered line
-    /// at the bottom of the box.</summary>
     public void InsertFootnote(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return;
@@ -981,16 +887,14 @@ public sealed class RichTextEditor : Control
     public void ToggleUnderline() => ToggleFlag(r => r.Underline, (r, v) => r.Underline = v, f => f with { Underline = !f.Underline });
     public void ToggleStrike() => ToggleFlag(r => r.Strike, (r, v) => r.Strike = v, f => f with { Strike = !f.Strike });
 
-    /// <summary>Apply a highlight color to the selection (null clears), or set it pending at the caret.</summary>
     public void ApplyHighlight(string? hex) => ApplyValue(r => r.Highlight = hex, f => f with { Highlight = hex });
-    /// <summary>Apply a text color to the selection (null = theme default), or set it pending at the caret.</summary>
+
     public void ApplyColor(string? hex) => ApplyValue(r => r.Color = hex, f => f with { Color = hex });
-    /// <summary>Apply a font size to the selection (null = editor default), or set it pending at the caret.</summary>
+
     public void ApplySize(double? size) => ApplyValue(r => r.Size = size, f => f with { Size = size });
-    /// <summary>Apply a font family to the selection (null = editor default), or set it pending at the caret.</summary>
+
     public void ApplyFont(string? family) => ApplyValue(r => r.Font = family, f => f with { Font = family });
 
-    /// <summary>Ctrl+Shift+H: toggle the default yellow highlight.</summary>
     public void ToggleDefaultHighlight()
     {
         if (HasSelection)
@@ -1005,7 +909,6 @@ public sealed class RichTextEditor : Control
         }
     }
 
-    /// <summary>Ctrl+Shift+T: insert the current date/time at the caret using the format pref.</summary>
     public void InsertDateTime()
     {
         string stamp;
@@ -1014,9 +917,6 @@ public sealed class RichTextEditor : Control
         InsertPlainText(stamp);
     }
 
-    /// <summary>Insert plain text at the caret, replacing any selection — the same flow the paste
-    /// path uses (PushUndo, delete selection, insert with the caret's current format, land the
-    /// caret after it, invalidate). Shared so paste and other programmatic inserts stay identical.</summary>
     private void InsertPlainText(string text)
     {
         if (string.IsNullOrEmpty(text)) return;
@@ -1086,7 +986,7 @@ public sealed class RichTextEditor : Control
         var to = PosFromPoint(new Point(_desiredX, targetY));
         double keepX = _desiredX;
         MoveCaret(to, extend);
-        _desiredX = keepX;                       // MoveCaret resets it; up/down keeps the sticky column
+        _desiredX = keepX;
     }
 
     private DocPos LineEdge(DocPos p, bool start)
@@ -1119,12 +1019,10 @@ public sealed class RichTextEditor : Control
 
     private void ResetBlink()
     {
-        _blinkMs = 0;            // solid caret right after activity, then it starts pulsing again
+        _blinkMs = 0;
         _caretOpacity = 1;
     }
 
-    /// <summary>One animation frame: glide the caret toward its target, pulse its opacity (soft blink),
-    /// and advance any checkbox pops. Only invalidates when something actually changed.</summary>
     private void AnimTick()
     {
         bool dirty = false;
@@ -1160,7 +1058,7 @@ public sealed class RichTextEditor : Control
 
     private static double AnimLerp(double a, double b, double t) => a + (b - a) * t;
     private static double Smooth(double t) => t * t * (3 - 2 * t);
-    // hold on → fade out to a dim value → hold → fade back in.
+
     private static double BlinkOpacity(double ms)
     {
         double t = (ms % 1150) / 1150;
@@ -1176,8 +1074,7 @@ public sealed class RichTextEditor : Control
         {
             EnsureLayouts(Bounds.Width);
             var r = CaretRect().Inflate(new Thickness(0, 12));
-            // Skip the ScrollViewer round-trip entirely when the caret is already visible — poking it on
-            // every keystroke costs a layout pass even when nothing needs to scroll.
+
             if (this.FindAncestorOfType<ScrollViewer>() is { } sv)
             {
                 var visible = new Rect(sv.Offset.X, sv.Offset.Y, sv.Viewport.Width, sv.Viewport.Height);
@@ -1186,8 +1083,6 @@ public sealed class RichTextEditor : Control
             this.BringIntoView(r);
         }, DispatcherPriority.Background);
     }
-
-    // =========================== clipboard ===========================
 
     private string SelectedText()
     {
@@ -1237,10 +1132,8 @@ public sealed class RichTextEditor : Control
         catch { }
     }
 
-    // =========================== mouse ===========================
-
     private bool _dragging;
-    private Point _pressPoint;      // where the last press landed — a near-still release on a link = "open it"
+    private Point _pressPoint;
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
@@ -1251,20 +1144,16 @@ public sealed class RichTextEditor : Control
         _pressPoint = pt;
         var pos = PosFromPoint(pt);
 
-        // Click on a checkbox in the gutter toggles it — ANY click count: rapid re-clicks arrive
-        // with ClickCount 2/3 (the OS multi-click window) and gating on 1 made the box go dead
-        // until the timer reset (owner report). Checkbox hit always outranks word/line selection.
         if (IsOverCheckbox(pt, out int checkPara))
         {
             PushUndo();
             _doc.ToggleChecked(checkPara);
-            _checkAnim[checkPara] = (0, _doc.Paragraphs[checkPara].Checked);   // pop the toggle in
+            _checkAnim[checkPara] = (0, _doc.Paragraphs[checkPara].Checked);
             if (!_anim.IsEnabled) _anim.Start();
             e.Handled = true;
             return;
         }
 
-        // Ctrl+click a hyperlink opens it (plain click still places the caret so links stay editable).
         if (Services.Keymap.HasCommandStrict(e.KeyModifiers) && LinkAt(pos) is { } url)
         {
             OpenLink(url);
@@ -1297,7 +1186,6 @@ public sealed class RichTextEditor : Control
     private static readonly Cursor IbeamCursor = new(StandardCursorType.Ibeam);
     private static readonly Cursor HandCursor = new(StandardCursorType.Hand);
 
-    /// <summary>The link URL of the run covering this position (null = not a link).</summary>
     private string? LinkAt(DocPos pos)
     {
         _doc.Clamp(ref pos);
@@ -1312,12 +1200,11 @@ public sealed class RichTextEditor : Control
         return null;
     }
 
-    /// <summary>Open a hyperlink in the default browser (http/https/mailto only — no local commands).</summary>
     private static void OpenLink(string url)
     {
         var u = url.Trim();
         if (!u.Contains("://") && !u.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
-            u = "https://" + u;                      // bare "example.com" → https
+            u = "https://" + u;
         if (!u.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
             !u.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
             !u.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase)) return;
@@ -1325,10 +1212,9 @@ public sealed class RichTextEditor : Control
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(u) { UseShellExecute = true });
         }
-        catch { /* nothing sensible to do if the shell refuses */ }
+        catch {  }
     }
 
-    /// <summary>Is the point on a checkbox glyph (its paragraph's gutter, first line)?</summary>
     private bool IsOverCheckbox(Point pt, out int paraIndex)
     {
         paraIndex = -1;
@@ -1353,7 +1239,7 @@ public sealed class RichTextEditor : Control
             InvalidateVisual();
             return;
         }
-        // Checkboxes AND links are clickable — show a pointing hand over them, the I-beam elsewhere.
+
         Cursor = IsOverCheckbox(pt, out _) || LinkAt(PosFromPoint(pt)) is not null ? HandCursor : IbeamCursor;
     }
 
@@ -1362,8 +1248,6 @@ public sealed class RichTextEditor : Control
         base.OnPointerReleased(e);
         if (_dragging) { _dragging = false; e.Pointer.Capture(null); }
 
-        // A clean click (no drag-select) on a link opens it — the discoverable path most note apps use;
-        // Ctrl+click already handled it on press, so skip when a modifier is down to avoid double-opening.
         var pt = e.GetPosition(this);
         if (!HasSelection && !Services.Keymap.HasCommandStrict(e.KeyModifiers) &&
             Math.Abs(pt.X - _pressPoint.X) < 4 && Math.Abs(pt.Y - _pressPoint.Y) < 4 &&
@@ -1373,8 +1257,6 @@ public sealed class RichTextEditor : Control
 
     private static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c == '_';
 
-    /// <summary>Start of the previous word (Windows convention): skip whitespace, then the run of
-    /// same-class characters. At paragraph start, crosses to the previous paragraph's end.</summary>
     private DocPos PrevWordPos(DocPos p)
     {
         _doc.Clamp(ref p);
@@ -1390,8 +1272,6 @@ public sealed class RichTextEditor : Control
         return p with { Off = i };
     }
 
-    /// <summary>Start of the next word: skip the current run of same-class characters, then whitespace.
-    /// At paragraph end, crosses to the next paragraph's start.</summary>
     private DocPos NextWordPos(DocPos p)
     {
         _doc.Clamp(ref p);

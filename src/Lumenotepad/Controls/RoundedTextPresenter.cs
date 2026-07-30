@@ -8,10 +8,6 @@ using Avalonia.VisualTree;
 
 namespace Lumenotepad.Controls;
 
-/// <summary>Draws a TextBox's selection as ROUNDED rects. The stock TextPresenter paints square
-/// selection with no styling hook and its Render is sealed — so this control sits UNDER the presenter
-/// in the template (same panel, first child), reads its selection + TextLayout, and paints rounded
-/// rects itself while the TextBox's real SelectionBrush is transparent.</summary>
 public sealed class TextSelectionUnderlay : Control
 {
     public static readonly StyledProperty<TextPresenter?> PresenterProperty =
@@ -69,16 +65,10 @@ public sealed class TextSelectionUnderlay : Control
                 context.FillRectangle(brush,
                     new Rect(r.X + offset.X, r.Y + offset.Y, Math.Max(r.Width, 2), r.Height), 3f);
         }
-        catch { /* layout mid-update — skip this frame */ }
+        catch {  }
     }
 }
 
-/// <summary>The editor's smooth caret for PLAIN TextBoxes: the stock TextPresenter caret hard-blinks
-/// and teleports, with no styling hook to change either. This control sits over the presenter (whose
-/// own CaretBrush the template sets Transparent), reads its caret index + TextLayout, and paints a
-/// caret that GLIDES toward the target and soft-fades its blink — same feel as RichTextEditor's.
-/// A 16ms timer runs only while the host TextBox is focused; blink resets on any caret move so the
-/// caret stays solid while typing. Reduce-motion snaps position and blinks hard on/off.</summary>
 public sealed class GlidingCaret : Control
 {
     public static readonly StyledProperty<TextPresenter?> PresenterProperty =
@@ -126,7 +116,7 @@ public sealed class GlidingCaret : Control
     {
         if (e.Property == TextPresenter.CaretIndexProperty || e.Property == TextPresenter.TextProperty)
         {
-            _blinkMs = 0; _opacity = 1;              // solid while typing/moving
+            _blinkMs = 0; _opacity = 1;
             if (_host?.IsFocused == true && !_anim.IsEnabled) _anim.Start();
             InvalidateVisual();
         }
@@ -169,8 +159,6 @@ public sealed class GlidingCaret : Control
         InvalidateVisual();
     }
 
-    /// <summary>One frame: glide the display rect toward the caret target and advance the blink.
-    /// Repaints only when something visibly moved or faded.</summary>
     private void Tick()
     {
         if (_host is null || !_host.IsFocused) { _anim.Stop(); InvalidateVisual(); return; }
@@ -198,7 +186,6 @@ public sealed class GlidingCaret : Control
         if (dirty) InvalidateVisual();
     }
 
-    // hold on → fade to a dim value → hold → fade back in (hard on/off under reduce-motion)
     private double BlinkOpacity()
     {
         if (!Editor.RichTextEditor.CaretBlinkPref) return 1;
@@ -226,7 +213,7 @@ public sealed class GlidingCaret : Control
             double h = hit.Height > 1 ? hit.Height : p.FontSize * 1.35;
             return new Rect(hit.X + offset.X, hit.Y + offset.Y, Editor.RichTextEditor.CaretWidthPref, h);
         }
-        catch { return default; }   // layout mid-update — skip this frame
+        catch { return default; }
     }
 
     public override void Render(DrawingContext context)

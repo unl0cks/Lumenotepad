@@ -5,8 +5,6 @@ using Lumenotepad.Services;
 
 namespace Lumenotepad.Views;
 
-/// <summary>A window that hosts a <see cref="PdfViewer"/> — the popup used when a PDF ATTACHMENT is
-/// opened. PDF PAGES embed the same PdfViewer inline in the canvas instead.</summary>
 public partial class PdfViewerWindow : Window
 {
     public PdfViewerWindow(string pdfPath, bool doubleClickCreate = false)
@@ -22,7 +20,7 @@ public partial class PdfViewerWindow : Window
 
         Opened += (_, _) =>
         {
-            Services.ThemeManager.UseMacNativeChrome(this, PdfTitleBar);   // mac: native frame = rounded + frosted
+            Services.ThemeManager.UseMacNativeChrome(this, PdfTitleBar);
             WinChrome.RoundCorners(this, true);
             ThemeManager.ApplyChildChrome(this);
             if (Content is Control root) Motion.ScaleIn(root, 0.96, 180);

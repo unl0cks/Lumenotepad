@@ -27,7 +27,7 @@ public class FontInstallerTests
         const string css =
             "@font-face{font-family:'X';src:url(https://a.test/1.ttf) format('truetype');}" +
             "@font-face{font-family:'X';src:url(https://a.test/2.ttf) format('truetype');}" +
-            "@font-face{font-family:'X';src:url(https://a.test/1.ttf) format('truetype');}";  // dup
+            "@font-face{font-family:'X';src:url(https://a.test/1.ttf) format('truetype');}";
         var urls = FontInstaller.ParseCssFontUrls(css);
         Assert.Equal(2, urls.Count);
         Assert.Contains("https://a.test/1.ttf", urls);
@@ -41,10 +41,10 @@ public class FontInstallerTests
         {
             "Font_Complete/Fonts/TTF/Font-Regular.ttf",
             "Font_Complete/Fonts/TTF/Font-Bold.ttf",
-            "Font_Complete/Fonts/TTF/Font-Variable.ttf",       // variable → dropped
-            "Font_Complete/Fonts/OTF/Font-Regular.otf",        // OTF present but TTF wins
-            "Font_Complete/Fonts/WEB/fonts/Font-Regular.woff2",// web → dropped (not a font ext anyway)
-            "Font_Complete/Fonts/WEB/fonts/Font-Regular.ttf",  // web TTF → dropped (in /WEB/)
+            "Font_Complete/Fonts/TTF/Font-Variable.ttf",
+            "Font_Complete/Fonts/OTF/Font-Regular.otf",
+            "Font_Complete/Fonts/WEB/fonts/Font-Regular.woff2",
+            "Font_Complete/Fonts/WEB/fonts/Font-Regular.ttf",
         };
         var chosen = FontInstaller.ChooseFontEntries(entries);
         Assert.Equal(2, chosen.Count);
@@ -60,7 +60,7 @@ public class FontInstallerTests
         {
             "F/OTF/F-Regular.otf",
             "F/OTF/F-Bold.otf",
-            "F/TTF/F-Variable.ttf",   // only variable ttf → excluded, so OTFs are used
+            "F/TTF/F-Variable.ttf",
         };
         var chosen = FontInstaller.ChooseFontEntries(entries);
         Assert.Equal(2, chosen.Count);

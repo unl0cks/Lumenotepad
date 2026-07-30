@@ -22,7 +22,7 @@ public class RichDocJsonTests
 
         Assert.Equal(doc.GetText(), restored.GetText());
         Assert.Equal(3, restored.Paragraphs.Count);
-        Assert.Empty(restored.Paragraphs[1].Runs);                       // empty paragraph survives
+        Assert.Empty(restored.Paragraphs[1].Runs);
         Assert.True(restored.RangeAll(new DocPos(0, 6), new DocPos(0, 10), r => r.Bold));
         Assert.True(restored.RangeAll(new DocPos(2, 0), new DocPos(2, 6), r => r.Italic));
     }
@@ -100,7 +100,7 @@ public class PageDocStoreTests
             var ws = new Workspace();
             var nb = new Notebook { Name = "Biology" };
             ws.Notebooks.Add(nb);
-            store.Save(ws);                                   // assigns nb.Folder
+            store.Save(ws);
 
             var canvas = new CanvasDocument();
             var box = canvas.AddBox(24, 48, 400);
@@ -129,14 +129,14 @@ public class PageDocStoreTests
     {
         var canvas = new CanvasDocument();
         canvas.AddBox(10, 20, 300).Locked = true;
-        canvas.AddBox(40, 400, 300);                       // unlocked stays unlocked
+        canvas.AddBox(40, 400, 300);
 
         var reloaded = CanvasDocJson.FromJson(CanvasDocJson.ToJson(canvas));
 
         Assert.Equal(2, reloaded.Boxes.Count);
         Assert.True(reloaded.Boxes[0].Locked);
         Assert.False(reloaded.Boxes[1].Locked);
-        // default-false stays off the wire (WhenWritingDefault)
+
         Assert.DoesNotContain("\"lk\":false", CanvasDocJson.ToJson(canvas));
     }
 }

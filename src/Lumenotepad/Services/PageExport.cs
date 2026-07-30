@@ -11,12 +11,6 @@ namespace Lumenotepad.Services;
 
 public enum ExportFormat { Txt, Markdown, Html, Rtf, Pdf, Docx, Odt, Epub }
 
-/// <summary>Exports a page (title + its freeform canvas) to any of the supported document formats
-/// (M10). Boxes are emitted in reading order (top-to-bottom, then left-to-right); empty boxes are
-/// skipped. The plain-text family (TXT/MD/HTML/RTF) is pure and unit-tested; PDF is drawn with
-/// SkiaSharp and embeds image boxes, draws divider rules, and draws real vector checkboxes;
-/// DOCX/ODT/EPUB are minimal-but-valid zip packages that honor headings, alignment,
-/// bold/italic/underline/strike, text color, and links.</summary>
 public static class PageExport
 {
     public static readonly (ExportFormat Fmt, string Label, string Ext)[] Formats =
@@ -33,8 +27,6 @@ public static class PageExport
 
     public static string ExtensionFor(ExportFormat fmt) => Formats.First(f => f.Fmt == fmt).Ext;
 
-    /// <summary>Produce the file bytes for a page in the given format. <paramref name="imageRoot"/>
-    /// is the notebook folder image-box paths resolve against — only PDF embeds pictures.</summary>
     public static byte[] Export(ExportFormat fmt, string title, CanvasDocument doc, string? imageRoot = null)
     {
         title = string.IsNullOrWhiteSpace(title) ? "Untitled" : title.Trim();
@@ -59,10 +51,8 @@ public static class PageExport
 
     private static string AttachName(NoteBox b) => Path.GetFileName(b.AttachPath ?? "");
 
-    /// <summary>A table cell's plain text (newlines flattened to spaces) for the text-family exports.</summary>
     private static string CellText(RichDocument cell) => cell.GetText().Replace('\n', ' ').Trim();
 
-    /// <summary>A GitHub-style Markdown table (first row treated as the header).</summary>
     private static string MarkdownTable(NoteTable t)
     {
         string Row(IEnumerable<string> cells) => "| " + string.Join(" | ", cells) + " |";
@@ -74,7 +64,6 @@ public static class PageExport
         return string.Join("\n", lines);
     }
 
-    /// <summary>A monospaced plain-text table with padded columns (TXT export).</summary>
     private static string TextTable(NoteTable t)
     {
         var cells = t.Rows.Select(r => r.Select(CellText).ToList()).ToList();
@@ -106,11 +95,9 @@ public static class PageExport
         return sb.Append("</table>\n").ToString();
     }
 
-    /// <summary>A table cell's rich inline HTML (its paragraphs joined by &lt;br&gt;).</summary>
     private static string InlineHtmlCell(RichDocument cell) =>
         string.Join("<br>", cell.Paragraphs.Select(InlineHtml));
 
-    /// <summary>Plain-text marker for a tagged paragraph (TXT/MD; HTML gets the colored glyph).</summary>
     private static string TagMark(Paragraph p) => p.Tag switch
     {
         "important" => "[!] ", "question" => "[?] ", "idea" => "[idea] ",
@@ -122,8 +109,6 @@ public static class PageExport
             ? $"<span style=\"color:{g.Color};font-weight:bold\">{Esc(g.Glyph)}</span> "
             : "";
 
-    // ---- plain text ----
-
     public static string ToText(string title, CanvasDocument doc)
     {
         var sb = new StringBuilder();
@@ -133,7 +118,7 @@ public static class PageExport
             if (box.Divider is not null) { sb.AppendLine(new string('-', 24)).AppendLine(); continue; }
             if (box.Table is { } tt) { sb.Append(TextTable(tt)).AppendLine(); continue; }
             if (box.AttachPath is { Length: > 0 }) { sb.AppendLine("Attachment: " + AttachName(box)).AppendLine(); continue; }
-            if (box.ImagePath is not null) continue;   // pictures can't ride along in plain text
+            if (box.ImagePath is not null) continue;
             int num = 0;
             foreach (var p in box.Doc.Paragraphs)
             {
@@ -150,8 +135,6 @@ public static class PageExport
         return sb.ToString().TrimEnd() + "\n";
     }
 
-    // ---- markdown (extends the box walk with headings + links) ----
-
     public static string ToMarkdown(string title, CanvasDocument doc)
     {
         var blocks = new List<string> { "# " + title };
@@ -160,7 +143,7 @@ public static class PageExport
             if (box.Divider is not null) { blocks.Add("---"); continue; }
             if (box.Table is { } tt) { blocks.Add(MarkdownTable(tt)); continue; }
             if (box.AttachPath is { Length: > 0 }) { blocks.Add("**Attachment:** " + AttachName(box)); continue; }
-            if (box.ImagePath is not null) continue;   // the .md leaves the notebook — no path survives
+            if (box.ImagePath is not null) continue;
             var lines = new List<string>();
             int num = 0;
             foreach (var p in box.Doc.Paragraphs)
@@ -179,7 +162,7 @@ public static class PageExport
                     null => heading, "num" => $"{num}. ",
                     "check" => p.Checked ? "- [x] " : "- [ ] ", _ => "- ",
                 };
-                lines.Add(prefix + TagMark(p) + body);      // tag AFTER the marker so "## " stays a heading
+                lines.Add(prefix + TagMark(p) + body);
             }
             blocks.Add(string.Join("\n", lines));
         }
@@ -202,15 +185,13 @@ public static class PageExport
         return text[..a] + open + text[a..b] + close + text[b..];
     }
 
-    // ---- HTML (also the EPUB body) ----
-
     public static string ToHtml(string title, CanvasDocument doc, bool standalone)
     {
         var body = new StringBuilder();
         body.Append("<h1>").Append(Esc(title)).Append("</h1>\n");
         foreach (var box in Boxes(doc))
         {
-            if (box.Divider is not null) { body.Append("<hr/>\n"); continue; }   // self-closed: EPUB is XHTML
+            if (box.Divider is not null) { body.Append("<hr/>\n"); continue; }
             if (box.Table is { } tt) { body.Append(HtmlTable(tt)); continue; }
             if (box.AttachPath is { Length: > 0 })
             { body.Append("<p class=\"attachment\">📎 ").Append(Esc(AttachName(box))).Append("</p>\n"); continue; }
@@ -237,7 +218,7 @@ public static class PageExport
         while (i < ps.Count)
         {
             var p = ps[i];
-            if (p.Bullet == "check")     // a checklist: real (disabled) checkboxes, not plain bullets
+            if (p.Bullet == "check")
             {
                 body.Append("<ul class=\"tasklist\">\n");
                 while (i < ps.Count && ps[i].Bullet == "check")
@@ -306,13 +287,11 @@ public static class PageExport
         return sb.ToString();
     }
 
-    // ---- RTF ----
-
     public static string ToRtf(string title, CanvasDocument doc)
     {
         var sb = new StringBuilder();
         sb.Append(@"{\rtf1\ansi\deff0{\fonttbl{\f0 Segoe UI;}}");
-        sb.Append(@"{\colortbl;\red47\green111\blue196;}");   // color 1 = link blue
+        sb.Append(@"{\colortbl;\red47\green111\blue196;}");
         sb.Append(@"\fs48\b ").Append(RtfEsc(title)).Append(@"\b0\fs22\par\par");
         foreach (var box in Boxes(doc))
         {
@@ -336,7 +315,7 @@ public static class PageExport
                     TextAlign.Center => @"\qc ", TextAlign.Right => @"\qr ",
                     TextAlign.Justify => @"\qj ", _ => @"\ql ",
                 });
-                int fs = (int)Math.Round(RichTextEditor.BaseSizeFor(p.Style, 11) * 2);   // RTF half-points
+                int fs = (int)Math.Round(RichTextEditor.BaseSizeFor(p.Style, 11) * 2);
                 bool headingBold = RichTextEditor.BaseWeightFor(p.Style) >= Avalonia.Media.FontWeight.SemiBold;
                 sb.Append(@"\fs").Append(fs).Append(' ');
                 string bullet = p.Bullet switch
@@ -375,16 +354,12 @@ public static class PageExport
         if (bold) sb.Append(@"\b0 ");
     }
 
-    // ---- PDF (SkiaSharp) ----
-
     private static byte[] ToPdf(string title, CanvasDocument doc, string? imageRoot) =>
         ToPdfMulti(new[] { (title, doc) }, imageRoot);
 
-    /// <summary>Render several pages into one PDF (each starts on a fresh page). Used both by the
-    /// single-page export and by "Open section as PDF".</summary>
     public static byte[] ToPdfMulti(IReadOnlyList<(string Title, CanvasDocument Doc)> items, string? imageRoot = null)
     {
-        const float W = 595, H = 842, Margin = 54;         // A4 points
+        const float W = 595, H = 842, Margin = 54;
         const float MaxW = W - 2 * Margin;
         using var ms = new MemoryStream();
         using (var pdf = SkiaSharp.SKDocument.CreatePdf(ms))
@@ -414,8 +389,6 @@ public static class PageExport
                 if (y > H - Margin) NewPage();
             }
 
-            // A real drawn checkbox (no font glyph to go missing): a rounded square hugging the
-            // first line's baseline, with an accent tick when done.
             void DrawCheckbox(bool ticked, float size)
             {
                 float side = size * 0.85f;
@@ -444,7 +417,7 @@ public static class PageExport
             using var titlePaint = MakePaint(bold: true, italic: false, link: false, 26);
             for (int it = 0; it < items.Count; it++)
             {
-                if (it > 0) NewPage();          // each page/section entry starts fresh
+                if (it > 0) NewPage();
                 y += 26;
                 canvas.DrawText(items[it].Title, Margin, y, SkiaSharp.SKTextAlign.Left, titlePaint.Font, titlePaint.Paint);
                 y += 30;
@@ -456,7 +429,7 @@ public static class PageExport
                     if (box.ImagePath is { Length: > 0 }) { DrawImage(box); continue; }
                     if (box.AttachPath is { Length: > 0 })
                     {
-                        // The file itself can't ride inside the page — a quiet italic marker names it.
+
                         EnsureRoom(20);
                         using var ap = MakePaint(false, true, false, 12);
                         ap.Paint.Color = new SkiaSharp.SKColor(0x77, 0x77, 0x77);
@@ -511,8 +484,6 @@ public static class PageExport
             }
             pdf.EndPage();
 
-            // A drawn table grid: equal columns across the content width, one line per cell (trimmed
-            // with an ellipsis if it overflows), hairline borders.
             void DrawTable(NoteTable t)
             {
                 float colW = MaxW / t.ColCount;
@@ -546,8 +517,6 @@ public static class PageExport
                 return s + "…";
             }
 
-            // A drawn rule matching the on-page divider: horizontal at its own length, vertical as
-            // a centered column stroke (reading order can't keep true side-by-side placement).
             void DrawDivider(NoteBox box)
             {
                 using var rule = new SkiaSharp.SKPaint
@@ -573,8 +542,6 @@ public static class PageExport
                 }
             }
 
-            // The actual picture, embedded: fit to the box's on-page width, capped to the content
-            // column and one page tall. Missing/unreadable files are skipped, never fatal.
             void DrawImage(NoteBox box)
             {
                 SkiaSharp.SKBitmap? bmp = null;
@@ -584,7 +551,7 @@ public static class PageExport
                         ? Path.Combine(imageRoot, box.ImagePath!) : box.ImagePath!;
                     if (File.Exists(full)) bmp = SkiaSharp.SKBitmap.Decode(full);
                 }
-                catch { /* unreadable image → skip it */ }
+                catch {  }
                 if (bmp is null || bmp.Width <= 0 || bmp.Height <= 0) return;
                 using (bmp)
                 {
@@ -593,7 +560,7 @@ public static class PageExport
                     float maxH = H - 2 * Margin;
                     if (drawH > maxH) { drawW *= maxH / drawH; drawH = maxH; }
                     EnsureRoom(drawH);
-                    float top = y - 8;                      // y is a text baseline; hug the flow
+                    float top = y - 8;
                     canvas.DrawBitmap(bmp, new SkiaSharp.SKRect(Margin, top, Margin + drawW, top + drawH));
                     y = top + drawH + 24;
                 }
@@ -602,8 +569,6 @@ public static class PageExport
         return ms.ToArray();
     }
 
-    /// <summary>An SKPaint + SKFont pair — SkiaSharp 3 moved text styling (size/typeface/measure)
-    /// off SKPaint onto SKFont, so the drawn-PDF path carries both around together.</summary>
     private sealed record TextPaint(SkiaSharp.SKPaint Paint, SkiaSharp.SKFont Font) : IDisposable
     {
         public float Measure(string s) => Font.MeasureText(s);
@@ -618,9 +583,6 @@ public static class PageExport
         },
         new SkiaSharp.SKFont(ExportTypeface(bold, italic), size));
 
-    /// <summary>The face the drawn-PDF/PNG export writes with. "Segoe UI" does not exist off Windows,
-    /// where the lookup falls through to Skia's default — legible, but not a face anyone chose. Try the
-    /// platform's own UI font first and keep Segoe as the Windows answer.</summary>
     private static SkiaSharp.SKTypeface ExportTypeface(bool bold, bool italic)
     {
         var style = new SkiaSharp.SKFontStyle(
@@ -635,8 +597,6 @@ public static class PageExport
                 return tf;
         return SkiaSharp.SKTypeface.Default;
     }
-
-    // ---- DOCX (minimal OOXML) ----
 
     private static byte[] ToDocx(string title, CanvasDocument doc)
     {
@@ -684,7 +644,7 @@ public static class PageExport
     {
         int half = (int)Math.Round(RichTextEditor.BaseSizeFor(p.Style, 11) * 2);
         bool headBold = RichTextEditor.BaseWeightFor(p.Style) >= Avalonia.Media.FontWeight.SemiBold;
-        // Word does proper font fallback, so the real ballot glyphs render (only the drawn PDF lacked them).
+
         string bullet = p.Bullet switch
         {
             null => "", "num" => "• ", "check" => p.Checked ? "☑ " : "☐ ", _ => "• ",
@@ -717,8 +677,6 @@ public static class PageExport
         return $"<w:r>{rpr}<w:t xml:space=\"preserve\">{Esc(text)}</w:t></w:r>";
     }
 
-    // ---- ODT (minimal ODF) ----
-
     private static byte[] ToOdt(string title, CanvasDocument doc)
     {
         var content = new StringBuilder();
@@ -740,7 +698,7 @@ public static class PageExport
                 string tag = heading ? "text:h" : "text:p";
                 string lvl = heading ? " text:outline-level=\"2\"" : "";
                 var runs = new StringBuilder();
-                string bullet = p.Bullet switch          // LibreOffice font-fallback renders the glyphs
+                string bullet = p.Bullet switch
                 {
                     null => "", "num" => "• ", "check" => p.Checked ? "☑ " : "☐ ", _ => "• ",
                 };
@@ -767,7 +725,7 @@ public static class PageExport
 
         return Zip(new (string, byte[])[]
         {
-            ("mimetype", Utf8("application/vnd.oasis.opendocument.text")),   // stored first, uncompressed
+            ("mimetype", Utf8("application/vnd.oasis.opendocument.text")),
             ("content.xml", Utf8(contentXml)),
             ("META-INF/manifest.xml", Utf8(manifest)),
         }, storeFirst: true);
@@ -776,15 +734,12 @@ public static class PageExport
     private static string OdtRun(RichRun r)
     {
         if (r.Text.Length == 0) return "";
-        // ODF styling needs automatic-styles plumbing; keep it readable — bold/italic via nested spans
-        // isn't valid without style defs, so emit the text (structure + headings are preserved).
+
         string text = Esc(r.Text);
         if (r.Link is { Length: > 0 } url)
             return $"<text:a xmlns:xlink=\"http://www.w3.org/1999/xlink\" xlink:href=\"{Esc(url)}\">{text}</text:a>";
         return text;
     }
-
-    // ---- EPUB (zipped XHTML) ----
 
     private static byte[] ToEpub(string title, CanvasDocument doc)
     {
@@ -820,7 +775,7 @@ public static class PageExport
 
         return Zip(new (string, byte[])[]
         {
-            ("mimetype", Utf8("application/epub+zip")),      // stored first, uncompressed
+            ("mimetype", Utf8("application/epub+zip")),
             ("META-INF/container.xml", Utf8(container)),
             ("OEBPS/content.opf", Utf8(opf)),
             ("OEBPS/nav.xhtml", Utf8(nav)),
@@ -828,10 +783,6 @@ public static class PageExport
         }, storeFirst: true);
     }
 
-    // ---- helpers ----
-
-    /// <summary>Build a zip archive. <paramref name="storeFirst"/> writes the FIRST entry uncompressed
-    /// (the ODF/EPUB "mimetype" rule) so the package is recognized.</summary>
     private static byte[] Zip(IReadOnlyList<(string Name, byte[] Data)> entries, bool storeFirst = false)
     {
         using var ms = new MemoryStream();
@@ -866,11 +817,10 @@ public static class PageExport
     private static string HexNoHash(string? hex) =>
         hex is { Length: > 0 } ? HexNoAlpha(hex).TrimStart('#') : "";
 
-    /// <summary>Drop a leading '#AA' alpha (8-digit) down to '#RRGGBB' for CSS/Office color values.</summary>
     private static string HexNoAlpha(string hex)
     {
         var h = hex.TrimStart('#');
-        if (h.Length == 8) h = h[2..];              // AARRGGBB → RRGGBB
+        if (h.Length == 8) h = h[2..];
         return "#" + h;
     }
 }

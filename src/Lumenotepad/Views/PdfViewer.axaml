@@ -60,14 +60,12 @@
     <DockPanel>
         <Border DockPanel.Dock="Top" Padding="16,6,16,8" Background="Transparent">
             <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
-                <!-- No Select tool: a single click always selects; the tools arm gestures on top.
-                     Clicking an armed tool again disarms it. -->
                 <ToggleButton x:Name="HighlightTool" Classes="tool" Content="Highlight" ToolTip.Tip="Drag over the page to highlight"/>
                 <ToggleButton x:Name="NoteTool" Classes="tool" Content="Note" ToolTip.Tip="Double-click the page to add a sticky note"/>
                 <ToggleButton x:Name="TextTool" Classes="tool" Content="Text" ToolTip.Tip="Double-click the page to write text on it"/>
                 <ToggleButton x:Name="ArrowTool" Classes="tool" Content="Arrow" ToolTip.Tip="Drag to draw an arrow"/>
                 <Button x:Name="ArrowOptsBtn" Classes="mini" Content="&#x25BE;"
-                        ToolTip.Tip="Arrow style — curved, arrowhead shape &amp; size"/>
+                        ToolTip.Tip="Arrow style: curved, arrowhead shape and size"/>
                 <Border Classes="sep"/>
                 <ToggleButton x:Name="SnapBtn" Classes="tool" Content="Snap"
                               ToolTip.Tip="Snap notes, text, highlights, and arrows to a grid"/>
@@ -87,9 +85,6 @@
             </StackPanel>
         </Border>
 
-        <!-- The full canvas formatting toolbar (compact). ALWAYS visible so the layout never jumps;
-             it just disables until a note/text box is selected. Drives that box's embedded
-             rich-text editor — same fonts/super-sub/align/color/etc. -->
         <v:FormatToolbar x:Name="FmtBar" DockPanel.Dock="Top" IsEnabled="False" Opacity="0.45"/>
 
         <ScrollViewer x:Name="PagesScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">

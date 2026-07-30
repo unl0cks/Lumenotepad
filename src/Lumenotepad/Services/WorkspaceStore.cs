@@ -7,12 +7,9 @@ using Lumenotepad.Models;
 
 namespace Lumenotepad.Services;
 
-/// <summary>Loads/saves the notebook tree under <c>userdata/notebooks/</c>: one folder per notebook, its
-/// structure in <c>notebook.json</c>, and the notebook order in <c>order.json</c>. Human-readable and portable
-/// — a notebook is just a folder you can back up, sync, or copy. Page content folders arrive in M3.</summary>
 public sealed class WorkspaceStore
 {
-    private readonly string _root;   // userdata/notebooks
+    private readonly string _root;
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
 
     public WorkspaceStore(string userDataDir) => _root = Path.Combine(userDataDir, "notebooks");
@@ -43,12 +40,11 @@ public sealed class WorkspaceStore
                     ws.Notebooks.Add(nb);
                 }
             }
-            catch { /* skip a corrupt notebook rather than losing the whole workspace */ }
+            catch {  }
         }
         return ws;
     }
 
-    /// <summary>Load, or seed a friendly default workspace on first run so the app is never empty.</summary>
     public Workspace LoadOrSeed()
     {
         var ws = Load();
@@ -92,8 +88,6 @@ public sealed class WorkspaceStore
         try { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); } catch { }
     }
 
-    /// <summary>Copy an image into the notebook folder as its cover (replacing any old one).
-    /// Returns the new absolute path, or null if the notebook has no folder yet.</summary>
     public string? SaveCover(Notebook nb, string sourcePath)
     {
         if (string.IsNullOrEmpty(nb.Folder)) return null;
@@ -111,13 +105,9 @@ public sealed class WorkspaceStore
         DeleteCoverFiles(Path.Combine(_root, nb.Folder));
     }
 
-    /// <summary>The notebook's absolute folder (image-box paths resolve against it), or null when
-    /// the notebook hasn't been persisted yet.</summary>
     public string? NotebookDir(Notebook nb) =>
         string.IsNullOrEmpty(nb.Folder) ? null : Path.Combine(_root, nb.Folder);
 
-    /// <summary>Copy an inserted image into the notebook's <c>images/</c> subfolder under a unique
-    /// name; returns the path RELATIVE to the notebook folder ("images/xxx.png"), or null on failure.</summary>
     public string? SavePageImage(Notebook nb, string sourcePath)
     {
         if (string.IsNullOrEmpty(nb.Folder)) return null;
@@ -132,10 +122,6 @@ public sealed class WorkspaceStore
         catch { return null; }
     }
 
-    /// <summary>Copy an attached file into the notebook's <c>assets/</c> subfolder, KEEPING the
-    /// original filename (the user opens it later and should recognize it) — an existing name gets
-    /// a " (2)"-style counter; returns the path RELATIVE to the notebook folder ("assets/report.pdf"),
-    /// or null on failure (M11).</summary>
     public string? SavePageAsset(Notebook nb, string sourcePath)
     {
         if (string.IsNullOrEmpty(nb.Folder)) return null;
@@ -161,8 +147,6 @@ public sealed class WorkspaceStore
             try { File.Delete(f); } catch { }
     }
 
-    // ---- page content (one JSON per page in <notebook>/pages/) ----
-
     private string PageDocPath(Notebook nb, string pageId) => PageDocPath(nb.Folder, pageId);
 
     private string PageDocPath(string folder, string pageId) =>
@@ -170,17 +154,14 @@ public sealed class WorkspaceStore
 
     public void SavePageDoc(Notebook nb, string pageId, Editor.CanvasDocument doc)
     {
-        if (string.IsNullOrEmpty(nb.Folder)) return;   // notebook not persisted yet (Save assigns folders)
+        if (string.IsNullOrEmpty(nb.Folder)) return;
         var path = PageDocPath(nb, pageId);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, Editor.CanvasDocJson.ToJson(doc));
     }
 
-    /// <summary>The page's saved canvas, or null if it has none yet (v1 files migrate on read).</summary>
     public Editor.CanvasDocument? LoadPageDoc(Notebook nb, string pageId) => LoadPageDoc(nb.Folder, pageId);
 
-    /// <summary>Same, keyed by the notebook's on-disk FOLDER (a stable string) rather than the live
-    /// model — so a background export can read page content without touching the UI-thread tree.</summary>
     public Editor.CanvasDocument? LoadPageDoc(string folder, string pageId)
     {
         if (string.IsNullOrEmpty(folder)) return null;
@@ -190,8 +171,6 @@ public sealed class WorkspaceStore
         catch { return null; }
     }
 
-    /// <summary>When the page's content file was last written (UTC), or null if it has none —
-    /// powers the homepage's "Jump back in" strip without storing any extra state.</summary>
     public DateTime? PageDocTime(Notebook nb, string pageId)
     {
         if (string.IsNullOrEmpty(nb.Folder)) return null;

@@ -12,8 +12,6 @@ using Avalonia.Styling;
 
 namespace CardRepro;
 
-// SPIKE: which animation primitives actually animate (produce intermediate values) in this build?
-// Advance the headless render/animation clock and read the property mid-flight.
 internal static class Program
 {
     [STAThread]
@@ -36,7 +34,7 @@ internal static class Program
         };
         Pump();
         target.Opacity = 0.0;
-        Tick(9);   // ~150ms at 60fps
+        Tick(9);
         Console.WriteLine($"   Opacity after ~150ms (expect ~0.5 if animating): {target.Opacity:0.###}");
         target.Opacity = 1; target.Transitions = null; Pump();
 
@@ -79,7 +77,7 @@ internal static class Program
         window.Content = tcc; Pump();
         tcc.Content = new Border { Background = Brushes.Green };
         Tick(9);
-        // during a cross-fade the presenters animate opacity; sample any child opacity != 1
+
         var opacities = tcc.GetVisualDescendants().OfType<Control>()
             .Select(c => c.Opacity).Where(o => o < 0.999).ToList();
         Console.WriteLine($"   mid-fade child opacities <1 (expect some ~0.5 if animating): [{string.Join(", ", opacities.Select(o => o.ToString("0.##")))}]");

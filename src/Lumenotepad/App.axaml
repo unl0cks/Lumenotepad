@@ -11,15 +11,7 @@
     </Application.Resources>
     <Application.Styles>
         <FluentTheme />
-        <!-- Scrollbar look lives in Themes/Theme.axaml as a full ControlTheme replacement:
-             Fluent's scrollbar keeps its chunky expanded state (track plate + arrow buttons)
-             regardless of what plain styles here say. -->
-        <!-- App-wide button press feedback: a quick opacity dip. Opacity animates in this build
-             (RenderTransform does not — see the motion spec), so this is declarative and global. -->
         <Style Selector="Button">
-            <!-- App-wide rounding. Plain Buttons otherwise inherit Fluent's near-square default, which
-                 read as hard corners next to everything else here (owner: "too square"). Matches the
-                 LumenButton theme so a themed and an untouched button sit together. -->
             <Setter Property="CornerRadius" Value="10"/>
             <Setter Property="Transitions">
                 <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.11"/></Transitions>
@@ -28,19 +20,12 @@
         <Style Selector="Button:pressed">
             <Setter Property="Opacity" Value="0.7"/>
         </Style>
-        <!-- App-wide combo rounding (owner: dropdowns should be "more rounded"). The popup's own
-             content border in Fluent's ComboBox template is named "PopupBorder" — if a future Fluent
-             build renames it this selector simply fails to match (silent, acceptable fallback). -->
         <Style Selector="ComboBox">
             <Setter Property="CornerRadius" Value="9"/>
         </Style>
         <Style Selector="ComboBox /template/ Border#PopupBorder">
             <Setter Property="CornerRadius" Value="9"/>
         </Style>
-        <!-- Themed rounded menus (owner: right-click menus rounded + themed to match the active
-             theme). MenuBackgroundBrush/MenuBorderBrush are written by ThemeManager.Apply from the
-             new ThemeTokens.MenuBackground/MenuBorder. Flyout (toolbar pickers) is a DIFFERENT type
-             from ContextMenu/MenuFlyoutPresenter — these selectors must never hit it. -->
         <Style Selector="ContextMenu">
             <Setter Property="Background" Value="{DynamicResource MenuBackgroundBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource MenuBorderBrush}"/>
@@ -55,8 +40,6 @@
             <Setter Property="CornerRadius" Value="8"/>
             <Setter Property="Padding" Value="4"/>
         </Style>
-        <!-- Toolbar picker flyouts (bullets/highlight/color/font) wear the same themed menu
-             material — MenuFx blurs their popup window on the Lumen glass variant too. -->
         <Style Selector="FlyoutPresenter">
             <Setter Property="Background" Value="{DynamicResource MenuBackgroundBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource MenuBorderBrush}"/>

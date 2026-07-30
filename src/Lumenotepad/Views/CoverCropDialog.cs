@@ -11,12 +11,9 @@ using Lumenotepad.Platform;
 
 namespace Lumenotepad.Views;
 
-/// <summary>Cover cropper: a fixed card-aspect frame over the picked image — drag to position,
-/// mouse wheel / slider to zoom. Returns a temp PNG of exactly the framed region (card aspect),
-/// or null on cancel / unreadable image. Same solid DWM-rounded window style as ConfirmDialog.</summary>
 public static class CoverCropDialog
 {
-    private const double FrameW = 392, FrameH = 264;      // 2× the gallery card, same aspect ratio
+    private const double FrameW = 392, FrameH = 264;
 
     public static async Task<string?> Show(Window owner, string imagePath)
     {
@@ -36,7 +33,7 @@ public static class CoverCropDialog
                 offX = Math.Min(0, Math.Max(FrameW - imgW * Scale(), offX));
                 offY = Math.Min(0, Math.Max(FrameH - imgH * Scale(), offY));
             }
-            offX = (FrameW - imgW * Scale()) / 2;          // start centered
+            offX = (FrameW - imgW * Scale()) / 2;
             offY = (FrameH - imgH * Scale()) / 2;
 
             var img = new Image
@@ -69,7 +66,7 @@ public static class CoverCropDialog
                 if (e.Property != Slider.ValueProperty) return;
                 double old = Scale();
                 zoom = slider.Value;
-                // zoom around the frame center so the subject stays put
+
                 double cx = (FrameW / 2 - offX) / old, cy = (FrameH / 2 - offY) / old;
                 offX = FrameW / 2 - cx * Scale();
                 offY = FrameH / 2 - cy * Scale();
@@ -115,7 +112,7 @@ public static class CoverCropDialog
                 Background = new SolidColorBrush(Color.Parse("#1B1D27")),
             };
             win.Opened += (_, _) => WinChrome.RoundCorners(win, true);
-            Services.ThemeManager.ConfigureDialogChrome(win);   // mac: native rounding + frost, no traffic lights
+            Services.ThemeManager.ConfigureDialogChrome(win);
 
             var lumenTheme = Application.Current?.FindResource("LumenButton") as Avalonia.Styling.ControlTheme;
             var cancel = new Button
@@ -171,7 +168,6 @@ public static class CoverCropDialog
             var ok = await win.ShowDialog<bool?>(owner);
             if (ok != true) return null;
 
-            // Bake exactly the framed region to a PNG (upscaled floor keeps tiny crops crisp enough).
             double s = Scale();
             var src = new Rect(-offX / s, -offY / s, FrameW / s, FrameH / s);
             int outW = (int)Math.Clamp(src.Width, 392, 1176);

@@ -11,16 +11,11 @@
     <UserControl.Resources>
         <x:Double x:Key="NbCardWidth">196</x:Double>
         <x:Double x:Key="NbCardHeight">132</x:Double>
-        <!-- cell = card + hover/shadow slack (28/30); ApplyCardSize keeps all four in step -->
         <x:Double x:Key="NbCardCellWidth">224</x:Double>
         <x:Double x:Key="NbCardCellHeight">162</x:Double>
     </UserControl.Resources>
 
     <UserControl.Styles>
-        <!-- Rename fields: flat at rest (they read as headings), but hover hints and focus shows a
-             REAL box + accent ring so the editing surface is unmissable (owner report). Neutral
-             gray-alpha fills read on light paper AND dark frame; border thickness stays 1 at rest
-             (brush transparent) so focusing never shifts the text. -->
         <Style Selector="TextBox.rename">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}"/>
@@ -36,21 +31,15 @@
             <Setter Property="Background" Value="#26808080"/>
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
         </Style>
-        <!-- rail chips. The item STRETCHES to the full rail width (not just the 36px chip) and centres
-             the chip inside — the GPU compositor clips a scaled element to its layout SLOT, so the chip
-             needs a slot bigger than itself or the selected scale + glow get clipped off. -->
         <Style Selector="ListBox.rail ListBoxItem">
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Margin" Value="0,2"/>
             <Setter Property="CornerRadius" Value="12"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <!-- Taller than the 36px chip + centred, so the selected scale + glow have VERTICAL slack
-                 too (the item is the chip's layout slot; without this the scale clips top/bottom). -->
             <Setter Property="MinHeight" Value="48"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
-        <!-- The full-width rail item must show NO selection/hover fill — only the chip. -->
         <Style Selector="ListBox.rail ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="Transparent"/>
         </Style>
@@ -60,12 +49,8 @@
         <Style Selector="ListBox.rail ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="Transparent"/>
         </Style>
-        <!-- selected notebook: gentle scale + a very faint glow in the notebook's OWN color -->
         <Style Selector="ListBox.rail ListBoxItem Border.railchip">
             <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
-            <!-- Identity baseline: a TransformOperationsTransition won't fire the FIRST time the
-                 :selected scale is applied unless the element already holds a TransformOperations
-                 value. Without this the selected chip only scales after it's been re-touched. -->
             <Setter Property="RenderTransform" Value="scale(1)"/>
             <Setter Property="Transitions">
                 <Transitions>
@@ -74,43 +59,29 @@
                 </Transitions>
             </Setter>
         </Style>
-        <!-- scale is driven from code-behind (UpdateSelectionScale); the glow works via the style path -->
         <Style Selector="ListBox.rail ListBoxItem:selected Border.railchip">
             <Setter Property="BoxShadow" Value="{ReflectionBinding Color, Converter={x:Static v:Converters.GlowShadow}}"/>
         </Style>
-        <!-- page rows. Horizontal margin gives the selected scale + glow room so they don't clip
-             against the panel edges (the item is clipped to its layout slot). -->
         <Style Selector="ListBox.pages ListBoxItem">
             <Setter Property="Padding" Value="9,6"/>
             <Setter Property="Margin" Value="7,3"/>
             <Setter Property="CornerRadius" Value="8"/>
             <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
         </Style>
-        <!-- scale driven from code-behind (UpdateSelectionScale); glow via the style path -->
         <Style Selector="ListBox.pages ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="BoxShadow" Value="{DynamicResource AccentGlowShadow}"/>
         </Style>
-        <!-- section tabs. Symmetric margin so the selected scale + glow have room top & bottom too. -->
         <Style Selector="ListBox.sections ListBoxItem">
             <Setter Property="Padding" Value="10,4"/>
             <Setter Property="Margin" Value="3,4,5,4"/>
             <Setter Property="CornerRadius" Value="8"/>
             <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
         </Style>
-        <!-- scale driven from code-behind (UpdateSelectionScale); glow via the style path -->
         <Style Selector="ListBox.sections ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="BoxShadow" Value="{DynamicResource AccentGlowShadow}"/>
         </Style>
-        <!-- homepage notebook cards. Hover/grab SCALE lives on Border.nbcard; the rearrange WIGGLE
-             lives on the separate Border.wigglewrap parent — a keyframe Animation targeting
-             RotateTransform.Angle forces its host's RenderTransform to a RotateTransform, which
-             would break a TransformOperations scale transition on the same element. Compositor
-             layers clip to the layout SLOT, so the shadow (static underlay) + growth fit the cell. -->
         <Style Selector="Border.nbcard">
             <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
-            <!-- Identity baseline: without an initial TransformOperations value the
-                 TransformOperationsTransition swallows the FIRST :pointerover scale (hover appears
-                 dead until a local transform has primed the property, e.g. after a grab). -->
             <Setter Property="RenderTransform" Value="scale(1)"/>
             <Setter Property="Transitions">
                 <Transitions>
@@ -118,11 +89,6 @@
                 </Transitions>
             </Setter>
         </Style>
-        <!-- Hover SCALE is applied from code-behind (SetHoverCard) as a LOCAL RenderTransform: the
-             :pointerover STYLE path does not drive RenderTransform in this build (other properties
-             like Opacity apply fine, RenderTransform stays pinned at identity), whereas a local
-             value — the same mechanism the grab-pop uses — works. The transition below animates it. -->
-        <!-- "Glossy accents" preference: top-lit gloss on chips + selected pills -->
         <Style Selector="Border.chipfx">
             <Setter Property="IsVisible" Value="False"/>
         </Style>
@@ -132,24 +98,18 @@
         <Style Selector="ListBox.glossy ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource AccentGradientBrush}"/>
         </Style>
-        <!-- "Jump back in" chips: scale hover, with symmetric margin slack so the grown render
-             stays inside the layout slot (no compositor clip). -->
         <Style Selector="Border.recentchip">
             <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
-            <Setter Property="RenderTransform" Value="scale(1)"/>   <!-- identity baseline; see nbcard -->
-            <Setter Property="Transitions">
+            <Setter Property="RenderTransform" Value="scale(1)"/>            <Setter Property="Transitions">
                 <Transitions>
                     <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" Easing="CubicEaseOut"/>
                     <BrushTransition Property="BorderBrush" Duration="0:0:0.12"/>
                 </Transitions>
             </Setter>
         </Style>
-        <!-- BorderBrush accent via :pointerover works (non-transform property); the SCALE is applied
-             from code-behind (SetHoverChip) as a local RenderTransform, see the nbcard note above. -->
         <Style Selector="Border.recentchip:pointerover">
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
         </Style>
-        <!-- Rearrange mode: Apple-style wiggle (on the wrapper) + grab hand cursor (on the card) -->
         <Style Selector="ItemsControl.rearrange Border.nbcard">
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
@@ -163,15 +123,12 @@
                 </Animation>
             </Style.Animations>
         </Style>
-        <!-- "Flat covers" preference: the gloss overlays vanish, shadow + caption scrim stay -->
         <Style Selector="ItemsControl.flat Border.cardfx">
             <Setter Property="IsVisible" Value="False"/>
         </Style>
         <Style Selector="ListBox.flat Border.cardfx">
             <Setter Property="IsVisible" Value="False"/>
         </Style>
-        <!-- inline rename box (section tab) — only exists WHILE editing, so it always wears the
-             full editing box: gray fill + accent ring (was a near-invisible white-alpha) -->
         <Style Selector="TextBox.inlineedit">
             <Setter Property="Padding" Value="2,0"/>
             <Setter Property="MinHeight" Value="0"/>
@@ -187,17 +144,10 @@
     </UserControl.Styles>
 
     <Panel>
-    <!-- AppRoot wraps ALL regular content so the rename overlay can blur it as one visual
-         (the overlay is its SIBLING and stays sharp). -->
     <Grid x:Name="AppRoot" RowDefinitions="38,*">
 
-        <!-- Glass tint: a veil UNDER all content that lightens/darkens what the acrylic shows
-             through (prefs slider). First child = bottom of z-order; hidden only when the theme
-             shows no acrylic at all (GlassWindow false) — solid frames with Full theme OFF still
-             show it through the glass page box. -->
         <Border x:Name="GlassTintVeil" Grid.RowSpan="2" IsVisible="False" IsHitTestVisible="False"/>
 
-        <!-- ============ Title bar ============ -->
         <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto" x:Name="TitleBar" Background="{DynamicResource FrameBackgroundBrush}">
             <StackPanel x:Name="TitleLeft" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0" Spacing="9">
                 <Border Width="22" Height="22" CornerRadius="7" Background="{DynamicResource AccentBrush}">
@@ -232,15 +182,10 @@
             </StackPanel>
         </Grid>
 
-        <!-- ============ Body: homepage gallery OR the editor (toolbar + rail | nav | canvas) ============ -->
         <Panel Grid.Row="1">
 
-        <!-- Homepage: the notebook gallery -->
         <ScrollViewer x:Name="HomeHost" VerticalScrollBarVisibility="Auto"
                       Background="{DynamicResource CanvasBackgroundBrush}">
-            <!-- Content column grows with the window (a stretched column auto-centers once it hits
-                 MaxWidth), capped so it never stretches edge-to-edge on very wide screens — fills
-                 fullscreen without feeling empty, and the card grid flows more columns as it widens. -->
             <StackPanel Margin="48,26,48,32" Spacing="20" MaxWidth="1560">
                 <Grid ColumnDefinitions="*,Auto">
                     <StackPanel Spacing="3" VerticalAlignment="Center">
@@ -268,7 +213,6 @@
                         </Button>
                     </StackPanel>
                 </Grid>
-                <!-- recently edited pages, one click from anywhere -->
                 <StackPanel Spacing="8" IsVisible="{Binding HasRecents}">
                     <TextBlock Text="JUMP BACK IN" FontSize="11" FontWeight="SemiBold"
                                Foreground="{DynamicResource CanvasTextMutedBrush}"/>
@@ -278,8 +222,6 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:RecentPage">
-                                <!-- symmetric margin gives the hover-scale slack on ALL sides (with 0 top/left
-                                     the scale overflowed off the top-left and clipped) -->
                                 <Border Classes="recentchip" Margin="5,5,13,13" CornerRadius="10"
                                         Background="{DynamicResource CanvasChipBrush}"
                                         BorderBrush="{DynamicResource CanvasChipBorderBrush}" BorderThickness="1"
@@ -317,20 +259,11 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="models:Notebook">
-                            <!-- Fixed cell sized so EVERYTHING (static shadow halo + hover growth) fits fully
-                                 inside it — nothing ever draws past the item boundary, so nothing can clip.
-                                 ALL FOUR dimensions follow the Cover-size pref (cell = card + slack), or the
-                                 halo detaches and Large cards overlap their neighbours. -->
                             <Panel Width="{DynamicResource NbCardCellWidth}" Height="{DynamicResource NbCardCellHeight}" Margin="0,0,2,2">
                                 <Border Width="{DynamicResource NbCardWidth}" Height="{DynamicResource NbCardHeight}"
                                         HorizontalAlignment="Center" VerticalAlignment="Center"
                                         CornerRadius="14" Background="#01000000" IsHitTestVisible="False"
                                         BoxShadow="0 2 10 0 #59000000"/>
-                                <!-- wiggle wrapper: rotates in rearrange mode, leaving the card's own
-                                     RenderTransform free for hover / grab scale. It fills the WHOLE cell
-                                     so the nbcard, centred inside it, keeps ~14px of slack on every side —
-                                     a transitioned element is clipped to its layout SLOT, so without that
-                                     slack the hover growth is clipped away (invisible). -->
                                 <Border Classes="wigglewrap"
                                         Width="{DynamicResource NbCardCellWidth}" Height="{DynamicResource NbCardCellHeight}"
                                         HorizontalAlignment="Center" VerticalAlignment="Center" Background="Transparent">
@@ -341,10 +274,8 @@
                                         Background="{Binding Color, Converter={x:Static v:Converters.HexBrush}}"
                                         BorderBrush="{Binding Color, Converter={x:Static v:Converters.CoverBorder}}">
                                     <Panel>
-                                        <!-- optional photo cover (rounded via brush fill, sits under the scrim) -->
                                         <Border CornerRadius="13"
                                                 Background="{Binding CoverPath, Converter={x:Static v:Converters.CoverImage}}"/>
-                                        <!-- top-lit gloss + hairline: hidden by the "Flat covers" preference -->
                                         <Border Classes="cardfx" CornerRadius="13" BorderThickness="0,1,0,0" BorderBrush="#38FFFFFF">
                                             <Border.Background>
                                                 <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
@@ -354,7 +285,6 @@
                                                 </LinearGradientBrush>
                                             </Border.Background>
                                         </Border>
-                                        <!-- caption scrim: always on (keeps labels readable on photos and flat covers) -->
                                         <Border CornerRadius="13">
                                             <Border.Background>
                                                 <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
@@ -386,11 +316,8 @@
             </StackPanel>
         </ScrollViewer>
 
-        <!-- Floating drag layer: the card being dragged is rendered here (as a snapshot) so it can
-             move freely without being clipped to its grid cell. Sits above the gallery, ignores input. -->
         <Canvas x:Name="DragLayer" IsHitTestVisible="False" IsVisible="{Binding IsHomeVisible}" ClipToBounds="False"/>
 
-        <!-- Preferences, homepage style: a proper filled button floating bottom-right -->
         <Button x:Name="HomePrefsBtn" Theme="{StaticResource LumenButton}"
                 IsVisible="{Binding IsHomeVisible}"
                 HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,24,20">
@@ -404,7 +331,6 @@
         <v:FormatToolbar x:Name="Toolbar" DockPanel.Dock="Top"/>
         <Grid ColumnDefinitions="Auto,Auto,Auto,*">
 
-            <!-- Notebooks rail -->
             <Border x:Name="RailPanel" Grid.Column="0" Width="64" ClipToBounds="True"
                     Background="{DynamicResource FrameBackgroundBrush}"
                     BorderBrush="{DynamicResource FrameBorderBrush}" BorderThickness="0,0,1,0">
@@ -412,10 +338,6 @@
                     <Button x:Name="RailAddBtn" DockPanel.Dock="Bottom" Theme="{StaticResource IconButton}" Width="40" Height="40"
                             HorizontalAlignment="Center" Margin="0,8,0,0" FontFamily="{StaticResource IconFont}"
                             Content="&#xE710;" ToolTip.Tip="New notebook"/>
-                    <!-- No outer ScrollViewer: it reserved scrollbar width, which shrank + shifted the
-                         chips and clipped their left edge. The ListBox scrolls itself with an OVERLAY
-                         scrollbar that doesn't reserve space, so the 40px chips stay centred in the 64px
-                         rail with room for the selected scale + glow. -->
                     <ListBox x:Name="NotebooksList" Classes="rail" Background="Transparent" BorderThickness="0"
                              Padding="0,8" ClipToBounds="False"
                              ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -424,8 +346,6 @@
                              SelectedItem="{Binding SelectedNotebook, Mode=TwoWay}">
                             <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="models:Notebook">
-                                    <!-- 36px (was 40) so the selected scale + glow keep margin from the
-                                         rail's right scrollbar zone whether it overlays or reserves width. -->
                                     <Border Classes="railchip" Width="36" Height="36" CornerRadius="11" BorderThickness="1"
                                             Background="{Binding Color, Converter={x:Static v:Converters.HexBrush}}"
                                             BorderBrush="{Binding Color, Converter={x:Static v:Converters.CoverBorder}}"
@@ -451,7 +371,6 @@
                 </DockPanel>
             </Border>
 
-            <!-- Sections as their OWN sidebar (preference; hidden = sections live in the pages panel) -->
             <Border x:Name="SectionsSidebar" Grid.Column="1" Width="152" IsVisible="False" ClipToBounds="True"
                     Background="{DynamicResource FrameBackgroundBrush}"
                     BorderBrush="{DynamicResource FrameBorderBrush}" BorderThickness="0,0,1,0">
@@ -477,7 +396,6 @@
                 </DockPanel>
             </Border>
 
-            <!-- Sections + pages -->
             <Border x:Name="PagesPanel" Grid.Column="2" Width="224" ClipToBounds="True"
                     Background="{DynamicResource FrameBackgroundBrush}"
                     BorderBrush="{DynamicResource FrameBorderBrush}" BorderThickness="0,0,1,0">
@@ -538,16 +456,11 @@
               </Panel>
             </Border>
 
-            <!-- Page area: an OPAQUE canvas plate with a rounded HOLE punched under the page box
-                 (clip set in code), so the acrylic backdrop blurs through the page ONLY — solid
-                 themes get a real-glass page with solid surroundings. -->
             <Panel Grid.Column="3">
             <Border x:Name="CanvasPlate" Background="{DynamicResource CanvasBackgroundBrush}"/>
-            <!-- Page: title + freeform canvas of note containers -->
             <Border x:Name="PageBoxSurface" Margin="14" CornerRadius="{DynamicResource RadiusPage}"
                     Background="{DynamicResource PaperBackgroundBrush}" BorderBrush="{DynamicResource PaperBorderBrush}" BorderThickness="1">
                 <Panel>
-                <!-- per-notebook paper tint: a translucent veil over the paper, under the content -->
                 <Border x:Name="PaperTintVeil" CornerRadius="{DynamicResource RadiusPageInner}" IsVisible="False" IsHitTestVisible="False"/>
                 <DockPanel x:Name="PageDock">
                     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="26,22,26,0"
@@ -567,7 +480,6 @@
                                 IsVisible="{Binding DeletedHistory}" ToolTip.Tip="Deleted containers"/>
                     </Grid>
 
-                    <!-- Mind-map toolbar: shown only on Mindmap pages (built in code-behind). -->
                     <Border x:Name="MindmapBar" DockPanel.Dock="Top" IsVisible="False"
                             Margin="26,10,26,0" Padding="5,3" CornerRadius="9"
                             HorizontalAlignment="Left" UseLayoutRounding="True"
@@ -580,13 +492,10 @@
                     <Panel>
                         <ScrollViewer x:Name="CanvasScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                                       Margin="16,12,16,16">
-                            <!-- Ctrl+wheel zoom (M8 Part 6): a LAYOUT transform, so the scrollbars
-                                 track the scaled size; Ctrl+0 resets. -->
                             <LayoutTransformControl x:Name="CanvasZoomHost">
                                 <editor:NoteCanvas x:Name="PageCanvas"/>
                             </LayoutTransformControl>
                         </ScrollViewer>
-                        <!-- Tagged notes (M11): every tagged line in the notebook, click to jump -->
                         <Border x:Name="TagsPanel" IsVisible="False" Width="252"
                                 HorizontalAlignment="Right" VerticalAlignment="Stretch" Margin="0,10,12,12"
                                 CornerRadius="10" Background="#E8191B24"
@@ -602,7 +511,6 @@
                                 </ScrollViewer>
                             </DockPanel>
                         </Border>
-                        <!-- Deleted-containers history: drag a card onto the page to bring it back -->
                         <Border x:Name="TrashPanel" IsVisible="False" Width="238"
                                 HorizontalAlignment="Right" VerticalAlignment="Stretch" Margin="0,10,12,12"
                                 CornerRadius="10" Background="#E8191B24"
@@ -620,7 +528,6 @@
                         </Border>
                     </Panel>
                 </DockPanel>
-                <!-- PDF page: the viewer/annotator embeds right in the page box, replacing the note surface -->
                 <v:PdfViewer x:Name="PagePdfViewer" IsVisible="False" ClipToBounds="True"/>
                 </Panel>
             </Border>
@@ -631,8 +538,6 @@
         </Panel>
     </Grid>
 
-    <!-- Zoomed rename: everything behind blurs (AppRoot gets a BlurEffect from code), a veil dims,
-         and the rename box sits big and centered — Enter/click-away saves, Esc cancels. -->
     <Panel x:Name="RenameOverlay" IsVisible="False">
         <Border x:Name="RenameVeil" Background="#66000000"/>
         <Border x:Name="RenameCard" Width="460" HorizontalAlignment="Center" VerticalAlignment="Center"

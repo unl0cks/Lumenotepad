@@ -1,13 +1,3 @@
-# Packs the Windows portable build from `dotnet publish` output.
-#
-# Input:  src/Lumenotepad/bin/Release/net10.0/win-x64/publish   (created by publish-windows.sh)
-# Output: dist/Lumenotepad-<version>-win-x64-portable.zip
-#
-# PORTABLE, deliberately - not an installer. On Windows the app keeps all user data in a `userdata`
-# folder beside its own assemblies (see AppSettings.DefaultDir), so installing into Program Files would
-# put notebooks somewhere a non-admin process cannot write and saving would fail. An MSI/Inno installer
-# would first require moving the Windows data directory to %APPDATA%, which is a migration for anyone
-# already running a portable copy - a decision, not a packaging detail.
 import os
 import re
 import sys
@@ -17,13 +7,11 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 CSPROJ = os.path.join(ROOT, "src", "Lumenotepad", "Lumenotepad.csproj")
 DIST = os.path.join(ROOT, "dist")
 
-
 def csproj_version() -> str:
     m = re.search(r"<Version>([^<]+)</Version>", open(CSPROJ, encoding="utf-8").read())
     if not m:
         sys.exit("no <Version> in Lumenotepad.csproj")
     return m.group(1).strip()
-
 
 VERSION = sys.argv[1] if len(sys.argv) > 1 else csproj_version()
 FOLDER = f"Lumenotepad-{VERSION}-win-x64"
@@ -67,9 +55,8 @@ BETA
   This is a beta. It is the same codebase as the macOS build and gets the
   same fixes, but the Windows packaging has had less real-world mileage.
   Back up anything you would be upset to lose:
-  Preferences > General > Saving has a backup folder setting.
+  Preferences > Data & tools has a backup folder setting.
 """
-
 
 def main() -> None:
     pub = os.path.join(ROOT, "src", "Lumenotepad", "bin", "Release", "net10.0", "win-x64", "publish")
@@ -84,14 +71,12 @@ def main() -> None:
             for name in files:
                 full = os.path.join(base, name)
                 rel = os.path.relpath(full, pub).replace("\\", "/")
-                # Everything lives under one folder so extracting never scatters 200 files loose.
                 zf.write(full, f"{FOLDER}/{rel}")
                 count += 1
         zf.writestr(f"{FOLDER}/README.txt", README)
     size = os.path.getsize(out)
     print(f"  win-x64: {count} files, {size / 1024 / 1024:.1f} MB -> {os.path.basename(out)}")
     print("Now run:  python tools/publish-manifest.py   (writes the shared update manifest)")
-
 
 if __name__ == "__main__":
     main()

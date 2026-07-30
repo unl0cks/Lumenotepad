@@ -5,26 +5,18 @@ using Avalonia.Media;
 
 namespace Lumenotepad.Controls;
 
-/// <summary>
-/// A rounded rectangle with continuous "squircle" corners — straight edges that blend smoothly into
-/// superellipse corner arcs (the iOS-style shape), instead of circular-arc corners. This looks right at
-/// any aspect ratio: short wide rows stay rectangular with smoothly-rounded ends rather than bowing into a
-/// lens. The attached <see cref="EnabledProperty"/> clips any control to the shape (kept in sync as it
-/// resizes); <see cref="RadiusProperty"/> optionally overrides the auto corner radius.
-/// </summary>
 public static class Squircle
 {
-    /// <summary>Corner superellipse exponent (4 ≈ the Apple squircle; higher → closer to a circular corner).</summary>
+
     public const double Exponent = 4.0;
 
-    /// <summary>Rounded rectangle (w × h) with squircle corners of the given radius (clamped to fit).</summary>
     public static Geometry RoundedSquircle(double w, double h, double radius, double n = Exponent, int perCorner = 14)
     {
         double r = Math.Max(0, Math.Min(radius, Math.Min(w, h) / 2));
         var geo = new StreamGeometry();
         using (var ctx = geo.Open())
         {
-            if (r < 0.75)   // effectively a plain rectangle
+            if (r < 0.75)
             {
                 ctx.BeginFigure(new Point(0, 0), true);
                 ctx.LineTo(new Point(w, 0));
@@ -35,11 +27,11 @@ public static class Squircle
             }
 
             bool started = false;
-            // Clockwise: TR corner, right edge, BR corner, bottom edge, BL corner, left edge, TL corner, top edge.
-            Corner(ctx, w - r, r, +1, -1, true, r, n, perCorner, ref started);   // top-right
-            Corner(ctx, w - r, h - r, +1, +1, false, r, n, perCorner, ref started); // bottom-right
-            Corner(ctx, r, h - r, -1, +1, true, r, n, perCorner, ref started);   // bottom-left
-            Corner(ctx, r, r, -1, -1, false, r, n, perCorner, ref started);      // top-left
+
+            Corner(ctx, w - r, r, +1, -1, true, r, n, perCorner, ref started);
+            Corner(ctx, w - r, h - r, +1, +1, false, r, n, perCorner, ref started);
+            Corner(ctx, r, h - r, -1, +1, true, r, n, perCorner, ref started);
+            Corner(ctx, r, r, -1, -1, false, r, n, perCorner, ref started);
             ctx.EndFigure(true);
         }
         return geo;
@@ -60,11 +52,9 @@ public static class Squircle
         }
     }
 
-    // ---- attached "clip this control to a squircle" properties ----
     public static readonly AttachedProperty<bool> EnabledProperty =
         AvaloniaProperty.RegisterAttached<Control, bool>("Enabled", typeof(Squircle));
 
-    /// <summary>Explicit corner radius. NaN (default) = auto (a fraction of the short side, capped).</summary>
     public static readonly AttachedProperty<double> RadiusProperty =
         AvaloniaProperty.RegisterAttached<Control, double>("Radius", typeof(Squircle), double.NaN);
 

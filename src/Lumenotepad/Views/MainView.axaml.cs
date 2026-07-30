@@ -34,53 +34,44 @@ public partial class MainView : UserControl
         MaxBtn.Click += (_, _) => { if (Window is { } w) w.WindowState = w.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized; };
         CloseBtn.Click += (_, _) => Window?.Close();
 
-        // macOS keeps its NATIVE window shell (traffic lights top-left, real fullscreen), so our custom
-        // caption buttons are redundant — hide them — and shift the logo/title right so it clears the
-        // traffic lights that now float over our extended title-bar band.
         if (!System.OperatingSystem.IsWindows())
         {
             CaptionButtons.IsVisible = false;
             TitleLeft.Margin = new Thickness(78, 0, 0, 0);
         }
 
-        // Header rename fields (notebook, page) commit on blur / Enter.
         foreach (var box in new[] { NotebookName, PageTitle })
         {
             box.LostFocus += (_, _) => Vm?.Save();
             box.KeyDown += (s, e) => { if (e.Key == Key.Enter) { Vm?.Save(); ((Control?)s)?.Focus(); } };
         }
 
-        // The canvas edits the selected page's document.
         DataContextChanged += (_, _) => HookVm();
 
-        // The toolbar follows whichever note container was focused last; dock menu re-docks it (persisted).
         PageCanvas.ActiveEditorChanged += ed => { if (ed is not null) Toolbar.Target = ed; RefreshMindmapRings(); };
 
         BuildMindmapBar();
 
-        // A freshly downloaded font (font installer) should appear in the toolbar menu right away.
         Services.AppFonts.InstalledChanged += () =>
         {
             if (Vm is { } fvm) Toolbar.SetFontPrefs(fvm.ExtendedFonts, fvm.DisabledFontsList);
         };
 
-        // Deleting a container asks first; the deleted history panel lists what can come back.
         PageCanvas.ConfirmDelete = () =>
             Vm is { ConfirmDeleteContainer: false }
                 ? System.Threading.Tasks.Task.FromResult(true)
                 : ConfirmDialog.Show(Window!,
                     "Delete this container?",
                     PageCanvas.HistoryEnabled
-                        ? "It will move to this page's deleted history — you can drag it back onto the page anytime."
+                        ? "It moves to this page's deleted history. You can drag it back onto the page whenever you want."
                         : "The deleted history is turned off, so this can't be undone.");
         PageCanvas.TrashChanged += () => { if (TrashPanel.IsVisible) RefreshTrashPanel(); };
-        PageCanvas.OpenPdfRequested = path =>   // PDF attachments open in the in-app viewer/annotator
+        PageCanvas.OpenPdfRequested = path =>
         {
             var viewer = new PdfViewerWindow(path, Vm?.DoubleClickCreate ?? false);
             if (Window is { } w) viewer.Show(w); else viewer.Show();
         };
 
-        // The section/page "+" buttons open an Add / Rearrange / Open-as-PDF menu.
         SectionsAddBtn.Click += (_, _) => OpenSectionsMenu(SectionsAddBtn);
         SideSectionsAddBtn.Click += (_, _) => OpenSectionsMenu(SideSectionsAddBtn);
         PagesAddBtn.Click += (_, _) => OpenPagesMenu(PagesAddBtn);
@@ -89,7 +80,7 @@ public partial class MainView : UserControl
             TrashPanel.IsVisible = !TrashPanel.IsVisible;
             if (TrashPanel.IsVisible) { TagsPanel.IsVisible = false; RefreshTrashPanel(); }
         };
-        // Tagged notes: the two side panels share the page's right edge — opening one closes the other.
+
         TagsBtn.Click += (_, _) =>
         {
             TagsPanel.IsVisible = !TagsPanel.IsVisible;
@@ -104,11 +95,9 @@ public partial class MainView : UserControl
         Toolbar.InsertTableRequested += InsertTable;
         Toolbar.InsertPdfRequested += async () => await InsertPdfAsync();
 
-        // Section/page rename: double-click, the rename button, or right-click → Rename — all open
-        // the zoomed rename overlay (the background blurs until the name is saved).
         RenameSectionBtn.Click += (_, _) => BeginRenameSection(Vm?.SelectedSection);
         SectionsList.DoubleTapped += (_, e) => BeginRenameSection((e.Source as StyledElement)?.DataContext as Section);
-        // Sections sidebar (preference): same rename / context behaviour as the in-panel list.
+
         SideRenameSectionBtn.Click += (_, _) => BeginRenameSection(Vm?.SelectedSection);
         SectionsSidebarList.DoubleTapped += (_, e) => BeginRenameSection((e.Source as StyledElement)?.DataContext as Section);
         SectionsSidebarList.ContextRequested += OnSectionsContextRequested;
@@ -120,13 +109,11 @@ public partial class MainView : UserControl
         };
         RenameVeil.PointerPressed += (_, _) => EndRenameOverlay(commit: true);
 
-        // Delete lives on the right-click menu now (no delete buttons), always behind an "are you sure" prompt.
         SectionsList.ContextRequested += OnSectionsContextRequested;
         NotebooksList.ContextRequested += OnNotebooksContextRequested;
         PagesList.ContextRequested += OnPagesContextRequested;
         NotebookName.ContextRequested += OnNotebookNameContextRequested;
 
-        // Homepage gallery: click a card to open it, right-click for open/rename/color/delete.
         HomeCards.AddHandler(TappedEvent, OnHomeCardTapped);
         HomeCards.ContextRequested += OnHomeCardContextRequested;
         RecentList.AddHandler(TappedEvent, (_, e) =>
@@ -139,27 +126,19 @@ public partial class MainView : UserControl
         HomePrefsBtn.Click += (_, _) => OpenPreferences();
         SortBtn.Click += (_, _) => OpenSortMenu();
 
-        // "New notebook" opens the wizard (M9) — the instant-create command remains for tests only.
         NewNotebookBtn.Click += (_, _) => OpenNotebookWizard();
         RailAddBtn.Click += (_, _) => OpenNotebookWizard();
 
-        // Rearrange mode: cards wiggle and can be dragged into new slots (click the button again to stop).
         RearrangeBtn.Click += (_, _) => SetRearranging(!_rearranging);
         HomeCards.AddHandler(PointerPressedEvent, OnRearrangePressed, RoutingStrategies.Tunnel);
         HomeCards.PointerMoved += OnRearrangeMoved;
         HomeCards.PointerReleased += OnRearrangeReleased;
 
-        // Hover scale — driven from code-behind as a local RenderTransform because the :pointerover
-        // STYLE path does not move RenderTransform in this build (SetHoverCard / SetHoverChip).
         HomeCards.PointerMoved += (_, e) => { if (_dragNotebook is null) SetHoverCard(Ancestor(e.Source, "nbcard")); };
         HomeCards.PointerExited += (_, _) => SetHoverCard(null);
         RecentList.PointerMoved += (_, e) => SetHoverChip(Ancestor(e.Source, "recentchip"));
         RecentList.PointerExited += (_, _) => SetHoverChip(null);
 
-        // Recycled containers keep whatever LOCAL Opacity/RenderTransform a Motion tween left on
-        // them (a deleted row collapsed to opacity 0, a cancelled rise…) — the next item presented
-        // in that container then renders INVISIBLE. Reset the visual state every time a container
-        // is (re)prepared; legit add-animations start AFTER this (posted at Background priority).
         foreach (var list in new ItemsControl[] { NotebooksList, SectionsList, SectionsSidebarList, PagesList, HomeCards })
             list.ContainerPrepared += (_, e) =>
             {
@@ -168,16 +147,12 @@ public partial class MainView : UserControl
                 e.Container.ClearValue(Visual.RenderTransformProperty);
             };
 
-        // Keep the canvas plate's punched hole aligned with the page box (margin 14, radius 14).
         CanvasPlate.SizeChanged += (_, _) => UpdateCanvasPlateClip();
 
-        // Guides + starter templates anchor to the visible page area (in CANVAS coordinates, so
-        // the zoom divides out).
         CanvasScroll.SizeChanged += (_, _) => PushCanvasViewport();
-        // The page glides like every other pane (SmoothScroll leaves Ctrl+wheel to the zoom below).
+
         SmoothScroll.Attach(CanvasScroll);
-        // Ctrl+wheel canvas zoom (M8 Part 6): 50%–200% in ×1.1 notches, Ctrl+0 resets. Shift+wheel pans the
-        // canvas horizontally. Tunnel so the ScrollViewer never also scrolls vertically on the same notch.
+
         CanvasScroll.AddHandler(PointerWheelChangedEvent, (_, e) =>
         {
             if (Services.Keymap.HasCommandStrict(e.KeyModifiers))
@@ -185,8 +160,7 @@ public partial class MainView : UserControl
                 SetCanvasZoom(_canvasZoom * (e.Delta.Y > 0 ? 1.1 : 1 / 1.1));
                 e.Handled = true;
             }
-            // Shift+wheel horizontal panning now runs through SmoothScroll (attached above) so it
-            // eases like every other scroll instead of jumping.
+
         }, RoutingStrategies.Tunnel);
         AddHandler(KeyDownEvent, (_, e) =>
         {
@@ -194,7 +168,6 @@ public partial class MainView : UserControl
             { SetCanvasZoom(1.0); e.Handled = true; }
         }, RoutingStrategies.Tunnel);
 
-        // Drag the pages panel's right edge to resize it (clamped); persists via the VM setting.
         bool panelDragging = false; double panelStartX = 0, panelStartW = 0;
         PagesResizeGrip.PointerPressed += (_, e) =>
         {
@@ -215,19 +188,15 @@ public partial class MainView : UserControl
             if (!panelDragging) return;
             panelDragging = false;
             e.Pointer.Capture(null);
-            if (Vm is { } pvm) pvm.PagesPanelWidth = PagesPanel.Width;   // persist once, on release
+            if (Vm is { } pvm) pvm.PagesPanelWidth = PagesPanel.Width;
         };
     }
 
-    // ---- transform animation (delegates to the shared Motion engine) ------------------------------
     private static double ScaleNow(Visual b) => b.RenderTransform?.Value is { } m && m.M11 > 0 ? m.M11 : 1;
-
-    // ---- hover scale (smooth, code-behind) --------------------------------------------------------
 
     private Border? _hoverCard;
     private Border? _hoverChip;
-    // Cards mid drop-glide: hover must NOT touch them, or its Tween cancels the glide (and its onDone,
-    // where the reorder happens) — which looked like "moving won't work" + the card popping.
+
     private readonly System.Collections.Generic.HashSet<Visual> _settling = new();
 
     private static Border? Ancestor(object? source, string cls)
@@ -239,7 +208,7 @@ public partial class MainView : UserControl
 
     private void SetHoverCard(Border? card)
     {
-        if (card is not null && _settling.Contains(card)) card = null;   // let the drop glide finish
+        if (card is not null && _settling.Contains(card)) card = null;
         if (ReferenceEquals(_hoverCard, card)) return;
         var old = _hoverCard;
         _hoverCard = card;
@@ -258,16 +227,12 @@ public partial class MainView : UserControl
         if (chip is not null) Motion.Tween(chip, 0, 0, ScaleNow(chip), 0, 0, 1.035, 150);
     }
 
-    // ---- selected-item scale (rail chip, section tab, page row) -----------------------------------
-    // The :selected STYLE can't move RenderTransform either, so the "lit" scale is driven here too.
     private Control? _selRail, _selSection, _selPage;
 
     private void ScaleSelect(ref Control? cur, Control? next, double scale)
     {
         if (ReferenceEquals(cur, next)) return;
-        // Always carry opacity to 1: one tween per element, so this CANCELS any in-flight rise-in
-        // on the same container — without opacity params the kill strands a just-added section/page
-        // at opacity ~0 (invisible until its container is re-prepared by leaving the notebook).
+
         if (cur is not null) Motion.Tween(cur, 0, 0, ScaleNow(cur), 0, 0, 1.0, 140,
                                           fromOpacity: cur.Opacity, toOpacity: 1);
         cur = next;
@@ -285,26 +250,21 @@ public partial class MainView : UserControl
         ScaleSelect(ref _selPage, Vm?.SelectedPage is { } pg ? PagesList.ContainerFromItem(pg) as Control : null, 1.02);
     }
 
-    // ---- gallery rearrange mode ----
-
     private bool _rearranging;
     private Notebook? _dragNotebook;
 
     private void SetRearranging(bool on)
     {
         _rearranging = on;
-        ResetDrag();                                    // never leave a card stranded mid-drag
+        ResetDrag();
         HomeCards.Classes.Set("rearrange", on);
         RearrangeBtn.Classes.Set("on", on);
     }
 
-    // The dragged card is rendered as a SNAPSHOT floating in DragLayer (a Canvas), so it can move
-    // freely without being clipped to its grid cell. The real card is hidden while it floats; the
-    // live reorder still runs on the real cards underneath so the grid reflows.
-    private Border? _ghost;        // floating snapshot
-    private Border? _dragCard;     // the real card, hidden during the drag
+    private Border? _ghost;
+    private Border? _dragCard;
     private Size _ghostSize;
-    private Point _grabOffset;     // cursor position relative to the ghost's top-left
+    private Point _grabOffset;
     private DispatcherTimer? _ghostTween;
 
     private void ResetDrag()
@@ -325,7 +285,7 @@ public partial class MainView : UserControl
 
         _dragNotebook = nb;
         _dragCard = card;
-        card.ClearValue(Visual.RenderTransformProperty);   // snapshot the card clean (no leftover hover scale)
+        card.ClearValue(Visual.RenderTransformProperty);
 
         var size = card.Bounds.Size;
         double scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1.0;
@@ -345,11 +305,9 @@ public partial class MainView : UserControl
             IsHitTestVisible = false,
         };
         DragLayer.Children.Add(_ghost);
-        card.Opacity = 0;                                  // the ghost stands in for it
+        card.Opacity = 0;
         if (ReferenceEquals(_hoverCard, card)) _hoverCard = null;
 
-        // Lift the ghost IN PLACE (centred on the card) so it doesn't jump to the cursor; then keep
-        // the grab point under the cursor as it moves.
         var centre = card.TranslatePoint(new Point(size.Width / 2, size.Height / 2), DragLayer) ?? default;
         Canvas.SetLeft(_ghost, centre.X - _ghostSize.Width / 2);
         Canvas.SetTop(_ghost, centre.Y - _ghostSize.Height / 2);
@@ -372,8 +330,6 @@ public partial class MainView : UserControl
         if (_dragNotebook is null || _ghost is null) return;
         PositionGhost(e.GetPosition(DragLayer));
 
-        // Live reorder: slide the OTHER cards out of the way as the cursor enters their slot. The
-        // dragged card's own (hidden) container moves too; the floating ghost shows where it is.
         var dragged = _dragNotebook;
         var container = HomeCards.ContainerFromItem(dragged);
         int curIdx = container is null ? -1 : HomeCards.IndexFromContainer(container);
@@ -401,7 +357,7 @@ public partial class MainView : UserControl
                 if (HomeCards.ItemFromContainer(c) is not { } it) continue;
                 var nbc = c.GetVisualDescendants().OfType<Border>().FirstOrDefault(x => x.Classes.Contains("nbcard"));
                 if (nbc is null) continue;
-                if (ReferenceEquals(it, dragged)) { nbc.Opacity = 0; _dragCard = nbc; continue; }  // keep it hidden after regen
+                if (ReferenceEquals(it, dragged)) { nbc.Opacity = 0; _dragCard = nbc; continue; }
                 if (!old.TryGetValue(it, out var op)) continue;
                 var np = Center(c);
                 double dx = op.X - np.X, dy = op.Y - np.Y;
@@ -422,7 +378,6 @@ public partial class MainView : UserControl
         Vm?.Save();
         if (ghost is null) { ResetDrag(); return; }
 
-        // Glide the ghost into the dragged card's (already-reordered) slot, then reveal the real card.
         var card = HomeCards.ContainerFromItem(dragged)?.GetVisualDescendants()
             .OfType<Border>().FirstOrDefault(x => x.Classes.Contains("nbcard"));
         Point targetTL;
@@ -445,8 +400,7 @@ public partial class MainView : UserControl
     private void TweenGhost(Border ghost, Point target, int ms, System.Action onDone)
     {
         _ghostTween?.Stop();
-        // The ghost runs its own timer (Canvas position, not a transform) — honor the reduce-motion
-        // pref here too so the drop snap matches the rest of the app.
+
         if (!Motion.Enabled)
         {
             Canvas.SetLeft(ghost, target.X);
@@ -491,11 +445,7 @@ public partial class MainView : UserControl
     {
         var b = CanvasPlate.Bounds;
         if (b.Width <= 30 || b.Height <= 30) { CanvasPlate.Clip = null; return; }
-        // The hole is inset 1.5px INSIDE the page box's border (margin 14, radius 14, 1px stroke):
-        // a hole cut exactly at the border line leaves an anti-aliased seam where the acrylic
-        // backdrop (the wallpaper) peeks between plate and border — a colored halo, worst at the
-        // rounded corners (owner report). Tucking the plate edge under the border hides the seam.
-        // Hole radius tracks the (roundness-scaled) page-box radius minus the 1.5px tuck-under.
+
         double holeR = System.Math.Max(1, System.Math.Round(14 * Services.ThemeManager.Roundness) - 1.5);
         var hole = new RectangleGeometry(new Rect(15.5, 15.5, b.Width - 31, b.Height - 31))
         {
@@ -542,7 +492,7 @@ public partial class MainView : UserControl
             ApplyBulletPrefs(rebuild: false);
             ApplyEditorPrefs(rebuild: false);
             SyncEditorDocument();
-            ApplyPdfPage();     // show the embedded viewer if the startup page is a PDF
+            ApplyPdfPage();
             ApplyToolbarPlacement();
             ApplyCanvasPrefs();
             ApplyPaperTint();
@@ -561,7 +511,6 @@ public partial class MainView : UserControl
         }
     }
 
-    /// <summary>Push the preferences-window canvas toggles onto the canvas.</summary>
     private void ApplyCanvasPrefs()
     {
         if (Vm is not { } vm) return;
@@ -574,17 +523,15 @@ public partial class MainView : UserControl
             "TopDown" => Editor.MindmapLayout.TopDown,
             _ => Editor.MindmapLayout.Radial,
         };
-        ApplyPageStyles();             // per-page effective styles (falls back to the global grid pref)
+        ApplyPageStyles();
         PageCanvas.SnapToGrid = vm.GridSnap;
         PageCanvas.CreateOnDoubleClick = vm.DoubleClickCreate;
         PdfViewer.RoundedPagePref = vm.RoundedPdfCorners;
-        PagePdfViewer.RefreshChrome();                 // re-round (or square) an already-open PDF
+        PagePdfViewer.RefreshChrome();
         if (!vm.DeletedHistory) TrashPanel.IsVisible = false;
         ApplyFlatCovers();
     }
 
-    /// <summary>Resolve the selected page's effective grid + page styles (page ?? notebook ?? global
-    /// pref) and push them onto the canvas guide layer.</summary>
     private void ApplyPageStyles()
     {
         if (Vm is not { } vm) return;
@@ -598,9 +545,6 @@ public partial class MainView : UserControl
         ApplyMindmapBar();
     }
 
-    // ---- mind-map toolbar (shown only on Mindmap pages) ----
-
-    /// <summary>Show/hide the mind-map toolbar with the page style, and reflect the active bubble's colour.</summary>
     private void ApplyMindmapBar()
     {
         bool on = PageCanvas.IsMindmap && !PagePdfViewer.IsVisible;
@@ -608,8 +552,6 @@ public partial class MainView : UserControl
         if (on) RefreshMindmapRings();
     }
 
-    /// <summary>Build the mind-map toolbar once in the app's icon-toolbar language: icon buttons,
-    /// group separators, and flyout pickers (colour / size / options) — matching the format toolbar.</summary>
     private void BuildMindmapBar()
     {
         MindmapBarContent.Children.Clear();
@@ -632,7 +574,7 @@ public partial class MainView : UserControl
             Background = this.FindResource("FrameBorderBrush") as IBrush, Opacity = 0.7,
         });
 
-        var addBubble = IconBtn("", "Add bubble — pick a type");
+        var addBubble = IconBtn("", "Add bubble: pick a type");
         addBubble.Flyout = BuildAddBubbleFlyout();
         MindmapBarContent.Children.Add(addBubble);
 
@@ -647,7 +589,6 @@ public partial class MainView : UserControl
 
         Sep();
 
-        // Colour: an icon button carrying a swatch underline of the current colour, opening a palette.
         var colourGlyph = new TextBlock
         {
             Text = "", FontFamily = iconFont, FontSize = 15,
@@ -670,8 +611,7 @@ public partial class MainView : UserControl
         ToolTip.SetTip(sizeBtn, "New bubble size");
         MindmapBarContent.Children.Add(sizeBtn);
 
-        // Paint bucket (fill tool): pick a colour, then click bubbles to recolour them; click again to stop.
-        var paintBtn = IconBtn("", "Paint bucket — pick a colour, then click bubbles to fill them", 15);
+        var paintBtn = IconBtn("", "Paint bucket: pick a colour, then click bubbles to fill them", 15);
         _paintBtn = paintBtn;
         var paintFlyout = BuildPaintFlyout();
         paintBtn.Click += (_, _) =>
@@ -688,7 +628,7 @@ public partial class MainView : UserControl
         center.Click += (_, _) => CentreMap();
         MindmapBarContent.Children.Add(center);
 
-        var tidy = IconBtn("", "Tidy up — arrange the map around the selected (or hub) bubble", 15);
+        var tidy = IconBtn("", "Tidy up: arrange the map around the selected (or hub) bubble", 15);
         tidy.Click += (_, _) => PageCanvas.TidyMindmap();
         MindmapBarContent.Children.Add(tidy);
 
@@ -699,7 +639,6 @@ public partial class MainView : UserControl
         RefreshMindmapRings();
     }
 
-    /// <summary>The canvas point at the centre of the current viewport (for "add here" actions).</summary>
     private (double X, double Y) CanvasCentre()
     {
         double x = (CanvasScroll.Offset.X + CanvasScroll.Bounds.Width / 2) / _canvasZoom;
@@ -707,7 +646,6 @@ public partial class MainView : UserControl
         return (x, y);
     }
 
-    /// <summary>Scroll so the bounding box of every bubble is centred in the viewport.</summary>
     private void CentreMap()
     {
         var bb = PageCanvas.ContentBounds();
@@ -718,9 +656,6 @@ public partial class MainView : UserControl
         CanvasScroll.Offset = new Vector(System.Math.Max(0, ox), System.Math.Max(0, oy));
     }
 
-    /// <summary>The palette flyout: a row of shades per family plus grayscale, and a "No colour" reset.</summary>
-    /// <summary>The "+" chooser: pick which bubble family to drop — a Title pill, an Information squircle,
-    /// or a Callout. Each row shows a little shape preview so the choice reads at a glance.</summary>
     private Flyout BuildAddBubbleFlyout()
     {
         var panel = new StackPanel { Spacing = 3, Margin = new Thickness(6), MinWidth = 224 };
@@ -742,7 +677,7 @@ public partial class MainView : UserControl
                     b.CornerRadius = new CornerRadius(999); b.BorderThickness = new Thickness(2); break;
                 case BubbleKind.Info:
                     b.CornerRadius = new CornerRadius(7); b.BorderThickness = new Thickness(1.6); break;
-                default:   // Callout: thick left stripe
+                default:
                     b.CornerRadius = new CornerRadius(3); b.BorderThickness = new Thickness(5, 1.2, 1.2, 1.2); break;
             }
             return b;
@@ -766,9 +701,9 @@ public partial class MainView : UserControl
             panel.Children.Add(btn);
         }
 
-        Row(BubbleKind.Title, "Title bubble", "Rounded pill, centred text — topics and headings.");
-        Row(BubbleKind.Info, "Information bubble", "Squircle card, left-aligned body text — details.");
-        Row(BubbleKind.Callout, "Callout", "Squarer card with a left accent bar — asides and quotes.");
+        Row(BubbleKind.Title, "Title bubble", "Rounded pill with centred text. Good for topics and headings.");
+        Row(BubbleKind.Info, "Information bubble", "Squircle card with left-aligned body text. Good for details.");
+        Row(BubbleKind.Callout, "Callout", "Squarer card with a left accent bar. Good for asides and quotes.");
         return flyout;
     }
 
@@ -805,7 +740,6 @@ public partial class MainView : UserControl
         return flyout;
     }
 
-    /// <summary>The S/M/L new-bubble-size menu.</summary>
     private MenuFlyout BuildSizeFlyout()
     {
         var mf = new MenuFlyout();
@@ -821,7 +755,6 @@ public partial class MainView : UserControl
         return mf;
     }
 
-    /// <summary>Toggles for connector style and the diagonal connect ports.</summary>
     private Flyout BuildOptionsFlyout()
     {
         var panel = new StackPanel { Spacing = 6, Margin = new Thickness(12, 9), MinWidth = 190 };
@@ -845,7 +778,6 @@ public partial class MainView : UserControl
         return flyout;
     }
 
-    /// <summary>Swatch hover: border turns accent (matches the format toolbar's swatch style).</summary>
     private static void SwatchHover(Border b)
     {
         var rest = b.BorderBrush;
@@ -870,7 +802,6 @@ public partial class MainView : UserControl
         return b;
     }
 
-    /// <summary>The paint-bucket colour picker: choosing a colour sets the fill colour and turns the tool on.</summary>
     private Flyout BuildPaintFlyout()
     {
         var panel = new StackPanel { Spacing = 5, Margin = new Thickness(8) };
@@ -900,7 +831,6 @@ public partial class MainView : UserControl
         return flyout;
     }
 
-    /// <summary>Accent-light the paint-bucket button while the fill tool is active.</summary>
     private void RefreshPaintButton()
     {
         if (_paintBtn is null) return;
@@ -909,13 +839,8 @@ public partial class MainView : UserControl
             : (this.FindResource("TextPrimaryBrush") as IBrush ?? Brushes.White);
     }
 
-    /// <summary>Kept as a no-op hook (the old colour-dot indicator was removed).</summary>
     private void RefreshMindmapRings() { }
 
-    /// <summary>Temporary Part-1 entry point (the Part-4 Page dialog supersedes it): set the style,
-    /// refresh the guides, and offer the starter containers — additive, never clears content.</summary>
-    /// <summary>Per-notebook paper tint: the selected notebook's PaperTint hex as a translucent
-    /// veil (fixed alpha keeps text readable on both light and dark paper).</summary>
     private void ApplyPaperTint()
     {
         var hex = Services.ThemePalettes.NormalizeHex(Vm?.SelectedNotebook?.PaperTint);
@@ -923,7 +848,6 @@ public partial class MainView : UserControl
         if (hex is not null) PaperTintVeil.Background = new SolidColorBrush(Color.Parse(hex), 0.22);
     }
 
-    /// <summary>"Flat covers": a class on the hosts hides every Border.cardfx gloss overlay.</summary>
     private void ApplyFlatCovers()
     {
         bool flat = Vm?.FlatCovers ?? false;
@@ -931,7 +855,6 @@ public partial class MainView : UserControl
         NotebooksList.Classes.Set("flat", flat);
     }
 
-    // ---- add / delete animations (list mutations rise in / collapse out) --------------------------
     private bool _notebooksHooked;
     private System.Collections.Specialized.INotifyCollectionChanged? _sections, _pages;
 
@@ -964,7 +887,6 @@ public partial class MainView : UserControl
     private void OnPagesChanged(object? s, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
     { RiseAdded(e, PagesList); }
 
-    /// <summary>Rise newly-added item containers in (ignores Move — that's the drag reflow).</summary>
     private void RiseAdded(System.Collections.Specialized.NotifyCollectionChangedEventArgs e, ItemsControl list)
     {
         if (e.Action != System.Collections.Specialized.NotifyCollectionChangedAction.Add || e.NewItems is null) return;
@@ -976,8 +898,6 @@ public partial class MainView : UserControl
         }, DispatcherPriority.Background);
     }
 
-    /// <summary>Collapse an item's container out, then run the actual delete. The container may be
-    /// RECYCLED for another item afterwards — restore its visual state once the delete has run.</summary>
     private void CollapseThenDelete(Control? container, System.Action delete)
     {
         if (container is null) { delete(); return; }
@@ -989,7 +909,6 @@ public partial class MainView : UserControl
         });
     }
 
-    /// <summary>Initial rail/pages panel state (no animation); the toggles animate via Motion.Reveal.</summary>
     private void ApplyPanels()
     {
         if (Vm is not { } vm) return;
@@ -997,16 +916,11 @@ public partial class MainView : UserControl
         PagesPanel.Width = vm.IsPagesVisible ? vm.PagesPanelWidth : 0; PagesPanel.Opacity = vm.IsPagesVisible ? 1 : 0;
     }
 
-    /// <summary>"Sections in their own sidebar" preference: when on, the sections list moves out of
-    /// the pages panel into a dedicated column, and the pages panel's inline sections header + list
-    /// hide (SelectedSection binding still drives both — they share the VM). Toggling slides the
-    /// column open/closed (width tween — RenderTransform styles are dead in this build); the initial
-    /// apply on startup snaps so launch doesn't play a slide.</summary>
     private void ApplySectionsSidebar(bool animate = false)
     {
         if (Vm?.SingleMode == true)
         {
-            // Single mode: no sections anywhere — the notebook is just pages.
+
             SectionsHeader.IsVisible = false;
             SectionsList.IsVisible = false;
             SectionsSidebar.IsVisible = false;
@@ -1025,7 +939,7 @@ public partial class MainView : UserControl
         }
         if (side)
         {
-            // Coming from hidden: start collapsed so the slide grows from 0, not from a stale width.
+
             if (!SectionsSidebar.IsVisible) { SectionsSidebar.Width = 0; SectionsSidebar.Opacity = 0; }
             SectionsSidebar.IsVisible = true;
             Motion.Reveal(SectionsSidebar, 152, show: true);
@@ -1033,15 +947,11 @@ public partial class MainView : UserControl
         }
         else
         {
-            Motion.Reveal(SectionsSidebar, 152, show: false);   // width 0 + clip = gone; stays laid out
-            Motion.RiseIn(SectionsList);                        // the inline list glides back in its place
+            Motion.Reveal(SectionsSidebar, 152, show: false);
+            Motion.RiseIn(SectionsList);
         }
     }
 
-    /// <summary>Initial home/editor surface state (no animation); the switch zooms in code (their
-    /// IsVisible bindings were removed so we control the fade timing). BOTH stay laid out — the hidden
-    /// one just sits at opacity 0 — so opening a notebook doesn't pay a first-time editor layout that
-    /// stalls the click.</summary>
     private void ApplyHomeSurface()
     {
         bool home = Vm?.IsHomeVisible ?? true;
@@ -1049,7 +959,6 @@ public partial class MainView : UserControl
         BodyDock.IsVisible = true; BodyDock.Opacity = home ? 0 : 1; BodyDock.IsHitTestVisible = !home;
     }
 
-    /// <summary>"Glossy accents": gloss on the recents chips + accent-gradient selected pills.</summary>
     private void ApplyGlossyAccents()
     {
         bool glossy = Vm?.GlossyAccents ?? true;
@@ -1057,13 +966,9 @@ public partial class MainView : UserControl
         SectionsList.Classes.Set("glossy", glossy);
         SectionsSidebarList.Classes.Set("glossy", glossy);
         PagesList.Classes.Set("glossy", glossy);
-        // NOT the rail: its item now stretches full-width, so the glossy accent-gradient selection
-        // fill would show as an ugly full-width blue bar. The rail chip shows its own colour + glow.
+
     }
 
-    /// <summary>Gallery card size pref → the DynamicResource doubles the card template consumes.
-    /// The CELL (and the shadow halo bound to the card size) must scale WITH the card — the cell
-    /// carries the hover-growth/shadow slack, and a fixed cell makes Large cards overlap.</summary>
     private void ApplyCardSize()
     {
         var (w, h) = (Vm?.CardSize) switch
@@ -1074,31 +979,22 @@ public partial class MainView : UserControl
         };
         Resources["NbCardWidth"] = w;
         Resources["NbCardHeight"] = h;
-        Resources["NbCardCellWidth"] = w + 28;    // same 28/30 slack the Medium layout always had
+        Resources["NbCardCellWidth"] = w + 28;
         Resources["NbCardCellHeight"] = h + 30;
     }
 
-    /// <summary>"Glass tint": white/black veil under all content, tinting whatever the acrylic
-    /// backdrop shows through. Hidden only when the theme shows no acrylic anywhere (GlassWindow
-    /// false, i.e. solid frame + Full theme) or at ~zero — solid+FullOff themes still show it
-    /// through the glass page box.</summary>
     private void ApplyGlassTint()
     {
         if (Vm is not { } vm) return;
         double t = System.Math.Clamp(vm.GlassTint, -1, 1);
         bool on = Services.ThemeManager.Current.GlassWindow && System.Math.Abs(t) > 0.01;
         GlassTintVeil.IsVisible = on;
-        // macOS frosts far brighter than the DWM acrylic, so the Windows-tuned 35% ceiling left the
-        // glass washed out even at -100% (tester: "-100% on the Mac looks like 30-35% on Windows").
-        // Give the mac a deeper range so the slider actually reaches a dark glass.
+
         double max = System.OperatingSystem.IsWindows() ? 0.35 : 0.82;
         if (on) GlassTintVeil.Background =
             new SolidColorBrush(t >= 0 ? Colors.White : Colors.Black, System.Math.Abs(t) * max);
     }
 
-    /// <summary>Re-seat every macOS frost layer on the newly chosen material. The material is a
-    /// property of the live NSVisualEffectView, so nothing needs rebuilding — but the windows do have
-    /// to be walked again, and the frost has to be re-pinned after any glass re-arm.</summary>
     private void RefreshMacMaterial()
     {
         if (System.OperatingSystem.IsWindows()) return;
@@ -1106,8 +1002,6 @@ public partial class MainView : UserControl
         Services.ThemeManager.RefreshMacChildGlass();
     }
 
-    /// <summary>Push the bullet/number prefs onto the editor statics; optionally rebuild the open
-    /// page so existing note boxes re-render with the new furniture.</summary>
     private void ApplyBulletPrefs(bool rebuild)
     {
         if (Vm is not { } vm) return;
@@ -1121,8 +1015,6 @@ public partial class MainView : UserControl
         if (rebuild) PageCanvas.Document = PageCanvas.Document;
     }
 
-    /// <summary>Push the editor prefs onto the shared statics; optionally rebuild so open note
-    /// boxes pick up caret color/width changes immediately.</summary>
     private void ApplyEditorPrefs(bool rebuild)
     {
         if (Vm is not { } vm) return;
@@ -1144,7 +1036,6 @@ public partial class MainView : UserControl
         if (rebuild) PageCanvas.Document = PageCanvas.Document;
     }
 
-    /// <summary>Push the motion prefs onto the shared engine (statics — affect every window).</summary>
     private void ApplyMotionPrefs()
     {
         if (Vm is not { } vm) return;
@@ -1152,7 +1043,6 @@ public partial class MainView : UserControl
         Motion.SpeedScale = vm.MotionSpeed switch { "Calm" => 1.4, "Snappy" => 0.6, _ => 1.0 };
     }
 
-    /// <summary>Place the toolbar per the VM: docked to a side of either the WINDOW body or the PAGE box.</summary>
     private void ApplyToolbarPlacement()
     {
         if (Vm is not { } vm) return;
@@ -1167,14 +1057,13 @@ public partial class MainView : UserControl
         if (!ReferenceEquals(Toolbar.Parent, host))
         {
             (Toolbar.Parent as Panel)?.Children.Remove(Toolbar);
-            host.Children.Insert(0, Toolbar);      // DockPanel: last child fills, so docked items go first
+            host.Children.Insert(0, Toolbar);
         }
         DockPanel.SetDock(Toolbar, dock);
         Toolbar.SetPlacement(dock, vm.ToolbarScope == "Page");
-        Motion.FadeIn(Toolbar, Motion.Base);       // fade the toolbar in on (re)placement
+        Motion.FadeIn(Toolbar, Motion.Base);
     }
 
-    // Debounced autosave: flush dirty page docs after ~0.9s of typing idle.
     private void OnDocsDirtied()
     {
         if (_autosave is null)
@@ -1190,42 +1079,35 @@ public partial class MainView : UserControl
 
     private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        // Selection changed (or the notebook/section swapped the list's ItemsSource) — re-assert the
-        // section/page ListBox selection so the :selected styling (scale + glow) shows by default.
+
         if (e.PropertyName is nameof(MainViewModel.SelectedNotebook)
             or nameof(MainViewModel.SelectedSection) or nameof(MainViewModel.SelectedPage))
             ReassertListSelection();
 
-        // Re-point the add-animation hooks at the current section/page collections.
         if (e.PropertyName == nameof(MainViewModel.SelectedNotebook))
-        { RehookSections(); ApplyPaperTint(); ApplyEditorPrefs(rebuild: true); TagsPanel.IsVisible = false; }   // chips reference the OLD notebook's pages
+        { RehookSections(); ApplyPaperTint(); ApplyEditorPrefs(rebuild: true); TagsPanel.IsVisible = false; }
         if (e.PropertyName == nameof(MainViewModel.SelectedSection)) RehookPages();
 
-        // Section switch: the repopulated pages list rises in instead of popping.
         if (e.PropertyName == nameof(MainViewModel.SelectedSection))
             Dispatcher.UIThread.Post(() => Motion.RiseIn(PagesList, Motion.Base), DispatcherPriority.Background);
 
         if (e.PropertyName == nameof(MainViewModel.SelectedPage))
         {
-            bool wasPdf = PagePdfViewer.IsVisible;   // capture BEFORE ApplyPdfPage flips the visibilities
-            ApplyPdfPage();     // PDF page → embedded viewer; note page → the canvas below
+            bool wasPdf = PagePdfViewer.IsVisible;
+            ApplyPdfPage();
             if (!string.IsNullOrEmpty(Vm?.SelectedPage?.PdfPath))
             {
-                // Switching TO a PDF: rise the viewer in like a note page instead of popping. Hide it
-                // NOW (synchronously) so it doesn't flash at full opacity for the frame before the
-                // Background-posted RiseIn snaps it to 0 — that flash is the "flicker".
+
                 PagePdfViewer.Opacity = 0;
                 Dispatcher.UIThread.Post(() => Motion.RiseIn(PagePdfViewer, Motion.Base), DispatcherPriority.Background);
             }
             else if (wasPdf)
             {
-                // Leaving the PDF viewer: PageDock was hidden, so fading it out would flash the STALE
-                // note doc for a frame first ("pops back to it, THEN animates"). Hide it, swap the doc
-                // while hidden, then rise the new page in — a clean reveal with no pop.
+
                 PageDock.Opacity = 0;
                 SyncEditorDocument();
             }
-            // Note → note: fade the current page out, THEN swap + rise the new one in.
+
             else if (PageCanvas.Document is not null) Motion.FadeOut(PageDock, Motion.Fast, SyncEditorDocument);
             else SyncEditorDocument();
         }
@@ -1239,13 +1121,13 @@ public partial class MainView : UserControl
             ApplyCanvasPrefs();
         else if (e.PropertyName == nameof(MainViewModel.CornerRoundness))
         {
-            UpdateCanvasPlateClip();                     // the punched hole follows the page radius
-            ApplyEditorPrefs(rebuild: true);             // canvas rebuild re-reads NoteRadiusPref
+            UpdateCanvasPlateClip();
+            ApplyEditorPrefs(rebuild: true);
         }
         else if (e.PropertyName == nameof(MainViewModel.SectionsSidebar))
             ApplySectionsSidebar(animate: true);
         else if (e.PropertyName == nameof(MainViewModel.SingleMode))
-            ApplySectionsSidebar();   // show/hide all section UI (the VM already restructured the tree)
+            ApplySectionsSidebar();
         else if (e.PropertyName == nameof(MainViewModel.FlatCovers))
             ApplyFlatCovers();
         else if (e.PropertyName == nameof(MainViewModel.GlossyAccents))
@@ -1284,55 +1166,45 @@ public partial class MainView : UserControl
         else if (e.PropertyName == nameof(MainViewModel.IsPagesVisible))
             Motion.Reveal(PagesPanel, Vm?.PagesPanelWidth ?? 224, Vm?.IsPagesVisible ?? true);
         else if (e.PropertyName == nameof(MainViewModel.PagesPanelWidth))
-            ApplyPanels();          // reset-to-defaults (or any programmatic width change) applies live
+            ApplyPanels();
         else if (e.PropertyName == nameof(MainViewModel.IsHomeVisible))
         {
-            if (_rearranging) SetRearranging(false);          // leaving home exits rearrange mode
+            if (_rearranging) SetRearranging(false);
             bool home = Vm?.IsHomeVisible ?? true;
             if (home && Vm is { } vm)
             {
-                // Card subtitles (counts) are converter-computed — re-realize on return home.
+
                 HomeCards.ItemsSource = null;
                 HomeCards.ItemsSource = vm.Notebooks;
             }
-            // Zoom: the incoming surface grows in from 0.95 while the outgoing one shrinks to 0.95 and
-            // fades — reads as "zoom into the notebook" / "shrink back to the gallery". Scales kept <=1
-            // so a full-screen surface never overflows + clips at the window edges. Quick (240ms).
+
             var show = home ? (Control)HomeHost : BodyDock;
             var hide = home ? (Control)BodyDock : HomeHost;
             const double small = 0.95;
             const int ms = 170;
             show.RenderTransformOrigin = hide.RenderTransformOrigin = Avalonia.RelativePoint.Center;
-            hide.IsHitTestVisible = false;                                 // both stay laid out (opacity only)
+            hide.IsHitTestVisible = false;
             Motion.Tween(hide, 0, 0, 1, 0, 0, small, ms, Motion.EaseOutSoft, 1, 0);
             show.IsHitTestVisible = true;
-            Motion.Tween(show, 0, 0, small, 0, 0, 1, ms + 40, Motion.EaseOutSoft, 0, 1);   // +40ms tail = soft landing
+            Motion.Tween(show, 0, 0, small, 0, 0, 1, ms + 40, Motion.EaseOutSoft, 0, 1);
         }
         else if (e.PropertyName is nameof(MainViewModel.Theme)
                  or nameof(MainViewModel.FullTheme) or nameof(MainViewModel.PaperLight)
                  or nameof(MainViewModel.CustomAccent) or nameof(MainViewModel.AccentFollowsNotebook))
         {
-            // Note containers read their paper-region brushes at construction — rebuild them.
+
             PageCanvas.Document = PageCanvas.Document;
             if (TrashPanel.IsVisible) RefreshTrashPanel();
-            if (Content is Control root) Motion.FadeIn(root, Motion.Fast);   // soft cross to the new theme
-            // Posted: MainWindow's own PropertyChanged handler updates ThemeManager.Current on this
-            // same VM event, and subscription order between the two views isn't guaranteed — read
-            // GlassWindow / the new paper tokens only after that handler has had a chance to run.
+            if (Content is Control root) Motion.FadeIn(root, Motion.Fast);
+
             Dispatcher.UIThread.Post(() =>
             {
                 ApplyGlassTint();
-                ApplyPdfBackdrop(PagePdfViewer.IsVisible);   // re-tint the PDF backdrop for the new theme
+                ApplyPdfBackdrop(PagePdfViewer.IsVisible);
             }, DispatcherPriority.Background);
         }
     }
 
-    /// <summary>
-    /// Avalonia's ListBox drops its bound selection when its nested ItemsSource swaps
-    /// (SelectedNotebook.Sections / SelectedSection.Pages): it coerces SelectedIndex to -1 and the
-    /// unchanged bound value never re-pushes, so the item never reads as :selected. Re-assert it once
-    /// the new containers have materialized so the default section/page light up without a click.
-    /// </summary>
     private void ReassertListSelection()
     {
         Dispatcher.UIThread.Post(() =>
@@ -1342,26 +1214,22 @@ public partial class MainView : UserControl
                 SectionsList.SelectedItem = sec;
             if (vm.SelectedPage is { } pg && !ReferenceEquals(PagesList.SelectedItem, pg))
                 PagesList.SelectedItem = pg;
-            UpdateSelectionScale();     // drive the "lit" scale (the style path can't move RenderTransform)
+            UpdateSelectionScale();
         }, DispatcherPriority.Background);
     }
 
     private void SyncEditorDocument()
     {
-        Vm?.FlushDirtyDocs();                      // the page being left saves immediately
-        PageCanvas.ImageRoot = Vm?.SelectedNotebookDir;   // set BEFORE Document so image boxes resolve
+        Vm?.FlushDirtyDocs();
+        PageCanvas.ImageRoot = Vm?.SelectedNotebookDir;
         PageCanvas.Document = Vm?.SelectedPage is { } page ? Vm.DocumentFor(page) : null;
-        ApplyPageStyles();                     // the new page's effective grid + method guides
+        ApplyPageStyles();
         if (PageCanvas.Document is null) { TrashPanel.IsVisible = false; return; }
         if (TrashPanel.IsVisible) RefreshTrashPanel();
-        // Page switch: title + canvas rise in instead of the content popping.
+
         Dispatcher.UIThread.Post(() => Motion.RiseIn(PageDock, Motion.Base), DispatcherPriority.Background);
     }
 
-    // ---- deleted-containers history panel ----
-
-    /// <summary>Rebuild the Tagged-notes list: tag-order groups (colored glyph header), then a chip
-    /// per tagged line with its section › page trail; clicking a chip jumps to that page.</summary>
     private void RefreshTagsPanel()
     {
         TagsList.Children.Clear();
@@ -1482,22 +1350,13 @@ public partial class MainView : UserControl
         chip.PointerPressed += (_, e) =>
         {
             if (!e.GetCurrentPoint(chip).Properties.IsLeftButtonPressed) return;
-            // includeSelf: a press landing directly ON the restore button reports the button itself.
+
             if (e.Source is Visual v && v.FindAncestorOfType<Button>(true) is not null) return;
             BeginTrashDrag(chip, box, e);
         };
         return chip;
     }
 
-    /// <summary>Drag a chip out of the deleted history and drop it back onto the page.
-    ///
-    /// Deliberately a plain pointer-capture drag rather than a platform drag-and-drop. macOS routes
-    /// every DnD through NSPasteboard and calls the data provider back FROM AppKit; an in-process CLR
-    /// payload has no pasteboard representation, so the wrapper threw inside a native frame, where a
-    /// managed exception cannot unwind and the runtime kills the process instead ("Avalonia Application
-    /// quit unexpectedly" the moment the tester dragged a container back onto a page). Doing the drag
-    /// ourselves keeps the payload an ordinary object reference and behaves the same on both platforms.
-    /// This was the app's only use of platform DnD.</summary>
     private void BeginTrashDrag(Control chip, NoteBox box, PointerPressedEventArgs e)
     {
         if (Avalonia.Controls.Primitives.OverlayLayer.GetOverlayLayer(chip) is not { } layer) return;
@@ -1510,7 +1369,7 @@ public partial class MainView : UserControl
             Point p = me.GetPosition(layer);
             if (ghost is null)
             {
-                // Small threshold so a click on the chip is still just a click.
+
                 if (System.Math.Abs(p.X - start.X) < 4 && System.Math.Abs(p.Y - start.Y) < 4) return;
                 ghost = BuildTrashGhost(box);
                 layer.Children.Add(ghost);
@@ -1526,17 +1385,13 @@ public partial class MainView : UserControl
             chip.PointerCaptureLost -= Lost;
         }
 
-        // Detach BEFORE releasing capture: Capture(null) raises PointerCaptureLost synchronously, so a
-        // still-subscribed Lost would tear the drag down (ghost gone, handlers off) before the release
-        // handler ever got to work out where the drop landed — the box would silently never come back.
         void Finish(Point? drop)
         {
             if (ghost is null) return;
             layer.Children.Remove(ghost);
             ghost = null;
             if (drop is not { } screenPoint) return;
-            // Hit-test from the root: a point can sit inside the canvas's bounds while a panel covers
-            // it, and dropping behind the sidebar should do nothing.
+
             if (this.InputHitTest(screenPoint) is not Visual hit) return;
             if (!ReferenceEquals(hit, PageCanvas) && hit.FindAncestorOfType<NoteCanvas>() is null) return;
             Point onCanvas = this.TranslatePoint(screenPoint, PageCanvas) ?? default;
@@ -1559,8 +1414,6 @@ public partial class MainView : UserControl
         pointer.Capture(chip);
     }
 
-    /// <summary>The translucent card that follows the pointer while a deleted container is being
-    /// dragged back onto the page.</summary>
     private Border BuildTrashGhost(NoteBox box)
     {
         var preview = box.Doc.GetText().Replace('\n', ' ').Trim();
@@ -1594,7 +1447,6 @@ public partial class MainView : UserControl
         BeginRenameOverlay("RENAME PAGE", pg.Title, t => { pg.Title = t; Vm?.Save(); }, PagesList);
     }
 
-    // ---- zoomed rename overlay: blur the whole app, dim it, and float one big name box ----------
     private System.Action<string>? _renameCommit;
     private Control? _renameReturnFocus;
     private Avalonia.Media.BlurEffect? _renameBlur;
@@ -1620,7 +1472,7 @@ public partial class MainView : UserControl
         if (commit)
         {
             var name = (RenameBox.Text ?? "").Trim();
-            if (name.Length > 0) _renameCommit?.Invoke(name);   // empty keeps the old name
+            if (name.Length > 0) _renameCommit?.Invoke(name);
         }
         _renameCommit = null;
 
@@ -1634,9 +1486,6 @@ public partial class MainView : UserControl
         });
     }
 
-    /// <summary>Ease AppRoot's blur radius toward a target (the same 15ms code-tween style as
-    /// Motion — Effect properties have no declarative animation path here). Radius 0 removes the
-    /// effect entirely so normal rendering pays nothing.</summary>
     private void AnimateBlur(double to)
     {
         _renameBlurTimer?.Stop();
@@ -1666,8 +1515,6 @@ public partial class MainView : UserControl
         _renameBlurTimer = timer;
     }
 
-    // ---- right-click delete menus (with confirm) for notebooks, sections, pages ----
-
     private void OnSectionsContextRequested(object? sender, ContextRequestedEventArgs e)
     {
         if ((e.Source as StyledElement)?.DataContext is not Section sec) return;
@@ -1679,7 +1526,7 @@ public partial class MainView : UserControl
         {
             if (Vm is not { } v || Window is not { } w) return;
             await new CustomizeSheetWindow(v, sec).ShowDialog(w);
-            RefreshAfterStyleDialog(null);          // bulk apply may restyle the page on screen
+            RefreshAfterStyleDialog(null);
         };
         var delete = new MenuItem { Header = "Delete section" };
         delete.Click += (_, _) => ConfirmThenDelete(
@@ -1730,7 +1577,6 @@ public partial class MainView : UserControl
         var rename = new MenuItem { Header = "Rename" };
         rename.Click += (_, _) => BeginRenamePage(pg);
 
-        // The real customization dialog (M9 Part 4) replaced the temporary grid/style submenus.
         var customize = new MenuItem { Header = "Customize page…" };
         customize.Click += async (_, _) =>
         {
@@ -1751,8 +1597,6 @@ public partial class MainView : UserControl
         OpenMenu(e, rename, customize, export, delete);
     }
 
-    /// <summary>After a customization dialog closes: re-apply the guides and re-push the canvas
-    /// document so a freshly stamped starter layout shows without switching pages.</summary>
     private void RefreshAfterStyleDialog(Models.Page? pg)
     {
         ApplyPageStyles();
@@ -1760,10 +1604,8 @@ public partial class MainView : UserControl
             PageCanvas.Document = PageCanvas.Document;
     }
 
-    /// <summary>The mind-map toolbar's paint-bucket button (accent-lit while the fill tool is active).</summary>
     private Button? _paintBtn;
 
-    // ---- Ctrl+wheel canvas zoom (session-only viewing posture, not a preference) ----
     private double _canvasZoom = 1.0;
 
     private void SetCanvasZoom(double zoom)
@@ -1775,16 +1617,12 @@ public partial class MainView : UserControl
         PushCanvasViewport();
     }
 
-    /// <summary>Guides/starters think in canvas coordinates — the visible area is the scroll
-    /// viewport divided by the zoom.</summary>
     private void PushCanvasViewport()
     {
         var s = new Size(CanvasScroll.Bounds.Width / _canvasZoom, CanvasScroll.Bounds.Height / _canvasZoom);
         PageCanvas.SetViewport(s);
         if (Vm is { } vm) vm.CanvasViewport = (s.Width, s.Height);
     }
-
-    // ---- homepage gallery ----
 
     private void OnHomeCardTapped(object? sender, TappedEventArgs e)
     {
@@ -1809,7 +1647,6 @@ public partial class MainView : UserControl
                                      DispatcherPriority.Background);
         };
 
-        // Color → 9 hue families, each expanding into its 5 shades.
         var color = new MenuItem { Header = "Color" };
         foreach (var (family, shades) in MainViewModel.NotebookPalette)
         {
@@ -1854,8 +1691,6 @@ public partial class MainView : UserControl
         }
     }
 
-    /// <summary>Pick an image file and drop it on the current page as an image box (copied into the
-    /// notebook's images folder, so the page stays self-contained).</summary>
     private async System.Threading.Tasks.Task InsertImageAsync()
     {
         if (Vm is not { SelectedPage: not null } vm || TopLevel.GetTopLevel(this)?.StorageProvider is not { } sp) return;
@@ -1870,15 +1705,13 @@ public partial class MainView : UserControl
         });
         if (files.Count == 0 || files[0].TryGetLocalPath() is not { } path) return;
         if (vm.ImportPageImage(path) is not { } rel) return;
-        // Drop it near the top-left of what's currently in view.
+
         double x = CanvasScroll.Offset.X / _canvasZoom + 40;
         double y = CanvasScroll.Offset.Y / _canvasZoom + 40;
         PageCanvas.ImageRoot = vm.SelectedNotebookDir;
         PageCanvas.AddImage(rel, x, y);
     }
 
-    /// <summary>Pick any file and drop it on the current page as an attachment chip (copied into
-    /// the notebook's assets folder, so the page stays self-contained).</summary>
     private async System.Threading.Tasks.Task InsertAttachmentAsync()
     {
         if (Vm is not { SelectedPage: not null } vm || TopLevel.GetTopLevel(this)?.StorageProvider is not { } sp) return;
@@ -1894,8 +1727,6 @@ public partial class MainView : UserControl
         PageCanvas.AddAttachment(rel, x, y);
     }
 
-    /// <summary>Pick a PDF, attach it to the page (copied into the notebook), and open it straight
-    /// away in the in-app viewer/annotator — the discoverable one-step "open a PDF" path.</summary>
     private async System.Threading.Tasks.Task InsertPdfAsync()
     {
         if (Vm is not { SelectedPage: not null } vm || TopLevel.GetTopLevel(this)?.StorageProvider is not { } sp) return;
@@ -1913,7 +1744,7 @@ public partial class MainView : UserControl
         double y = CanvasScroll.Offset.Y / _canvasZoom + 40;
         PageCanvas.ImageRoot = vm.SelectedNotebookDir;
         PageCanvas.AddAttachment(rel, x, y);
-        // Open it right away so the user sees the viewer without hunting for the double-click.
+
         if (vm.SelectedNotebookDir is { } dir)
         {
             var full = System.IO.Path.Combine(dir, rel);
@@ -1922,7 +1753,6 @@ public partial class MainView : UserControl
         }
     }
 
-    // ---- section / page "+" menus (add · rearrange · open a PDF as page/section) ----
     private void OpenSectionsMenu(Control anchor)
     {
         if (Vm is not { SelectedNotebook: { } nb }) return;
@@ -1973,7 +1803,6 @@ public partial class MainView : UserControl
         menu.Open(anchor);
     }
 
-    // ---- open a PDF file as a dedicated page/section (the page IS the PDF, edited inline) ----
     private async System.Threading.Tasks.Task<string?> PickAndImportPdf()
     {
         if (Vm is not { } vm || TopLevel.GetTopLevel(this)?.StorageProvider is not { } sp) return null;
@@ -1983,7 +1812,7 @@ public partial class MainView : UserControl
             FileTypeFilter = new[] { new Avalonia.Platform.Storage.FilePickerFileType("PDF") { Patterns = new[] { "*.pdf" } } },
         });
         if (files.Count == 0 || files[0].TryGetLocalPath() is not { } path) return null;
-        return vm.ImportPageAsset(path);        // copies into the notebook's assets, returns the relative path
+        return vm.ImportPageAsset(path);
     }
 
     private async System.Threading.Tasks.Task OpenPdfAsPage()
@@ -2009,11 +1838,9 @@ public partial class MainView : UserControl
         vm.Save();
     }
 
-    /// <summary>Show the embedded PDF viewer in the page box when the selected page is a PDF, else the
-    /// note canvas. Called whenever the selected page changes.</summary>
     private void ApplyPdfPage()
     {
-        PagePdfViewer.Flush();      // persist any annotations from the outgoing PDF page
+        PagePdfViewer.Flush();
         var rel = Vm?.SelectedPage?.PdfPath;
         bool isPdf = !string.IsNullOrEmpty(rel) && Vm?.SelectedNotebookDir is { };
         PageDock.IsVisible = !isPdf;
@@ -2026,12 +1853,6 @@ public partial class MainView : UserControl
         }
     }
 
-    /// <summary>The ONLY theme combo where the PDF viewer needed a backdrop fix is a SOLID theme with
-    /// Full-theme OFF: there the page box is a real-glass acrylic hole, so a PDF sat over the bare
-    /// desktop. In that one case we recolor the rounded page-box Border to an opaque neutral (following
-    /// the theme's light/dark). EVERY other combo — all of Lumen (its glass/frost is intentional), and
-    /// solid Full-theme-on — keeps its own PaperBackground untouched, so Lumen looks exactly like it
-    /// always has. The rounded Border is what we recolor, so corners stay rounded.</summary>
     private void ApplyPdfBackdrop(bool isPdf)
     {
         bool needsOpaque = isPdf && Vm is { } vm && vm.Theme != "Lumen" && !vm.FullTheme;
@@ -2044,7 +1865,6 @@ public partial class MainView : UserControl
         PageBoxSurface.Background = new Avalonia.Media.SolidColorBrush(c);
     }
 
-    /// <summary>Drop a line divider ("h"/"v") on the current page, near the top-left of the view.</summary>
     private void InsertDivider(string orientation)
     {
         if (Vm is not { SelectedPage: not null }) return;
@@ -2053,7 +1873,6 @@ public partial class MainView : UserControl
         PageCanvas.AddDivider(orientation, x, y);
     }
 
-    /// <summary>Drop a rows×cols table on the current page, near the top-left of the view.</summary>
     private void InsertTable(int rows, int cols)
     {
         if (Vm is not { SelectedPage: not null }) return;
@@ -2062,8 +1881,6 @@ public partial class MainView : UserControl
         PageCanvas.AddTable(rows, cols, x, y);
     }
 
-    /// <summary>Export one page to a file the user picks — the format follows the chosen file type
-    /// (all eight offered), so it's one Save dialog, no extra prompt.</summary>
     private async System.Threading.Tasks.Task ExportPageAsync(Models.Page pg)
     {
         if (Vm is not { } vm || TopLevel.GetTopLevel(this)?.StorageProvider is not { } sp) return;
@@ -2079,7 +1896,7 @@ public partial class MainView : UserControl
         if (file?.TryGetLocalPath() is not { } path) return;
 
         var ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
-        var fmt = Services.PageExport.Formats.FirstOrDefault(f => f.Ext == ext, Services.PageExport.Formats[4]).Fmt;   // default PDF
+        var fmt = Services.PageExport.Formats.FirstOrDefault(f => f.Ext == ext, Services.PageExport.Formats[4]).Fmt;
         try
         {
             vm.FlushDirtyDocs();
@@ -2111,14 +1928,12 @@ public partial class MainView : UserControl
         if (files.Count == 0) return;
         if (files[0].TryGetLocalPath() is not { } path || Window is not { } w) return;
 
-        // Let the user frame the part of the image the card shows (fixed card aspect).
         var cropped = await CoverCropDialog.Show(w, path);
         if (cropped is null) return;
         try { Vm.SetNotebookCover(nb, cropped); }
         finally { try { System.IO.File.Delete(cropped); } catch { } }
     }
 
-    /// <summary>Soft tints that stay readable at the veil's fixed alpha on light AND dark paper.</summary>
     private static readonly (string Name, string? Hex)[] PaperTints =
     {
         ("None", null),
@@ -2127,7 +1942,6 @@ public partial class MainView : UserControl
         ("Sand", "#CBB98F"), ("Graphite", "#8C939E"),
     };
 
-    /// <summary>The per-notebook "Paper color" submenu (current choice shown bold).</summary>
     private MenuItem PaperTintMenu(Notebook nb)
     {
         var root = new MenuItem { Header = "Paper color" };
@@ -2165,7 +1979,7 @@ public partial class MainView : UserControl
     {
         var menu = new ContextMenu();
         foreach (var i in items) menu.Items.Add(i);
-        MenuFx.Attach(menu);       // rise-in + real popup acrylic for the Lumen glass variant
+        MenuFx.Attach(menu);
         if (e.Source is Control c) { menu.Open(c); e.Handled = true; }
     }
 

@@ -10,32 +10,22 @@ using Avalonia.Threading;
 
 namespace Lumenotepad.Editor;
 
-/// <summary>How the mind-map Tidy command arranges the tree. <see cref="Radial"/> fans branches in every
-/// direction; <see cref="Hybrid"/> sends fanning branches left/right and single bubbles top/bottom;
-/// <see cref="TopDown"/> is a top-rooted org-chart tree.</summary>
 public enum MindmapLayout { Radial, Hybrid, TopDown }
 
-/// <summary>The freeform page canvas (the OneNote model): any number of movable, resizable note
-/// containers, each holding its own rich document. Click empty space to start a new container
-/// there; a container that loses focus while still empty evaporates. Deleted containers go to the
-/// page's history and can be dragged back onto the canvas.</summary>
 public sealed class NoteCanvas : Panel
 {
-    /// <summary>Note-container corner radius (M8 Part 6 roundness pref; default 9). Views read it
-    /// at construction — pushing a new value takes effect on the next canvas rebuild.</summary>
+
     public static double NoteRadiusPref = 9;
 
     private CanvasDocument? _doc;
     private bool _canResize = true;
 
-    /// <summary>The page's canvas document; setting it rebuilds all container views.</summary>
     public CanvasDocument? Document
     {
         get => _doc;
         set { _doc = value; Rebuild(); }
     }
 
-    /// <summary>Whether containers show resize handles ("Resizable pages" preference).</summary>
     public bool CanResize
     {
         get => _canResize;
@@ -47,20 +37,12 @@ public sealed class NoteCanvas : Panel
         }
     }
 
-    /// <summary>Whether deleting a container keeps it in the page history ("Deleted pages history" preference).</summary>
     public bool HistoryEnabled { get; set; } = true;
 
-    /// <summary>Absolute folder that image-box ("images/xxx.png") and attachment-box
-    /// ("assets/report.pdf") paths resolve against — the current notebook's folder, pushed by
-    /// MainView when the page loads (M10).</summary>
     public string? ImageRoot { get; set; }
 
-    /// <summary>Opens a PDF attachment in the in-app viewer/annotator (MainView wires this). Null ⇒
-    /// PDFs fall back to the OS default app like any other attachment.</summary>
     public Action<string>? OpenPdfRequested { get; set; }
 
-    /// <summary>Insert an image box (M10): a movable/resizable container showing the picture at
-    /// <paramref name="relPath"/> (relative to <see cref="ImageRoot"/>).</summary>
     public void AddImage(string relPath, double x, double y, double width = 340)
     {
         if (_doc is null) return;
@@ -68,12 +50,9 @@ public sealed class NoteCanvas : Panel
         var box = _doc.AddBox(x, y, width);
         box.ImagePath = relPath;
         AddBoxView(box);
-        _doc.CommitGeometry();                 // persist with the image path set
+        _doc.CommitGeometry();
     }
 
-    /// <summary>Insert a file-attachment box (M11): a movable chip showing the file's name;
-    /// double-click opens it with the default app. <paramref name="relPath"/> is relative to
-    /// <see cref="ImageRoot"/> (the notebook folder).</summary>
     public void AddAttachment(string relPath, double x, double y)
     {
         if (_doc is null) return;
@@ -81,10 +60,9 @@ public sealed class NoteCanvas : Panel
         var box = _doc.AddBox(x, y, 260);
         box.AttachPath = relPath;
         AddBoxView(box);
-        _doc.CommitGeometry();                 // persist with the attachment path set
+        _doc.CommitGeometry();
     }
 
-    /// <summary>Insert a table box (M11): a rows×cols grid of rich-text cells, focused on the first cell.</summary>
     public void AddTable(int rows, int cols, double x, double y)
     {
         if (_doc is null) return;
@@ -95,110 +73,83 @@ public sealed class NoteCanvas : Panel
         _doc.CommitGeometry();
     }
 
-    /// <summary>Insert a line divider: "h" (horizontal rule) or "v" (vertical rule) — a movable
-    /// strip whose single resize handle stretches the line longer or shorter.</summary>
     public void AddDivider(string orientation, double x, double y)
     {
         if (_doc is null) return;
         if (SnapToGrid) { x = Math.Max(0, GridMath.Snap(x)); y = Math.Max(0, GridMath.Snap(y)); }
         var box = _doc.AddBox(x, y);
         box.Divider = orientation;
-        if (orientation == "v") { box.Width = 22; box.H = 240; }   // thin strip, line runs down it
-        else { box.Width = 320; box.H = 22; }                      // low strip, line runs across it
+        if (orientation == "v") { box.Width = 22; box.H = 240; }
+        else { box.Width = 320; box.H = 22; }
         AddBoxView(box);
-        _doc.CommitGeometry();                 // persist with the divider kind set
+        _doc.CommitGeometry();
     }
 
-    /// <summary>Asked before a container is deleted via its ✕ button / menu; null = no prompt.</summary>
     public Func<Task<bool>>? ConfirmDelete { get; set; }
 
-    /// <summary>"Snap to grid" preference: drag/resize/placement land on the 20px cell.</summary>
     public bool SnapToGrid { get; set; }
 
-    /// <summary>"Always show container borders" preference: containers keep a visible edge instead of
-    /// only revealing it on hover/focus.</summary>
     public bool AlwaysShowBorders { get; set; }
 
-    /// <summary>"Create notes with double-click" preference: a bare-canvas single click does nothing.</summary>
     public bool CreateOnDoubleClick { get; set; }
 
-    // The bottom guide layer: grid-style paper background + page-style guide lines (M9).
     private readonly GuideLayer _guides = new();
-    // The mindmap connector layer: above the guides, under every container (M9 Part 5).
+
     private readonly LinkLayer _links = new();
     private string _pageStyle = PageStyles.Freeform;
     private int _mode;
     private Size _viewport;
 
-    /// <summary>Push the page's effective styles (grid background, method guides, apply mode).</summary>
     public void SetStyles(string gridStyle, string pageStyle, int mode)
     {
         _pageStyle = pageStyle;
         _mode = mode;
         _guides.SetStyles(gridStyle, pageStyle, mode);
-        EnsureRegions();               // tag legacy structured starters so they dock like fresh ones
-        RefreshMindmapPorts();         // views built before the style was set pick up the bubble look now
+        EnsureRegions();
+        RefreshMindmapPorts();
         InvalidateMeasure();
     }
 
-    /// <summary>The visible page area — guide dividers AND docked region boxes anchor to it
-    /// (MainView pushes it on layout / resize / zoom).</summary>
     public void SetViewport(Size viewport)
     {
         if (viewport == _viewport) return;
         _viewport = viewport;
         _guides.Viewport = viewport;
         _guides.InvalidateVisual();
-        DockRegions();                 // reposition region boxes to the new viewport right away
+        DockRegions();
         InvalidateMeasure();
-        InvalidateArrange();           // force a re-arrange even if the content bounds didn't change
+        InvalidateArrange();
     }
 
-    // ---- mind map (Mindmap page style): coloured bubbles + drag-to-connect links ----
-
-    /// <summary>True while the page's method is Mindmap — MainView shows the mind-map toolbar then.</summary>
     public bool IsMindmap => _pageStyle == PageStyles.Mindmap;
 
-    /// <summary>The colour new bubbles take (and the last colour picked in the mind-map toolbar).</summary>
     public string? MindmapColor { get; set; }
 
-    /// <summary>The colour a bubble gets when none has been picked — a neutral gray so a fresh map
-    /// reads cleanly before the user starts colour-coding.</summary>
     public const string DefaultBubbleColor = "#8B9099";
 
-    /// <summary>Width of newly added bubbles (toolbar S/M/L). Defaults to the medium preset.</summary>
     public double MindmapBubbleWidth { get; set; } = 220;
 
-    /// <summary>Which arrangement the Tidy command lays the map out in (Preferences ▸ Mind map ▸ Tidy layout).</summary>
     public MindmapLayout TidyLayout { get; set; } = MindmapLayout.Radial;
 
-    /// <summary>When true, bubbles also show the four diagonal (corner) connect ports (toolbar toggle).</summary>
     public bool MindmapDiagonalPorts { get; set; }
 
-    /// <summary>Draw connectors as rigid straight lines instead of springy curves (toolbar toggle).</summary>
     public bool MindmapStraightLines
     {
         get => _links.Straight;
         set { _links.Straight = value; _links.InvalidateVisual(); }
     }
 
-    /// <summary>Paint-bucket (fill) mode: while active, clicking any bubble fills it with
-    /// <see cref="MindmapPaintColor"/> instead of selecting it. Toggled from the toolbar.</summary>
     public bool MindmapPaintActive { get; set; }
     public string? MindmapPaintColor { get; set; }
 
-    /// <summary>The fill tool applied the paint colour to a bubble.</summary>
     internal void PaintBubble(NoteBoxView view) => RecolorBox(view, MindmapPaintColor);
 
-    /// <summary>Repaint every bubble's chrome — after the diagonal-ports toggle flips, or the style set.</summary>
     public void RefreshMindmapPorts()
     {
         foreach (var child in Children)
             if (child is NoteBoxView v) v.RefreshChrome();
     }
 
-    /// <summary>Drop a new bubble of the given family centred on (<paramref name="cx"/>,<paramref name="cy"/>)
-    /// and focus it. Info/Callout cards start a touch wider than a Title pill since they hold body text.</summary>
     public void AddBubble(double cx, double cy, BubbleKind kind = BubbleKind.Title)
     {
         if (_doc is null) return;
@@ -213,8 +164,6 @@ public sealed class NoteCanvas : Panel
         Dispatcher.UIThread.Post(view.FocusEditor, DispatcherPriority.Background);
     }
 
-    /// <summary>Add a bubble beside the selected one and link them — fast branch-building. Returns false
-    /// when nothing is selected, so the caller can fall back to a plain add at the viewport centre.</summary>
     public bool AddConnectedBubble()
     {
         if (ActiveBubble() is not { } from) return false;
@@ -222,15 +171,13 @@ public sealed class NoteCanvas : Panel
         return true;
     }
 
-    /// <summary>Add a bubble to the right of <paramref name="from"/> and link the two, inheriting its
-    /// colour (used by the toolbar and a bubble's context menu).</summary>
     public void AddConnectedFrom(NoteBox from)
     {
         if (_doc is null) return;
         double nx = from.X + from.Width + 110, ny = from.Y;
         if (SnapToGrid) { nx = GridMath.Snap(nx); ny = GridMath.Snap(ny); }
         var box = _doc.AddBox(Math.Max(0, nx), Math.Max(0, ny), from.Width);
-        box.Kind = from.Kind;   // a branch of same-family nodes
+        box.Kind = from.Kind;
         box.Color = from.Color ?? MindmapColor ?? DefaultBubbleColor;
         var view = AddBoxView(box);
         _doc.ToggleLink(from, box, "E", "W");
@@ -239,7 +186,6 @@ public sealed class NoteCanvas : Panel
         Dispatcher.UIThread.Post(view.FocusEditor, DispatcherPriority.Background);
     }
 
-    /// <summary>Duplicate a container (text, colour, size) a little down-right of the original.</summary>
     internal void DuplicateBox(NoteBoxView view)
     {
         if (_doc is null) return;
@@ -256,9 +202,6 @@ public sealed class NoteCanvas : Panel
         Dispatcher.UIThread.Post(nv.FocusEditor, DispatcherPriority.Background);
     }
 
-    /// <summary>Tidy the mind map into a radial tree around the selected bubble (or the most-connected
-    /// one if nothing is selected): each connection depth rings out from the root, children fanned into
-    /// their parent's angular slice. Bubbles glide to their new spots. Isolated bubbles are left alone.</summary>
     public void TidyMindmap()
     {
         if (_doc is null || _doc.Boxes.Count < 2) return;
@@ -289,7 +232,6 @@ public sealed class NoteCanvas : Panel
         double cx = root.X + root.Width / 2, cy = root.Y + H(root) / 2;
         var targets = new System.Collections.Generic.Dictionary<NoteBox, Point> { [root] = new Point(cx, cy) };
 
-        // ---- three interchangeable layouts (Preferences ▸ Mind map ▸ Tidy layout) ----
         switch (TidyLayout)
         {
             case MindmapLayout.Radial: LayoutRadial(); break;
@@ -297,14 +239,10 @@ public sealed class NoteCanvas : Panel
             default: LayoutHybrid(); break;
         }
 
-        // RADIAL: the bubbles CONNECTED TO THE CENTRE ring around it on an ellipse; everything deeper hangs off
-        // its branch as a vertical-stacking column growing outward (like Hybrid) so wide labels cost nothing.
-        // Branches that fan out are put on the LEFT/RIGHT arcs (their columns grow into open space); lone
-        // bubbles fill the TOP/BOTTOM arcs. So the direct children make a clean ellipse and nothing collides.
         void LayoutRadial()
         {
             const double vgap = 22, hstep = 62, agap = 34;
-            var subH = new System.Collections.Generic.Dictionary<NoteBox, double>();   // stacked height of a sub-tree
+            var subH = new System.Collections.Generic.Dictionary<NoteBox, double>();
             double SubH(NoteBox n)
             {
                 var k = children[n];
@@ -315,10 +253,9 @@ public sealed class NoteCanvas : Panel
             }
             SubH(root);
 
-            double ax = root.Width / 2 + 240;                                 // ellipse semi-axes — roomy so the
-            double ay = Math.Max(H(root) / 2 + 150, ax * 0.72);               // side branches curve onto a real ring
+            double ax = root.Width / 2 + 240;
+            double ay = Math.Max(H(root) / 2 + 150, ax * 0.72);
 
-            // A sub-tree as a column: children stacked vertically, one horizontal step further out.
             void PlaceColumn(System.Collections.Generic.List<NoteBox> ch, int side, double parentHalfW, double atX, double atY)
             {
                 double band = -vgap;
@@ -339,8 +276,6 @@ public sealed class NoteCanvas : Panel
             var deep = kids.Where(c => children[c].Count > 0).ToList();
             var lone = kids.Where(c => children[c].Count == 0).ToList();
 
-            // Deep branches → left/right arcs, balanced by sub-tree height; stacked vertically, sitting on the
-            // ellipse curve at each row's height, columns growing outward.
             var right = new System.Collections.Generic.List<NoteBox>();
             var left = new System.Collections.Generic.List<NoteBox>();
             double rS = 0, lS = 0;
@@ -350,17 +285,16 @@ public sealed class NoteCanvas : Panel
             {
                 if (group.Count == 0) return;
                 double span = 0;
-                foreach (var c in group) span += subH[c] + vgap;   // total vertical room the branches need
-                double baseA = side > 0 ? 0 : Math.PI;             // right arc around 0°, left around 180°
+                foreach (var c in group) span += subH[c] + vgap;
+                double baseA = side > 0 ? 0 : Math.PI;
                 double acc = 0;
                 foreach (var c in group)
                 {
-                    // Spread the branches across a ~120° arc (weighted by sub-tree height) so they curve up and
-                    // down the side instead of stacking into a straight column — this is what reads as radial.
-                    double frac = span > 1e-6 ? (acc + subH[c] / 2) / span - 0.5 : 0;   // -0.5..+0.5 down the arc
+
+                    double frac = span > 1e-6 ? (acc + subH[c] / 2) / span - 0.5 : 0;
                     double a = baseA - side * frac * 2.1;
                     double ex = ax * Math.Cos(a);
-                    double minCx = root.Width / 2 + c.Width / 2 + 46;   // but never nearer than clears the pill
+                    double minCx = root.Width / 2 + c.Width / 2 + 46;
                     double ccx = Math.Abs(ex) < minCx ? cx + side * minCx : cx + ex;
                     double ccy = cy + ay * Math.Sin(a);
                     targets[c] = new Point(ccx, ccy);
@@ -371,7 +305,6 @@ public sealed class NoteCanvas : Panel
             PlaceSide(right, 1);
             PlaceSide(left, -1);
 
-            // Lone bubbles → spread across the top and bottom arcs of the same ellipse.
             var topRow = new System.Collections.Generic.List<NoteBox>();
             var botRow = new System.Collections.Generic.List<NoteBox>();
             for (int i = 0; i < lone.Count; i++) (i % 2 == 0 ? topRow : botRow).Add(lone[i]);
@@ -386,7 +319,7 @@ public sealed class NoteCanvas : Panel
                     double ccx = x + c.Width / 2;
                     double nx = Math.Clamp((ccx - cx) / ax, -1, 1);
                     double ey = ay * Math.Sqrt(Math.Max(0, 1 - nx * nx));
-                    double ccy = cy + vside * Math.Max(H(root) / 2 + H(c) / 2 + 40, ey);   // clear the pill vertically
+                    double ccy = cy + vside * Math.Max(H(root) / 2 + H(c) / 2 + 40, ey);
                     targets[c] = new Point(ccx, ccy);
                     x += c.Width + agap;
                 }
@@ -395,9 +328,6 @@ public sealed class NoteCanvas : Panel
             PlaceArc(botRow, 1);
         }
 
-        // HYBRID: branches that FAN OUT (have children) go left & right as vertical-stacking columns — the
-        // only orientation that never overlaps wide text boxes — while simple single-bubble branches are
-        // spread across the TOP and BOTTOM. Clean like the two-sided tree, but uses the vertical space too.
         void LayoutHybrid()
         {
             const double hGap = 56, vGap = 22;
@@ -434,8 +364,7 @@ public sealed class NoteCanvas : Panel
                 if (rSum <= lSum) { right.Add(c); rSum += subH[c] + vGap; } else { left.Add(c); lSum += subH[c] + vGap; }
             PlaceColumn(right, +1, root.Width / 2, cx, cy);
             PlaceColumn(left, -1, root.Width / 2, cx, cy);
-            // The simple branches ride a row above and a row below, cleared past however tall the side
-            // columns grew, spread horizontally and centred on the root.
+
             double sideExtent = 0;
             foreach (var c in right) sideExtent = Math.Max(sideExtent, subH[c] / 2);
             foreach (var c in left) sideExtent = Math.Max(sideExtent, subH[c] / 2);
@@ -461,8 +390,6 @@ public sealed class NoteCanvas : Panel
             PlaceRow(botRow, +1);
         }
 
-        // TOP-DOWN: an org-chart tree. The root sits up top; each level drops one row, and siblings spread
-        // horizontally by their sub-tree width (parent centred over its children). Reads as a hierarchy.
         void LayoutTopDown()
         {
             const double vStep = 150, hGap = 34;
@@ -476,7 +403,7 @@ public sealed class NoteCanvas : Panel
                 return subW[n] = Math.Max(n.Width, sum);
             }
             SubWidth(root);
-            double firstDrop = H(root) / 2 + 145;   // extra breathing room under the (tall) central bubble
+            double firstDrop = H(root) / 2 + 145;
             void Place(NoteBox n, double centerX, int depth)
             {
                 targets[n] = new Point(centerX, depth == 0 ? cy : cy + firstDrop + (depth - 1) * vStep);
@@ -493,10 +420,6 @@ public sealed class NoteCanvas : Panel
             Place(root, cx, 0);
         }
 
-        // Tidy is an explicit rearrange, so re-anchor BOTH ends of every connector. Top-down wants clean
-        // VERTICAL runs (leave the upper box's bottom, enter the lower box's top) — Compass would pick
-        // sideways ports for the long diagonal spans and the lines would bow up and over. The radial and
-        // hybrid layouts point each end straight at its partner.
         foreach (var l in _doc.Links)
             if (targets.TryGetValue(l.A, out var pa) && targets.TryGetValue(l.B, out var pb))
             {
@@ -513,8 +436,6 @@ public sealed class NoteCanvas : Panel
                 }
             }
 
-        // The animator clamps X/Y at 0, which would pile any box that landed above/left of the origin into
-        // the corner. Shift the whole arrangement into positive space (a 40px margin) so that never happens.
         double minX = double.MaxValue, minY = double.MaxValue;
         foreach (var kv in targets)
         {
@@ -540,10 +461,9 @@ public sealed class NoteCanvas : Panel
         }, done: () => _doc.CommitGeometry());
     }
 
-    /// <summary>The 8-way compass edge nearest the direction (dx,dy) — used to re-anchor connectors on tidy.</summary>
     private static string Compass(double dx, double dy)
     {
-        double deg = Math.Atan2(dy, dx) * 180 / Math.PI;   // screen-down positive; 0 = East
+        double deg = Math.Atan2(dy, dx) * 180 / Math.PI;
         if (deg >= -22.5 && deg < 22.5) return "E";
         if (deg >= 22.5 && deg < 67.5) return "SE";
         if (deg >= 67.5 && deg < 112.5) return "S";
@@ -554,8 +474,6 @@ public sealed class NoteCanvas : Panel
         return "NE";
     }
 
-    /// <summary>The bounding rect of every container on the page (empty rect when there are none) — the
-    /// mind-map "centre on map" command frames it.</summary>
     public Rect ContentBounds()
     {
         double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
@@ -570,7 +488,6 @@ public sealed class NoteCanvas : Panel
         return maxX < minX ? default : new Rect(minX, minY, maxX - minX, maxY - minY);
     }
 
-    /// <summary>The bubble whose editor is currently active, or null.</summary>
     private NoteBoxView? ActiveBubble()
     {
         if (ActiveEditor is null) return null;
@@ -579,16 +496,11 @@ public sealed class NoteCanvas : Panel
         return null;
     }
 
-    /// <summary>The active bubble's colour, if a bubble is selected (for the toolbar's ring).</summary>
     public string? ActiveBubbleColor => ActiveBubble()?.Box.Color;
 
-    /// <summary>Connect-port drag started on <paramref name="from"/>'s <paramref name="dir"/> edge —
-    /// begin the rubber-band line from that edge.</summary>
     internal void BeginLink(NoteBoxView from, string dir, Point canvasPt)
         => _links.BeginPending(from.Box, dir, canvasPt);
 
-    /// <summary>The connect-port drag moved — chase the cursor, and once the cursor is over a bubble snap
-    /// the line's tip onto that bubble's NEAREST port and light up its ports so the drop point is clear.</summary>
     internal void UpdateLink(Point canvasPt)
     {
         _links.PendingCursor = canvasPt;
@@ -603,9 +515,6 @@ public sealed class NoteCanvas : Panel
         _links.Animate();
     }
 
-    /// <summary>The connect-port drag ended — link the source to the port the tip snapped onto
-    /// (releasing over empty canvas just cancels; releasing on an already-linked bubble unlinks).
-    /// Persists so the connector survives a reload.</summary>
     internal void EndLink(Point canvasPt)
     {
         var src = _links.PendingSource;
@@ -614,25 +523,23 @@ public sealed class NoteCanvas : Panel
         string dstDir = "W";
         if (src is not null) snap = FindSnap(canvasPt, src, out dstDir);
         _links.CancelPending();
-        foreach (var child in Children)                        // drop the hover highlight on every bubble
+        foreach (var child in Children)
             if (child is NoteBoxView v) v.SetLinkTarget(false);
         if (src is null || _doc is null || snap is null) return;
         var existing = _doc.Links.FirstOrDefault(l =>
             (ReferenceEquals(l.A, src) && ReferenceEquals(l.B, snap.Box)) ||
             (ReferenceEquals(l.A, snap.Box) && ReferenceEquals(l.B, src)));
-        if (_doc.ToggleLink(src, snap.Box, srcDir, dstDir))    // anchor at the exact port snapped to
-            _links.AnimateLinkIn(_doc.Links[^1]);              // string grows into the target with sparks
+        if (_doc.ToggleLink(src, snap.Box, srcDir, dstDir))
+            _links.AnimateLinkIn(_doc.Links[^1]);
         else if (existing is not null)
-            _links.AnimateLinkRemoval(existing);               // drag onto a linked bubble to unlink → fuse retract
+            _links.AnimateLinkRemoval(existing);
         _links.InvalidateVisual();
-        _doc.CommitGeometry();       // links persist alongside geometry
+        _doc.CommitGeometry();
     }
 
-    /// <summary>The bubble the cursor is over while connecting (nearest whose body is within the margin,
-    /// excluding the source), plus the port on it nearest the cursor — the dot the tip snaps to.</summary>
     private NoteBoxView? FindSnap(Point p, NoteBox src, out string dir)
     {
-        const double margin = 34;   // "hovering over" the bubble (a little slack outside its body)
+        const double margin = 34;
         NoteBoxView? best = null;
         double bestD = double.MaxValue;
         foreach (var child in Children)
@@ -645,7 +552,6 @@ public sealed class NoteCanvas : Panel
         return best;
     }
 
-    /// <summary>Distance from a point to a rectangle (0 when the point is inside).</summary>
     private static double RectDistance(Rect r, Point p)
     {
         double dx = Math.Max(Math.Max(r.X - p.X, p.X - r.Right), 0);
@@ -653,12 +559,10 @@ public sealed class NoteCanvas : Panel
         return Math.Sqrt(dx * dx + dy * dy);
     }
 
-    /// <summary>Set the mind-map colour: the default for new bubbles, and (when one is selected) applied
-    /// to that bubble immediately.</summary>
     public void SetBubbleColor(string? color)
     {
         MindmapColor = color;
-        if (_selection.Count > 0)          // a rubber-band selection recolours all of them at once
+        if (_selection.Count > 0)
         {
             foreach (var sv in _selection) { sv.Box.Color = color; sv.RefreshChrome(); }
             _links.InvalidateVisual();
@@ -669,13 +573,11 @@ public sealed class NoteCanvas : Panel
         {
             v.Box.Color = color;
             v.RefreshChrome();
-            _links.InvalidateVisual();     // its half of every attached connector's gradient recolours
+            _links.InvalidateVisual();
             _doc?.CommitGeometry();
         }
     }
 
-    /// <summary>Recolour a specific bubble (its right-click "Colour" menu) — updates its connectors'
-    /// gradient and, when it's the selected one, the toolbar's colour ring.</summary>
     internal void RecolorBox(NoteBoxView view, string? color)
     {
         view.Box.Color = color;
@@ -684,37 +586,32 @@ public sealed class NoteCanvas : Panel
         if (ReferenceEquals(ActiveEditor, view.Editor))
         {
             MindmapColor = color;
-            ActiveEditorChanged?.Invoke(ActiveEditor);   // MainView re-rings the picker
+            ActiveEditorChanged?.Invoke(ActiveEditor);
         }
         _doc?.CommitGeometry();
     }
 
-    /// <summary>Toggle a bubble's CENTRAL state (right-click): larger + bold text, thicker border, and the
-    /// anchor the tidy layout roots on.</summary>
     internal void SetCentral(NoteBoxView view, bool central)
     {
         if (view.Box.Central == central) return;
         view.Box.Central = central;
-        view.Box.Width = central ? view.Box.Width * 1.3 : view.Box.Width / 1.3;   // wider too, so it clearly reads as central
-        view.SetFontScale(central ? 1.45 : 1.0);   // larger text (applies the size, re-measures, commits)
-        view.RefreshChrome();                      // thick border + bold pick up now
+        view.Box.Width = central ? view.Box.Width * 1.3 : view.Box.Width / 1.3;
+        view.SetFontScale(central ? 1.45 : 1.0);
+        view.RefreshChrome();
         _links.InvalidateVisual();
     }
 
-    /// <summary>Convert a bubble to another family (Title pill / Info squircle / Callout). Body-text kinds
-    /// get widened to a readable minimum so a narrow pill doesn't become a cramped card.</summary>
     internal void SetBubbleKind(NoteBoxView view, BubbleKind kind)
     {
         if (view.Box.Kind == kind) return;
         view.Box.Kind = kind;
         if (kind != BubbleKind.Title && view.Box.Width < 240) view.Box.Width = 240;
-        view.RefreshChrome();     // shape, border, and alignment all switch here
+        view.RefreshChrome();
         view.InvalidateMeasure();
         _links.InvalidateVisual();
         _doc?.CommitGeometry();
     }
 
-    /// <summary>Raise a container above the others (drawn last = on top); persisted via the box order.</summary>
     internal void BringToFront(NoteBoxView view)
     {
         if (_doc is null) return;
@@ -724,32 +621,29 @@ public sealed class NoteCanvas : Panel
         _doc.CommitGeometry();
     }
 
-    /// <summary>Drop a container below the other containers (but still above the connectors/guides).</summary>
     internal void SendToBack(NoteBoxView view)
     {
         if (_doc is null) return;
         if (_doc.Boxes.Remove(view.Box)) _doc.Boxes.Insert(0, view.Box);
         Children.Remove(view);
         int i = 0;
-        while (i < Children.Count && Children[i] is not NoteBoxView) i++;   // first bubble slot, above base layers
+        while (i < Children.Count && Children[i] is not NoteBoxView) i++;
         Children.Insert(i, view);
         _doc.CommitGeometry();
     }
 
-    /// <summary>The editor of the most recently focused container (what the toolbar targets).</summary>
     public RichTextEditor? ActiveEditor { get; private set; }
     public event Action<RichTextEditor?>? ActiveEditorChanged;
 
-    /// <summary>Raised when the deleted history changes (delete/restore) so panels can refresh.</summary>
     public event Action? TrashChanged;
 
     public NoteCanvas()
     {
-        // An un-rendered control is not hit-testable — bare-canvas clicks would fall through.
-        Background = Brushes.Transparent;
-        Focusable = true;   // so a bare-canvas click can pull focus off a bubble to deselect it
 
-        ContextRequested += OnCanvasContext;     // right-click the bare canvas for a general menu
+        Background = Brushes.Transparent;
+        Focusable = true;
+
+        ContextRequested += OnCanvasContext;
 
         _labelEditor.KeyDown += (_, e) =>
         {
@@ -759,7 +653,6 @@ public sealed class NoteCanvas : Panel
         _labelEditor.LostFocus += (_, _) => { if (_editingLink is not null) CommitLabel(true); };
     }
 
-    /// <summary>Double-clicking a connector edits its label: an inline text box at the line's midpoint.</summary>
     private void EditLinkLabel(MindLink link)
     {
         _editingLink = link;
@@ -784,11 +677,9 @@ public sealed class NoteCanvas : Panel
         Focus();
     }
 
-    /// <summary>The general right-click menu on empty canvas (bubbles/editors keep their own). Offers the
-    /// page-appropriate "add here" at the click point, plus a quick connect when a bubble is selected.</summary>
     private void OnCanvasContext(object? sender, Avalonia.Input.ContextRequestedEventArgs e)
     {
-        if (_doc is null || !ReferenceEquals(e.Source, this)) return;   // only true bare-canvas right-clicks
+        if (_doc is null || !ReferenceEquals(e.Source, this)) return;
         var pos = e.TryGetPosition(this, out var p) ? p : new Point(80, 80);
         var menu = new ContextMenu();
         void Item(string header, Action act)
@@ -819,15 +710,12 @@ public sealed class NoteCanvas : Panel
         e.Handled = true;
     }
 
-    // A quiet starter hint on empty pages, so a blank canvas never feels dead. A child element
-    // because Panel.Render is sealed (same lesson as the TextPresenter selection underlay).
     private readonly TextBlock _hint = new()
     {
         Text = "Click anywhere and start typing",
         FontSize = 13.5, IsHitTestVisible = false, IsVisible = false,
     };
 
-    // Inline editor for a connector's label (double-click a mind-map line), positioned at its midpoint.
     private readonly TextBox _labelEditor = new()
     {
         IsVisible = false, MinWidth = 46, FontSize = 12, Padding = new Thickness(6, 2),
@@ -835,8 +723,6 @@ public sealed class NoteCanvas : Panel
     private MindLink? _editingLink;
     private Point _labelPos;
 
-    // Multi-select: a rubber-band drag on bare canvas selects the bubbles it covers; the set can then be
-    // moved, coloured, or deleted together.
     private readonly System.Collections.Generic.HashSet<NoteBoxView> _selection = new();
     private readonly Border _rubber = new() { IsVisible = false, IsHitTestVisible = false, BorderThickness = new Thickness(1) };
     private Point _rubberStart, _rubberCur;
@@ -847,9 +733,9 @@ public sealed class NoteCanvas : Panel
     {
         Children.Clear();
         SetActive(null);
-        Children.Add(_guides);         // first child = bottom of z-order: under every container
-        _guides.Refresh();             // theme changes arrive as a Document reset — re-tint here
-        _links.Doc = _doc;             // connectors run under the bubbles, over the paper
+        Children.Add(_guides);
+        _guides.Refresh();
+        _links.Doc = _doc;
         _links.Resolve = BoxRect;
         _links.Refresh();
         Children.Add(_links);
@@ -862,7 +748,7 @@ public sealed class NoteCanvas : Panel
         _rubber.BorderBrush = new SolidColorBrush(Color.Parse(Services.ThemeManager.Current.Accent), 0.9);
         _rubber.Background = new SolidColorBrush(Color.Parse(Services.ThemeManager.Current.Accent), 0.12);
         Children.Add(_rubber);
-        EnsureRegions();               // tag legacy structured starters before their views are built
+        EnsureRegions();
         if (_doc is not null)
             foreach (var box in _doc.Boxes)
                 Children.Add(new NoteBoxView(this, box));
@@ -870,7 +756,6 @@ public sealed class NoteCanvas : Panel
         InvalidateMeasure();
     }
 
-    /// <summary>A box's current on-screen rect (the arranged view), for the link layer.</summary>
     private Rect? BoxRect(NoteBox box)
     {
         foreach (var child in Children)
@@ -887,7 +772,7 @@ public sealed class NoteCanvas : Panel
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        DockRegions();                             // snap every structured style's region boxes to the guides
+        DockRegions();
 
         double w = 0, h = 0, notesFoot = 0;
         foreach (var child in Children)
@@ -897,29 +782,26 @@ public sealed class NoteCanvas : Panel
             double bottom = v.Box.Y + Math.Max(v.DesiredSize.Height, v.Box.H);
             w = Math.Max(w, v.Box.X + v.Box.Width);
             h = Math.Max(h, bottom);
-            if (v.Box.Region != "summary") notesFoot = Math.Max(notesFoot, bottom);  // summary excluded (breaks the loop)
+            if (v.Box.Region != "summary") notesFoot = Math.Max(notesFoot, bottom);
         }
 
-        DockCornellSummary(notesFoot);             // drop the summary band just below the notes content
-        _guides.ContentBottom = notesFoot;         // the guide's summary rule uses the very same foot
+        DockCornellSummary(notesFoot);
+        _guides.ContentBottom = notesFoot;
 
-        foreach (var child in Children)            // the summary box may have moved down — fold it into the height
+        foreach (var child in Children)
             if (child is NoteBoxView sv && sv.Box.Region == "summary")
                 h = Math.Max(h, sv.Box.Y + Math.Max(sv.DesiredSize.Height, sv.Box.H));
 
-        return new Size(w + 220, h + 320);        // breathing room so the page can always grow by clicking
+        return new Size(w + 220, h + 320);
     }
 
-    /// <summary>Snap every structured style's region boxes (X/Y/Width) to the live guide geometry.
-    /// Purely viewport-driven, so it's safe to run each measure; Cornell's summary Y is finished later
-    /// once the notes content foot is known (<see cref="DockCornellSummary"/>).</summary>
     private void DockRegions()
     {
         if (_doc is null || _viewport.Width <= 0 || _viewport.Height <= 0) return;
-        if (_mode == PageStyles.ModeStartersOnly) return;              // starters-only keeps free boxes
+        if (_mode == PageStyles.ModeStartersOnly) return;
         var regions = PageStyleGuides.Regions(_pageStyle, _viewport, default);
         if (regions.Count == 0) return;
-        EnsureRegions();                                              // tag legacy starters (idempotent)
+        EnsureRegions();
         foreach (var child in Children)
         {
             if (child is not NoteBoxView v || v.Box.Region is not { } id) continue;
@@ -928,8 +810,6 @@ public sealed class NoteCanvas : Panel
         }
     }
 
-    /// <summary>Place Cornell's summary region a small gap below the notes content foot (never above its
-    /// 80%-of-screen home) — the same rule the guide's summary line uses, so line and box stay glued.</summary>
     private void DockCornellSummary(double notesFoot)
     {
         if (_pageStyle != PageStyles.Cornell || _viewport.Width <= 0 || _viewport.Height <= 0) return;
@@ -939,15 +819,11 @@ public sealed class NoteCanvas : Panel
                 v.Box.Y = summary.Y;
     }
 
-    /// <summary>Legacy structured pages (created before regions were docked) carry untagged starters —
-    /// tag a pristine starter set (box count matching the style's region count, plain text boxes only)
-    /// by creation order so they dock like freshly stamped ones. Pages the user has since reshaped
-    /// (added/removed boxes, images, tables) are left alone as ordinary free boxes.</summary>
     private void EnsureRegions()
     {
         if (_doc is null || _doc.Boxes.Count == 0) return;
-        if (_mode == PageStyles.ModeStartersOnly) return;                 // starters-only pages keep free boxes
-        // Tag legacy starters (label-matched, robust to stray boxes); fresh pages arrive tagged → no-op.
+        if (_mode == PageStyles.ModeStartersOnly) return;
+
         PageStyleTemplate.RetagLegacyStarters(_doc.Boxes, _pageStyle, _viewport.Width > 0 ? _viewport : new Size(900, 600));
     }
 
@@ -957,7 +833,7 @@ public sealed class NoteCanvas : Panel
         {
             if (ReferenceEquals(child, _guides) || ReferenceEquals(child, _links))
             {
-                child.Arrange(new Rect(finalSize));     // full-page layers under every container
+                child.Arrange(new Rect(finalSize));
                 continue;
             }
             if (ReferenceEquals(child, _labelEditor))
@@ -982,21 +858,20 @@ public sealed class NoteCanvas : Panel
             }
             v.Arrange(new Rect(v.Box.X, v.Box.Y, v.Box.Width, Math.Max(v.DesiredSize.Height, v.Box.H)));
         }
-        _links.Animate();                        // connectors spring after bubbles as they move, then settle
+        _links.Animate();
         return finalSize;
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
-        // Only clicks on bare canvas start a container — clicks inside one bubble with another Source.
+
         if (_doc is null || !ReferenceEquals(e.Source, this)) return;
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         var p = e.GetPosition(this);
         if (_pageStyle == PageStyles.Mindmap)
         {
-            // Mind map: double-click a connector to label it; double-click bare canvas drops a bubble;
-            // a single click+drag rubber-bands a selection; a plain single click deselects.
+
             if (e.ClickCount >= 2 && _links.HitLink(p) is { } hitLink) { EditLinkLabel(hitLink); e.Handled = true; return; }
             if (e.ClickCount >= 2) { AddBubble(p.X, p.Y); e.Handled = true; return; }
             _rubberStart = _rubberCur = p;
@@ -1043,7 +918,7 @@ public sealed class NoteCanvas : Panel
             foreach (var child in Children)
                 if (child is NoteBoxView v && rect.Intersects(v.Bounds)) AddToSelection(v);
             InvalidateArrange();
-            Focus();   // so Delete acts on the selection
+            Focus();
         }
         else
         {
@@ -1069,10 +944,8 @@ public sealed class NoteCanvas : Panel
     private void AddToSelection(NoteBoxView v) { if (_selection.Add(v)) v.SetSelected(true); }
     private void ClearSelection() { foreach (var v in _selection) v.SetSelected(false); _selection.Clear(); }
 
-    /// <summary>Start moving the whole selection together (capture every selected box's origin).</summary>
     internal void BeginGroupDrag() => _groupOrigins = _selection.ToDictionary(v => v.Box, v => (v.Box.X, v.Box.Y));
 
-    /// <summary>Move the captured selection by (dx,dy) from where the drag began. False = no group drag active.</summary>
     internal bool GroupDragTo(double dx, double dy)
     {
         if (_groupOrigins is null) return false;
@@ -1087,7 +960,7 @@ public sealed class NoteCanvas : Panel
     {
         var view = new NoteBoxView(this, box);
         Children.Add(view);
-        // Bounce in: grow from small and overshoot past full size before settling (easeOutBack).
+
         view.RenderTransformOrigin = RelativePoint.Center;
         Views.Motion.Tween(view, 0, 0, 0.5, 0, 0, 1, 320,
             s => { double c1 = 2.4, c3 = c1 + 1, u = s - 1; return 1 + c3 * u * u * u + c1 * u * u; }, 0, 1);
@@ -1096,13 +969,12 @@ public sealed class NoteCanvas : Panel
         return view;
     }
 
-    /// <summary>Bring a box back from the deleted history, optionally at a new spot.</summary>
     public void RestoreBox(NoteBox box, double? x = null, double? y = null)
     {
         if (_doc is null) return;
-        _doc.RestoreFromTrash(box, x, y);   // reinstates any parked links whose partner is still present
+        _doc.RestoreFromTrash(box, x, y);
         AddBoxView(box);
-        foreach (var l in _doc.Links)       // grow the reconnected strings back in (also repaints the layer)
+        foreach (var l in _doc.Links)
             if (ReferenceEquals(l.A, box) || ReferenceEquals(l.B, box))
                 _links.AnimateLinkIn(l);
         TrashChanged?.Invoke();
@@ -1110,17 +982,15 @@ public sealed class NoteCanvas : Panel
 
     internal void SetActive(RichTextEditor? editor)
     {
-        if (editor is not null && _selection.Count > 0) ClearSelection();   // focusing one bubble drops the group
+        if (editor is not null && _selection.Count > 0) ClearSelection();
         if (ReferenceEquals(ActiveEditor, editor)) return;
         ActiveEditor = editor;
         ActiveEditorChanged?.Invoke(editor);
     }
 
-    /// <summary>✕ button / context-menu delete: confirm, then trash (or remove outright when the
-    /// history is disabled). Empty boxes skip the prompt — there is nothing to lose.</summary>
     internal async void RequestDelete(NoteBoxView view)
     {
-        if (view.Box.Locked) return;                       // rigid starters can't be deleted
+        if (view.Box.Locked) return;
         if (_doc is null || !_doc.Boxes.Contains(view.Box)) return;
         if (!view.Box.IsEmpty && ConfirmDelete is not null && !await ConfirmDelete()) return;
         if (HistoryEnabled && !view.Box.IsEmpty)
@@ -1143,8 +1013,6 @@ public sealed class NoteCanvas : Panel
         AnimateOutAndDetach(view);
     }
 
-    /// <summary>Delete honouring the history preference: trash restorable boxes, remove the rest outright.
-    /// Used by group (multi-select) delete, which has no per-box confirm.</summary>
     private void DeleteBoxToHistory(NoteBoxView view)
     {
         if (_doc is null) return;
@@ -1160,11 +1028,10 @@ public sealed class NoteCanvas : Panel
         }
     }
 
-    /// <summary>Play a container's exit animation (shrink + fade), then detach it once the tween ends.</summary>
     private void AnimateOutAndDetach(NoteBoxView view)
     {
         if (ReferenceEquals(ActiveEditor, view.Editor)) SetActive(null);
-        // Pop out: accelerate the shrink + fade (the particle burst from AnimateBubbleRemoval fills its place).
+
         view.RenderTransformOrigin = RelativePoint.Center;
         Views.Motion.Tween(view, 0, 0, 1, 0, 0, 0.35, 170, Views.Motion.EaseIn, view.Opacity, 0, () =>
         {
@@ -1182,41 +1049,30 @@ public sealed class NoteCanvas : Panel
         InvalidateMeasure();
     }
 
-    /// <summary>A bubble MOVE drag ended. Linking now happens by dragging a bubble's connect port onto
-    /// another (see <see cref="EndLink"/>), so a plain move no longer toggles links — repositioning a
-    /// bubble over another is just a move. Kept as a hook the view calls after any drag.</summary>
     internal void OnBoxDragEnd(NoteBoxView view) { _links.InvalidateVisual(); }
 
-    /// <summary>OneNote behavior: an empty container evaporates once focus has settled elsewhere.
-    /// Deferred a beat so the click that stole focus can land first.</summary>
     internal void OnEditorLostFocus(NoteBoxView view)
     {
         Dispatcher.UIThread.Post(() =>
         {
             if (_doc is null || !_doc.Boxes.Contains(view.Box)) return;
-            if (_pageStyle == PageStyles.Mindmap) return;   // mind-map bubbles persist even when empty
+            if (_pageStyle == PageStyles.Mindmap) return;
             if (!view.Box.IsEmpty || view.Box.Locked || view.IsKeyboardFocusWithin) return;
-            if (view.Manipulated) return;   // the user is working with it — only an explicit delete removes it
+            if (view.Manipulated) return;
             DeleteBoxPermanently(view);
         }, DispatcherPriority.Background);
     }
 }
 
-/// <summary>One container: hover/focus chrome, a top drag-grip, a ✕ delete button, the editor, and
-/// right/bottom/corner resize handles. Geometry lives on the NoteBox model; the canvas arranges
-/// from it, so drags just mutate the model and re-measure.</summary>
 internal sealed class NoteBoxView : Panel
 {
-    /// <summary>Which edges a drag moves. None = a whole-box move (the grip).</summary>
+
     [System.Flags]
     private enum Edge { None = 0, Left = 1, Right = 2, Top = 4, Bottom = 8 }
 
-    /// <summary>The container's own edge brush. Kept as ONE instance whose Opacity is animated, so the
-    /// hover edge fades in/out instead of popping — swapping brush instances can only snap.</summary>
     private readonly SolidColorBrush _edge = new(Colors.Transparent, 0);
     private DispatcherTimer? _edgeFade;
 
-    // Paper-region theme tokens, read at construction (theme changes rebuild the canvas views).
     private readonly IBrush HoverBorder;
     private readonly IBrush FocusBorder;
     private readonly IBrush GripFill;
@@ -1233,7 +1089,7 @@ internal sealed class NoteBoxView : Panel
     private readonly Border _gripBar;
     private readonly Border _close;
     private readonly TextBlock _closeGlyph;
-    // The close look (differs bubble vs card): resting + hover fills and glyph colour.
+
     private IBrush _closeRestBg = Brushes.Transparent;
     private IBrush _closeRestFg = Brushes.Gray;
     private IBrush _closeHoverBg = CloseHoverBg;
@@ -1241,18 +1097,16 @@ internal sealed class NoteBoxView : Panel
     private readonly Border _resizeRight;
     private readonly Border _resizeTop;
     private readonly Border _resizeBottom;
-    private readonly Border _resizeCorner;       // bottom-right
+    private readonly Border _resizeCorner;
     private readonly Border _resizeCornerTL;
     private readonly Border _resizeCornerBL;
-    // mind-map: connect dots on the bubble's edges — drag one onto another bubble to link. Four
-    // orthogonal (N/S/E/W) always, four diagonal (corners) when the toolbar toggle is on.
+
     private readonly System.Collections.Generic.List<(Border Port, bool Diagonal, string Dir)> _ports = new();
     private bool _linking;
-    private bool _linkTarget;   // a link drag is hovering this bubble — show its ports as drop targets
-    private bool _selected;     // part of a rubber-band multi-selection
+    private bool _linkTarget;
+    private bool _selected;
     private bool _hover;
 
-    // Table box (M11): the grid host + its cell editors in row-major order (rebuilt on structural edits).
     private Border? _tableHost;
     private readonly System.Collections.Generic.List<RichTextEditor> _cellEditors = new();
 
@@ -1289,7 +1143,7 @@ internal sealed class NoteBoxView : Panel
         var body = new DockPanel();
         if (box.Divider is not null)
         {
-            // Divider box: the whole strip is the grip — grab the line anywhere to move it.
+
             _grip.Height = double.NaN;
             _grip.CornerRadius = new CornerRadius(r);
             _grip.Child = BuildDividerLine(box.Divider);
@@ -1299,12 +1153,12 @@ internal sealed class NoteBoxView : Panel
         {
             body.Children.Add(_grip);
             if (box.ImagePath is { Length: > 0 })
-                body.Children.Add(BuildImage(box.ImagePath));   // image box: picture instead of the editor
+                body.Children.Add(BuildImage(box.ImagePath));
             else if (box.AttachPath is { Length: > 0 })
-                body.Children.Add(BuildAttachment(box.AttachPath));   // attachment box: file chip
+                body.Children.Add(BuildAttachment(box.AttachPath));
             else if (box.Table is not null)
             {
-                _tableHost = new Border { Child = BuildTableGrid() };   // table box: grid of cell editors
+                _tableHost = new Border { Child = BuildTableGrid() };
                 body.Children.Add(_tableHost);
             }
             else
@@ -1316,16 +1170,14 @@ internal sealed class NoteBoxView : Panel
             Child = body, CornerRadius = new CornerRadius(r),
             BorderThickness = new Thickness(1), BorderBrush = Brushes.Transparent,
             Background = Brushes.Transparent,
-            // Clip content (notably the full-width grip "title bar" fill) to the rounded outline, so it
-            // follows the pill's curved corners instead of overhanging them.
+
             ClipToBounds = true,
         };
 
         _closeRestFg = CloseFg;
         _closeGlyph = new TextBlock
         {
-            // IconFont resource (not an inline Segoe literal) so the theme's cross-platform fallback
-            // chain applies: on macOS the bundled LumenIcons supplies the glyph.
+
             Text = "\uE711",
             FontFamily = Avalonia.Application.Current?.FindResource("IconFont") as FontFamily
                          ?? new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
@@ -1341,10 +1193,9 @@ internal sealed class NoteBoxView : Panel
         };
         _close.PointerEntered += (_, _) => { _close.Background = _closeHoverBg; _closeGlyph.Foreground = Brushes.White; };
         _close.PointerExited += (_, _) => { _close.Background = _closeRestBg; _closeGlyph.Foreground = _closeRestFg; };
-        _close.PointerPressed += (_, e) => e.Handled = true;      // don't start a grip drag from the ✕
+        _close.PointerPressed += (_, e) => e.Handled = true;
         _close.PointerReleased += (_, e) => { _canvas.RequestDelete(this); e.Handled = true; };
 
-        // Edge strips inset from the ends so the corner squares below stay grabbable.
         Border EdgeStrip(HorizontalAlignment h, VerticalAlignment v, bool vertical, StandardCursorType cur) => new()
         {
             Width = vertical ? 7 : double.NaN, Height = vertical ? double.NaN : 7,
@@ -1365,8 +1216,7 @@ internal sealed class NoteBoxView : Panel
         _resizeCornerBL = Corner(HorizontalAlignment.Left, VerticalAlignment.Bottom, StandardCursorType.BottomLeftCorner);
         _resizeCorner = Corner(HorizontalAlignment.Right, VerticalAlignment.Bottom, StandardCursorType.BottomRightCorner);
 
-        // Mind-map connect ports on the bubble's edges: drag one onto another bubble to link them.
-        const double o = -7;   // half the 14px dot, so it straddles the edge
+        const double o = -7;
         void AddPort(HorizontalAlignment h, VerticalAlignment vv, Thickness m, bool diagonal, string dir)
         {
             var port = new Border
@@ -1413,16 +1263,14 @@ internal sealed class NoteBoxView : Panel
         Children.Add(_resizeCornerTL);
         Children.Add(_resizeCornerBL);
         Children.Add(_resizeCorner);
-        Children.Add(_close);            // on top of the resize strips so the ✕ stays clickable
-        foreach (var (port, _, _) in _ports) Children.Add(port);   // ports on top of everything
+        Children.Add(_close);
+        foreach (var (port, _, _) in _ports) Children.Add(port);
 
-        // Paint-bucket: a click anywhere on a bubble while the fill tool is on recolours it (tunnel so it
-        // beats the editor/ports/grip to the click).
         AddHandler(InputElement.PointerPressedEvent, OnPaintClick, Avalonia.Interactivity.RoutingStrategies.Tunnel);
 
         PointerEntered += (_, _) => { _hover = true; RefreshChrome(); };
         PointerExited += (_, _) => { _hover = false; RefreshChrome(); };
-        // Image/divider/attachment/table boxes don't use the single main editor to focus / evaporate.
+
         if (box.ImagePath is null && box.Divider is null && box.AttachPath is null && box.Table is null)
         {
             Editor.GotFocus += (_, _) => { _canvas.SetActive(Editor); RefreshChrome(); };
@@ -1457,7 +1305,7 @@ internal sealed class NoteBoxView : Panel
                 void KindItem(string h, BubbleKind k)
                 {
                     var m = new MenuItem { Header = h };
-                    if (Box.Kind == k)   // an accent dot marks the current family (glyph-free, always renders)
+                    if (Box.Kind == k)
                         m.Icon = new Border
                         {
                             Width = 7, Height = 7, CornerRadius = new CornerRadius(4),
@@ -1529,7 +1377,7 @@ internal sealed class NoteBoxView : Panel
             var del = new MenuItem { Header = Box.Divider is null ? "Delete container" : "Delete divider" };
             del.Click += (_, _) => _canvas.RequestDelete(this);
             menu.Items.Add(del);
-            Views.MenuFx.Attach(menu);     // rise-in + Lumen glass-variant popup acrylic
+            Views.MenuFx.Attach(menu);
             menu.Open(_grip);
             e.Handled = true;
         };
@@ -1547,8 +1395,6 @@ internal sealed class NoteBoxView : Panel
         e.Handled = true;
     }
 
-    /// <summary>Mind-map keyboard shortcuts on a focused bubble: Tab spawns a linked child, Ctrl+D
-    /// duplicates. Both are swallowed so the editor doesn't also act on the key.</summary>
     private void OnBubbleKey(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.D && Services.Keymap.HasCommand(e.KeyModifiers) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
@@ -1563,7 +1409,6 @@ internal sealed class NoteBoxView : Panel
         }
     }
 
-    /// <summary>Apply this box's text-size multiplier to its editor (mind-map hierarchy).</summary>
     private void ApplyFontScale()
     {
         double baseSize = Math.Clamp(RichTextEditor.EditorFontSizePref, 11, 24);
@@ -1584,8 +1429,6 @@ internal sealed class NoteBoxView : Panel
         if (Box.ImagePath is null && Box.Divider is null && Box.AttachPath is null) Editor.Focus();
     }
 
-    /// <summary>Build a note editor (main box or a table cell) with the paper-region theme brushes
-    /// and the user's font/spacing prefs.</summary>
     private RichTextEditor MakeEditor(RichDocument doc, Thickness margin)
     {
         var t = Services.ThemeManager.Current;
@@ -1603,8 +1446,6 @@ internal sealed class NoteBoxView : Panel
         };
     }
 
-    /// <summary>Build the table's cell grid: equal-width columns, auto-height rows, hairline gridlines,
-    /// a rich-text editor per cell. Rebuilt whenever rows/columns are added or removed.</summary>
     private Control BuildTableGrid()
     {
         _cellEditors.Clear();
@@ -1637,7 +1478,6 @@ internal sealed class NoteBoxView : Panel
                 grid.Children.Add(cell);
             }
 
-        // Outer border closes the top + left edges the per-cell borders leave open.
         return new Border
         {
             BorderBrush = line, BorderThickness = new Thickness(1, 1, 0, 0),
@@ -1652,7 +1492,6 @@ internal sealed class NoteBoxView : Panel
         _canvas.InvalidateMeasure();
     }
 
-    /// <summary>Tab / Shift+Tab walk the cells in reading order; Tab off the last cell grows a new row.</summary>
     private void OnCellKey(Avalonia.Input.KeyEventArgs e, int r, int c)
     {
         if (e.Key != Key.Tab || Box.Table is null) return;
@@ -1694,7 +1533,6 @@ internal sealed class NoteBoxView : Panel
         menu.Open(target);
     }
 
-    /// <summary>The picture control for an image box, loaded from ImageRoot + the box's relative path.</summary>
     private Control BuildImage(string relPath)
     {
         var img = new Avalonia.Controls.Image
@@ -1707,12 +1545,10 @@ internal sealed class NoteBoxView : Panel
             var full = root is { Length: > 0 } ? System.IO.Path.Combine(root, relPath) : relPath;
             if (System.IO.File.Exists(full)) img.Source = new Avalonia.Media.Imaging.Bitmap(full);
         }
-        catch { /* missing/unreadable image → empty box (still movable/deletable) */ }
+        catch {  }
         return img;
     }
 
-    /// <summary>The file chip for an attachment box: paperclip glyph + filename + an open hint,
-    /// tinted from the paper region's text so it themes. Double-click opens the file.</summary>
     private Control BuildAttachment(string relPath)
     {
         var t = Services.ThemeManager.Current;
@@ -1722,7 +1558,7 @@ internal sealed class NoteBoxView : Panel
         row.Children.Add(new TextBlock
         {
             Text = "", FontFamily = Avalonia.Application.Current?.FindResource("IconFont") as FontFamily
-                         ?? new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),   // theme fallback chain (LumenIcons on macOS)
+                         ?? new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
             FontSize = 16, Foreground = text, VerticalAlignment = VerticalAlignment.Center,
         });
         var lines = new StackPanel { Spacing = 1, VerticalAlignment = VerticalAlignment.Center };
@@ -1745,7 +1581,6 @@ internal sealed class NoteBoxView : Panel
         return chip;
     }
 
-    /// <summary>Hand the attached file to its default app (shell open). Missing files no-op.</summary>
     private void OpenAttachment()
     {
         try
@@ -1754,17 +1589,16 @@ internal sealed class NoteBoxView : Panel
             var full = root is { Length: > 0 }
                 ? System.IO.Path.Combine(root, Box.AttachPath!) : Box.AttachPath!;
             if (!System.IO.File.Exists(full)) return;
-            // PDFs open in the in-app viewer/annotator; everything else goes to its default app.
+
             if (full.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) && _canvas.OpenPdfRequested is { } openPdf)
                 openPdf(full);
             else
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 { FileName = full, UseShellExecute = true });
         }
-        catch { /* no handler / locked file → nothing to do */ }
+        catch {  }
     }
 
-    /// <summary>The line visual for a divider box, tinted from the paper text so it themes.</summary>
     private Control BuildDividerLine(string orientation)
     {
         var line = new Border
@@ -1791,21 +1625,18 @@ internal sealed class NoteBoxView : Panel
     internal void RefreshChrome()
     {
         bool focused = Editor.IsFocused;
-        // Capturing the pointer on a resize/grip handle drops the box's own IsPointerOver (so PointerExited
-        // fires and would blank the border mid-drag) — treat an active drag as "keep the chrome lit".
+
         bool active = _hover || focused || _dragging;
         if (Box.Color is { } hex && Color.TryParse(hex, out var bc))
         {
-            // Coloured bubble (mind-map): a soft fill of the colour plus a solid coloured edge that
-            // brightens when the bubble is active — the whole card carries its colour category.
+
             _chrome.Background = new SolidColorBrush(bc, active ? 0.28 : 0.18);
             _chrome.BorderBrush = new SolidColorBrush(bc, active ? 1.0 : 0.72);
         }
         else
         {
             _chrome.Background = Brushes.Transparent;
-            // Pick the edge COLOUR for the current state, then ease its opacity toward the target so a
-            // hover edge fades in rather than popping. "Always show borders" keeps a quieter resting edge.
+
             bool strong = _dragging || focused;
             var edgeSrc = strong ? FocusBorder : HoverBorder;
             if (edgeSrc is ISolidColorBrush sb) _edge.Color = sb.Color;
@@ -1816,12 +1647,11 @@ internal sealed class NoteBoxView : Panel
         _grip.Background = active ? GripFill : Brushes.Transparent;
         _gripBar.IsVisible = active;
         _close.IsVisible = active && !Box.Locked;
-        // Hidden handles are also not hit-testable — the "Resizable pages" preference off = no resizing.
-        // Dividers stretch along their axis only: the cross-axis and corner handles stay hidden.
+
         bool resize = _canvas.CanResize && !Box.Locked;
         _resizeRight.IsVisible = resize && Box.Divider != "v";
         _resizeBottom.IsVisible = resize && Box.Divider != "h";
-        // Full all-sides + corners resize for real containers; dividers keep their one-axis handle only.
+
         bool full = resize && Box.Divider is null;
         _resizeLeft.IsVisible = full;
         _resizeTop.IsVisible = full;
@@ -1829,39 +1659,32 @@ internal sealed class NoteBoxView : Panel
         _resizeCornerTL.IsVisible = full;
         _resizeCornerBL.IsVisible = full;
 
-        // Mind-map text bubbles read by family: a Title pill (fully-rounded), an Info squircle, or a
-        // Callout with a thick left accent stripe.
         bool normalBox = Box.Divider is null && Box.ImagePath is null && Box.Table is null && Box.AttachPath is null;
         bool bubble = _canvas.IsMindmap && normalBox;
         var kind = Box.Kind;
         bool titlePill = kind == BubbleKind.Title;
-        // Border: a title pill wears a uniform ring (extra-thick when central); Info a slim uniform ring;
-        // a Callout a thick left stripe over a hairline elsewhere (reads as a quote/aside bar).
+
         _chrome.BorderThickness = !bubble ? new Thickness(1)
             : kind == BubbleKind.Callout ? new Thickness(7, 1.6, 1.6, 1.6)
             : new Thickness(titlePill ? (Box.Central ? 6.5 : 2.6) : 2.2);
-        if (normalBox)   // leave divider/image/attachment/table chrome radii as their constructor set them
+        if (normalBox)
         {
             double rad = !bubble ? NoteCanvas.NoteRadiusPref
-                       : titlePill ? 999                          // pill
-                       : kind == BubbleKind.Info ? 16              // squircle
-                       : 7;                                        // Callout: nearly square
+                       : titlePill ? 999
+                       : kind == BubbleKind.Info ? 16
+                       : 7;
             _chrome.CornerRadius = new CornerRadius(rad);
             _grip.CornerRadius = new CornerRadius(rad, rad, 0, 0);
         }
         if (bubble)
         {
-            // A Title pill centres its single-line label (both axes) via a balancing bottom margin; Info and
-            // Callout read as body cards, so their text sits top-left. Centering/bolding is display-only —
-            // it never bakes alignment or weight into the document.
+
             Editor.ForceCenter = titlePill;
             Editor.ForceBold = titlePill && Box.Central;
             Editor.Margin = titlePill ? new Thickness(10, 3, 10, 20)
-                          : kind == BubbleKind.Callout ? new Thickness(15, 5, 12, 10)   // clear the left stripe
+                          : kind == BubbleKind.Callout ? new Thickness(15, 5, 12, 10)
                           : new Thickness(12, 5, 12, 10);
-            // A small round close button nestled just inside the top-right corner — it echoes the
-            // connect-port dots (same round chip language), a subtle chip at rest and red on hover.
-            // ArrangeOverride seats it: along the pill's corner diagonal, or hugging the corner otherwise.
+
             _close.Width = _close.Height = 16;
             _close.CornerRadius = new CornerRadius(8);
             _close.Clip = null;
@@ -1873,7 +1696,7 @@ internal sealed class NoteBoxView : Panel
             _closeRestFg = new SolidColorBrush(Colors.White, 0.80);
             _closeHoverBg = new SolidColorBrush(Color.Parse("#E81123"));
         }
-        else if (normalBox)   // ordinary note card: the ✕ hugs the square corner as before
+        else if (normalBox)
         {
             _close.Width = _close.Height = 17;
             _close.CornerRadius = new CornerRadius(0, NoteCanvas.NoteRadiusPref, 0, 6);
@@ -1887,11 +1710,9 @@ internal sealed class NoteBoxView : Panel
             _closeRestFg = CloseFg;
             _closeHoverBg = CloseHoverBg;
         }
-        _close.Background = _closeRestBg;       // apply the resting look now the box kind is known
+        _close.Background = _closeRestBg;
         _closeGlyph.Foreground = _closeRestFg;
 
-        // Connect ports show while the bubble is active or a link is in flight; the diagonals wait for
-        // the toolbar toggle. All wear the bubble colour (or accent) so the map's wiring reads clearly.
         bool showPorts = bubble && (active || _linking || _linkTarget);
         var portBrush = Box.Color is { } ph && Color.TryParse(ph, out var pc)
             ? new SolidColorBrush(pc) : new SolidColorBrush(Color.Parse(Services.ThemeManager.Current.Accent));
@@ -1901,12 +1722,10 @@ internal sealed class NoteBoxView : Panel
             if (port.IsVisible) port.Background = portBrush;
         }
 
-        if (_selected)   // rubber-band selection: an accent outline over whatever the normal border was
+        if (_selected)
             _chrome.BorderBrush = new SolidColorBrush(Color.Parse(Services.ThemeManager.Current.Accent));
     }
 
-    /// <summary>Ease the container edge toward <paramref name="target"/> opacity (instant when motion is
-    /// off, or when it is already there).</summary>
     private void FadeEdge(double target)
     {
         if (System.Math.Abs(_edge.Opacity - target) < 0.01) return;
@@ -1918,8 +1737,6 @@ internal sealed class NoteBoxView : Panel
             done: () => _edge.Opacity = target);
     }
 
-    /// <summary>A link drag entered/left this bubble: light up its ports as drop targets (and drop them
-    /// again on leave). Cheap no-op when the state hasn't changed — UpdateLink calls it every move.</summary>
     internal void SetLinkTarget(bool on)
     {
         if (_linkTarget == on) return;
@@ -1934,9 +1751,6 @@ internal sealed class NoteBoxView : Panel
         RefreshChrome();
     }
 
-    /// <summary>Panels arrange children to fill, so ports sit by alignment + margin. The diagonal ports
-    /// must land on the rounded pill corners (radius = half the shorter side), not the empty rectangular
-    /// corners — recompute their margins from the arranged size each pass.</summary>
     protected override Size ArrangeOverride(Size finalSize)
     {
         if (_canvas.IsMindmap)
@@ -1945,17 +1759,13 @@ internal sealed class NoteBoxView : Panel
             bool bubble = Box.Divider is null && Box.ImagePath is null && Box.Table is null && Box.AttachPath is null;
             if (bubble)
             {
-                // Seat the round ✕ (16px) so its OUTER corner lands just inside the bubble's rounded corner:
-                // the 45° point of a corner arc of radius cr sits (0.293·cr) in from each edge, and we back
-                // off a further (0.707·bt) so the chip clears the border ring (fat on a central pill). This
-                // keeps the whole chip on-bubble for every kind — Title's big pill cap and the tight Info/
-                // Callout corners alike — instead of the old maths that let it ride over the curve.
+
                 double bt = _chrome.BorderThickness.Top;
                 double cr = Box.Kind switch
                 {
-                    BubbleKind.Title => Math.Min(finalSize.Width, finalSize.Height) / 2,   // pill cap radius
+                    BubbleKind.Title => Math.Min(finalSize.Width, finalSize.Height) / 2,
                     BubbleKind.Info => 16,
-                    _ => 7,                                                                // Callout
+                    _ => 7,
                 };
                 double m = 0.293 * cr + 0.707 * bt + 1;
                 _close.Margin = new Thickness(0, m, m, 0);
@@ -1967,7 +1777,7 @@ internal sealed class NoteBoxView : Panel
     private void PlaceDiagonalPorts(double w, double h)
     {
         double rad = Math.Min(w, h) / 2;
-        double m = 0.2929 * rad - 7;   // 45° point on the corner arc, less half the 14px dot
+        double m = 0.2929 * rad - 7;
         foreach (var (port, diagonal, dir) in _ports)
         {
             if (!diagonal) continue;
@@ -1986,11 +1796,6 @@ internal sealed class NoteBoxView : Panel
     private (double X, double Y, double W, double H) _dragOrigin;
     private bool _dragging;
 
-    /// <summary>Set once the user has actually grabbed this container (move or resize). A brand-new
-    /// container is EMPTY, and grabbing it takes focus off its editor — which used to hand it straight
-    /// to the empty-box cleanup, so newly created containers vanished (with the pop particles) the
-    /// instant you tried to move or resize them. Containers with text were unaffected, which is why
-    /// only NEW ones appeared broken.</summary>
     internal bool Manipulated { get; private set; }
 
     private void WireDrag(Control handle, Edge edges)
@@ -1998,14 +1803,14 @@ internal sealed class NoteBoxView : Panel
         handle.PointerPressed += (_, e) =>
         {
             if (!e.GetCurrentPoint(handle).Properties.IsLeftButtonPressed) return;
-            if (Box.Locked) return;                        // rigid starters: no move, no resize
+            if (Box.Locked) return;
             _dragStart = e.GetPosition(_canvas);
-            // Height origin = what's on screen now, so the first drag pixel moves from there.
+
             _dragOrigin = (Box.X, Box.Y, Box.Width, Box.H > 0 ? Box.H : Bounds.Height);
             _dragging = true;
-            Manipulated = true;   // never let the empty-box cleanup swallow a container being moved/resized
-            if (edges == Edge.None && _canvas.IsSelected(this)) _canvas.BeginGroupDrag();   // move the whole selection
-            RefreshChrome();                          // lock the border visible for the whole drag
+            Manipulated = true;
+            if (edges == Edge.None && _canvas.IsSelected(this)) _canvas.BeginGroupDrag();
+            RefreshChrome();
             e.Pointer.Capture(handle);
             e.Handled = true;
         };
@@ -2016,9 +1821,9 @@ internal sealed class NoteBoxView : Panel
             double dx = p.X - _dragStart.X, dy = p.Y - _dragStart.Y;
             var (ox, oy, ow, oh) = _dragOrigin;
             bool snap = _canvas.SnapToGrid;
-            if (edges == Edge.None)                        // whole-box move (the grip)
+            if (edges == Edge.None)
             {
-                if (!_canvas.GroupDragTo(dx, dy))          // moves the whole selection (incl. this box); else just this box
+                if (!_canvas.GroupDragTo(dx, dy))
                 {
                     double nx = ox + dx, ny = oy + dy;
                     if (snap) { nx = GridMath.Snap(nx); ny = GridMath.Snap(ny); }
@@ -2034,7 +1839,7 @@ internal sealed class NoteBoxView : Panel
                     if (snap) nw = GridMath.Snap(nw);
                     nw = Math.Clamp(nw, Box.Divider == "h" ? NoteBox.MinDividerLength : NoteBox.MinWidth, 1600);
                     Box.Width = nw;
-                    if (edges.HasFlag(Edge.Left)) Box.X = Math.Max(0, ox + ow - nw);   // keep the right edge fixed
+                    if (edges.HasFlag(Edge.Left)) Box.X = Math.Max(0, ox + ow - nw);
                 }
                 if ((edges & (Edge.Top | Edge.Bottom)) != 0)
                 {
@@ -2042,7 +1847,7 @@ internal sealed class NoteBoxView : Panel
                     if (snap) nh = GridMath.Snap(nh);
                     nh = Math.Clamp(nh, Box.Divider == "v" ? NoteBox.MinDividerLength : NoteBox.MinHeight, 4000);
                     Box.H = nh;
-                    if (edges.HasFlag(Edge.Top)) Box.Y = Math.Max(0, oy + oh - nh);    // keep the bottom edge fixed
+                    if (edges.HasFlag(Edge.Top)) Box.Y = Math.Max(0, oy + oh - nh);
                 }
             }
             _canvas.InvalidateMeasure();
@@ -2053,9 +1858,9 @@ internal sealed class NoteBoxView : Panel
             if (!_dragging) return;
             _dragging = false;
             e.Pointer.Capture(null);
-            RefreshChrome();                          // back to hover/focus-driven now the drag is done
+            RefreshChrome();
             if (edges == Edge.None) { _canvas.EndGroupDrag(); _canvas.OnBoxDragEnd(this); }
-            _canvas.Document?.CommitGeometry();      // persist the final geometry once
+            _canvas.Document?.CommitGeometry();
             e.Handled = true;
         };
     }

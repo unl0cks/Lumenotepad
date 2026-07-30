@@ -3,9 +3,6 @@ using Avalonia;
 
 namespace Lumenotepad.Editor;
 
-/// <summary>Pure guide geometry for the page styles: which lines/boxes a style draws, computed from
-/// the VIEWPORT (divider positions — the "one screen" the method is designed around) and the CANVAS
-/// (how far lines extend as the page grows). Rendered by GuideLayer; unit-tested here.</summary>
 public static class PageStyleGuides
 {
     public sealed record GuideSet(
@@ -15,34 +12,26 @@ public static class PageStyleGuides
         public static readonly GuideSet Empty = new(new List<(Point, Point)>(), new List<Rect>());
     }
 
-    public const double Margin = 16;        // must match PageStyleTemplate.Margin (region insets)
-    public const double RuleSpacing = 28;   // Sentence/Ruled line pitch
-    public const double RuleTop = 48;       // first Sentence rule
-    public const double HeaderY = 64;       // Charting header underline
-    public const double BoxMargin = 24;     // Boxing outer margin
-    public const double BoxGap = 16;        // Boxing gap between boxes
+    public const double Margin = 16;
+    public const double RuleSpacing = 28;
+    public const double RuleTop = 48;
+    public const double HeaderY = 64;
+    public const double BoxMargin = 24;
+    public const double BoxGap = 16;
 
     public static GuideSet For(string pageStyle, Size viewport, Size canvas, double contentBottom = 0)
     {
-        // Divider positions come from the viewport; a zero viewport (not yet measured) uses the canvas.
+
         double vw = viewport.Width > 0 ? viewport.Width : canvas.Width;
         double vh = viewport.Height > 0 ? viewport.Height : canvas.Height;
         double cw = canvas.Width, ch = canvas.Height;
         var lines = new List<(Point, Point)>();
         var boxes = new List<Rect>();
 
-        // Positions are rounded to WHOLE PIXELS: crisper 1px lines, and fraction-of-viewport math
-        // isn't exactly representable in binary floats (900 × 0.28 = 252.00000000000003) — rounding
-        // keeps the geometry (and the tests) on clean values. PageStyleTemplate rounds identically
-        // so starters always align with the guides.
         switch (pageStyle)
         {
             case PageStyles.Cornell:
-                // The cue/notes rule and the summary rule come from CornellMetrics — the SAME geometry
-                // the docked region boxes snap to (NoteCanvas), so the lines and the labelled boxes can
-                // never drift apart on resize. contentBottom is the notes content foot (breathing-room
-                // and the summary box excluded); the summary rule sits just below it and the cue rule
-                // runs down to meet it, so both descend as the notes grow.
+
                 var (cx, sy) = CornellMetrics(vw, vh, contentBottom);
                 lines.Add((new Point(cx, 0), new Point(cx, sy)));
                 lines.Add((new Point(0, sy), new Point(cw, sy)));
@@ -77,12 +66,6 @@ public static class PageStyleGuides
         return lines.Count == 0 && boxes.Count == 0 ? GuideSet.Empty : new GuideSet(lines, boxes);
     }
 
-    /// <summary>The Cornell divider geometry both the guide lines and the docked region boxes derive
-    /// from, so they can never drift apart. <c>Cue</c> = the cue|notes column split (a viewport
-    /// fraction). <c>Sum</c> = the summary rule: it sits a little below the notes content
-    /// (<paramref name="notesFoot"/>, the summary box excluded) but never rides above its 80%-of-screen
-    /// home — so it starts on the first screen and descends as the notes grow, the cue rule running
-    /// down to meet it. A zero/empty notesFoot just parks the summary at its 80% home.</summary>
     public static (double Cue, double Sum) CornellMetrics(double vw, double vh, double notesFoot)
     {
         double cue = System.Math.Round(vw * 0.28);
@@ -92,9 +75,6 @@ public static class PageStyleGuides
         return (cue, sum);
     }
 
-    /// <summary>The three Cornell region rects (cue / notes / summary), in canvas coords, that the
-    /// docked starter boxes snap to — the same math as the guide lines. Widths are viewport-relative
-    /// so the columns fill the visible page; heights are 0 (auto — the box grows with its content).</summary>
     public static (Rect Cue, Rect Notes, Rect Summary) CornellRegions(double vw, double vh, double notesFoot)
     {
         var (cue, sum) = CornellMetrics(vw, vh, notesFoot);
@@ -105,16 +85,8 @@ public static class PageStyleGuides
             new Rect(m, sum + 12, System.Math.Max(NoteBoxMinWidth, vw - 2 * m), 0));
     }
 
-    /// <summary>Floor for a region box width — mirrors NoteBox.MinWidth without an Avalonia-model
-    /// dependency in this pure geometry file.</summary>
     private const double NoteBoxMinWidth = 140;
 
-    /// <summary>The docking rects for a structured style's labelled starter boxes, keyed by a stable
-    /// region id, in canvas coords — the SAME viewport math the guide lines use, so a page's boxes and
-    /// its guides scale together and never drift apart on resize. Rects are auto-height (Height 0): the
-    /// box sits at the top-left of its region and grows with its content. Cornell's summary is the one
-    /// region that also descends with the notes (<paramref name="notesFoot"/>); the rest ignore it.
-    /// Styles with no docked starters (Freeform, Mindmap) return an empty list.</summary>
     public static IReadOnlyList<(string Id, Rect Rect)> Regions(
         string pageStyle, Size viewport, Size canvas, double notesFoot = 0)
     {

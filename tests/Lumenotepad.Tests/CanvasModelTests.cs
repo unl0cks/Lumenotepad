@@ -71,15 +71,15 @@ public class CanvasModelTests
 
         int n = 0;
         canvas.Changed += () => n++;
-        box.Doc.InsertText(box.Doc.End, "!");           // edits while trashed don't bubble
+        box.Doc.InsertText(box.Doc.End, "!");
         Assert.Equal(0, n);
 
         canvas.RestoreFromTrash(box, 200, 300);
-        Assert.Equal(1, n);                             // the restore itself raises Changed
+        Assert.Equal(1, n);
         Assert.Empty(canvas.Trash);
         Assert.Equal(200, Assert.Single(canvas.Boxes).X);
 
-        box.Doc.InsertText(box.Doc.End, "?");           // edits bubble again after restore
+        box.Doc.InsertText(box.Doc.End, "?");
         Assert.Equal(2, n);
     }
 
@@ -95,7 +95,7 @@ public class CanvasModelTests
         box.Doc.DeleteRange(new DocPos(0, 0), end);
         Assert.True(box.IsEmpty);
 
-        box.Doc.SetBullet(new DocPos(0, 0), new DocPos(0, 0), "dot");   // a bare bullet is content too
+        box.Doc.SetBullet(new DocPos(0, 0), new DocPos(0, 0), "dot");
         Assert.False(box.IsEmpty);
     }
 }
@@ -141,7 +141,7 @@ public class CanvasJsonTests
         var trashed = Assert.Single(restored.Trash);
         Assert.Equal("deleted", trashed.Doc.GetText());
 
-        restored.RestoreFromTrash(trashed);              // reloaded trash restores cleanly
+        restored.RestoreFromTrash(trashed);
         Assert.Equal(2, restored.Boxes.Count);
         Assert.Empty(restored.Trash);
     }
@@ -150,12 +150,12 @@ public class CanvasJsonTests
     public void V2_roundTrip_preservesBubbleKind_titleStaysDefault()
     {
         var canvas = new CanvasDocument();
-        canvas.AddBox(0, 0);                             // Title = default, no serialized field
+        canvas.AddBox(0, 0);
         canvas.AddBox(200, 0).Kind = BubbleKind.Info;
         canvas.AddBox(400, 0).Kind = BubbleKind.Callout;
 
         var json = CanvasDocJson.ToJson(canvas);
-        Assert.DoesNotContain("\"knd\":0", json);        // the default is omitted from the file
+        Assert.DoesNotContain("\"knd\":0", json);
         var restored = CanvasDocJson.FromJson(json);
 
         Assert.Equal(BubbleKind.Title, restored.Boxes[0].Kind);
@@ -196,8 +196,6 @@ public class CanvasJsonTests
         Assert.Empty(CanvasDocJson.FromJson(json).Boxes);
     }
 
-    // ---- mindmap links (M9 Part 5) ----
-
     [Fact]
     public void ToggleLink_linksThenUnlinks_firesChanged_ignoresSelf()
     {
@@ -207,12 +205,12 @@ public class CanvasJsonTests
         int changed = 0;
         canvas.Changed += () => changed++;
 
-        Assert.False(canvas.ToggleLink(a, a));           // self-link refused
+        Assert.False(canvas.ToggleLink(a, a));
         Assert.Empty(canvas.Links);
 
         Assert.True(canvas.ToggleLink(a, b));
         Assert.Single(canvas.Links);
-        Assert.False(canvas.ToggleLink(b, a));           // same pair, either order → unlink
+        Assert.False(canvas.ToggleLink(b, a));
         Assert.Empty(canvas.Links);
         Assert.Equal(2, changed);
     }
@@ -229,7 +227,7 @@ public class CanvasJsonTests
         canvas.ToggleLink(a, c);
 
         canvas.DeleteToTrash(b);
-        Assert.Single(canvas.Links);                     // only a—c survives
+        Assert.Single(canvas.Links);
         Assert.True(ReferenceEquals(canvas.Links[0].A, a) && ReferenceEquals(canvas.Links[0].B, c));
 
         canvas.RemoveBox(a);
@@ -247,10 +245,10 @@ public class CanvasJsonTests
         canvas.ToggleLink(b, c);
 
         canvas.DeleteToTrash(b);
-        Assert.Empty(canvas.Links);                       // both of b's links parked, not dropped
+        Assert.Empty(canvas.Links);
 
         canvas.RestoreFromTrash(b);
-        Assert.Equal(2, canvas.Links.Count);              // restoring b brings both connections back
+        Assert.Equal(2, canvas.Links.Count);
         Assert.Contains(canvas.Links, l => Touches(l, a, b));
         Assert.Contains(canvas.Links, l => Touches(l, b, c));
     }
@@ -265,11 +263,11 @@ public class CanvasJsonTests
         canvas.ToggleLink(a, b);
         canvas.ToggleLink(b, c);
 
-        canvas.DeleteToTrash(b);        // parks a—b and b—c
-        canvas.RemoveBox(a);            // a gone for good → its parked a—b can never return
+        canvas.DeleteToTrash(b);
+        canvas.RemoveBox(a);
 
         canvas.RestoreFromTrash(b);
-        Assert.Single(canvas.Links);                      // only b—c reconnects
+        Assert.Single(canvas.Links);
         Assert.True(Touches(canvas.Links[0], b, c));
     }
 
@@ -285,7 +283,7 @@ public class CanvasJsonTests
         a.Doc.InsertText(new DocPos(0, 0), "center");
         var b = canvas.AddBox(400, 0);
         b.Doc.InsertText(new DocPos(0, 0), "branch");
-        canvas.AddBox(0, 400);                           // unlinked third box
+        canvas.AddBox(0, 400);
         canvas.ToggleLink(a, b);
 
         var reloaded = CanvasDocJson.FromJson(CanvasDocJson.ToJson(canvas));
@@ -301,7 +299,7 @@ public class CanvasJsonTests
         var canvas = new CanvasDocument();
         var img = canvas.AddBox(20, 30, 300);
         img.ImagePath = "images/pic.png";
-        Assert.False(img.IsEmpty);                       // an image box never evaporates
+        Assert.False(img.IsEmpty);
 
         var reloaded = CanvasDocJson.FromJson(CanvasDocJson.ToJson(canvas));
         var box = Assert.Single(reloaded.Boxes);
@@ -316,14 +314,14 @@ public class CanvasJsonTests
         var canvas = new CanvasDocument();
         var div = canvas.AddBox(50, 80);
         div.Divider = "v";
-        div.Width = 22;                                  // vertical strips sit under NoteBox.MinWidth
+        div.Width = 22;
         div.H = 240;
-        Assert.False(div.IsEmpty);                       // a divider box never evaporates
+        Assert.False(div.IsEmpty);
 
         var reloaded = CanvasDocJson.FromJson(CanvasDocJson.ToJson(canvas));
         var box = Assert.Single(reloaded.Boxes);
         Assert.Equal("v", box.Divider);
-        Assert.Equal(22, box.Width);                     // load must not clamp back to MinWidth
+        Assert.Equal(22, box.Width);
         Assert.Equal(240, box.H);
     }
 
@@ -333,7 +331,7 @@ public class CanvasJsonTests
         var canvas = new CanvasDocument();
         var att = canvas.AddBox(10, 20, 260);
         att.AttachPath = "assets/report (2).pdf";
-        Assert.False(att.IsEmpty);                       // an attachment box never evaporates
+        Assert.False(att.IsEmpty);
 
         var reloaded = CanvasDocJson.FromJson(CanvasDocJson.ToJson(canvas));
         var box = Assert.Single(reloaded.Boxes);
@@ -349,7 +347,7 @@ public class CanvasJsonTests
 
         t.InsertRow(-1);
         Assert.Equal(3, t.RowCount);
-        Assert.Equal(3, t.Rows[2].Count);       // new row matches column count
+        Assert.Equal(3, t.Rows[2].Count);
 
         t.InsertColumn(0);
         Assert.Equal(4, t.ColCount);
@@ -358,7 +356,6 @@ public class CanvasJsonTests
         t.RemoveColumn(0);
         Assert.Equal(3, t.ColCount);
 
-        // Can't empty the table.
         var single = NoteTable.Create(1, 1);
         single.RemoveRow(0);
         single.RemoveColumn(0);
@@ -374,14 +371,13 @@ public class CanvasJsonTests
         int changes = 0;
         canvas.Changed += () => changes++;
 
-        box.Table!.Rows[0][0].InsertText(new DocPos(0, 0), "hi");   // a cell edit
+        box.Table!.Rows[0][0].InsertText(new DocPos(0, 0), "hi");
         Assert.True(changes >= 1);
 
         int before = changes;
-        canvas.TableInsertRow(box, -1);                            // a structural edit
+        canvas.TableInsertRow(box, -1);
         Assert.True(changes > before);
 
-        // A cell in the newly added row is also wired.
         int mid = changes;
         box.Table.Rows[2][0].InsertText(new DocPos(0, 0), "x");
         Assert.True(changes > mid);
@@ -404,7 +400,6 @@ public class CanvasJsonTests
         Assert.Equal("A1", r.Table.Rows[0][0].GetText());
         Assert.Equal("B2", r.Table.Rows[1][1].GetText());
 
-        // The reloaded table's cells must be wired for autosave too.
         int changes = 0;
         reloaded.Changed += () => changes++;
         r.Table.Rows[0][1].InsertText(new DocPos(0, 0), "edit");
@@ -420,6 +415,6 @@ public class CanvasJsonTests
 
         var json = "{\"v\":2,\"boxes\":[{\"x\":0,\"y\":0,\"w\":360,\"paras\":[]}]," +
                    "\"links\":[[0,5],[0,0],[1],[0,-1]]}";
-        Assert.Empty(CanvasDocJson.FromJson(json).Links); // out-of-range/self/short pairs all dropped
+        Assert.Empty(CanvasDocJson.FromJson(json).Links);
     }
 }

@@ -19,7 +19,7 @@ public class RichModelTests
         var d = Doc("hello world");
         d.InsertText(new DocPos(0, 5), " brave");
         Assert.Equal("hello brave world", d.GetText());
-        Assert.Single(d.Paragraphs[0].Runs);   // same format → normalized to one run
+        Assert.Single(d.Paragraphs[0].Runs);
     }
 
     [Fact]
@@ -67,11 +67,10 @@ public class RichModelTests
         var b = new DocPos(0, 11);
         d.ApplyFormat(a, b, r => r.Bold = true);
 
-        Assert.Equal(2, d.Paragraphs[0].Runs.Count);   // "hello " + bold "world"
+        Assert.Equal(2, d.Paragraphs[0].Runs.Count);
         Assert.True(d.RangeAll(a, b, r => r.Bold));
         Assert.False(d.RangeAll(new DocPos(0, 0), b, r => r.Bold));
 
-        // toggle back off → normalizes to a single run again
         d.ApplyFormat(a, b, r => r.Bold = false);
         Assert.Single(d.Paragraphs[0].Runs);
     }
@@ -132,7 +131,7 @@ public class RichModelTests
         d.SetTag(new DocPos(0, 0), new DocPos(0, 0), "important");
         Assert.Equal("important", d.Paragraphs[0].Tag);
 
-        d.SplitParagraph(d.End);                       // Enter: the tag marks that ONE thought
+        d.SplitParagraph(d.End);
         Assert.Equal("important", d.Paragraphs[0].Tag);
         Assert.Null(d.Paragraphs[1].Tag);
 
@@ -155,7 +154,7 @@ public class RichModelTests
     {
         var doc = new RichDocument();
         doc.InsertText(new DocPos(0, 0), "a\nb\nc\nd\ne");
-        doc.SetBullet(new DocPos(1, 0), new DocPos(3, 0), "num");   // paras 1..3 numbered
+        doc.SetBullet(new DocPos(1, 0), new DocPos(3, 0), "num");
 
         Assert.Equal((1, 3), doc.NumRunAt(2));
         Assert.Equal((1, 3), doc.NumRunAt(1));
@@ -171,7 +170,7 @@ public class RichModelTests
     {
         var doc = new RichDocument();
         doc.InsertText(new DocPos(0, 0), "a\nb\nc\nd");
-        doc.SetBullet(new DocPos(0, 0), new DocPos(2, 0), "num");   // paras 0..2 numbered
+        doc.SetBullet(new DocPos(0, 0), new DocPos(2, 0), "num");
 
         bool changed = false;
         doc.Changed += () => changed = true;
@@ -181,13 +180,13 @@ public class RichModelTests
         Assert.True(doc.Paragraphs[0].NumBold);
         Assert.True(doc.Paragraphs[1].NumBold);
         Assert.True(doc.Paragraphs[2].NumBold);
-        Assert.Null(doc.Paragraphs[3].NumBold);      // outside the run
+        Assert.Null(doc.Paragraphs[3].NumBold);
 
-        doc.SetNumFlag(1, 'b', null);                // clearing restores inherit
+        doc.SetNumFlag(1, 'b', null);
         Assert.Null(doc.Paragraphs[0].NumBold);
 
         changed = false;
-        doc.SetNumFlag(3, 'b', true);                // not a numbered paragraph → no-op
+        doc.SetNumFlag(3, 'b', true);
         Assert.False(changed);
     }
 
@@ -197,17 +196,17 @@ public class RichModelTests
         var d = Doc("ab\ncd");
         Assert.Equal(new DocPos(1, 0), d.Move(new DocPos(0, 2), +1));
         Assert.Equal(new DocPos(0, 2), d.Move(new DocPos(1, 0), -1));
-        Assert.Equal(new DocPos(0, 0), d.Move(new DocPos(0, 0), -1));   // clamped at start
+        Assert.Equal(new DocPos(0, 0), d.Move(new DocPos(0, 0), -1));
     }
 
     [Fact]
     public void NumFlag_ResolvesParaThenDefaultThenRun()
     {
-        Assert.True(RichTextEditor.NumFlag(true, false, false));    // paragraph override wins
+        Assert.True(RichTextEditor.NumFlag(true, false, false));
         Assert.False(RichTextEditor.NumFlag(false, true, true));
-        Assert.True(RichTextEditor.NumFlag(null, true, false));     // then the global default
+        Assert.True(RichTextEditor.NumFlag(null, true, false));
         Assert.False(RichTextEditor.NumFlag(null, false, true));
-        Assert.True(RichTextEditor.NumFlag(null, null, true));      // then the text run
+        Assert.True(RichTextEditor.NumFlag(null, null, true));
         Assert.False(RichTextEditor.NumFlag(null, null, false));
     }
 
@@ -217,13 +216,11 @@ public class RichModelTests
         Assert.Equal("num", RichTextEditor.SmartListKind("1."));
         Assert.Equal("dot", RichTextEditor.SmartListKind("-"));
         Assert.Equal("dot", RichTextEditor.SmartListKind("*"));
-        Assert.Null(RichTextEditor.SmartListKind("2."));      // only "1." starts a list
+        Assert.Null(RichTextEditor.SmartListKind("2."));
         Assert.Null(RichTextEditor.SmartListKind("a."));
         Assert.Null(RichTextEditor.SmartListKind(""));
         Assert.Null(RichTextEditor.SmartListKind("hello -"));
     }
-
-    // ---- M10: alignment, text types, super/subscript, links ----
 
     [Fact]
     public void SetAlign_and_AlignOf_acrossParagraphs()
@@ -234,7 +231,7 @@ public class RichModelTests
         Assert.Equal(TextAlign.Center, d.Paragraphs[1].Align);
         Assert.Equal(TextAlign.Left, d.Paragraphs[2].Align);
         Assert.Equal(TextAlign.Center, d.AlignOf(new DocPos(0, 0), new DocPos(1, 1)));
-        Assert.Null(d.AlignOf(new DocPos(0, 0), new DocPos(2, 0)));   // mixed → null
+        Assert.Null(d.AlignOf(new DocPos(0, 0), new DocPos(2, 0)));
     }
 
     [Fact]
@@ -255,15 +252,15 @@ public class RichModelTests
         d.SetAlign(new DocPos(0, 0), new DocPos(0, 0), TextAlign.Right);
         d.SetParaStyle(new DocPos(0, 0), new DocPos(0, 0), ParaStyle.Title);
         d.SplitParagraph(new DocPos(0, 10));
-        Assert.Equal(TextAlign.Right, d.Paragraphs[1].Align);        // alignment carries
-        Assert.Equal(ParaStyle.Body, d.Paragraphs[1].Style);         // heading → body after Enter
+        Assert.Equal(TextAlign.Right, d.Paragraphs[1].Align);
+        Assert.Equal(ParaStyle.Body, d.Paragraphs[1].Style);
     }
 
     [Fact]
     public void Baseline_and_Link_areRunFormatState()
     {
         var d = Doc("H2O and a link");
-        d.ApplyFormat(new DocPos(0, 1), new DocPos(0, 2), r => r.Baseline = Baseline.Sub);   // the "2"
+        d.ApplyFormat(new DocPos(0, 1), new DocPos(0, 2), r => r.Baseline = Baseline.Sub);
         Assert.True(d.RangeAll(new DocPos(0, 1), new DocPos(0, 2), r => r.Baseline == Baseline.Sub));
         Assert.True(d.RangeAll(new DocPos(0, 0), new DocPos(0, 1), r => r.Baseline == Baseline.Normal));
 
@@ -292,15 +289,15 @@ public class RichModelTests
     public void InsertFootnote_addsMarkerAndNumberedEntry()
     {
         var d = Doc("See here.");
-        var caret = d.InsertFootnote(new DocPos(0, 8), "A source.");   // before the period
-        Assert.Equal(new DocPos(0, 11), caret);                        // caret after "[1]"
+        var caret = d.InsertFootnote(new DocPos(0, 8), "A source.");
+        Assert.Equal(new DocPos(0, 11), caret);
 
         Assert.Contains("[1]", d.Paragraphs[0].Text);
         var fn = d.Paragraphs[^1];
         Assert.True(fn.Footnote);
         Assert.Equal("[1] A source.", fn.Text);
 
-        d.InsertFootnote(new DocPos(0, 0), "Second.");                 // numbering continues
+        d.InsertFootnote(new DocPos(0, 0), "Second.");
         Assert.Equal(2, d.Paragraphs.Count(p => p.Footnote));
         Assert.Equal("[2] Second.", d.Paragraphs[^1].Text);
     }

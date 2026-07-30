@@ -1,17 +1,3 @@
-# Builds Assets/Fonts/LumenIcons.ttf - the macOS fallback icon font.
-#
-# Windows renders the app's icon glyphs from the system "Segoe Fluent Icons" font, which does not
-# exist on macOS (and is not redistributable), so every PUA codepoint would render as tofu there.
-# This script maps the SAME codepoints the app already uses (U+E70D..U+EDE0) to MIT-licensed glyph
-# shapes from Microsoft's open-source fluentui-system-icons set - the OSS re-implementation of the
-# very same Fluent design language - and compiles them into a TrueType font. The theme's IconFont
-# fallback chain keeps Segoe first, so Windows rendering is untouched; macOS falls through to this.
-#
-# Metrics mimic Segoe MDL2 Assets so the app's pixel-tuned FontSize values (7.5..16) behave the
-# same: unitsPerEm=2048, ascent=2048, descent=0, every glyph a 2048-advance square on the baseline.
-#
-# Run (from repo root):  python tools/lumenicons/build_lumenicons.py
-# Requires: pip install fonttools.  Downloads SVGs once into tools/lumenicons/svg/ (idempotent).
 import os
 import re
 import sys
@@ -23,11 +9,8 @@ REPO_RAW = "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/ma
 OUT_TTF = os.path.normpath(os.path.join(HERE, "..", "..", "src", "Lumenotepad", "Assets", "Fonts", "LumenIcons.ttf"))
 NOTICE = os.path.normpath(os.path.join(HERE, "..", "..", "THIRD-PARTY-NOTICES.md"))
 
-UPM = 2048  # Segoe MDL2-style: square glyphs filling the em, sitting on the baseline
+UPM = 2048
 
-# codepoint -> (glyph name, [candidate repo asset folders], icon snake name)
-# Folder + snake name form the raw URL: assets/<Folder>/SVG/ic_fluent_<snake>_<size>_regular.svg
-# Sizes tried in order: 24 then 20 (a few icons lack a 24px cut). Meanings match the audit list.
 ICONS = {
     0xE70D: ("chevron_down", ["Chevron Down"], "chevron_down"),
     0xE70E: ("chevron_up", ["Chevron Up"], "chevron_up"),
@@ -48,12 +31,10 @@ ICONS = {
     0xE80F: ("home", ["Home"], "home"),
     0xE81C: ("history", ["History"], "history"),
     0xE82F: ("lightbulb", ["Lightbulb"], "lightbulb"),
-    # Segoe's E897 is a BARE question mark - the app draws its own circle around it, so a
-    # "question in a circle" glyph rendered as a circle inside a circle on macOS.
     0xE897: ("question", ["Question"], "question"),
     0xE8A1: ("panel_left", ["Panel Left"], "panel_left"),
     0xE8A5: ("document", ["Document"], "document"),
-    0xE8BB: ("dismiss_chrome", ["Dismiss"], "dismiss"),          # window close: same shape as E711
+    0xE8BB: ("dismiss_chrome", ["Dismiss"], "dismiss"),
     0xE8CB: ("arrow_sort", ["Arrow Sort"], "arrow_sort"),
     0xE8D2: ("text_font", ["Text Font"], "text_font"),
     0xE8D3: ("text_color", ["Text Color"], "text_color"),
@@ -75,7 +56,6 @@ ICONS = {
     0xEDE0: ("text_strikethrough", ["Text Strikethrough"], "text_strikethrough"),
 }
 
-
 def fetch(url: str, dest: str) -> bool:
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "lumenicons-build"})
@@ -87,9 +67,7 @@ def fetch(url: str, dest: str) -> bool:
     except Exception:
         return False
 
-
 def download_all() -> dict:
-    """codepoint -> local svg path; downloads missing files, trying folder/size candidates."""
     os.makedirs(SVG_DIR, exist_ok=True)
     paths, failures = {}, []
     for cp, (gname, folders, snake) in ICONS.items():
@@ -117,7 +95,6 @@ def download_all() -> dict:
         sys.exit(f"{len(failures)} icon(s) could not be downloaded - fix the mapping and re-run")
     return paths
 
-
 def svg_view_size(svg: str) -> float:
     m = re.search(r'viewBox="\s*0\s+0\s+([\d.]+)\s+([\d.]+)', svg)
     if m:
@@ -125,13 +102,7 @@ def svg_view_size(svg: str) -> float:
     m = re.search(r'height="(\d+)', svg)
     return float(m.group(1)) if m else 24.0
 
-
-# Segoe draws the window-CAPTION glyphs (close/min/max) edge-to-edge across the full em, while the
-# Fluent 24px source icons keep ~2px inner padding — uniform scaling left them 25-35% smaller than
-# the Windows look (adversarial-review measurement vs C:\Windows\Fonts\SegoeIcons.ttf). These
-# codepoints get a post-scale about the em centre so their long dimension fills the em.
 CHROME_FILL = {0xE8BB, 0xE921, 0xE922}
-
 
 def build_font(paths: dict) -> None:
     from fontTools.fontBuilder import FontBuilder
@@ -144,19 +115,19 @@ def build_font(paths: dict) -> None:
 
     glyphs, cmap = {}, {}
     order = [".notdef"]
-    pen = TTGlyphPen(None)          # empty .notdef
+    pen = TTGlyphPen(None)
     glyphs[".notdef"] = pen.glyph()
 
     for cp in sorted(paths):
         gname, _, _ = ICONS[cp]
-        if gname in glyphs:          # duplicate mapping reuses the built glyph
+        if gname in glyphs:
             cmap[cp] = gname
             continue
         with open(paths[cp], encoding="utf-8") as f:
             svg = f.read()
         box = svg_view_size(svg)
-        s = UPM / box                # scale the SVG box to the em; flip Y (SVG is y-down)
-        rec = RecordingPen()         # record em-space outlines first so chrome glyphs can re-scale
+        s = UPM / box
+        rec = RecordingPen()
         xform = TransformPen(rec, (s, 0, 0, -s, 0, UPM))
         for d in re.findall(r'\bd="([^"]+)"', svg):
             parse_path(d, xform)
@@ -166,7 +137,7 @@ def build_font(paths: dict) -> None:
             bp = BoundsPen(None)
             rec.replay(bp)
             x0, y0, x1, y1 = bp.bounds
-            k = UPM / max(x1 - x0, y1 - y0)      # long dimension -> full em, scaled about the centre
+            k = UPM / max(x1 - x0, y1 - y0)
             c = UPM / 2 * (1 - k)
             rec.replay(TransformPen(quad, (k, 0, 0, k, c, c)))
         else:
@@ -205,7 +176,6 @@ def build_font(paths: dict) -> None:
     fb.save(OUT_TTF)
     print(f"wrote {OUT_TTF} ({os.path.getsize(OUT_TTF)} bytes, {len(order) - 1} glyphs, {len(cmap)} codepoints)")
 
-
 def write_notice() -> None:
     text = """# Third-party notices
 
@@ -238,9 +208,8 @@ DEALINGS IN THE SOFTWARE.
         f.write(text)
     print(f"wrote {NOTICE}")
 
-
 if __name__ == "__main__":
-    import urllib.parse  # noqa: F401  (used in download_all)
+    import urllib.parse
     print("downloading SVGs...")
     svg_paths = download_all()
     print("building font...")

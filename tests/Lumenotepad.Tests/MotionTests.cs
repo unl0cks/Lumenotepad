@@ -8,7 +8,7 @@ public class MotionTests
     [Theory]
     [InlineData(0.0, 0.0)]
     [InlineData(1.0, 1.0)]
-    [InlineData(0.5, 0.875)]   // 1-(1-0.5)^3
+    [InlineData(0.5, 0.875)]
     public void EaseOut_matches_cubic(double t, double expected)
         => Assert.Equal(expected, Motion.EaseOut(t), 3);
 

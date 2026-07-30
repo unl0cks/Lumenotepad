@@ -88,9 +88,9 @@ public class MarkdownExportTests
     public void Boxes_orderedByYThenX_emptySkipped()
     {
         var doc = new CanvasDocument();
-        doc.Boxes.Add(Box(0, 100, P("second")));   // added first, lower on the page
-        doc.Boxes.Add(Box(0, 10, P("first")));     // higher up → comes first
-        doc.Boxes.Add(new NoteBox() { X = 0, Y = 5 });   // empty → skipped
+        doc.Boxes.Add(Box(0, 100, P("second")));
+        doc.Boxes.Add(Box(0, 10, P("first")));
+        doc.Boxes.Add(new NoteBox() { X = 0, Y = 5 });
         Assert.Equal("# T\n\nfirst\n\nsecond\n", MarkdownExport.PageToMarkdown("T", doc));
     }
 

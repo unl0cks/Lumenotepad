@@ -124,7 +124,6 @@ public class PdfAnnotationTests
             var a = PdfAnnotationHub.Get(@"C:\x\a.pdf", seed.ToJson());
             Assert.Single(a.Items);
 
-            // Same path (any case), even with different disk json → the SAME cached instance.
             var again = PdfAnnotationHub.Get(@"C:\X\A.PDF", null);
             Assert.Same(a, again);
 

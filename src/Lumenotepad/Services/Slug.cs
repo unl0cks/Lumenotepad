@@ -3,11 +3,9 @@ using System.Text;
 
 namespace Lumenotepad.Services;
 
-/// <summary>Turns a display name into a stable, filesystem-safe folder name.</summary>
 public static class Slug
 {
-    /// <summary>Lowercase, alphanumerics kept, runs of anything else collapsed to single dashes,
-    /// trimmed. Empty / symbol-only input falls back to "notebook".</summary>
+
     public static string Make(string name)
     {
         var sb = new StringBuilder();
@@ -21,7 +19,6 @@ public static class Slug
         return s.Length == 0 ? "notebook" : s;
     }
 
-    /// <summary>A slug not already present in <paramref name="existing"/>, appending -2, -3, … on collision.</summary>
     public static string Unique(string name, IEnumerable<string> existing)
     {
         var set = new HashSet<string>(existing);

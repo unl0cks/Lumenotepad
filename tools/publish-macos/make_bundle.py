@@ -1,25 +1,3 @@
-# Assembles the macOS distribution from `dotnet publish` output - runs on Windows.
-#
-# Input:  src/Lumenotepad/bin/Release/net10.0/{osx-arm64,osx-x64}/publish  (created by publish-macos.sh)
-#         assets/macos-iconset/icon_{16..1024}.png                        (created by tools/icongen)
-# Output: dist/Lumenotepad-macOS-<version>-arm64.zip   (Apple Silicon)
-#         dist/Lumenotepad-macOS-<version>-x64.zip     (Intel)
-#         (the update manifest is written separately by tools/publish-manifest.py, which covers
-#          every platform in one file)
-#
-# The bundle is STAGED ON DISK and code-signed here with rcodesign (the cross-platform Apple signer,
-# `cargo install apple-codesign`) rather than by a script on the user's Mac. Apple Silicon refuses to
-# execute unsigned Mach-O, and `dotnet publish` leaves ~220 unsigned dylibs, so something has to sign
-# them; doing it at build time is what lets the download be a plain drag-into-Applications app instead
-# of a Terminal installer.
-#
-# The signature is AD-HOC, which satisfies the kernel but not Gatekeeper - the first launch of any
-# downloaded build still needs one trip through System Settings > Privacy & Security. Every update after
-# that is prompt-free because the app fetches those itself (see Services/UpdateService.cs), and nothing
-# an app downloads is quarantined. Notarising with a real Developer ID would remove even the first trip.
-#
-# Zips are written with unix modes (create_system=3) so the app host and dylibs stay executable through
-# macOS Archive Utility - a plain Windows zip drops the exec bit and the app will not start.
 import os
 import plistlib
 import re
@@ -32,24 +10,18 @@ import zipfile
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 CSPROJ = os.path.join(ROOT, "src", "Lumenotepad", "Lumenotepad.csproj")
 
-
 def csproj_version() -> str:
-    """<Version> in the csproj is the single source of truth - the binary, the Info.plist and the update
-    manifest all have to agree or the updater would offer a build that says it is already installed."""
     m = re.search(r"<Version>([^<]+)</Version>", open(CSPROJ, encoding="utf-8").read())
     if not m:
         sys.exit("no <Version> in Lumenotepad.csproj")
     return m.group(1).strip()
-
 
 VERSION = sys.argv[1] if len(sys.argv) > 1 else csproj_version()
 RIDS = {"arm64": "osx-arm64", "x64": "osx-x64"}
 ICONSET = os.path.join(ROOT, "assets", "macos-iconset")
 DIST = os.path.join(ROOT, "dist")
 
-
 def icns_rle(data: bytes) -> bytes:
-    """The icns packbits variant (it32/ARGB channels): 0x80+n = run of n+3 repeats, 0..0x7F = n+1 literals."""
     out = bytearray()
     i, n = 0, len(data)
     while i < n:
@@ -71,21 +43,15 @@ def icns_rle(data: bytes) -> bytes:
             i = j
     return bytes(out)
 
-
 def argb_chunk(size: int) -> bytes:
-    """Apple-native ARGB entry (what iconutil emits for the small 1x slots): 'ARGB' + RLE'd A,R,G,B planes."""
     with open(os.path.join(ICONSET, f"icon_{size}.rgba"), "rb") as f:
         rgba = f.read()
     if len(rgba) != size * size * 4:
         sys.exit(f"icon_{size}.rgba has {len(rgba)} bytes, expected {size * size * 4} - re-run tools/icongen")
-    planes = [rgba[c::4] for c in (3, 0, 1, 2)]        # A, R, G, B
+    planes = [rgba[c::4] for c in (3, 0, 1, 2)]
     return b"ARGB" + b"".join(icns_rle(p) for p in planes)
 
-
 def build_icns() -> bytes:
-    """Compose a .icns: PNG entries for the big sizes, native ARGB for the 16/32 1x slots.
-    (PNG data in the small legacy types icp4/icp5 renders SCRAMBLED as an app icon in non-Retina
-    1x contexts - macOS decodes it as packbits RGB - so those slots use Apple's ARGB format.)"""
     chunks = []
     for typ, size in [(b"ic04", 16), (b"ic05", 32)]:
         data = argb_chunk(size)
@@ -97,7 +63,6 @@ def build_icns() -> bytes:
         chunks.append(typ + struct.pack(">I", len(data) + 8) + data)
     body = b"".join(chunks)
     return b"icns" + struct.pack(">I", len(body) + 8) + body
-
 
 def info_plist() -> bytes:
     return plistlib.dumps({
@@ -115,7 +80,6 @@ def info_plist() -> bytes:
         "NSPrincipalClass": "NSApplication",
         "LSApplicationCategoryType": "public.app-category.productivity",
     })
-
 
 README = f"""Lumenotepad for macOS  (v{VERSION})
 =====================================
@@ -143,9 +107,7 @@ YOUR NOTES:
   installing or updating.
 """
 
-
 def stage_bundle(arch: str, rid: str, icns: bytes, plist: bytes) -> str:
-    """Lay the .app out on disk so it can be signed as a real bundle."""
     pub = os.path.join(ROOT, "src", "Lumenotepad", "bin", "Release", "net10.0", rid, "publish")
     if not os.path.isdir(pub):
         sys.exit(f"missing publish output: {pub} - run dotnet publish -r {rid} first")
@@ -160,27 +122,17 @@ def stage_bundle(arch: str, rid: str, icns: bytes, plist: bytes) -> str:
         f.write(icns)
     return app
 
-
 def sign_bundle(app: str) -> None:
-    """Ad-hoc sign the bundle (and, recursively, every Mach-O inside it) with rcodesign.
-
-    Not optional on Apple Silicon: the kernel kills unsigned arm64 code, so without this the app simply
-    would not launch after a drag-install. Ad-hoc is as far as we can go without a paid Developer ID -
-    it makes the app RUNNABLE, not Gatekeeper-approved."""
     exe = shutil.which("rcodesign")
     if not exe:
         sys.exit("rcodesign not found - install it with:  cargo install apple-codesign")
     r = subprocess.run([exe, "sign", app], capture_output=True, text=True)
     if r.returncode != 0:
         sys.exit("rcodesign failed:\n" + r.stdout + "\n" + r.stderr)
-    # Prove a signature actually landed rather than trusting the exit code.
     if not os.path.isdir(os.path.join(app, "Contents", "_CodeSignature")):
         sys.exit("rcodesign reported success but wrote no _CodeSignature - refusing to ship it")
 
-
 def zip_bundle(app: str, out: str) -> int:
-    """Zip the signed bundle with unix modes intact. Signatures cover file CONTENT, not mode, so setting
-    the exec bit here cannot invalidate them."""
     count = 0
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
         root = os.path.dirname(app)
@@ -194,14 +146,12 @@ def zip_bundle(app: str, out: str) -> int:
         write_file(zf, "README.txt", README.encode(), 0o644)
     return count
 
-
 def write_file(zf: zipfile.ZipFile, arcname: str, data: bytes, mode: int) -> None:
     zi = zipfile.ZipInfo(arcname)
-    zi.create_system = 3                      # unix, so modes survive extraction on macOS
-    zi.external_attr = ((0o100000 | mode) & 0xFFFF) << 16   # S_IFREG + mode, for picky extractors
+    zi.create_system = 3
+    zi.external_attr = ((0o100000 | mode) & 0xFFFF) << 16
     zi.compress_type = zipfile.ZIP_DEFLATED
     zf.writestr(zi, data)
-
 
 def main() -> None:
     icns = build_icns()
@@ -217,7 +167,6 @@ def main() -> None:
 
     shutil.rmtree(os.path.join(DIST, "stage"), ignore_errors=True)
     print("Now run:  python tools/publish-manifest.py   (writes the shared update manifest)")
-
 
 if __name__ == "__main__":
     main()
