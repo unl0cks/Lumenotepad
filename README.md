@@ -109,9 +109,9 @@ since Apple Silicon refuses to execute unsigned Mach-O and a self-contained .NET
 220 unsigned dylibs. Signing happens at package time with
 [rcodesign](https://github.com/indygreg/apple-platform-rs).
 
-Notarizing with a paid Apple Developer ID would remove the installer step entirely. Until then the
-installer is the supported path, and in-app updates avoid the whole problem because a build the app
-downloads itself is never quarantined.
+The installer is the supported path. It is a one-time cost per machine, not per release, because
+in-app updates avoid the problem entirely: a build the app downloads itself is never quarantined, so
+Gatekeeper never looks at it again.
 
 ### Windows (beta)
 
@@ -321,14 +321,19 @@ somewhere under your user profile.
 Near-term:
 
 - Prove the macOS update path over a real release-to-release hop.
-- Notarize with an Apple Developer ID, which would remove the first-launch Gatekeeper step entirely.
 - Screenshots in this README once the macOS chrome settles.
-- A signed Windows installer, which needs the data directory moved to `%APPDATA%` first.
 
 Later:
 
 - Sync between machines.
+- A signed Windows installer, which needs the data directory moved to `%APPDATA%` first.
 - A real DMG, which needs a macOS runner to build.
+
+Not planned for now:
+
+- **Notarization.** It would remove the installer step on macOS, but it costs an Apple Developer
+  membership every year and the installer already handles it in one pass per machine. Worth
+  revisiting only if this ever goes out to more than a handful of people.
 
 ## License
 
