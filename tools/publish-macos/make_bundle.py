@@ -81,31 +81,69 @@ def info_plist() -> bytes:
         "LSApplicationCategoryType": "public.app-category.productivity",
     })
 
+INSTALL_CMD = """#!/bin/bash
+set -e
+cd "$(dirname "$0")"
+
+DEST="/Applications"
+[ -w "$DEST" ] || { DEST="$HOME/Applications"; mkdir -p "$DEST"; }
+
+if [ -d "Lumenotepad.app" ]; then
+  echo "Installing Lumenotepad into $DEST ..."
+  pkill -x Lumenotepad 2>/dev/null || true
+  for i in 1 2 3 4 5; do pgrep -x Lumenotepad >/dev/null || break; sleep 1; done
+  pgrep -x Lumenotepad >/dev/null && pkill -9 -x Lumenotepad 2>/dev/null || true
+  rm -rf "$DEST/Lumenotepad.app"
+  cp -R "Lumenotepad.app" "$DEST/Lumenotepad.app"
+elif [ -d "$DEST/Lumenotepad.app" ]; then
+  echo "Repairing the copy already in $DEST ..."
+else
+  echo "Could not find Lumenotepad.app next to this file or in $DEST." >&2
+  exit 1
+fi
+
+APP="$DEST/Lumenotepad.app"
+chmod +x "$APP/Contents/MacOS/Lumenotepad" 2>/dev/null || true
+xattr -cr "$APP" 2>/dev/null || true
+codesign --force --deep -s - "$APP" >/dev/null 2>&1 || true
+
+echo "Done. Opening Lumenotepad."
+open "$APP"
+"""
+
 README = f"""Lumenotepad for macOS  (v{VERSION})
 =====================================
 
-TO INSTALL, OR TO UPDATE BY HAND:
-  Drag Lumenotepad.app into your Applications folder (replace the old one if asked).
+DOUBLE-CLICK "Install Lumenotepad.command".
 
-THE FIRST TIME YOU OPEN IT, macOS WILL REFUSE:
-  1. Double-click Lumenotepad - you get "Apple could not verify Lumenotepad".
-     Click "Done".
+That is the whole install. It copies the app into your Applications folder and
+opens it.
+
+macOS will get in the way the first time, because this app is not registered
+with Apple:
+
+  1. You get a warning that it cannot be verified. Click "Done".
   2. Open System Settings > Privacy & Security and scroll down. There is a line
-     about Lumenotepad being blocked - click "Open Anyway", then confirm.
-  3. It opens. You only ever have to do this once.
+     about "Install Lumenotepad.command" being blocked. Click "Open Anyway"
+     and confirm.
+  3. Double-click the file again. It installs and opens.
 
-  (That is macOS being cautious about an app not bought from the App Store - not a
-   sign anything is wrong. Any small independent app does this.)
+You only do this once. Updates come through the app itself afterwards:
+Preferences > About > "Check for updates".
 
-AFTER THAT, UPDATES ARE ONE CLICK:
-  Preferences > About > "Check for updates". The app downloads new versions
-  itself, so macOS does NOT ask you to approve them again. You never need to
-  repeat the steps above, and you never need this zip again.
+DO NOT just drag the app across on its own. macOS refuses to open apps from
+outside the App Store that arrive that way, and tells you the app is damaged
+even though it is fine. The installer removes that block for you.
+
+IF YOU ALREADY DRAGGED IT AND SEE "damaged":
+  Put Lumenotepad back in Applications if you deleted it, then double-click
+  "Install Lumenotepad.command". It repairs the copy that is already there.
 
 YOUR NOTES:
-  Stored in ~/Library/Application Support/Lumenotepad and never touched by
+  Stored in ~/Library/Application Support/Lumenotepad, and never touched by
   installing or updating.
 """
+
 
 def stage_bundle(arch: str, rid: str, icns: bytes, plist: bytes) -> str:
     pub = os.path.join(ROOT, "src", "Lumenotepad", "bin", "Release", "net10.0", rid, "publish")
@@ -143,6 +181,7 @@ def zip_bundle(app: str, out: str) -> int:
                 mode = 0o755 if (name == "Lumenotepad" or name.endswith(".dylib")) else 0o644
                 write_file(zf, arc, open(full, "rb").read(), mode)
                 count += 1
+        write_file(zf, "Install Lumenotepad.command", INSTALL_CMD.encode(), 0o755)
         write_file(zf, "README.txt", README.encode(), 0o644)
     return count
 

@@ -83,21 +83,35 @@ testing attention right now.
 
 ### macOS
 
-Download the zip for your Mac, `arm64` for Apple Silicon or `x64` for Intel, and drag
-`Lumenotepad.app` into Applications.
+Download the zip for your Mac, `arm64` for Apple Silicon or `x64` for Intel, unpack it, and
+double-click **Install Lumenotepad.command**. It copies the app into Applications and opens it.
 
-The first launch gets blocked, because the app is signed ad-hoc rather than with a paid Apple
-Developer ID:
+The first time, macOS blocks the installer because it isn't registered with Apple. Click **Done** on
+the warning, then open System Settings, go to Privacy & Security, scroll down and click **Open
+Anyway**. Double-click the installer again and it runs. That's one-time.
 
-1. Double-click Lumenotepad. You get "Apple could not verify Lumenotepad". Click **Done**.
-2. Open System Settings, go to Privacy & Security, scroll down and click **Open Anyway**, then
-   confirm.
-3. It opens. That's a one-time step, not once per launch.
+**Dragging the app across on its own does not work**, and the way it fails is misleading. macOS
+reports "Lumenotepad is damaged and can't be opened" and offers no override. The bundle is fine. The
+cause is that the app is ad-hoc signed rather than notarized, and macOS treats those two cases
+differently:
 
-Builds are code-signed at package time with [rcodesign](https://github.com/indygreg/apple-platform-rs).
-That matters more than it sounds: Apple Silicon refuses to execute unsigned Mach-O, and a
-self-contained .NET publish ships around 220 unsigned dylibs. Signing them during packaging is what
-makes a plain drag-install possible at all.
+| App state | Quarantined and opened | What you get |
+| --- | --- | --- |
+| Unsigned | Gatekeeper assesses | "could not verify", with an Open Anyway override |
+| **Ad-hoc signed** | Gatekeeper assesses | **"damaged", with no override** |
+| Ad-hoc signed | quarantine removed | Runs |
+| Notarized | Gatekeeper assesses | Runs after one confirmation |
+
+Because a signature is present, Gatekeeper validates it, finds no trusted authority and no
+notarization ticket, and calls that "damaged". The installer sidesteps it by running `xattr -cr` on
+the copy it places, so Gatekeeper never assesses it. The signature is still what lets it run at all,
+since Apple Silicon refuses to execute unsigned Mach-O and a self-contained .NET publish ships around
+220 unsigned dylibs. Signing happens at package time with
+[rcodesign](https://github.com/indygreg/apple-platform-rs).
+
+Notarizing with a paid Apple Developer ID would remove the installer step entirely. Until then the
+installer is the supported path, and in-app updates avoid the whole problem because a build the app
+downloads itself is never quarantined.
 
 ### Windows (beta)
 
