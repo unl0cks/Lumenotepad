@@ -81,7 +81,7 @@ def info_plist() -> bytes:
         "LSApplicationCategoryType": "public.app-category.productivity",
     })
 
-INSTALL_CMD = """#!/bin/bash
+INSTALL_CMD = r"""#!/bin/bash
 set -e
 cd "$(dirname "$0")"
 
@@ -105,7 +105,11 @@ fi
 APP="$DEST/Lumenotepad.app"
 chmod +x "$APP/Contents/MacOS/Lumenotepad" 2>/dev/null || true
 xattr -cr "$APP" 2>/dev/null || true
-codesign --force --deep -s - "$APP" >/dev/null 2>&1 || true
+
+echo "Signing (this takes a few seconds) ..."
+find "$APP/Contents/MacOS" -name "*.dylib" -exec codesign --force -s - {} \; >/dev/null 2>&1 || true
+codesign --force -s - "$APP/Contents/MacOS/Lumenotepad" >/dev/null 2>&1 || true
+codesign --force -s - "$APP" >/dev/null 2>&1 || true
 
 echo "Done. Opening Lumenotepad."
 open "$APP"

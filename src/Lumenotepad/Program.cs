@@ -6,7 +6,13 @@ sealed class Program
 {
     [System.STAThread]
     public static void Main(string[] args)
-        => BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    {
+        Services.StartupLog.Mark("main");
+        var app = BuildAvaloniaApp();
+        Services.StartupLog.Mark("avalonia configured");
+        app.StartWithClassicDesktopLifetime(args);
+        Services.StartupLog.Mark("lifetime ended");
+    }
 
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()

@@ -105,7 +105,9 @@ public partial class MainWindow : Window
     protected override void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
+        Services.StartupLog.Mark("window opened");
         ReassertChrome();
+        Services.StartupLog.Mark("chrome");
         ResizeBorder.IsVisible = UseResizeOverlay && WindowState == WindowState.Normal;
         SyncMaximizeMargin();
 
@@ -122,11 +124,13 @@ public partial class MainWindow : Window
         {
 
             RearmMacGlass();
-
+            Services.StartupLog.Mark("mac glass");
             MacVibrancy.DisableNativeFullScreen(this);
+            Services.StartupLog.Mark("mac fullscreen off");
             DispatcherTimer.RunOnce(RearmMacGlass, TimeSpan.FromMilliseconds(200));
             DispatcherTimer.RunOnce(WriteMacChromeDiagnostics, TimeSpan.FromMilliseconds(1200));
         }
+        Services.StartupLog.Mark("ready");
     }
 
     internal void RearmMacGlass()
