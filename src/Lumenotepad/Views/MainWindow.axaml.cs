@@ -173,6 +173,8 @@ public partial class MainWindow : Window
     {
         base.OnPropertyChanged(change);
 
+        if (Host is null || ResizeBorder is null) return;
+
         if (change.Property == ClientSizeProperty && !OperatingSystem.IsWindows())
         {
             RelayoutMac();
