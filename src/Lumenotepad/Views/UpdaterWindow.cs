@@ -111,9 +111,12 @@ public sealed class UpdaterWindow : Window
         : "This copy is running from a development tree, or from a folder it cannot write to, so it "
           + "cannot replace itself. Move the Lumenotepad folder somewhere writable, or download by hand.";
 
+    private bool _blocked;
+
     private async Task OnAction()
     {
-        if (_pending is { } p) await Install(p.Version, p.Build.Inner);
+        if (_blocked) OpenUrl(Services.UpdateService.ReleasesPage);
+        else if (_pending is { } p) await Install(p.Version, p.Build.Inner);
         else await Check();
     }
 
@@ -132,6 +135,17 @@ public sealed class UpdaterWindow : Window
             _headline.Text = "You're up to date";
             _detail.Text = $"Lumenotepad {Services.AppInfo.Version} is the latest version.";
             _action.Content = "Check again";
+            return;
+        }
+
+        if (!Services.UpdateService.CanApply)
+        {
+            _pending = null;
+            _blocked = true;
+            _headline.Text = $"Version {f.Version} is available";
+            _detail.Text = CannotInstallReason();
+            _action.Content = "Open release page";
+            _notes.IsVisible = true;
             return;
         }
 

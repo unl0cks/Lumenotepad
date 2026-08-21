@@ -49,9 +49,11 @@
         <GradientStop Offset="1" Color="#3B8BE6"/>
     </LinearGradientBrush>
     <SolidColorBrush x:Key="AccentDeepBrush" Color="#2B6CB8"/>
+    <SolidColorBrush x:Key="AccentTextBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="CardBackgroundBrush" Color="#1F000000"/>
 
     <ControlTheme x:Key="LumenButton" TargetType="Button">
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
         <Setter Property="Background" Value="{DynamicResource AccentGradientBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource AccentDeepBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>

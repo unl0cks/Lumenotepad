@@ -46,7 +46,7 @@ public sealed class NoteCanvas : Panel
     public void AddImage(string relPath, double x, double y, double width = 340)
     {
         if (_doc is null) return;
-        if (SnapToGrid) { x = Math.Max(0, GridMath.Snap(x)); y = Math.Max(0, GridMath.Snap(y)); }
+        if (SnapToGrid) { x = Math.Max(0, SnapX(x)); y = Math.Max(0, SnapY(y)); }
         var box = _doc.AddBox(x, y, width);
         box.ImagePath = relPath;
         AddBoxView(box);
@@ -56,7 +56,7 @@ public sealed class NoteCanvas : Panel
     public void AddAttachment(string relPath, double x, double y)
     {
         if (_doc is null) return;
-        if (SnapToGrid) { x = Math.Max(0, GridMath.Snap(x)); y = Math.Max(0, GridMath.Snap(y)); }
+        if (SnapToGrid) { x = Math.Max(0, SnapX(x)); y = Math.Max(0, SnapY(y)); }
         var box = _doc.AddBox(x, y, 260);
         box.AttachPath = relPath;
         AddBoxView(box);
@@ -66,7 +66,7 @@ public sealed class NoteCanvas : Panel
     public void AddTable(int rows, int cols, double x, double y)
     {
         if (_doc is null) return;
-        if (SnapToGrid) { x = Math.Max(0, GridMath.Snap(x)); y = Math.Max(0, GridMath.Snap(y)); }
+        if (SnapToGrid) { x = Math.Max(0, SnapX(x)); y = Math.Max(0, SnapY(y)); }
         double width = Math.Clamp(cols * 130, NoteBox.MinWidth, 940);
         var view = AddBoxView(_doc.AddTableBox(x, y, rows, cols, width));
         Dispatcher.UIThread.Post(view.FocusEditor, DispatcherPriority.Background);
@@ -76,7 +76,7 @@ public sealed class NoteCanvas : Panel
     public void AddDivider(string orientation, double x, double y)
     {
         if (_doc is null) return;
-        if (SnapToGrid) { x = Math.Max(0, GridMath.Snap(x)); y = Math.Max(0, GridMath.Snap(y)); }
+        if (SnapToGrid) { x = Math.Max(0, SnapX(x)); y = Math.Max(0, SnapY(y)); }
         var box = _doc.AddBox(x, y);
         box.Divider = orientation;
         if (orientation == "v") { box.Width = 22; box.H = 240; }
@@ -97,11 +97,17 @@ public sealed class NoteCanvas : Panel
 
     private readonly LinkLayer _links = new();
     private string _pageStyle = PageStyles.Freeform;
+    private string _gridStyle = PageStyles.Blank;
     private int _mode;
     private Size _viewport;
 
+    internal double SnapX(double v) => GridMath.SnapX(v, _gridStyle);
+
+    internal double SnapY(double v) => GridMath.SnapY(v, _gridStyle);
+
     public void SetStyles(string gridStyle, string pageStyle, int mode)
     {
+        _gridStyle = gridStyle;
         _pageStyle = pageStyle;
         _mode = mode;
         _guides.SetStyles(gridStyle, pageStyle, mode);
@@ -155,7 +161,7 @@ public sealed class NoteCanvas : Panel
         if (_doc is null) return;
         double w = kind == BubbleKind.Title ? MindmapBubbleWidth : MindmapBubbleWidth * 1.3;
         double bx = cx - w / 2, by = cy - 18;
-        if (SnapToGrid) { bx = GridMath.Snap(bx); by = GridMath.Snap(by); }
+        if (SnapToGrid) { bx = SnapX(bx); by = SnapY(by); }
         var box = _doc.AddBox(Math.Max(0, bx), Math.Max(0, by), w);
         box.Kind = kind;
         box.Color = MindmapColor ?? DefaultBubbleColor;
@@ -175,7 +181,7 @@ public sealed class NoteCanvas : Panel
     {
         if (_doc is null) return;
         double nx = from.X + from.Width + 110, ny = from.Y;
-        if (SnapToGrid) { nx = GridMath.Snap(nx); ny = GridMath.Snap(ny); }
+        if (SnapToGrid) { nx = SnapX(nx); ny = SnapY(ny); }
         var box = _doc.AddBox(Math.Max(0, nx), Math.Max(0, ny), from.Width);
         box.Kind = from.Kind;
         box.Color = from.Color ?? MindmapColor ?? DefaultBubbleColor;
@@ -699,7 +705,7 @@ public sealed class NoteCanvas : Panel
             Item("Add note here", () =>
             {
                 double bx = pos.X - 11, by = pos.Y - 16;
-                if (SnapToGrid) { bx = Math.Max(0, GridMath.Snap(bx)); by = Math.Max(0, GridMath.Snap(by)); }
+                if (SnapToGrid) { bx = Math.Max(0, SnapX(bx)); by = Math.Max(0, SnapY(by)); }
                 var v = AddBoxView(_doc.AddBox(bx, by, Math.Clamp(RichTextEditor.NewNoteWidthPref, 240, 640)));
                 Dispatcher.UIThread.Post(v.FocusEditor, DispatcherPriority.Background);
             });
@@ -887,7 +893,7 @@ public sealed class NoteCanvas : Panel
         }
         if (CreateOnDoubleClick && e.ClickCount < 2) return;
         double bx = p.X - 11, by = p.Y - 16;
-        if (SnapToGrid) { bx = Math.Max(0, GridMath.Snap(bx)); by = Math.Max(0, GridMath.Snap(by)); }
+        if (SnapToGrid) { bx = Math.Max(0, SnapX(bx)); by = Math.Max(0, SnapY(by)); }
         var view = AddBoxView(_doc.AddBox(bx, by, Math.Clamp(RichTextEditor.NewNoteWidthPref, 240, 640)));
         Dispatcher.UIThread.Post(view.FocusEditor, DispatcherPriority.Background);
         e.Handled = true;
@@ -1142,7 +1148,7 @@ internal sealed class NoteBoxView : Panel
         {
             Height = 17, Background = Brushes.Transparent, Child = _gripBar,
             CornerRadius = new CornerRadius(r, r, 0, 0),
-            Cursor = new Cursor(StandardCursorType.SizeAll),
+            Cursor = Platform.AdaptiveCursors.For(StandardCursorType.SizeAll),
         };
         DockPanel.SetDock(_grip, Dock.Top);
 
@@ -1212,7 +1218,7 @@ internal sealed class NoteBoxView : Panel
         Border Corner(HorizontalAlignment h, VerticalAlignment v, StandardCursorType cur) => new()
         {
             Width = 14, Height = 14, HorizontalAlignment = h, VerticalAlignment = v,
-            Background = Brushes.Transparent, Cursor = new Cursor(cur),
+            Background = Brushes.Transparent, Cursor = Platform.AdaptiveCursors.For(cur),
         };
         _resizeLeft = EdgeStrip(HorizontalAlignment.Left, VerticalAlignment.Stretch, true, StandardCursorType.SizeWestEast);
         _resizeRight = EdgeStrip(HorizontalAlignment.Right, VerticalAlignment.Stretch, true, StandardCursorType.SizeWestEast);
@@ -1832,7 +1838,7 @@ internal sealed class NoteBoxView : Panel
                 if (!_canvas.GroupDragTo(dx, dy))
                 {
                     double nx = ox + dx, ny = oy + dy;
-                    if (snap) { nx = GridMath.Snap(nx); ny = GridMath.Snap(ny); }
+                    if (snap) { nx = _canvas.SnapX(nx); ny = _canvas.SnapY(ny); }
                     Box.X = Math.Max(0, nx);
                     Box.Y = Math.Max(0, ny);
                 }
@@ -1842,7 +1848,7 @@ internal sealed class NoteBoxView : Panel
                 if ((edges & (Edge.Left | Edge.Right)) != 0)
                 {
                     double nw = edges.HasFlag(Edge.Left) ? ow - dx : ow + dx;
-                    if (snap) nw = GridMath.Snap(nw);
+                    if (snap) nw = _canvas.SnapX(nw);
                     nw = Math.Clamp(nw, Box.Divider == "h" ? NoteBox.MinDividerLength : NoteBox.MinWidth, 1600);
                     Box.Width = nw;
                     if (edges.HasFlag(Edge.Left)) Box.X = Math.Max(0, ox + ow - nw);
@@ -1850,7 +1856,7 @@ internal sealed class NoteBoxView : Panel
                 if ((edges & (Edge.Top | Edge.Bottom)) != 0)
                 {
                     double nh = edges.HasFlag(Edge.Top) ? oh - dy : oh + dy;
-                    if (snap) nh = GridMath.Snap(nh);
+                    if (snap) nh = _canvas.SnapY(nh);
                     nh = Math.Clamp(nh, Box.Divider == "v" ? NoteBox.MinDividerLength : NoteBox.MinHeight, 4000);
                     Box.H = nh;
                     if (edges.HasFlag(Edge.Top)) Box.Y = Math.Max(0, oy + oh - nh);

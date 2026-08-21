@@ -57,6 +57,8 @@ public static class ThemeManager
         Brush("AccentHoverBrush", t.AccentHover);
         Brush("AccentSoftBrush", t.AccentSoft);
         Brush("AccentDeepBrush", t.AccentDeep);
+        Brush("AccentTextBrush", t.AccentText);
+        Brush("CardBackgroundBrush", t.DarkChrome ? "#1F000000" : "#66FFFFFF");
         Brush("WindowBackgroundBrush", t.WindowBackground);
 
         string childSurface = t.FrostedWindow ? "#D8" + t.WindowBackground[^6..] : t.WindowBackground;

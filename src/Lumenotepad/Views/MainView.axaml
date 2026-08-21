@@ -97,6 +97,11 @@
         </Style>
         <Style Selector="ListBox.glossy ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource AccentGradientBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
+        </Style>
+        <Style Selector="ListBox.glossy ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentGradientBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
         </Style>
         <Style Selector="Border.recentchip">
             <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
@@ -152,7 +157,7 @@
             <StackPanel x:Name="TitleLeft" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0" Spacing="9">
                 <Border Width="22" Height="22" CornerRadius="7" Background="{DynamicResource AccentBrush}">
                     <TextBlock Text="&#xE82F;" FontFamily="{StaticResource IconFont}" FontSize="13"
-                               Foreground="#04213F" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                               Foreground="{DynamicResource AccentTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <TextBlock Text="Lumenotepad" FontSize="13.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
             </StackPanel>
@@ -498,11 +503,12 @@
                         </ScrollViewer>
                         <Border x:Name="TagsPanel" IsVisible="False" Width="252"
                                 HorizontalAlignment="Right" VerticalAlignment="Stretch" Margin="0,10,12,12"
-                                CornerRadius="10" Background="#E8191B24"
-                                BorderBrush="#33FFFFFF" BorderThickness="1">
+                                CornerRadius="10" Background="{DynamicResource ChildSurfaceBrush}"
+                                BorderBrush="{DynamicResource MenuBorderBrush}" BorderThickness="1">
                             <DockPanel Margin="12,10,12,12">
                                 <TextBlock DockPanel.Dock="Top" Text="Tagged notes"
-                                           FontSize="13" FontWeight="SemiBold"/>
+                                           FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
                                 <TextBlock DockPanel.Dock="Top" Text="Everything tagged in this notebook. Click one to jump to its page."
                                            FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
                                            TextWrapping="Wrap" Margin="0,4,0,10"/>
@@ -513,11 +519,12 @@
                         </Border>
                         <Border x:Name="TrashPanel" IsVisible="False" Width="238"
                                 HorizontalAlignment="Right" VerticalAlignment="Stretch" Margin="0,10,12,12"
-                                CornerRadius="10" Background="#E8191B24"
-                                BorderBrush="#33FFFFFF" BorderThickness="1">
+                                CornerRadius="10" Background="{DynamicResource ChildSurfaceBrush}"
+                                BorderBrush="{DynamicResource MenuBorderBrush}" BorderThickness="1">
                             <DockPanel Margin="12,10,12,12">
                                 <TextBlock DockPanel.Dock="Top" Text="Deleted containers"
-                                           FontSize="13" FontWeight="SemiBold"/>
+                                           FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
                                 <TextBlock DockPanel.Dock="Top" Text="Drag one onto the page to bring it back."
                                            FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
                                            TextWrapping="Wrap" Margin="0,4,0,10"/>

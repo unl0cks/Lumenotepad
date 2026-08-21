@@ -693,7 +693,7 @@ public partial class PdfViewer : UserControl
         var rect = new Border
         {
             Background = new SolidColorBrush(Color.Parse(a.Color)),
-            IsHitTestVisible = true, Cursor = new Cursor(StandardCursorType.SizeAll),
+            IsHitTestVisible = true, Cursor = Platform.AdaptiveCursors.For(StandardCursorType.SizeAll),
             CornerRadius = new CornerRadius(5),
             BorderThickness = new Thickness(selected ? 2.5 : 0),
             BorderBrush = NoteFocusBrush,
@@ -711,7 +711,7 @@ public partial class PdfViewer : UserControl
             {
                 Width = 12, Height = 12, Fill = AccentBrush,
                 Stroke = Brushes.White, StrokeThickness = 1.5,
-                Cursor = new Cursor(StandardCursorType.BottomRightCorner),
+                Cursor = Platform.AdaptiveCursors.For(StandardCursorType.BottomRightCorner),
                 Tag = a,
             };
             Canvas.SetLeft(dot, a.X * w + a.W * w - 6); Canvas.SetTop(dot, a.Y * h + a.H * h - 6);
@@ -939,7 +939,7 @@ public partial class PdfViewer : UserControl
         {
             Data = PolyGeometry(pts), Stroke = Brushes.Transparent, StrokeThickness = Math.Max(16, thick * 5),
             StrokeLineCap = PenLineCap.Round, StrokeJoin = PenLineJoin.Round,
-            IsHitTestVisible = true, Cursor = new Cursor(StandardCursorType.SizeAll), Tag = a,
+            IsHitTestVisible = true, Cursor = Platform.AdaptiveCursors.For(StandardCursorType.SizeAll), Tag = a,
         };
         hit.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, 0, e); };
 

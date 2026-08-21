@@ -57,7 +57,7 @@ public static class CoverCropDialog
                 BorderThickness = new Thickness(1),
                 Background = new SolidColorBrush(Color.Parse("#26000000")),
                 Child = img,
-                Cursor = new Cursor(StandardCursorType.SizeAll),
+                Cursor = Platform.AdaptiveCursors.For(StandardCursorType.SizeAll),
             };
 
             var slider = new Slider { Minimum = 1, Maximum = 4, Value = 1, Width = FrameW, Margin = new Thickness(0, 6, 0, 0) };
@@ -103,29 +103,36 @@ public static class CoverCropDialog
                 e.Handled = true;
             };
 
+            var t = Services.ThemeManager.Current;
             var win = new Window
             {
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 SizeToContent = SizeToContent.WidthAndHeight,
                 CanResize = false,
                 ShowInTaskbar = false,
-                Background = new SolidColorBrush(Color.Parse("#1B1D27")),
+                Background = new SolidColorBrush(Color.Parse(t.WindowBackground)),
             };
             win.Opened += (_, _) => WinChrome.RoundCorners(win, true);
             Services.ThemeManager.ConfigureDialogChrome(win);
 
             var lumenTheme = Application.Current?.FindResource("LumenButton") as Avalonia.Styling.ControlTheme;
+            string quietTop = t.DarkChrome ? "#33FFFFFF" : "#12000000";
+            string quietBottom = t.DarkChrome ? "#1AFFFFFF" : "#0A000000";
             var cancel = new Button
             {
                 Content = "Cancel", FontSize = 12.5, Padding = new Thickness(16, 7), Theme = lumenTheme,
-                Foreground = Brushes.White, CornerRadius = new CornerRadius(8),
+                Foreground = new SolidColorBrush(Color.Parse(t.TextPrimary)), CornerRadius = new CornerRadius(8),
                 Background = new LinearGradientBrush
                 {
                     StartPoint = new RelativePoint(0.5, 0, RelativeUnit.Relative),
                     EndPoint = new RelativePoint(0.5, 1, RelativeUnit.Relative),
-                    GradientStops = { new GradientStop(Color.Parse("#33FFFFFF"), 0), new GradientStop(Color.Parse("#1AFFFFFF"), 1) },
+                    GradientStops =
+                    {
+                        new GradientStop(Color.Parse(quietTop), 0),
+                        new GradientStop(Color.Parse(quietBottom), 1),
+                    },
                 },
-                BorderBrush = new SolidColorBrush(Color.Parse("#40FFFFFF")),
+                BorderBrush = new SolidColorBrush(Color.Parse(t.DarkChrome ? "#40FFFFFF" : "#2E000000")),
             };
             var confirm = new Button
             {
@@ -146,12 +153,13 @@ public static class CoverCropDialog
             var stack = new StackPanel { Margin = new Thickness(22, 18, 22, 16) };
             stack.Children.Add(new TextBlock
             {
-                Text = "Position the cover", FontSize = 15, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White,
+                Text = "Position the cover", FontSize = 15, FontWeight = FontWeight.SemiBold,
+                Foreground = new SolidColorBrush(Color.Parse(t.TextPrimary)),
             });
             stack.Children.Add(new TextBlock
             {
                 Text = "Drag to move · scroll or use the slider to zoom",
-                FontSize = 12, Foreground = new SolidColorBrush(Color.Parse("#99FFFFFF")),
+                FontSize = 12, Foreground = new SolidColorBrush(Color.Parse(t.TextSecondary)),
                 Margin = new Thickness(0, 6, 0, 12),
             });
             stack.Children.Add(frame);

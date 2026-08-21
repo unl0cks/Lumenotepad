@@ -1284,7 +1284,7 @@ public partial class MainView : UserControl
         });
         var chip = new Border
         {
-            Background = new SolidColorBrush(Color.Parse("#14FFFFFF")),
+            Background = (IBrush)this.FindResource("ControlHoverBrush")!,
             CornerRadius = new CornerRadius(8), Padding = new Thickness(9, 7),
             Cursor = new Cursor(StandardCursorType.Hand), Child = stack,
         };
@@ -1343,7 +1343,7 @@ public partial class MainView : UserControl
 
         var chip = new Border
         {
-            Background = new SolidColorBrush(Color.Parse("#14FFFFFF")),
+            Background = (IBrush)this.FindResource("ControlHoverBrush")!,
             CornerRadius = new CornerRadius(8), Padding = new Thickness(9, 7),
             Cursor = new Cursor(StandardCursorType.Hand), Child = grid,
         };

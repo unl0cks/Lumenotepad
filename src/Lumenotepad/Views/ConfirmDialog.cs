@@ -14,32 +14,34 @@ public static class ConfirmDialog
                                         string confirmText = "Delete", string cancelText = "Cancel",
                                         bool danger = true)
     {
+        var t = Services.ThemeManager.Current;
         var win = new Window
         {
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             SizeToContent = SizeToContent.WidthAndHeight,
             CanResize = false,
             ShowInTaskbar = false,
-            Background = new SolidColorBrush(Color.Parse("#1B1D27")),
+            Background = new SolidColorBrush(Color.Parse(t.WindowBackground)),
         };
         win.Opened += (_, _) => WinChrome.RoundCorners(win, true);
         Services.ThemeManager.ConfigureDialogChrome(win);
 
         var titleText = new TextBlock
         {
-            Text = title, FontSize = 15, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White,
+            Text = title, FontSize = 15, FontWeight = FontWeight.SemiBold,
+            Foreground = new SolidColorBrush(Color.Parse(t.TextPrimary)),
         };
         var msgText = new TextBlock
         {
             Text = message, FontSize = 12.5, TextWrapping = TextWrapping.Wrap, MaxWidth = 300,
-            Foreground = new SolidColorBrush(Color.Parse("#B3FFFFFF")), Margin = new Thickness(0, 8, 0, 18),
+            Foreground = new SolidColorBrush(Color.Parse(t.TextSecondary)), Margin = new Thickness(0, 8, 0, 18),
         };
 
         var lumenTheme = Avalonia.Application.Current?.FindResource("LumenButton") as Avalonia.Styling.ControlTheme;
-        Button MakeButton(string text, string top, string bottom, string border) => new()
+        Button MakeButton(string text, string top, string bottom, string border, string fg) => new()
         {
             Content = text, FontSize = 12.5, Padding = new Thickness(16, 7),
-            Theme = lumenTheme, Foreground = Brushes.White,
+            Theme = lumenTheme, Foreground = new SolidColorBrush(Color.Parse(fg)),
             CornerRadius = new CornerRadius(8),
             Background = new LinearGradientBrush
             {
@@ -53,11 +55,12 @@ public static class ConfirmDialog
             },
             BorderBrush = new SolidColorBrush(Color.Parse(border)),
         };
-        var cancel = MakeButton(cancelText, "#33FFFFFF", "#1AFFFFFF", "#40FFFFFF");
-        var t = Services.ThemeManager.Current;
+        var cancel = t.DarkChrome
+            ? MakeButton(cancelText, "#33FFFFFF", "#1AFFFFFF", "#40FFFFFF", t.TextPrimary)
+            : MakeButton(cancelText, "#12000000", "#0A000000", "#2E000000", t.TextPrimary);
         var confirm = danger
-            ? MakeButton(confirmText, "#D64258", "#A62A3C", "#7E1F2D")
-            : MakeButton(confirmText, t.AccentGradTop, t.AccentGradBottom, t.AccentDeep);
+            ? MakeButton(confirmText, "#D64258", "#A62A3C", "#7E1F2D", "#FFFFFFFF")
+            : MakeButton(confirmText, t.AccentGradTop, t.AccentGradBottom, t.AccentDeep, t.AccentText);
 
         var buttons = new StackPanel
         {
@@ -74,7 +77,7 @@ public static class ConfirmDialog
         var card = new Border
         {
             Background = Brushes.Transparent,
-            BorderBrush = new SolidColorBrush(Color.Parse("#26FFFFFF")),
+            BorderBrush = new SolidColorBrush(Color.Parse(t.DarkChrome ? "#26FFFFFF" : "#24000000")),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(9),
             Child = stack,

@@ -14,7 +14,7 @@ public sealed record ThemeTokens(
     string FieldSelection,
     string NoteChromeHover, string NoteChromeFocus, string NoteGripFill, string NoteGripBar,
     string Accent, string AccentHover, string AccentSoft, string AccentDeep,
-    string AccentGradTop, string AccentGradBottom,
+    string AccentGradTop, string AccentGradBottom, string AccentText,
     string WindowBackground,
     string MenuBackground, string MenuBorder,
     bool DarkChrome,
@@ -156,6 +156,7 @@ public static class ThemePalettes
         NoteGripFill: "#12FFFFFF", NoteGripBar: "#3DFFFFFF",
         Accent: accent, AccentHover: Shade(accent, 0.15), AccentSoft: Alpha(accent, 0x38),
         AccentDeep: Shade(accent, -0.28), AccentGradTop: Shade(accent, 0.12), AccentGradBottom: Shade(accent, -0.10),
+        AccentText: IdealTextOn(accent),
         WindowBackground: "#FF14161C",
 
         MenuBackground: "#F514161C", MenuBorder: "#33FFFFFF",
@@ -175,9 +176,16 @@ public static class ThemePalettes
         AccentDeep = Shade(seed, -0.28),
         AccentGradTop = Shade(seed, 0.12),
         AccentGradBottom = Shade(seed, -0.10),
+        AccentText = IdealTextOn(seed),
         FieldSelection = Alpha(seed, 0x78),
         NoteChromeFocus = Alpha(seed, 0x4D),
     };
+
+    public static string IdealTextOn(string hex)
+    {
+        var (_, r, g, b) = Parse(hex);
+        return (r * 299 + g * 587 + b * 114) / 1000 >= 152 ? "#FF23262F" : "#FFFFFFFF";
+    }
 
     public static string? NormalizeHex(string? s)
     {

@@ -148,4 +148,35 @@ public class ThemePalettesTests
     [InlineData("#4DA")]
     public void NormalizeHex_RejectsInvalid(string? input) =>
         Assert.Null(ThemePalettes.NormalizeHex(input));
+
+    [Theory]
+    [InlineData("#4DA6FF", "#FFFFFFFF")]
+    [InlineData("#FB6F92", "#FF23262F")]
+    [InlineData("#5C85E6", "#FFFFFFFF")]
+    [InlineData("#101218", "#FFFFFFFF")]
+    [InlineData("#F2D24B", "#FF23262F")]
+    [InlineData("#FFFFFF", "#FF23262F")]
+    [InlineData("#96CCFF", "#FF23262F")]
+    public void IdealTextOn_picksAReadableInk(string accent, string expected) =>
+        Assert.Equal(expected, ThemePalettes.IdealTextOn(accent));
+
+    [Theory]
+    [InlineData("Lumen")]
+    [InlineData("Dark")]
+    [InlineData("Light")]
+    [InlineData("Pink")]
+    [InlineData("Light blue")]
+    public void EveryTheme_carriesAnAccentInk(string theme)
+    {
+        var t = ThemePalettes.Resolve(theme, fullTheme: true, paperLight: false);
+        Assert.Equal(ThemePalettes.IdealTextOn(t.Accent), t.AccentText);
+    }
+
+    [Fact]
+    public void WithAccent_recomputesTheInk()
+    {
+        var t = ThemePalettes.Resolve("Lumen", false, false);
+        var seeded = ThemePalettes.WithAccent(t, "#F2D24B");
+        Assert.Equal("#FF23262F", seeded.AccentText);
+    }
 }

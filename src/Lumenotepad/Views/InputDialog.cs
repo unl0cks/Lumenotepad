@@ -16,13 +16,14 @@ public static class InputDialog
                                              IReadOnlyList<(string Label, string Placeholder, string Initial)> fields,
                                              string confirmText = "OK")
     {
+        var t = Services.ThemeManager.Current;
         var win = new Window
         {
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             SizeToContent = SizeToContent.WidthAndHeight,
             CanResize = false,
             ShowInTaskbar = false,
-            Background = new SolidColorBrush(Color.Parse("#1B1D27")),
+            Background = new SolidColorBrush(Color.Parse(t.WindowBackground)),
         };
         win.Opened += (_, _) => WinChrome.RoundCorners(win, true);
         Services.ThemeManager.ConfigureDialogChrome(win);
@@ -31,7 +32,8 @@ public static class InputDialog
         var stack = new StackPanel { Margin = new Thickness(22, 18, 22, 16), Spacing = 8, Width = 320 };
         stack.Children.Add(new TextBlock
         {
-            Text = title, FontSize = 15, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White,
+            Text = title, FontSize = 15, FontWeight = FontWeight.SemiBold,
+            Foreground = new SolidColorBrush(Color.Parse(t.TextPrimary)),
             Margin = new Thickness(0, 0, 0, 4),
         });
 
@@ -40,7 +42,7 @@ public static class InputDialog
         {
             stack.Children.Add(new TextBlock
             {
-                Text = label, FontSize = 12, Foreground = new SolidColorBrush(Color.Parse("#B3FFFFFF")),
+                Text = label, FontSize = 12, Foreground = new SolidColorBrush(Color.Parse(t.TextSecondary)),
             });
             var box = new TextBox
             {
@@ -67,7 +69,7 @@ public static class InputDialog
         var card = new Border
         {
             Background = Brushes.Transparent,
-            BorderBrush = new SolidColorBrush(Color.Parse("#26FFFFFF")),
+            BorderBrush = new SolidColorBrush(Color.Parse(t.DarkChrome ? "#26FFFFFF" : "#24000000")),
             BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(9), Child = stack,
         };
         card.PointerPressed += (_, e) =>
