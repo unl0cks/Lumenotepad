@@ -73,8 +73,10 @@ public partial class MainWindow : Window
         Services.ThemeManager.Apply(app, tokens);
         Services.ThemeManager.ApplyChrome(this);
 
-        if (!OperatingSystem.IsWindows()) RearmMacGlass();
+        if (_shellReady && !OperatingSystem.IsWindows()) RearmMacGlass();
     }
+
+    private bool _shellReady;
 
     private bool _closingAnimated;
 
@@ -106,6 +108,7 @@ public partial class MainWindow : Window
     {
         base.OnOpened(e);
         Services.StartupLog.Mark("window opened");
+        _shellReady = true;
         ReassertChrome();
         Services.StartupLog.Mark("chrome");
         ResizeBorder.IsVisible = UseResizeOverlay && WindowState == WindowState.Normal;
@@ -189,7 +192,7 @@ public partial class MainWindow : Window
 
         WinChrome.EnableSnap(this);
 
-        if (!OperatingSystem.IsWindows())
+        if (_shellReady && !OperatingSystem.IsWindows())
         {
 
             RearmMacGlass();

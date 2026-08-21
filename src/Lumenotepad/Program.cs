@@ -7,11 +7,24 @@ sealed class Program
     [System.STAThread]
     public static void Main(string[] args)
     {
+        System.AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            Services.StartupLog.Crash("unhandled", e.ExceptionObject as System.Exception);
+        System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, e) =>
+            Services.StartupLog.Crash("background task", e.Exception);
+
         Services.StartupLog.Mark("main");
-        var app = BuildAvaloniaApp();
-        Services.StartupLog.Mark("avalonia configured");
-        app.StartWithClassicDesktopLifetime(args);
-        Services.StartupLog.Mark("lifetime ended");
+        try
+        {
+            var app = BuildAvaloniaApp();
+            Services.StartupLog.Mark("avalonia configured");
+            app.StartWithClassicDesktopLifetime(args);
+            Services.StartupLog.Mark("lifetime ended");
+        }
+        catch (System.Exception ex)
+        {
+            Services.StartupLog.Crash("startup", ex);
+            throw;
+        }
     }
 
     public static AppBuilder BuildAvaloniaApp()

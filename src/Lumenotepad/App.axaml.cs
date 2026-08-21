@@ -28,8 +28,20 @@ public partial class App : Application
             Services.StartupLog.Mark("viewmodel");
             Services.AppFonts.RegisterInstalled();
             Services.StartupLog.Mark("installed fonts");
-            desktop.MainWindow = new MainWindow { DataContext = vm };
-            Services.StartupLog.Mark("main window created");
+            try
+            {
+                var window = new MainWindow();
+                Services.StartupLog.Mark("window built");
+                window.DataContext = vm;
+                Services.StartupLog.Mark("window themed");
+                desktop.MainWindow = window;
+                Services.StartupLog.Mark("main window created");
+            }
+            catch (System.Exception ex)
+            {
+                Services.StartupLog.Crash("main window", ex);
+                throw;
+            }
         }
         base.OnFrameworkInitializationCompleted();
     }
