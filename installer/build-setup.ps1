@@ -199,7 +199,18 @@ if (Test-Path -LiteralPath $configRoot) {
         if (Test-Path -LiteralPath $stale) { Remove-Item -LiteralPath $stale -Force }
     }
     else {
-        Remove-Item -LiteralPath $configRoot -Recurse -Force
+        # Per child, tolerating a directory that is empty but still has a stale handle on it (an antivirus
+        # scan of a just-deleted installer does this). Empty-but-stuck is harmless: publishing into it works;
+        # only leftover CONTENT would poison the payload, so that is the only thing treated as fatal.
+        foreach ($child in @(Get-ChildItem -LiteralPath $configRoot -Force)) {
+            try { Remove-Item -LiteralPath $child.FullName -Recurse -Force -ErrorAction Stop }
+            catch {
+                if (Test-Path -LiteralPath $child.FullName) {
+                    $left = @(Get-ChildItem -LiteralPath $child.FullName -Recurse -File -Force -ErrorAction SilentlyContinue)
+                    if ($left.Count -gt 0) { throw }
+                }
+            }
+        }
     }
 }
 [void](New-Item -ItemType Directory -Path $payloadDir -Force)

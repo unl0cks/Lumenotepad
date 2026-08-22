@@ -76,7 +76,7 @@ testing attention right now.
 | PDF annotation | Usable |
 | Export formats | Usable |
 | In-app updates | New in 1.2.0. Verified end to end on Windows, untried on macOS |
-| Windows packaging | Portable zip, beta |
+| Windows packaging | Setup wizard, download-on-install launcher, and a portable zip; beta |
 | Code signing | Ad-hoc only, see [Install](#install) |
 
 ## Install
@@ -115,14 +115,22 @@ Gatekeeper never looks at it again.
 
 ### Windows (beta)
 
-Download the portable zip, extract the folder somewhere **writable**, and run `Lumenotepad.exe`.
-SmartScreen warns the first time, so click "More info" then "Run anyway".
+Three ways in, all landing on the same app. SmartScreen warns the first time with any of them, so
+click "More info" then "Run anyway".
 
-It's portable on purpose. All user data lives in a `userdata` folder beside the executable, nothing
-touches the registry, and uninstalling means deleting the folder. Don't extract it into
-`C:\Program Files`, because Windows blocks normal processes from writing there and saving would fail.
-An installer would first need the Windows data directory moved to `%APPDATA%`, which is a migration
-for anyone already running a portable copy rather than a packaging change.
+- **Setup** (`Lumenotepad-Setup-*.exe`) is the easy path. A short wizard installs per user into
+  `%LocalAppData%\Programs\Lumenotepad`, so there is no administrator prompt, adds a Start menu
+  entry, and registers a proper uninstall in Windows' Installed apps.
+- **Launcher** (`Lumenotepad-Launcher-*.exe`) is the same wizard at a fraction of the download. It
+  carries no copy of the app; it fetches the latest release when you install and verifies the
+  download against the published hash before touching anything.
+- **Portable zip** needs no install at all. Extract the folder somewhere **writable** and run
+  `Lumenotepad.exe`. Don't extract it into `C:\Program Files`, because Windows blocks normal
+  processes from writing there and saving would fail.
+
+Whichever you pick, all user data lives in a `userdata` folder beside the executable, and nothing
+else on the system is touched. Uninstalling offers to keep that folder, so notes survive a reinstall;
+for a portable copy, deleting the folder is the whole uninstall.
 
 ## Updates
 
