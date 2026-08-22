@@ -312,6 +312,28 @@ public class AppSettingsTests
     }
 
     [Fact]
+    public void PaperAndInkToggles_defaultFalse_andRoundTrip()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            var d = new AppSettings();
+            Assert.False(d.PaperDark);
+            Assert.False(d.WhiteAccentText);
+            Assert.False(d.NeutralDark);
+
+            var s = new AppSettings { PaperDark = true, WhiteAccentText = true, NeutralDark = true };
+            s.Save(dir);
+            var loaded = AppSettings.Load(dir);
+
+            Assert.True(loaded.PaperDark);
+            Assert.True(loaded.WhiteAccentText);
+            Assert.True(loaded.NeutralDark);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public void DoubleClickCreate_defaultsFalse_andRoundTrip()
     {
         var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());

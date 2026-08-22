@@ -120,9 +120,20 @@ public static class MenuFx
                 WindowTransparencyLevel.Transparent,
             };
 
-            Platform.DwmAcrylic.BlurBehind(hwnd);
+            Platform.DwmAcrylic.BlurBehind(hwnd, MenuTint(bg));
             Platform.DwmAcrylic.Apply(hwnd, Platform.DwmAcrylic.Backdrop.Acrylic, dark: true);
         }
         catch {  }
+    }
+
+    private static uint MenuTint(string menuBackground)
+    {
+        try
+        {
+            uint v = Convert.ToUInt32(menuBackground.TrimStart('#'), 16);
+            uint r = (v >> 16) & 0xFF, g = (v >> 8) & 0xFF, b = v & 0xFF;
+            return 0x0A000000u | (b << 16) | (g << 8) | r;
+        }
+        catch { return 0x0A1C1614; }
     }
 }

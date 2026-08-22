@@ -133,6 +133,7 @@ public partial class MainView : UserControl
         HomeCards.AddHandler(PointerPressedEvent, OnRearrangePressed, RoutingStrategies.Tunnel);
         HomeCards.PointerMoved += OnRearrangeMoved;
         HomeCards.PointerReleased += OnRearrangeReleased;
+        HomeCards.PointerCaptureLost += (_, _) => { if (_dragNotebook is not null) ResetDrag(); };
 
         HomeCards.PointerMoved += (_, e) => { if (_dragNotebook is null) SetHoverCard(Ancestor(e.Source, "nbcard")); };
         HomeCards.PointerExited += (_, _) => SetHoverCard(null);
@@ -146,6 +147,12 @@ public partial class MainView : UserControl
                 e.Container.ClearValue(Visual.OpacityProperty);
                 e.Container.ClearValue(Visual.RenderTransformProperty);
             };
+
+        HomeCards.ContainerPrepared += (_, e) =>
+        {
+            if (_dragNotebook is not null && ReferenceEquals(e.Container.DataContext, _dragNotebook))
+                e.Container.Opacity = 0;
+        };
 
         CanvasPlate.SizeChanged += (_, _) => UpdateCanvasPlateClip();
 
@@ -269,22 +276,27 @@ public partial class MainView : UserControl
 
     private void ResetDrag()
     {
+        var dragged = _dragNotebook;
         _dragNotebook = null;
         _ghostTween?.Stop(); _ghostTween = null;
         if (_ghost is not null) { DragLayer.Children.Remove(_ghost); _ghost = null; }
         if (_dragCard is not null) { _dragCard.Opacity = 1; _dragCard = null; }
+        if (dragged is not null) HomeCards.ContainerFromItem(dragged)?.ClearValue(Visual.OpacityProperty);
     }
 
     private void OnRearrangePressed(object? sender, PointerPressedEventArgs e)
     {
         if (!_rearranging) return;
         if ((e.Source as StyledElement)?.DataContext is not Notebook nb) return;
-        var card = HomeCards.ContainerFromItem(nb)?.GetVisualDescendants()
+        var container = HomeCards.ContainerFromItem(nb);
+        var card = container?.GetVisualDescendants()
             .OfType<Border>().FirstOrDefault(x => x.Classes.Contains("nbcard"));
-        if (card is null || card.Bounds.Width < 1 || card.Bounds.Height < 1) return;
+        if (container is null || card is null || card.Bounds.Width < 1 || card.Bounds.Height < 1) return;
 
         _dragNotebook = nb;
         _dragCard = card;
+        Motion.Stop(card);
+        card.Transitions = null;
         card.ClearValue(Visual.RenderTransformProperty);
 
         var size = card.Bounds.Size;
@@ -293,19 +305,20 @@ public partial class MainView : UserControl
             new PixelSize(System.Math.Max(1, (int)(size.Width * scaling)), System.Math.Max(1, (int)(size.Height * scaling))),
             new Vector(96 * scaling, 96 * scaling));
         rtb.Render(card);
+        card.ClearValue(Avalonia.Animation.Animatable.TransitionsProperty);
 
         const double lift = 1.06;
         _ghostSize = new Size(size.Width * lift, size.Height * lift);
         _ghost = new Border
         {
             Width = _ghostSize.Width, Height = _ghostSize.Height,
-            CornerRadius = new CornerRadius(14),
+            CornerRadius = new CornerRadius(14 * lift),
             BoxShadow = BoxShadows.Parse("0 10 26 0 #70000000"),
             Child = new Image { Source = rtb, Stretch = Stretch.Fill },
             IsHitTestVisible = false,
         };
         DragLayer.Children.Add(_ghost);
-        card.Opacity = 0;
+        container.Opacity = 0;
         if (ReferenceEquals(_hoverCard, card)) _hoverCard = null;
 
         var centre = card.TranslatePoint(new Point(size.Width / 2, size.Height / 2), DragLayer) ?? default;
@@ -357,7 +370,7 @@ public partial class MainView : UserControl
                 if (HomeCards.ItemFromContainer(c) is not { } it) continue;
                 var nbc = c.GetVisualDescendants().OfType<Border>().FirstOrDefault(x => x.Classes.Contains("nbcard"));
                 if (nbc is null) continue;
-                if (ReferenceEquals(it, dragged)) { nbc.Opacity = 0; _dragCard = nbc; continue; }
+                if (ReferenceEquals(it, dragged)) { c.Opacity = 0; _dragCard = nbc; continue; }
                 if (!old.TryGetValue(it, out var op)) continue;
                 var np = Center(c);
                 double dx = op.X - np.X, dy = op.Y - np.Y;
@@ -388,12 +401,11 @@ public partial class MainView : UserControl
         }
         else targetTL = new Point(Canvas.GetLeft(ghost), Canvas.GetTop(ghost));
 
-        var reveal = card ?? _dragCard;
         _dragCard = null;
         TweenGhost(ghost, targetTL, 190, () =>
         {
             DragLayer.Children.Remove(ghost);
-            if (reveal is not null) reveal.Opacity = 1;
+            HomeCards.ContainerFromItem(dragged)?.ClearValue(Visual.OpacityProperty);
         });
     }
 
@@ -1188,21 +1200,20 @@ public partial class MainView : UserControl
             show.IsHitTestVisible = true;
             Motion.Tween(show, 0, 0, small, 0, 0, 1, ms + 40, Motion.EaseOutSoft, 0, 1);
         }
-        else if (e.PropertyName is nameof(MainViewModel.Theme)
-                 or nameof(MainViewModel.FullTheme) or nameof(MainViewModel.PaperLight)
-                 or nameof(MainViewModel.CustomAccent) or nameof(MainViewModel.AccentFollowsNotebook))
+    }
+
+    internal void RefreshThemedContent()
+    {
+        if (PageCanvas is null) return;
+
+        Dispatcher.UIThread.Post(() =>
         {
 
             PageCanvas.Document = PageCanvas.Document;
             if (TrashPanel.IsVisible) RefreshTrashPanel();
-            if (Content is Control root) Motion.FadeIn(root, Motion.Fast);
-
-            Dispatcher.UIThread.Post(() =>
-            {
-                ApplyGlassTint();
-                ApplyPdfBackdrop(PagePdfViewer.IsVisible);
-            }, DispatcherPriority.Background);
-        }
+            ApplyGlassTint();
+            ApplyPdfBackdrop(PagePdfViewer.IsVisible);
+        }, DispatcherPriority.Background);
     }
 
     private void ReassertListSelection()

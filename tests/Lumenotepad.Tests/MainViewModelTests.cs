@@ -14,6 +14,56 @@ public class MainViewModelTests
         return new MainViewModel(new WorkspaceStore(dir));
     }
 
+    [Theory]
+    [InlineData("Lumen", false, true, false, false)]
+    [InlineData("Lumen", true, false, false, false)]
+    [InlineData("Dark", true, true, false, false)]
+    [InlineData("Dark", false, false, false, false)]
+    [InlineData("Light", true, false, true, true)]
+    [InlineData("Light", false, false, false, true)]
+    [InlineData("Pink", true, false, true, true)]
+    [InlineData("Light blue", true, false, true, true)]
+    public void PaperAndInkRows_showOnlyWhereTheyApply(
+        string theme, bool full, bool light, bool dark, bool white)
+    {
+        var vm = NewVm(out var dir);
+        try
+        {
+            vm.Theme = theme;
+            vm.FullTheme = full;
+
+            Assert.Equal(light, vm.PaperLightVisible);
+            Assert.Equal(dark, vm.PaperDarkVisible);
+            Assert.Equal(white, vm.WhiteTextVisible);
+
+            Assert.False(vm.PaperLightVisible && vm.PaperDarkVisible);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void PaperRowVisibility_raisesChangeNotifications()
+    {
+        var vm = NewVm(out var dir);
+        try
+        {
+            vm.Theme = "Lumen";
+            vm.FullTheme = false;
+            var seen = new System.Collections.Generic.List<string?>();
+            vm.PropertyChanged += (_, e) => seen.Add(e.PropertyName);
+
+            vm.Theme = "Pink";
+            Assert.Contains(nameof(MainViewModel.PaperLightVisible), seen);
+            Assert.Contains(nameof(MainViewModel.PaperDarkVisible), seen);
+            Assert.Contains(nameof(MainViewModel.WhiteTextVisible), seen);
+
+            seen.Clear();
+            vm.FullTheme = true;
+            Assert.Contains(nameof(MainViewModel.PaperDarkVisible), seen);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
     [Fact]
     public void Ctor_seedsAndSelectsFirstNotebookSectionPage()
     {

@@ -449,14 +449,44 @@
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding FullTheme, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
 
-                        <Grid ColumnDefinitions="*,Auto" IsEnabled="{Binding PaperToggleEnabled}">
+                        <Grid x:Name="PaperLightRow" ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Classes="label" Text="Light paper"/>
-                                    <Border Classes="qmark" ToolTip.Tip="Only matters with the Lumen theme when Full theme is off. Switches the writing page to a light background instead of a dark one."><TextBlock/></Border>
+                                    <Border Classes="qmark" ToolTip.Tip="Switches the writing page to a light background instead of a dark one. Works with the Lumen theme when Full theme is off, and with the Dark theme when Full theme is on."><TextBlock/></Border>
                                 </StackPanel>
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding PaperLight, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <Grid x:Name="PaperDarkRow" ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Classes="label" Text="Dark paper"/>
+                                    <Border Classes="qmark" ToolTip.Tip="Switches the writing page to a dark background instead of a light one. Works with the Light, Pink and Light blue themes when Full theme is on."><TextBlock/></Border>
+                                </StackPanel>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding PaperDark, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <Grid x:Name="WhiteTextRow" ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Classes="label" Text="White text"/>
+                                    <Border Classes="qmark" ToolTip.Tip="With the Light, Pink and Light blue themes, text on accent-colored fills (selected pages and sections, filled buttons like New notebook and Preferences) uses white instead of near-black."><TextBlock/></Border>
+                                </StackPanel>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding WhiteAccentText, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Classes="label" Text="Disable blue tint"/>
+                                    <Border Classes="qmark" ToolTip.Tip="Dark parts of the interface use a plain dark gray instead of the blue-leaning Lumen dark. Applies on every theme, wherever a dark surface appears."><TextBlock/></Border>
+                                </StackPanel>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding NeutralDark, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
 
                         <Grid ColumnDefinitions="*,Auto">

@@ -179,4 +179,74 @@ public class ThemePalettesTests
         var seeded = ThemePalettes.WithAccent(t, "#F2D24B");
         Assert.Equal("#FF23262F", seeded.AccentText);
     }
+
+    [Fact]
+    public void Dark_fullOn_lightPaperToggle_flipsPaperOnly()
+    {
+        var t = ThemePalettes.Resolve("Dark", fullTheme: true, paperLight: true);
+        Assert.Equal("#F7F9FD", t.PaperBackground);
+        Assert.Equal("#FF23262F", t.PaperText);
+        Assert.True(t.DarkChrome);
+        Assert.Equal("#101218", t.CanvasBackground);
+        Assert.Equal("#FFFFFFFF", t.TextPrimary);
+    }
+
+    [Fact]
+    public void Dark_fullOff_ignoresLightPaper()
+    {
+        var t = ThemePalettes.Resolve("Dark", fullTheme: false, paperLight: true);
+        Assert.True(IsGlassy(t.PaperBackground));
+        Assert.Equal("#FFFFFFFF", t.PaperText);
+    }
+
+    [Theory]
+    [InlineData("Light")]
+    [InlineData("Pink")]
+    [InlineData("Light blue")]
+    public void LightThemes_fullOn_darkPaperToggle_flipsPaperOnly(string theme)
+    {
+        var t = ThemePalettes.Resolve(theme, fullTheme: true, paperLight: false, paperDark: true);
+        Assert.Equal("#1A1C24", t.PaperBackground);
+        Assert.Equal("#FFFFFFFF", t.PaperText);
+        Assert.False(t.DarkChrome);
+        Assert.Equal(t.TextPrimary, t.CanvasText);
+    }
+
+    [Fact]
+    public void LightThemes_fullOff_ignoreDarkPaper()
+    {
+        var t = ThemePalettes.Resolve("Pink", fullTheme: false, paperLight: false, paperDark: true);
+        Assert.True(IsGlassy(t.PaperBackground));
+    }
+
+    [Fact]
+    public void Dark_ignoresDarkPaperToggle()
+    {
+        var with = ThemePalettes.Resolve("Dark", fullTheme: true, paperLight: false, paperDark: true);
+        var without = ThemePalettes.Resolve("Dark", fullTheme: true, paperLight: false, paperDark: false);
+        Assert.Equal(without, with);
+    }
+
+    [Theory]
+    [InlineData("#FF14161C", "#FF161616")]
+    [InlineData("#F5171922", "#F5191919")]
+    [InlineData("#101218", "#FF121212")]
+    [InlineData("#FF292C34", "#FF2C2C2C")]
+    [InlineData("#4DA6FF", "#4DA6FF")]
+    [InlineData("#33FFFFFF", "#33FFFFFF")]
+    [InlineData("#1F000000", "#1F000000")]
+    [InlineData("#FB6F92", "#FB6F92")]
+    public void Neutral_greysOnlyDarkBlueLeaningColors(string input, string expected) =>
+        Assert.Equal(expected, ThemePalettes.Neutral(input));
+
+    [Fact]
+    public void Neutralize_greysSurfacesAndKeepsAccents()
+    {
+        var t = ThemePalettes.Neutralize(ThemePalettes.Resolve("Dark", fullTheme: true, paperLight: false));
+        Assert.Equal("#4DA6FF", t.Accent);
+        Assert.Equal("#FF121212", t.CanvasBackground);
+        Assert.Equal("#FF1C1C1C", t.PaperBackground);
+        Assert.Equal("#FF161616", t.WindowBackground);
+        Assert.Equal("#FFFFFFFF", t.TextPrimary);
+    }
 }

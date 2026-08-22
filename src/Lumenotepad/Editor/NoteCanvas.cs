@@ -111,7 +111,26 @@ public sealed class NoteCanvas : Panel
     {
         double size = RichTextEditor.EditorFontSizePref;
         double scale = RichTextEditor.LineSpacingScalePref;
-        return scale > 1.005 ? size * 1.35 * scale : size * 1.2;
+        return scale > 1.005 ? size * 1.35 * scale : NaturalLineHeight(size);
+    }
+
+    private static (string? Font, double Size, double Height) _lineHeightCache = (null, 0, 0);
+
+    private static double NaturalLineHeight(double size)
+    {
+        string font = RichTextEditor.EditorFontPref ?? "";
+        var cached = _lineHeightCache;
+        if (cached.Font == font && Math.Abs(cached.Size - size) < 0.01) return cached.Height;
+        double h;
+        try
+        {
+            var layout = new Avalonia.Media.TextFormatting.TextLayout(
+                "Ag", new Typeface(Services.AppFonts.Family(RichTextEditor.EditorFontPref)), size, Brushes.Black);
+            h = layout.TextLines.Count > 0 ? layout.TextLines[0].Height : size * 1.2;
+        }
+        catch { h = size * 1.2; }
+        _lineHeightCache = (font, size, h);
+        return h;
     }
 
     public void SetStyles(string gridStyle, string pageStyle, int mode)

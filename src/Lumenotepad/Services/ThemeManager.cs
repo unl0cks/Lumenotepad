@@ -87,7 +87,9 @@ public static class ThemeManager
         r["SystemAccentColorLight2"] = Color.Parse(ThemePalettes.Shade(t.Accent, 0.30));
         r["SystemAccentColorDark1"] = Color.Parse(ThemePalettes.Shade(t.Accent, -0.15));
         r["SystemAccentColorDark2"] = Color.Parse(ThemePalettes.Shade(t.Accent, -0.30));
-        app.RequestedThemeVariant = t.DarkChrome ? ThemeVariant.Dark : ThemeVariant.Light;
+        var variant = t.DarkChrome ? ThemeVariant.Dark : ThemeVariant.Light;
+
+        if (!Equals(app.RequestedThemeVariant, variant)) app.RequestedThemeVariant = variant;
 
         if (!System.OperatingSystem.IsWindows()) RefreshMacChildGlass();
     }

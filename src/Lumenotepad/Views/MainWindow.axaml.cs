@@ -43,6 +43,9 @@ public partial class MainWindow : Window
         if (e.PropertyName is nameof(ViewModels.MainViewModel.Theme)
             or nameof(ViewModels.MainViewModel.FullTheme)
             or nameof(ViewModels.MainViewModel.PaperLight)
+            or nameof(ViewModels.MainViewModel.PaperDark)
+            or nameof(ViewModels.MainViewModel.WhiteAccentText)
+            or nameof(ViewModels.MainViewModel.NeutralDark)
             or nameof(ViewModels.MainViewModel.CustomAccent)
             or nameof(ViewModels.MainViewModel.AccentFollowsNotebook))
             ApplyTheme();
@@ -64,14 +67,18 @@ public partial class MainWindow : Window
     private void ApplyTheme()
     {
         if (_themeVm is not { } vm || Application.Current is not { } app) return;
-        var tokens = Services.ThemePalettes.Resolve(vm.Theme, vm.FullTheme, vm.PaperLight);
+        var tokens = Services.ThemePalettes.Resolve(vm.Theme, vm.FullTheme, vm.PaperLight, vm.PaperDark);
 
         string? seed = vm.AccentFollowsNotebook && !vm.IsHomeVisible && vm.SelectedNotebook is { } nb
             ? Services.ThemePalettes.NormalizeHex(nb.Color)
             : Services.ThemePalettes.NormalizeHex(vm.CustomAccent);
         if (seed is { } accent) tokens = Services.ThemePalettes.WithAccent(tokens, accent);
+        if (vm.WhiteAccentText && !tokens.DarkChrome) tokens = tokens with { AccentText = "#FFFFFFFF" };
+        if (vm.NeutralDark) tokens = Services.ThemePalettes.Neutralize(tokens);
         Services.ThemeManager.Apply(app, tokens);
         Services.ThemeManager.ApplyChrome(this);
+
+        Host?.RefreshThemedContent();
 
         if (_shellReady && !OperatingSystem.IsWindows()) RearmMacGlass();
     }
@@ -134,6 +141,26 @@ public partial class MainWindow : Window
             DispatcherTimer.RunOnce(WriteMacChromeDiagnostics, TimeSpan.FromMilliseconds(1200));
         }
         Services.StartupLog.Mark("ready");
+        DispatcherTimer.RunOnce(() => _ = OfferStartupUpdate(), TimeSpan.FromSeconds(3));
+    }
+
+    private bool _startupUpdateOffered;
+
+    private async System.Threading.Tasks.Task OfferStartupUpdate()
+    {
+        if (_startupUpdateOffered) return;
+        _startupUpdateOffered = true;
+        if (Vm is not { AutoCheckUpdates: true }) return;
+        if (!Services.UpdateService.CanApply) return;
+        if (await Services.UpdateService.CheckAsync() is not { } f) return;
+        if (!IsVisible) return;
+        string message = (f.Notes is { Length: > 0 } ? f.Notes + "\n\n" : "")
+            + $"You have {Services.AppInfo.Version}. The update is a "
+            + $"{f.Build.Size / 1024.0 / 1024.0:F0} MB download; Lumenotepad restarts to finish, and "
+            + "your notebooks are not touched.";
+        bool go = await ConfirmDialog.Show(this, $"Lumenotepad {f.Version} is available", message,
+            confirmText: "Update now", cancelText: "Later", danger: false);
+        if (go) await new UpdaterWindow((f.Version, f.Build)).ShowDialog(this);
     }
 
     internal void RearmMacGlass()

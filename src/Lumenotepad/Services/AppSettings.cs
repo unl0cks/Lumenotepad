@@ -10,6 +10,9 @@ public sealed class AppSettings
     public string Theme { get; set; } = "Lumen";
     public bool FullTheme { get; set; }
     public bool PaperLight { get; set; }
+    public bool PaperDark { get; set; }
+    public bool WhiteAccentText { get; set; }
+    public bool NeutralDark { get; set; }
     public bool FlatCovers { get; set; }
     public bool GlossyAccents { get; set; } = true;
     public bool ExtendedFonts { get; set; }

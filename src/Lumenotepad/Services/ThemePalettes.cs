@@ -37,7 +37,7 @@ public static class ThemePalettes
 {
     public static readonly string[] Themes = { "Lumen", "Dark", "Light", "Pink", "Light blue" };
 
-    public static ThemeTokens Resolve(string theme, bool fullTheme, bool paperLight)
+    public static ThemeTokens Resolve(string theme, bool fullTheme, bool paperLight, bool paperDark = false)
     {
         return theme switch
         {
@@ -46,22 +46,22 @@ public static class ThemePalettes
                 accent: "#4DA6FF", dark: true,
                 frameBg: "#F214161C", frameBorder: "#FF292C34",
                 solidCanvas: "#101218", solidPaper: "#1A1C24", solidPaperBorder: "#FF2C2F38",
-                fullTheme),
+                fullTheme, paperLight, paperDark: false),
             "Light" => Solid(
                 accent: "#3E8EE0", dark: false,
                 frameBg: "#F2F2F5F9", frameBorder: "#FFC9CFD8",
                 solidCanvas: "#E9EDF3", solidPaper: "#FFFFFF", solidPaperBorder: "#FFCDD3DC",
-                fullTheme),
+                fullTheme, paperLight: false, paperDark),
             "Pink" => Solid(
                 accent: "#FB6F92", dark: false,
                 frameBg: "#F2FFE5EC", frameBorder: "#FFE9B7C6",
                 solidCanvas: "#FFD3DF", solidPaper: "#FFF5F8", solidPaperBorder: "#FFEBBECD",
-                fullTheme),
+                fullTheme, paperLight: false, paperDark),
             "Light blue" => Solid(
                 accent: "#5C85E6", dark: false,
                 frameBg: "#F2EDF2FB", frameBorder: "#FFC5D2E7",
                 solidCanvas: "#D7E3FC", solidPaper: "#F8FAFF", solidPaperBorder: "#FFCBD7EA",
-                fullTheme),
+                fullTheme, paperLight: false, paperDark),
             _ => Lumen(fullTheme, paperLight),
         };
     }
@@ -99,7 +99,8 @@ public static class ThemePalettes
 
     private static ThemeTokens Solid(
         string accent, bool dark, string frameBg, string frameBorder,
-        string solidCanvas, string solidPaper, string solidPaperBorder, bool fullTheme)
+        string solidCanvas, string solidPaper, string solidPaperBorder, bool fullTheme,
+        bool paperLight, bool paperDark)
     {
         var t = dark ? GlassRegionBase(accent) : LightFrameBase(accent);
         t = t with
@@ -118,7 +119,7 @@ public static class ThemePalettes
 
         if (fullTheme)
         {
-            return t with
+            var f = t with
             {
                 GlassWindow = false,
                 PaperBackground = solidPaper, PaperBorder = solidPaperBorder,
@@ -130,6 +131,21 @@ public static class ThemePalettes
                 ScrollThumbHover = dark ? "#52FFFFFF" : "#4D000000",
                 ScrollThumbPressed = dark ? "#70FFFFFF" : "#66000000",
             };
+            if (dark && paperLight)
+                f = f with
+                {
+                    PaperBackground = "#F7F9FD", PaperBorder = "#FFC9CFD8",
+                    PaperText = "#FF23262F", PaperTextMuted = "#8023262F",
+                    NoteChromeHover = "#1F000000", NoteGripFill = "#0E000000", NoteGripBar = "#38000000",
+                };
+            else if (!dark && paperDark)
+                f = f with
+                {
+                    PaperBackground = "#1A1C24", PaperBorder = "#FF2C2F38",
+                    PaperText = "#FFFFFFFF", PaperTextMuted = "#80FFFFFF",
+                    NoteChromeHover = "#26FFFFFF", NoteGripFill = "#12FFFFFF", NoteGripBar = "#3DFFFFFF",
+                };
+            return f;
         }
 
         return t with
@@ -180,6 +196,34 @@ public static class ThemePalettes
         FieldSelection = Alpha(seed, 0x78),
         NoteChromeFocus = Alpha(seed, 0x4D),
     };
+
+    public static ThemeTokens Neutralize(ThemeTokens t) => t with
+    {
+        FrameBackground = Neutral(t.FrameBackground), FrameBorder = Neutral(t.FrameBorder),
+        TextPrimary = Neutral(t.TextPrimary), TextSecondary = Neutral(t.TextSecondary),
+        TextMuted = Neutral(t.TextMuted),
+        ControlHover = Neutral(t.ControlHover), ControlPressed = Neutral(t.ControlPressed),
+        ScrollThumb = Neutral(t.ScrollThumb), ScrollThumbHover = Neutral(t.ScrollThumbHover),
+        ScrollThumbPressed = Neutral(t.ScrollThumbPressed),
+        CanvasBackground = Neutral(t.CanvasBackground), CanvasText = Neutral(t.CanvasText),
+        CanvasTextMuted = Neutral(t.CanvasTextMuted),
+        CanvasChip = Neutral(t.CanvasChip), CanvasChipBorder = Neutral(t.CanvasChipBorder),
+        PaperBackground = Neutral(t.PaperBackground), PaperBorder = Neutral(t.PaperBorder),
+        PaperText = Neutral(t.PaperText), PaperTextMuted = Neutral(t.PaperTextMuted),
+        NoteChromeHover = Neutral(t.NoteChromeHover),
+        NoteGripFill = Neutral(t.NoteGripFill), NoteGripBar = Neutral(t.NoteGripBar),
+        WindowBackground = Neutral(t.WindowBackground),
+        MenuBackground = Neutral(t.MenuBackground), MenuBorder = Neutral(t.MenuBorder),
+        AccentText = Neutral(t.AccentText),
+    };
+
+    public static string Neutral(string hex)
+    {
+        var (a, r, g, b) = Parse(hex);
+        if (Math.Max(r, Math.Max(g, b)) > 0x60 || b <= r) return hex;
+        byte y = (byte)Math.Clamp(Math.Round((r * 299 + g * 587 + b * 114) / 1000.0), 0, 255);
+        return Format(a, y, y, y);
+    }
 
     public static string IdealTextOn(string hex)
     {

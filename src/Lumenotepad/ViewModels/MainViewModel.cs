@@ -67,6 +67,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _theme = "Lumen";
     [ObservableProperty] private bool _fullTheme;
     [ObservableProperty] private bool _paperLight;
+    [ObservableProperty] private bool _paperDark;
+    [ObservableProperty] private bool _whiteAccentText;
+    [ObservableProperty] private bool _neutralDark;
     [ObservableProperty] private bool _flatCovers;
     [ObservableProperty] private bool _glossyAccents = true;
     [ObservableProperty] private bool _extendedFonts;
@@ -129,7 +132,13 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty] private int _palettePrefsVersion;
 
-    public bool PaperToggleEnabled => Theme == "Lumen" && !FullTheme;
+    public bool PaperLightVisible => Theme == "Lumen" ? !FullTheme : Theme == "Dark" && FullTheme;
+
+    public bool PaperDarkVisible => IsLightTheme && FullTheme;
+
+    public bool WhiteTextVisible => IsLightTheme;
+
+    private bool IsLightTheme => Theme is "Light" or "Pink" or "Light blue";
 
     [ObservableProperty] private string _greeting = BuildGreeting("");
     [ObservableProperty] private string _homeSubtitle = "Pick up where you left off, or start something new.";
@@ -209,6 +218,9 @@ public partial class MainViewModel : ObservableObject
             Theme = _settings.Theme;
             FullTheme = _settings.FullTheme;
             PaperLight = _settings.PaperLight;
+            PaperDark = _settings.PaperDark;
+            WhiteAccentText = _settings.WhiteAccentText;
+            NeutralDark = _settings.NeutralDark;
             FlatCovers = _settings.FlatCovers;
             GlossyAccents = _settings.GlossyAccents;
             ExtendedFonts = _settings.ExtendedFonts;
@@ -339,7 +351,9 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnThemeChanged(string value)
     {
-        OnPropertyChanged(nameof(PaperToggleEnabled));
+        OnPropertyChanged(nameof(PaperLightVisible));
+        OnPropertyChanged(nameof(PaperDarkVisible));
+        OnPropertyChanged(nameof(WhiteTextVisible));
         if (_settings is null || _settingsDir is null) return;
         _settings.Theme = value;
         _settings.Save(_settingsDir);
@@ -347,7 +361,8 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnFullThemeChanged(bool value)
     {
-        OnPropertyChanged(nameof(PaperToggleEnabled));
+        OnPropertyChanged(nameof(PaperLightVisible));
+        OnPropertyChanged(nameof(PaperDarkVisible));
         if (_settings is null || _settingsDir is null) return;
         _settings.FullTheme = value;
         _settings.Save(_settingsDir);
@@ -357,6 +372,27 @@ public partial class MainViewModel : ObservableObject
     {
         if (_settings is null || _settingsDir is null) return;
         _settings.PaperLight = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnPaperDarkChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.PaperDark = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnWhiteAccentTextChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.WhiteAccentText = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnNeutralDarkChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.NeutralDark = value;
         _settings.Save(_settingsDir);
     }
 
@@ -923,6 +959,7 @@ public partial class MainViewModel : ObservableObject
     {
         var d = new AppSettings();
         Theme = d.Theme; FullTheme = d.FullTheme; PaperLight = d.PaperLight;
+        PaperDark = d.PaperDark; WhiteAccentText = d.WhiteAccentText; NeutralDark = d.NeutralDark;
         FlatCovers = d.FlatCovers; GlossyAccents = d.GlossyAccents; ExtendedFonts = d.ExtendedFonts;
         ToolbarPosition = d.ToolbarPosition; ToolbarScope = d.ToolbarScope;
         ResizablePages = d.ResizablePages; DeletedHistory = d.DeletedHistory;

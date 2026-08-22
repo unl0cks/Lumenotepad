@@ -24,7 +24,9 @@ public sealed class UpdaterWindow : Window
 
     private sealed record UpdateBuild(Services.UpdateService.Build Inner);
 
-    public UpdaterWindow()
+    public UpdaterWindow() : this(null) { }
+
+    public UpdaterWindow((string Version, Services.UpdateService.Build Build)? install)
     {
         Title = "Lumenotepad Updates";
         Width = 460;
@@ -92,7 +94,8 @@ public sealed class UpdaterWindow : Window
 
         ShowIdle();
 
-        _ = Check();
+        if (install is { } i) _ = Install(i.Version, i.Build);
+        else _ = Check();
     }
 
     private IBrush? Res(string key) =>

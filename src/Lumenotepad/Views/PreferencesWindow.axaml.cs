@@ -494,8 +494,14 @@ public partial class PreferencesWindow : Window
         }
 
         else if (e.PropertyName is nameof(MainViewModel.Theme)
-                 or nameof(MainViewModel.FullTheme) or nameof(MainViewModel.PaperLight))
+                 or nameof(MainViewModel.FullTheme) or nameof(MainViewModel.PaperLight)
+                 or nameof(MainViewModel.PaperDark) or nameof(MainViewModel.WhiteAccentText)
+                 or nameof(MainViewModel.NeutralDark))
+        {
             BuildAccentSwatches();
+            if (e.PropertyName is nameof(MainViewModel.Theme) or nameof(MainViewModel.FullTheme))
+                SyncThemeRows(animate: true);
+        }
         else if (e.PropertyName == nameof(MainViewModel.AdvancedUnlocked)) UpdateGateVisuals();
         else if (e.PropertyName == nameof(MainViewModel.BulletPrefsVersion)) BuildBulletRows();
         else if (e.PropertyName == nameof(MainViewModel.ExtendedFonts))
@@ -1165,9 +1171,40 @@ public partial class PreferencesWindow : Window
     private static bool TipContains(Control c, string q) =>
         ToolTip.GetTip(c) is string tip && tip.Contains(q, StringComparison.OrdinalIgnoreCase);
 
+    private void SyncThemeRows(bool animate)
+    {
+        if (Vm is not { } vm) return;
+        var rows = new (Control Row, bool Show)[]
+        {
+            (PaperLightRow, vm.PaperLightVisible),
+            (PaperDarkRow, vm.PaperDarkVisible),
+            (WhiteTextRow, vm.WhiteTextVisible),
+        };
+
+        foreach (var (row, show) in rows)
+            if (_origVisible.ContainsKey(row)) _origVisible[row] = show;
+
+        if (animate && AppearancePanel.IsVisible && !_searching)
+        {
+            Motion.Reflow(AppearancePanel, rows);
+            return;
+        }
+
+        foreach (var (row, show) in rows)
+        {
+            Motion.Stop(row);
+            row.ClearValue(Visual.RenderTransformProperty);
+            row.ClearValue(HeightProperty);
+            row.ClearValue(MarginProperty);
+            row.Opacity = 1;
+            if (!_searching) row.IsVisible = show;
+        }
+    }
+
     private void SyncFromVm()
     {
         if (Vm is not { } vm) return;
+        SyncThemeRows(animate: false);
         ThemeList.SelectedItem = vm.Theme;
         ToolbarPosBox.SelectedItem = vm.ToolbarPosition;
         ToolbarScopeBox.SelectedItem = vm.ToolbarScope;
