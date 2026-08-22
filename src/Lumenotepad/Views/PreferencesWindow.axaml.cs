@@ -369,7 +369,7 @@ public partial class PreferencesWindow : Window
             if (Vm is { } vm && Math.Abs(vm.NewNoteWidth - v) > 0.5) vm.NewNoteWidth = v;
             NewNoteWidthValue.Text = ((int)v).ToString();
         };
-        PageGridBox.ItemsSource = new[] { "None", "Ruled", "Grid", "Dots" };
+        PageGridBox.ItemsSource = new[] { "None", "Ruled", "Wide ruled", "Grid", "Dots" };
         PageGridBox.SelectionChanged += (_, _) =>
         {
             if (Vm is { } vm && PageGridBox.SelectedItem is string g && vm.PageGrid != g) vm.PageGrid = g;
@@ -1206,7 +1206,7 @@ public partial class PreferencesWindow : Window
         {
             "Lines" => "Grid",
             "Blank" => "None",
-            "None" or "Ruled" or "Grid" or "Dots" => vm.PageGrid,
+            "None" or "Ruled" or "Wide ruled" or "Grid" or "Dots" => vm.PageGrid,
             _ => "None",
         };
         TidyLayoutBox.SelectedItem = vm.MindmapTidyLayout switch

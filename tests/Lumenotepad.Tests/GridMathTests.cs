@@ -25,23 +25,55 @@ public class GridMathTests
         Assert.Equal(expected, GridMath.SnapY(input, style));
 
     [Theory]
-    [InlineData(0, 0)]
-    [InlineData(13, 0)]
-    [InlineData(15, 28)]
-    [InlineData(28, 28)]
-    [InlineData(41, 28)]
-    [InlineData(43, 56)]
-    public void SnapY_landsOnRuleLinesForRuledPaper(double input, double expected) =>
-        Assert.Equal(expected, GridMath.SnapY(input, PageStyles.Ruled));
+    [InlineData(PageStyles.Ruled, 0)]
+    [InlineData(PageStyles.Ruled, 13)]
+    [InlineData(PageStyles.Ruled, 40)]
+    [InlineData(PageStyles.Ruled, 177)]
+    [InlineData(PageStyles.RuledWide, 0)]
+    [InlineData(PageStyles.RuledWide, 50)]
+    [InlineData(PageStyles.RuledWide, 200)]
+    public void SnapY_centersTheFirstTextRowBetweenRuleLines(string style, double input)
+    {
+        const double lineHeight = 18;
+        double spacing = GridMath.StepFor(style);
+        double snapped = GridMath.SnapY(input, style, lineHeight);
+
+        double textTop = snapped + GridMath.ChromeTop;
+        double gapAboveText = (spacing - lineHeight) / 2;
+        double lineAboveText = textTop - gapAboveText;
+
+        Assert.Equal(0, lineAboveText % spacing, 6);
+    }
+
+    [Fact]
+    public void SnapY_movesByWholeRuleSteps()
+    {
+        double a = GridMath.SnapY(100, PageStyles.Ruled, 18);
+        double b = GridMath.SnapY(100 + PageStyleGuides.RuleSpacing, PageStyles.Ruled, 18);
+        Assert.Equal(PageStyleGuides.RuleSpacing, b - a);
+    }
+
+    [Theory]
+    [InlineData(PageStyles.Ruled, 30, 28)]
+    [InlineData(PageStyles.Ruled, 43, 56)]
+    [InlineData(PageStyles.RuledWide, 30, 36)]
+    [InlineData(PageStyles.RuledWide, 55, 72)]
+    [InlineData(PageStyles.Grid, 29, 20)]
+    public void SnapHeight_staysInWholeSteps(string style, double input, double expected) =>
+        Assert.Equal(expected, GridMath.SnapHeight(input, style));
 
     [Fact]
     public void SnapX_leavesRuledPaperFree()
     {
         Assert.Equal(13.7, GridMath.SnapX(13.7, PageStyles.Ruled));
+        Assert.Equal(13.7, GridMath.SnapX(13.7, PageStyles.RuledWide));
         Assert.Equal(20, GridMath.SnapX(13.7, PageStyles.Grid));
     }
 
     [Fact]
-    public void RuleSpacing_matchesTheDrawnPaper() =>
+    public void RuleSpacing_matchesTheDrawnPaper()
+    {
         Assert.Equal(28, PageStyleGuides.RuleSpacing);
+        Assert.Equal(36, PageStyleGuides.RuleSpacingWide);
+    }
 }

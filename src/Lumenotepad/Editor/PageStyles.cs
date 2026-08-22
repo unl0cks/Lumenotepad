@@ -5,8 +5,8 @@ namespace Lumenotepad.Editor;
 public static class PageStyles
 {
 
-    public const string Blank = "Blank", Ruled = "Ruled", Grid = "Grid", Dots = "Dots";
-    public static readonly string[] GridStyles = { Blank, Ruled, Grid, Dots };
+    public const string Blank = "Blank", Ruled = "Ruled", RuledWide = "Wide ruled", Grid = "Grid", Dots = "Dots";
+    public static readonly string[] GridStyles = { Blank, Ruled, RuledWide, Grid, Dots };
 
     public const string Freeform = "Freeform", Cornell = "Cornell", TwoColumn = "Two-column",
         Outline = "Outline", Boxing = "Boxing", Charting = "Charting", Sentence = "Sentence",
@@ -22,6 +22,7 @@ public static class PageStyles
     {
         "Blank" => Blank,
         "Ruled" => Ruled,
+        "Wide ruled" => RuledWide,
         "Grid" => Grid,
         "Dots" => Dots,
         "Lines" => Grid,

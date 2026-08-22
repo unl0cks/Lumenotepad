@@ -53,8 +53,8 @@ public partial class CustomizeSheetWindow : Window
         UpdateModeEnabled();
 
         var gridChoices = sec
-            ? new[] { "Keep current", "Inherit", "Blank", "Ruled", "Grid", "Dots" }
-            : new[] { "Inherit", "Blank", "Ruled", "Grid", "Dots" };
+            ? new[] { "Keep current", "Inherit", "Blank", "Ruled", "Wide ruled", "Grid", "Dots" }
+            : new[] { "Inherit", "Blank", "Ruled", "Wide ruled", "Grid", "Dots" };
         GridBox.ItemsSource = gridChoices;
         GridBox.SelectedIndex = sec ? 0 : Math.Max(0, Array.IndexOf(gridChoices, page!.GridStyle));
         MenuFx.AttachDropDown(GridBox);

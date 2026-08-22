@@ -103,7 +103,16 @@ public sealed class NoteCanvas : Panel
 
     internal double SnapX(double v) => GridMath.SnapX(v, _gridStyle);
 
-    internal double SnapY(double v) => GridMath.SnapY(v, _gridStyle);
+    internal double SnapY(double v) => GridMath.SnapY(v, _gridStyle, FirstLineHeight());
+
+    internal double SnapH(double v) => GridMath.SnapHeight(v, _gridStyle);
+
+    private static double FirstLineHeight()
+    {
+        double size = RichTextEditor.EditorFontSizePref;
+        double scale = RichTextEditor.LineSpacingScalePref;
+        return scale > 1.005 ? size * 1.35 * scale : size * 1.2;
+    }
 
     public void SetStyles(string gridStyle, string pageStyle, int mode)
     {
@@ -1856,7 +1865,7 @@ internal sealed class NoteBoxView : Panel
                 if ((edges & (Edge.Top | Edge.Bottom)) != 0)
                 {
                     double nh = edges.HasFlag(Edge.Top) ? oh - dy : oh + dy;
-                    if (snap) nh = _canvas.SnapY(nh);
+                    if (snap) nh = _canvas.SnapH(nh);
                     nh = Math.Clamp(nh, Box.Divider == "v" ? NoteBox.MinDividerLength : NoteBox.MinHeight, 4000);
                     Box.H = nh;
                     if (edges.HasFlag(Edge.Top)) Box.Y = Math.Max(0, oy + oh - nh);

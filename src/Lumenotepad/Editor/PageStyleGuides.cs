@@ -14,6 +14,7 @@ public static class PageStyleGuides
 
     public const double Margin = 16;
     public const double RuleSpacing = 28;
+    public const double RuleSpacingWide = 36;
     public const double RuleTop = 48;
     public const double HeaderY = 64;
     public const double BoxMargin = 24;

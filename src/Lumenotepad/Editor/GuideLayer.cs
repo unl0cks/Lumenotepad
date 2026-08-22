@@ -93,15 +93,18 @@ public sealed class GuideLayer : Control
                 Pen = new Pen(new SolidColorBrush(Color.Parse(Services.ThemePalettes.Alpha(t.PaperText, 0x1E)))),
             }, GridMath.Cell);
         }
-        if (style == PageStyles.Ruled)
+        if (style is PageStyles.Ruled or PageStyles.RuledWide)
         {
+            double spacing = style == PageStyles.RuledWide
+                ? PageStyleGuides.RuleSpacingWide
+                : PageStyleGuides.RuleSpacing;
             var g = new GeometryGroup();
-            g.Children.Add(new LineGeometry(new Point(0, 0), new Point(PageStyleGuides.RuleSpacing, 0)));
+            g.Children.Add(new LineGeometry(new Point(0, 0), new Point(spacing, 0)));
             return Tile(new GeometryDrawing
             {
                 Geometry = g,
                 Pen = new Pen(new SolidColorBrush(Color.Parse(Services.ThemePalettes.Alpha(t.PaperText, 0x1E)))),
-            }, PageStyleGuides.RuleSpacing);
+            }, spacing);
         }
         return null;
     }

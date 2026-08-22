@@ -255,7 +255,7 @@ public partial class NotebookWizardWindow : Window
         ModeStarters.IsCheckedChanged += (_, _) => { if (ModeStarters.IsChecked == true) _draft.DefaultPageStyleMode = Editor.PageStyles.ModeStartersOnly; };
         ModeRigid.IsCheckedChanged += (_, _) => { if (ModeRigid.IsChecked == true) _draft.DefaultPageStyleMode = Editor.PageStyles.ModeRigid; };
 
-        var gridChoices = new[] { "Use my app setting", "Blank", "Ruled", "Grid", "Dots" };
+        var gridChoices = new[] { "Use my app setting", "Blank", "Ruled", "Wide ruled", "Grid", "Dots" };
         GridBox.ItemsSource = gridChoices;
         GridBox.SelectedIndex = System.Math.Max(0, System.Array.IndexOf(gridChoices, _draft.DefaultGridStyle));
         GridBox.SelectionChanged += (_, _) =>
