@@ -1,4 +1,6 @@
 <Solution>
   <Project Path="src/Lumenotepad/Lumenotepad.csproj" />
   <Project Path="tests/Lumenotepad.Tests/Lumenotepad.Tests.csproj" />
+  <Project Path="installer/Lumenotepad.Setup/Lumenotepad.Setup.csproj" />
+  <Project Path="installer/Lumenotepad.Setup.Tests/Lumenotepad.Setup.Tests.csproj" />
 </Solution>

@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>Lumenotepad.Setup</AssemblyName>
+    <RootNamespace>Lumenotepad.Setup</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\lumenotepad.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <!-- THE PAYLOAD.
+       Built in two passes by build-setup.ps1:
+         1. no LumenotepadPayload  -> a bare installer binary. Its only job is to ride along inside the payload
+                                      as uninstall.exe, so uninstalling never depends on keeping setup.exe.
+         2. LumenotepadPayload=... -> the real setup, with Lumenotepad (and that uninstall.exe) inside it.
+       A build with no payload still runs; it just uninstalls instead of pretending it can install. -->
+  <ItemGroup Condition="'$(LumenotepadPayload)' != ''">
+    <EmbeddedResource Include="$(LumenotepadPayload)" LogicalName="Lumenotepad.payload" />
+  </ItemGroup>
+
+  <!-- THE LAUNCHER FLAG.
+       Two of the three builds carry no payload, so "no payload" alone cannot mean "uninstall":
+
+         no payload, no flag  -> the bare build, which becomes uninstall.exe
+         no payload, flag set -> the launcher, which downloads the published portable zip
+         payload              -> the full setup, which installs what it carries
+
+       Compiled in rather than passed at runtime, so a build cannot be talked into downloading by an
+       argument. Off unless asked for, which is what keeps uninstall.exe an uninstaller. -->
+  <PropertyGroup>
+    <LumenotepadLauncher Condition="'$(LumenotepadLauncher)' == ''">false</LumenotepadLauncher>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>LumenotepadLauncher</_Parameter1>
+      <_Parameter2>$(LumenotepadLauncher)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\lumenotepad-icon-256.png" />
+    <AvaloniaResource Include="Themes\Setup.axaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+  </ItemGroup>
+</Project>

@@ -4,3 +4,4 @@ userdata/
 *.user
 .vs/
 dist/
+installer/.build/
