@@ -46,6 +46,8 @@ public sealed class RichTextEditor : Control
     private RunFormat _pending;
     private bool _hasPending;
 
+    private bool _pendingUser;
+
     private readonly DispatcherTimer _anim = new() { Interval = TimeSpan.FromMilliseconds(16) };
     private Rect _caretDisplay;
     private bool _caretSeeded;
@@ -614,8 +616,17 @@ public sealed class RichTextEditor : Control
     private void DeleteSelection()
     {
         var (a, b) = SelOrdered();
+        ArmPending(_doc.FormatStartingAt(a));
         _doc.DeleteRange(a, b);
         _caret = _anchor = a;
+    }
+
+    private void ArmPending(RunFormat f, bool user = false)
+    {
+        if (!user && _hasPending && _pendingUser) return;
+        _pending = f with { Link = null };
+        _hasPending = true;
+        _pendingUser = user;
     }
 
     protected override void OnTextInput(TextInputEventArgs e)
@@ -696,12 +707,9 @@ public sealed class RichTextEditor : Control
                 else
                 {
                     var carry = _hasPending ? _pending : _doc.FormatAt(_caret);
+                    bool wasUser = _hasPending && _pendingUser;
                     _caret = _anchor = _doc.SplitParagraph(_caret);
-                    if (_doc.Paragraphs[_caret.Para].Runs.Count == 0)
-                    {
-                        _pending = carry with { Link = null };
-                        _hasPending = true;
-                    }
+                    if (_doc.Paragraphs[_caret.Para].Runs.Count == 0) ArmPending(carry, wasUser);
                 }
                 AfterEdit();
                 break;
@@ -740,7 +748,12 @@ public sealed class RichTextEditor : Control
                 else
                 {
                     var prev = ctrl ? PrevWordPos(_caret) : _doc.Move(_caret, -1);
-                    if (prev != _caret) { _doc.DeleteRange(prev, _caret); _caret = _anchor = prev; }
+                    if (prev != _caret)
+                    {
+                        ArmPending(_caret.Off > 0 ? _doc.FormatAt(_caret) : _doc.FormatAt(prev));
+                        _doc.DeleteRange(prev, _caret);
+                        _caret = _anchor = prev;
+                    }
                 }
                 AfterEdit();
                 break;
@@ -750,7 +763,11 @@ public sealed class RichTextEditor : Control
                 else
                 {
                     var next = ctrl ? NextWordPos(_caret) : _doc.Move(_caret, 1);
-                    if (next != _caret) _doc.DeleteRange(_caret, next);
+                    if (next != _caret)
+                    {
+                        ArmPending(next.Para == _caret.Para ? _doc.FormatAt(next) : _doc.FormatAt(_caret));
+                        _doc.DeleteRange(_caret, next);
+                    }
                 }
                 AfterEdit();
                 break;
@@ -1009,8 +1026,7 @@ public sealed class RichTextEditor : Control
         }
         else
         {
-            _pending = flipPending(_hasPending ? _pending : _doc.FormatAt(_caret));
-            _hasPending = true;
+            ArmPending(flipPending(_hasPending ? _pending : _doc.FormatAt(_caret)), user: true);
         }
         RaiseSelectionChanged();
     }
@@ -1027,8 +1043,7 @@ public sealed class RichTextEditor : Control
         }
         else
         {
-            _pending = setPending(_hasPending ? _pending : _doc.FormatAt(_caret));
-            _hasPending = true;
+            ArmPending(setPending(_hasPending ? _pending : _doc.FormatAt(_caret)), user: true);
         }
         RaiseSelectionChanged();
     }

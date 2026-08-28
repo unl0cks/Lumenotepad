@@ -286,6 +286,13 @@ public sealed class RichDocument
         return para.Runs[^1].Format;
     }
 
+    public RunFormat FormatStartingAt(DocPos a)
+    {
+        Clamp(ref a);
+        var one = Move(a, 1);
+        return one.Para == a.Para && one != a ? FormatAt(one) : FormatAt(a);
+    }
+
     public bool RangeAll(DocPos a, DocPos b, Func<RichRun, bool> pred)
     {
         Clamp(ref a); Clamp(ref b);

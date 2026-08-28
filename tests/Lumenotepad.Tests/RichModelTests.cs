@@ -322,6 +322,51 @@ public class RichModelTests
     }
 
     [Fact]
+    public void FormatStartingAt_readsTheFirstCharacterOfTheRange()
+    {
+        var d = new RichDocument();
+        var end = d.InsertText(new DocPos(0, 0), "plain",
+            new RunFormat(false, false, false, false, null, null, null, null));
+        d.InsertText(end, "styled",
+            new RunFormat(true, false, false, false, null, null, 20, "Caveat"));
+
+        var styled = d.FormatStartingAt(new DocPos(0, 5));
+        Assert.Equal("Caveat", styled.Font);
+        Assert.Equal(20, styled.Size);
+        Assert.True(styled.Bold);
+
+        var plain = d.FormatStartingAt(new DocPos(0, 0));
+        Assert.Null(plain.Font);
+        Assert.False(plain.Bold);
+    }
+
+    [Fact]
+    public void FormatStartingAt_atParagraphEnd_fallsBackToTrailingFormat()
+    {
+        var d = new RichDocument();
+        d.InsertText(new DocPos(0, 0), "one",
+            new RunFormat(false, true, false, false, null, null, null, "Caveat"));
+        d.SplitParagraph(d.End);
+        d.InsertText(d.End, "two");
+
+        var f = d.FormatStartingAt(new DocPos(0, 3));
+        Assert.Equal("Caveat", f.Font);
+        Assert.True(f.Italic);
+    }
+
+    [Fact]
+    public void FormatAt_atCaret_describesTheCharacterToItsLeft()
+    {
+        var d = new RichDocument();
+        var end = d.InsertText(new DocPos(0, 0), "ab",
+            new RunFormat(false, false, false, false, null, null, null, "Gambarino"));
+        d.InsertText(end, "cd", new RunFormat(true, false, false, false, null, null, null, null));
+
+        Assert.Equal("Gambarino", d.FormatAt(new DocPos(0, 2)).Font);
+        Assert.True(d.FormatAt(new DocPos(0, 4)).Bold);
+    }
+
+    [Fact]
     public void ChangeIndent_onlyTouchesBulletedParagraphs_andClamps()
     {
         var d = Doc("one\ntwo\nthree");
