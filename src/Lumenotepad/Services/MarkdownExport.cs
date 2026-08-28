@@ -22,22 +22,31 @@ public static class MarkdownExport
     private static string BoxToMarkdown(NoteBox box)
     {
         var lines = new List<string>();
-        int num = 0;
+        var nums = new Dictionary<int, int>();
         foreach (var p in box.Doc.Paragraphs)
         {
-            if (p.Bullet == "num") num++; else num = 0;
-            lines.Add(Prefix(p, num) + Inline(p));
+            if (p.Bullet == "num")
+            {
+                nums[p.Indent] = nums.TryGetValue(p.Indent, out var n) ? n + 1 : 1;
+                foreach (var k in nums.Keys.Where(k => k > p.Indent).ToList()) nums.Remove(k);
+            }
+            else nums.Clear();
+            lines.Add(Prefix(p, p.Bullet == "num" ? nums[p.Indent] : 0) + Inline(p));
         }
         return string.Join("\n", lines);
     }
 
-    private static string Prefix(Paragraph p, int num) => p.Bullet switch
+    private static string Prefix(Paragraph p, int num)
     {
-        null => "",
-        "num" => $"{num}. ",
-        "check" => p.Checked ? "- [x] " : "- [ ] ",
-        _ => "- ",
-    };
+        string pad = p.Bullet is null ? "" : new string(' ', p.Indent * 2);
+        return pad + p.Bullet switch
+        {
+            null => "",
+            "num" => $"{num}. ",
+            "check" => p.Checked ? "- [x] " : "- [ ] ",
+            _ => "- ",
+        };
+    }
 
     private static string Inline(Paragraph p) => string.Concat(p.Runs.Select(Run));
 

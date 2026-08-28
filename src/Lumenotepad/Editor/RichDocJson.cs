@@ -26,6 +26,7 @@ public static class RichDocJson
     {
         [JsonPropertyName("runs")] public List<RunDto> Runs { get; set; } = new();
         [JsonPropertyName("bul")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Bul { get; set; }
+        [JsonPropertyName("ind")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Ind { get; set; }
         [JsonPropertyName("chk")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Chk { get; set; }
         [JsonPropertyName("tag")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Tag { get; set; }
         [JsonPropertyName("nb")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public bool? Nb { get; set; }
@@ -49,6 +50,7 @@ public static class RichDocJson
         doc.Paragraphs.Select(p => new ParaDto
         {
             Bul = p.Bullet,
+            Ind = p.Indent,
             Chk = p.Checked,
             Tag = p.Tag,
             Nb = p.NumBold, Ni = p.NumItalic, Nu = p.NumUnderline, Ns = p.NumStrike,
@@ -70,7 +72,8 @@ public static class RichDocJson
         {
             var para = new Paragraph
             {
-                Bullet = p.Bul, Checked = p.Chk, Tag = p.Tag,
+                Bullet = p.Bul, Indent = System.Math.Clamp(p.Ind, 0, RichDocument.MaxIndent),
+                Checked = p.Chk, Tag = p.Tag,
                 NumBold = p.Nb, NumItalic = p.Ni, NumUnderline = p.Nu, NumStrike = p.Ns,
                 Align = (TextAlign)p.Al, Style = (ParaStyle)p.Ps, Footnote = p.Fn,
             };

@@ -104,6 +104,14 @@ public static class PageExport
         "star" => "[fav] ", "flag" => "[flag] ", _ => "",
     };
 
+    private static int NextNum(Dictionary<int, int> nums, Paragraph p)
+    {
+        if (p.Bullet != "num") { nums.Clear(); return 0; }
+        nums[p.Indent] = nums.TryGetValue(p.Indent, out var n) ? n + 1 : 1;
+        foreach (var k in nums.Keys.Where(k => k > p.Indent).ToList()) nums.Remove(k);
+        return nums[p.Indent];
+    }
+
     private static string TagHtml(Paragraph p) =>
         p.Tag is { } t && TagStyles.Info(t) is { } g
             ? $"<span style=\"color:{g.Color};font-weight:bold\">{Esc(g.Glyph)}</span> "
@@ -119,16 +127,17 @@ public static class PageExport
             if (box.Table is { } tt) { sb.Append(TextTable(tt)).AppendLine(); continue; }
             if (box.AttachPath is { Length: > 0 }) { sb.AppendLine("Attachment: " + AttachName(box)).AppendLine(); continue; }
             if (box.ImagePath is not null) continue;
-            int num = 0;
+            var nums = new Dictionary<int, int>();
             foreach (var p in box.Doc.Paragraphs)
             {
-                if (p.Bullet == "num") num++; else num = 0;
+                int num = NextNum(nums, p);
+                string pad = p.Bullet is null ? "" : new string(' ', p.Indent * 2);
                 string prefix = p.Bullet switch
                 {
-                    null => "", "num" => $"{num}. ",
+                    null => "", "num" => Editor.RichTextEditor.NumLabel(num, p.Indent) + " ",
                     "check" => p.Checked ? "[x] " : "[ ] ", _ => "• ",
                 };
-                sb.AppendLine(prefix + TagMark(p) + p.Text);
+                sb.AppendLine(pad + prefix + TagMark(p) + p.Text);
             }
             sb.AppendLine();
         }
@@ -145,10 +154,10 @@ public static class PageExport
             if (box.AttachPath is { Length: > 0 }) { blocks.Add("**Attachment:** " + AttachName(box)); continue; }
             if (box.ImagePath is not null) continue;
             var lines = new List<string>();
-            int num = 0;
+            var nums = new Dictionary<int, int>();
             foreach (var p in box.Doc.Paragraphs)
             {
-                if (p.Bullet == "num") num++; else num = 0;
+                int num = NextNum(nums, p);
                 string body = string.Concat(p.Runs.Select(MdRun));
                 string heading = p.Style switch
                 {
@@ -157,12 +166,13 @@ public static class PageExport
                     ParaStyle.Heading3 => "#### ",
                     _ => "",
                 };
+                string pad = p.Bullet is null ? "" : new string(' ', p.Indent * 2);
                 string prefix = p.Bullet switch
                 {
                     null => heading, "num" => $"{num}. ",
                     "check" => p.Checked ? "- [x] " : "- [ ] ", _ => "- ",
                 };
-                lines.Add(prefix + TagMark(p) + body);
+                lines.Add(pad + prefix + TagMark(p) + body);
             }
             blocks.Add(string.Join("\n", lines));
         }
@@ -389,11 +399,11 @@ public static class PageExport
                 if (y > H - Margin) NewPage();
             }
 
-            void DrawCheckbox(bool ticked, float size)
+            void DrawCheckbox(bool ticked, float size, float nest = 0)
             {
                 float side = size * 0.85f;
                 float top = y - side + size * 0.12f;
-                var rect = new SkiaSharp.SKRect(Margin, top, Margin + side, top + side);
+                var rect = new SkiaSharp.SKRect(Margin + nest, top, Margin + nest + side, top + side);
                 using var stroke = new SkiaSharp.SKPaint
                 {
                     Style = SkiaSharp.SKPaintStyle.Stroke, StrokeWidth = 1.2f,
@@ -438,16 +448,17 @@ public static class PageExport
                         continue;
                     }
 
-                    int num = 0;
+                    var nums = new Dictionary<int, int>();
                     foreach (var p in box.Doc.Paragraphs)
                     {
-                        if (p.Bullet == "num") num++; else num = 0;
+                        int num = NextNum(nums, p);
                         double size = RichTextEditor.BaseSizeFor(p.Style, 12);
                         bool headBold = RichTextEditor.BaseWeightFor(p.Style) >= Avalonia.Media.FontWeight.SemiBold;
                         bool check = p.Bullet == "check";
+                        float nest = p.Bullet is null ? 0f : p.Indent * 14f;
                         string bullet = p.Bullet switch
                         {
-                            null or "check" => "", "num" => $"{num}.", _ => "•",
+                            null or "check" => "", "num" => RichTextEditor.NumLabel(num, p.Indent), _ => "•",
                         };
                         var words = new List<(string, TextPaint)>();
                         var paints = new List<TextPaint>();
@@ -468,14 +479,14 @@ public static class PageExport
                         if (check)
                         {
                             EnsureRoom((float)size * 1.5f);
-                            DrawCheckbox(p.Checked, (float)size);
+                            DrawCheckbox(p.Checked, (float)size, nest);
                             if (words.Count == 0) { y += (float)size * 1.3f * 1.4f; continue; }
-                            DrawParagraph(words, (float)size * 1.3f, indent: (float)size * 0.85f + 7f);
+                            DrawParagraph(words, (float)size * 1.3f, indent: nest + (float)size * 0.85f + 7f);
                         }
                         else
                         {
                             if (words.Count == 0) { y += (float)size * 1.4f; continue; }
-                            DrawParagraph(words, (float)size * 1.3f);
+                            DrawParagraph(words, (float)size * 1.3f, indent: nest);
                         }
                         foreach (var pt in paints) pt.Dispose();
                     }

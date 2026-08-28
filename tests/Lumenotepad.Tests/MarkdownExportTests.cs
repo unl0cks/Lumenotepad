@@ -54,6 +54,22 @@ public class MarkdownExportTests
     }
 
     [Fact]
+    public void Lists_nestedIndents_padAndRestartNumbering()
+    {
+        var doc = new CanvasDocument();
+        var a = P("A", "dot");
+        var a1 = P("A1", "dot"); a1.Indent = 1;
+        var one = P("One", "num");
+        var sub1 = P("s1", "num"); sub1.Indent = 1;
+        var sub2 = P("s2", "num"); sub2.Indent = 1;
+        var two = P("Two", "num");
+        var sub3 = P("s3", "num"); sub3.Indent = 1;
+        doc.Boxes.Add(Box(0, 0, a, a1, one, sub1, sub2, two, sub3));
+        Assert.Equal("# T\n\n- A\n  - A1\n1. One\n  1. s1\n  2. s2\n2. Two\n  1. s3\n",
+            MarkdownExport.PageToMarkdown("T", doc));
+    }
+
+    [Fact]
     public void InlineEmphasis_boldItalicStrike()
     {
         var doc = new CanvasDocument();

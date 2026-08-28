@@ -37,14 +37,15 @@ public sealed class SmoothScroll
 
         if (Services.Keymap.HasCommandStrict(e.KeyModifiers) || OverInnerScrollable(e.Source)) return;
 
-        bool sideways = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
-        double max = sideways ? MaxOffsetX : MaxOffset;
-        if (max <= 0) return;
+        double dy = e.Delta.Y, dx = e.Delta.X;
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) && dx == 0) { dx = dy; dy = 0; }
+        bool wantY = dy != 0 && MaxOffset > 0;
+        bool wantX = dx != 0 && MaxOffsetX > 0;
+        if (!wantY && !wantX) return;
 
         if (!_running) { _target = _sv.Offset.Y; _targetX = _sv.Offset.X; }
-        double notch = e.Delta.Y != 0 ? e.Delta.Y : e.Delta.X;
-        if (sideways) _targetX = Math.Clamp(_targetX - notch * StepPerNotch, 0, max);
-        else _target = Math.Clamp(_target - notch * StepPerNotch, 0, max);
+        if (wantY) _target = Math.Clamp(_target - dy * StepPerNotch, 0, MaxOffset);
+        if (wantX) _targetX = Math.Clamp(_targetX - dx * StepPerNotch, 0, MaxOffsetX);
         e.Handled = true;
 
         if (!Motion.Enabled)

@@ -320,4 +320,67 @@ public class RichModelTests
         Assert.True(RichTextEditor.BaseSizeFor(ParaStyle.Heading1, 15) > RichTextEditor.BaseSizeFor(ParaStyle.Heading2, 15));
         Assert.True(RichTextEditor.BaseSizeFor(ParaStyle.Heading2, 15) > RichTextEditor.BaseSizeFor(ParaStyle.Heading3, 15));
     }
+
+    [Fact]
+    public void ChangeIndent_onlyTouchesBulletedParagraphs_andClamps()
+    {
+        var d = Doc("one\ntwo\nthree");
+        d.SetBullet(new DocPos(0, 0), new DocPos(1, 0), "dot");
+
+        Assert.True(d.ChangeIndent(new DocPos(0, 0), new DocPos(2, 0), 1));
+        Assert.Equal(1, d.Paragraphs[0].Indent);
+        Assert.Equal(1, d.Paragraphs[1].Indent);
+        Assert.Equal(0, d.Paragraphs[2].Indent);
+
+        for (int i = 0; i < 10; i++) d.ChangeIndent(new DocPos(0, 0), new DocPos(0, 0), 1);
+        Assert.Equal(RichDocument.MaxIndent, d.Paragraphs[0].Indent);
+
+        Assert.False(d.ChangeIndent(new DocPos(2, 0), new DocPos(2, 0), 1));
+        Assert.True(d.ChangeIndent(new DocPos(0, 0), new DocPos(0, 0), -1));
+        Assert.Equal(RichDocument.MaxIndent - 1, d.Paragraphs[0].Indent);
+    }
+
+    [Fact]
+    public void SplitParagraph_inheritsIndent()
+    {
+        var d = Doc("nested item");
+        d.SetBullet(new DocPos(0, 0), new DocPos(0, 0), "dot");
+        d.ChangeIndent(new DocPos(0, 0), new DocPos(0, 0), 2);
+        d.SplitParagraph(d.End);
+        Assert.Equal(2, d.Paragraphs[1].Indent);
+        Assert.Equal("dot", d.Paragraphs[1].Bullet);
+    }
+
+    [Fact]
+    public void Indent_roundTripsThroughJson()
+    {
+        var d = Doc("a\nb");
+        d.SetBullet(new DocPos(0, 0), new DocPos(1, 0), "num");
+        d.ChangeIndent(new DocPos(1, 0), new DocPos(1, 0), 3);
+        var back = RichDocJson.FromJson(RichDocJson.ToJson(d));
+        Assert.Equal(0, back.Paragraphs[0].Indent);
+        Assert.Equal(3, back.Paragraphs[1].Indent);
+        Assert.DoesNotContain("\"ind\"", RichDocJson.ToJson(Doc("plain")));
+    }
+
+    [Fact]
+    public void Clone_carriesIndent()
+    {
+        var d = Doc("x");
+        d.SetBullet(new DocPos(0, 0), new DocPos(0, 0), "dot");
+        d.ChangeIndent(new DocPos(0, 0), new DocPos(0, 0), 2);
+        Assert.Equal(2, d.Paragraphs[0].Clone().Indent);
+    }
+
+    [Theory]
+    [InlineData(1, 0, "1.")]
+    [InlineData(3, 0, "3.")]
+    [InlineData(1, 1, "a.")]
+    [InlineData(27, 1, "aa.")]
+    [InlineData(1, 2, "i.")]
+    [InlineData(4, 2, "iv.")]
+    [InlineData(2, 3, "2.")]
+    [InlineData(2, 4, "b.")]
+    public void NumLabel_cyclesNumberLetterRoman(int n, int indent, string expected) =>
+        Assert.Equal(expected, RichTextEditor.NumLabel(n, indent));
 }

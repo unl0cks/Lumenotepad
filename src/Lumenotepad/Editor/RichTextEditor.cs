@@ -136,6 +136,8 @@ public sealed class RichTextEditor : Control
 
     private const double BulletIndent = 26;
 
+    private const double IndentStep = 22;
+
     private const double TagIndent = 22;
 
     private double ScaleOf(Paragraph p)
@@ -144,8 +146,10 @@ public sealed class RichTextEditor : Control
         return Math.Clamp(eff / FontSize, 0.75, 2.5);
     }
 
+    private double IndentUnitOf(Paragraph p) => IndentScalePref * Math.Max(1, ScaleOf(p));
+
     private double BulletIndentOf(Paragraph p) =>
-        p.Bullet is null ? 0 : BulletIndent * IndentScalePref * Math.Max(1, ScaleOf(p));
+        p.Bullet is null ? 0 : (BulletIndent + p.Indent * IndentStep) * IndentUnitOf(p);
     private double TagIndentOf(Paragraph p) =>
         p.Tag is null ? 0 : TagIndent * Math.Max(1, ScaleOf(p));
 
@@ -445,7 +449,7 @@ public sealed class RichTextEditor : Control
         if (p.Bullet is null) return;
         double indent = BulletIndentOf(p);
         double tagInd = TagIndentOf(p);
-        double cx = tagInd + indent / 2 - 2 * s;
+        double cx = tagInd + indent - BulletIndent * IndentUnitOf(p) / 2 - 2 * s;
 
         if (p.Bullet == "check")
         {
@@ -473,7 +477,12 @@ public sealed class RichTextEditor : Control
         if (p.Bullet == "num")
         {
             int n = 1;
-            for (int j = pi - 1; j >= 0 && _doc.Paragraphs[j].Bullet == "num"; j--) n++;
+            for (int j = pi - 1; j >= 0; j--)
+            {
+                var q = _doc.Paragraphs[j];
+                if (q.Bullet != "num" || q.Indent < p.Indent) break;
+                if (q.Indent == p.Indent) n++;
+            }
 
             var fr = p.Runs.Count > 0 ? p.Runs[0] : null;
             bool bold = NumFlag(p.NumBold, NumBoldDefault, fr?.Bold ?? false);
@@ -481,7 +490,7 @@ public sealed class RichTextEditor : Control
             bool under = NumFlag(p.NumUnderline, NumUnderlineDefault, fr?.Underline ?? false);
             bool strike = NumFlag(p.NumStrike, NumStrikeDefault, fr?.Strike ?? false);
             var brush = ForegroundAlpha(0.8);
-            var ft = new FormattedText($"{n}.", System.Globalization.CultureInfo.CurrentCulture,
+            var ft = new FormattedText(NumLabel(n, p.Indent), System.Globalization.CultureInfo.CurrentCulture,
                 FlowDirection.LeftToRight,
                 new Typeface(FontFamily, italic ? FontStyle.Italic : FontStyle.Normal,
                              bold ? FontWeight.Bold : FontWeight.Normal),
@@ -509,6 +518,31 @@ public sealed class RichTextEditor : Control
 
             ctx.DrawText(ft, new Point(cx - cal.CenterXFrac * size, cy - cal.CenterYFrac * size));
         }
+    }
+
+    public static string NumLabel(int n, int indent) => (indent % 3) switch
+    {
+        1 => $"{Letters(n)}.",
+        2 => $"{Roman(n)}.",
+        _ => $"{n}.",
+    };
+
+    private static string Letters(int n)
+    {
+        var s = "";
+        while (n > 0) { n--; s = (char)('a' + n % 26) + s; n /= 26; }
+        return s;
+    }
+
+    private static string Roman(int n)
+    {
+        if (n > 3999) return n.ToString();
+        var vals = new[] { 1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1 };
+        var syms = new[] { "m", "cm", "d", "cd", "c", "xc", "l", "xl", "x", "ix", "v", "iv", "i" };
+        var s = new System.Text.StringBuilder();
+        for (int i = 0; i < vals.Length; i++)
+            while (n >= vals[i]) { s.Append(syms[i]); n -= vals[i]; }
+        return s.ToString();
     }
 
     private Rect CaretRect()
@@ -655,17 +689,53 @@ public sealed class RichTextEditor : Control
                 if (HasSelection) DeleteSelection();
 
                 if (_doc.Paragraphs[_caret.Para].Bullet is not null && _doc.Paragraphs[_caret.Para].Length == 0)
-                    _doc.SetBullet(_caret, _caret, null);
+                {
+                    if (_doc.Paragraphs[_caret.Para].Indent > 0) _doc.ChangeIndent(_caret, _caret, -1);
+                    else _doc.SetBullet(_caret, _caret, null);
+                }
                 else
+                {
+                    var carry = _hasPending ? _pending : _doc.FormatAt(_caret);
                     _caret = _anchor = _doc.SplitParagraph(_caret);
+                    if (_doc.Paragraphs[_caret.Para].Runs.Count == 0)
+                    {
+                        _pending = carry with { Link = null };
+                        _hasPending = true;
+                    }
+                }
                 AfterEdit();
                 break;
+            case Key.Tab:
+            {
+                var (ta, tb) = SelOrdered();
+                bool anyBullet = false;
+                for (int t = ta.Para; t <= tb.Para && !anyBullet; t++)
+                    anyBullet = _doc.Paragraphs[t].Bullet is not null;
+                if (!anyBullet) { handled = false; break; }
+
+                int d = shift ? -1 : 1;
+                bool moves = false;
+                for (int t = ta.Para; t <= tb.Para && !moves; t++)
+                {
+                    var q = _doc.Paragraphs[t];
+                    moves = q.Bullet is not null &&
+                            Math.Clamp(q.Indent + d, 0, RichDocument.MaxIndent) != q.Indent;
+                }
+                if (moves)
+                {
+                    PushUndo();
+                    _doc.ChangeIndent(ta, tb, d);
+                    AfterEdit();
+                }
+                break;
+            }
             case Key.Back:
                 PushUndo(typing: !HasSelection && !ctrl);
                 if (HasSelection) DeleteSelection();
                 else if (_caret.Off == 0 && _doc.Paragraphs[_caret.Para].Bullet is not null)
                 {
-                    _doc.SetBullet(_caret, _caret, null);
+                    if (_doc.Paragraphs[_caret.Para].Indent > 0) _doc.ChangeIndent(_caret, _caret, -1);
+                    else _doc.SetBullet(_caret, _caret, null);
                 }
                 else
                 {

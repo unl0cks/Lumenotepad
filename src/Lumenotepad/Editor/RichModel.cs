@@ -79,6 +79,8 @@ public sealed class Paragraph
 
     public string? Bullet;
 
+    public int Indent;
+
     public bool Checked;
 
     public string? Tag;
@@ -98,6 +100,7 @@ public sealed class Paragraph
     {
         Runs = Runs.Select(r => r.Clone()).ToList(),
         Bullet = Bullet,
+        Indent = Indent,
         Checked = Checked,
         Tag = Tag,
         NumBold = NumBold, NumItalic = NumItalic, NumUnderline = NumUnderline, NumStrike = NumStrike,
@@ -226,6 +229,7 @@ public sealed class RichDocument
         {
             Runs = para.Runs.Skip(runIdx).ToList(),
             Bullet = para.Bullet,
+            Indent = para.Indent,
             Align = para.Align,
             Style = ParaStyle.Body,
             Footnote = para.Footnote,
@@ -340,6 +344,27 @@ public sealed class RichDocument
             para.Version++;
         }
         OnChanged();
+    }
+
+    public const int MaxIndent = 4;
+
+    public bool ChangeIndent(DocPos a, DocPos b, int delta)
+    {
+        Clamp(ref a); Clamp(ref b);
+        if (a > b) (a, b) = (b, a);
+        bool changed = false;
+        for (int pi = a.Para; pi <= b.Para; pi++)
+        {
+            var para = Paragraphs[pi];
+            if (para.Bullet is null) continue;
+            int next = Math.Clamp(para.Indent + delta, 0, MaxIndent);
+            if (next == para.Indent) continue;
+            para.Indent = next;
+            para.Version++;
+            changed = true;
+        }
+        if (changed) OnChanged();
+        return changed;
     }
 
     public void SetTag(DocPos a, DocPos b, string? tag)

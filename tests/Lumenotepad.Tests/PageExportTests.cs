@@ -45,6 +45,44 @@ public class PageExportTests
         Assert.Contains("• point one", s);
     }
 
+    private static CanvasDocument NestedPage()
+    {
+        var canvas = new CanvasDocument();
+        var box = canvas.AddBox(0, 0);
+        var d = box.Doc;
+        d.Paragraphs.Clear();
+        var one = new Paragraph { Bullet = "num" };
+        one.Runs.Add(new RichRun { Text = "One" });
+        var sub = new Paragraph { Bullet = "num", Indent = 1 };
+        sub.Runs.Add(new RichRun { Text = "Sub" });
+        var two = new Paragraph { Bullet = "num" };
+        two.Runs.Add(new RichRun { Text = "Two" });
+        var dot = new Paragraph { Bullet = "dot", Indent = 2 };
+        dot.Runs.Add(new RichRun { Text = "Deep" });
+        d.Paragraphs.AddRange(new[] { one, sub, two, dot });
+        return canvas;
+    }
+
+    [Fact]
+    public void Text_nestsIndentedListsAndResumesNumbering()
+    {
+        var s = Text(PageExport.Export(ExportFormat.Txt, "T", NestedPage()));
+        Assert.Contains("1. One", s);
+        Assert.Contains("  a. Sub", s);
+        Assert.Contains("2. Two", s);
+        Assert.Contains("    • Deep", s);
+    }
+
+    [Fact]
+    public void Markdown_nestsIndentedLists()
+    {
+        var s = Text(PageExport.Export(ExportFormat.Markdown, "T", NestedPage()));
+        Assert.Contains("1. One", s);
+        Assert.Contains("  1. Sub", s);
+        Assert.Contains("2. Two", s);
+        Assert.Contains("    - Deep", s);
+    }
+
     [Fact]
     public void Markdown_headingsBulletsLinks()
     {
