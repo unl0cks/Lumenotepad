@@ -457,7 +457,52 @@ public partial class PreferencesWindow : Window
             catch {  }
         };
 
+        AboutOpenFolderBtn.Click += (_, _) =>
+        {
+            try
+            {
+                var dir = Services.AppSettings.DefaultDir;
+                System.IO.Directory.CreateDirectory(dir);
+                System.Diagnostics.Process.Start(
+                    new System.Diagnostics.ProcessStartInfo { FileName = dir, UseShellExecute = true });
+            }
+            catch {  }
+        };
+
+        AboutCrashBtn.Click += async (_, _) =>
+        {
+            try
+            {
+                var dir = Services.AppSettings.DefaultDir;
+                string crash = System.IO.Path.Combine(dir, "crash.log");
+                string startup = System.IO.Path.Combine(dir, "startup.log");
+                bool any = System.IO.File.Exists(crash) || System.IO.File.Exists(startup);
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine(Services.AppInfo.Details());
+                if (System.IO.File.Exists(crash))
+                    sb.AppendLine().AppendLine("== crash.log ==").Append(Tail(crash, 12000));
+                if (System.IO.File.Exists(startup))
+                    sb.AppendLine().AppendLine("== startup.log ==").Append(Tail(startup, 4000));
+                if (Clipboard is not { } cb) return;
+                await cb.SetTextAsync(sb.ToString());
+                AboutCrashBtn.Content = any ? "Copied" : "Nothing recorded yet";
+                await System.Threading.Tasks.Task.Delay(1600);
+                AboutCrashBtn.Content = "Copy crash log";
+            }
+            catch {  }
+        };
+
         if (Vm is { AutoCheckUpdates: true }) _ = QuietCheck();
+    }
+
+    private static string Tail(string path, int maxChars)
+    {
+        try
+        {
+            var text = System.IO.File.ReadAllText(path);
+            return text.Length <= maxChars ? text : text[^maxChars..];
+        }
+        catch { return ""; }
     }
 
     private async System.Threading.Tasks.Task QuietCheck()

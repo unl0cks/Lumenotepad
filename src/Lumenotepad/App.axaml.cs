@@ -14,6 +14,12 @@ public partial class App : Application
     {
 
         Services.StartupLog.Mark("framework init");
+        Avalonia.Threading.Dispatcher.UIThread.UnhandledException += (_, e) =>
+        {
+            Services.StartupLog.Crash("ui thread", e.Exception);
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime { MainWindow: not null })
+                e.Handled = true;
+        };
         if (!System.OperatingSystem.IsWindows())
             Resources["IconFont"] = new Avalonia.Media.FontFamily(
                 $"{Services.AppFonts.CollectionUri}#Lumen Icons");

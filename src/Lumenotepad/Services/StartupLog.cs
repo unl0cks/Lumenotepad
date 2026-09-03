@@ -22,6 +22,23 @@ public static class StartupLog
         }
         Mark($"{stage} FAILED: {ex.GetType().FullName}: {ex.Message}");
         Append(ex.ToString() + "\n");
+        Keep($"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  Lumenotepad {AppVersion.Current}  {stage} FAILED\n{ex}\n\n");
+    }
+
+    private static void Keep(string text)
+    {
+        try
+        {
+            lock (Gate)
+            {
+                string dir = AppSettings.DefaultDir;
+                Directory.CreateDirectory(dir);
+                File.AppendAllText(Path.Combine(dir, "crash.log"), text);
+            }
+        }
+        catch
+        {
+        }
     }
 
     private static void Append(string text)

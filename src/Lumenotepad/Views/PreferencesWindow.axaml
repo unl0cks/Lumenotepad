@@ -991,6 +991,16 @@
                         </Grid>
                         <TextBlock x:Name="AboutUpdateNote" Classes="hint" TextWrapping="Wrap"/>
 
+                        <TextBlock Classes="section" Text="TROUBLESHOOTING"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="2,0,0,2">
+                            <Button x:Name="AboutOpenFolderBtn" Content="Open app folder" FontSize="12.5"
+                                    Padding="14,9"/>
+                            <Button x:Name="AboutCrashBtn" Content="Copy crash log" FontSize="12.5"
+                                    Padding="14,9"/>
+                        </StackPanel>
+                        <TextBlock Classes="hint" TextWrapping="Wrap"
+                                   Text="If Lumenotepad ever quits unexpectedly, the details are saved in its app folder. Copy crash log grabs them together with the build details, ready to paste into a message."/>
+
                         <TextBlock Classes="section" Text="BUILD"/>
                         <SelectableTextBlock x:Name="AboutDetails" FontSize="12" TextWrapping="Wrap"
                                              FontFamily="Consolas,Menlo,DejaVu Sans Mono,monospace"
