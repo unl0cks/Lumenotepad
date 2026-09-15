@@ -108,14 +108,28 @@ public partial class PdfViewer
 
     private static void DrawTint(PageView pv, IReadOnlyList<Rect> rects, IBrush brush)
     {
-        double w = pv.Overlay.Width, h = pv.Overlay.Height;
+        if (rects.Count == 0) return;
+        pv.Selection.Children.Add(new Avalonia.Controls.Shapes.Path
+        {
+            Data = Bands(rects, pv.Overlay.Width, pv.Overlay.Height),
+            Fill = brush,
+            IsHitTestVisible = false,
+        });
+    }
+
+    private static Geometry Bands(IReadOnlyList<Rect> rects, double w, double h)
+    {
+        double radius = rects.Count == 1 ? 2 : 0;
+        Geometry? shape = null;
         foreach (var r in rects)
         {
-            var b = new Border { Background = brush, IsHitTestVisible = false };
-            Canvas.SetLeft(b, r.X * w); Canvas.SetTop(b, r.Y * h);
-            b.Width = r.Width * w; b.Height = r.Height * h;
-            pv.Selection.Children.Add(b);
+            Geometry piece = new RectangleGeometry(new Rect(r.X * w, r.Y * h, r.Width * w, r.Height * h))
+            {
+                RadiusX = radius, RadiusY = radius,
+            };
+            shape = shape is null ? piece : new CombinedGeometry(GeometryCombineMode.Union, shape, piece);
         }
+        return shape!;
     }
 
     private void ShowSelectionBar(PageView pv, IReadOnlyList<Rect> rects)

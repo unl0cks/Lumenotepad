@@ -755,22 +755,19 @@ public partial class PdfViewer : UserControl
     {
         double w = pv.Overlay.Width, h = pv.Overlay.Height;
         bool selected = ReferenceEquals(a, _selected);
-        var brush = new SolidColorBrush(Color.Parse(a.Color));
         var rects = StoredRects(a);
-        foreach (var r in rects)
+        if (rects.Count == 0) return;
+        var shape = new Shapes.Path
         {
-            var box = new Border
-            {
-                Background = brush, CornerRadius = new CornerRadius(2),
-                BorderThickness = new Thickness(selected ? 2 : 0), BorderBrush = NoteFocusBrush,
-                Tag = a,
-            };
-            Canvas.SetLeft(box, r.X * w); Canvas.SetTop(box, r.Y * h);
-            box.Width = r.Width * w; box.Height = r.Height * h;
-            box.PointerPressed += (_, e) => OnTextHighlightPressed(pv, a, e);
-            pv.Overlay.Children.Add(box);
-        }
-        if (selected && rects.Count > 0)
+            Data = Bands(rects, w, h),
+            Fill = new SolidColorBrush(Color.Parse(a.Color)),
+            Stroke = selected ? NoteFocusBrush : null,
+            StrokeThickness = selected ? 2 : 0,
+            Tag = a,
+        };
+        shape.PointerPressed += (_, e) => OnTextHighlightPressed(pv, a, e);
+        pv.Overlay.Children.Add(shape);
+        if (selected)
         {
             var l = rects[^1];
             AddDeleteButton(pv, l.Right * w, l.Y * h, a);
@@ -1378,9 +1375,15 @@ public partial class PdfViewer : UserControl
         using var p = new SkiaSharp.SKPaint { Color = SkColor(a.Color), IsAntialias = true, Style = SkiaSharp.SKPaintStyle.Fill };
         if (a.IsTextHighlight)
         {
-            foreach (var r in StoredRects(a))
-                c.DrawRoundRect(new SkiaSharp.SKRect((float)r.X * wpt, (float)r.Y * hpt,
-                    (float)r.Right * wpt, (float)r.Bottom * hpt), 1.5f, 1.5f, p);
+            var rects = StoredRects(a);
+            using var shape = new SkiaSharp.SKPath { FillType = SkiaSharp.SKPathFillType.Winding };
+            foreach (var r in rects)
+            {
+                var rr = new SkiaSharp.SKRect((float)r.X * wpt, (float)r.Y * hpt,
+                    (float)r.Right * wpt, (float)r.Bottom * hpt);
+                if (rects.Count == 1) shape.AddRoundRect(rr, 1.5f, 1.5f); else shape.AddRect(rr);
+            }
+            c.DrawPath(shape, p);
             return;
         }
         var box = new SkiaSharp.SKRect((float)a.X * wpt, (float)a.Y * hpt, (float)(a.X + a.W) * wpt, (float)(a.Y + a.H) * hpt);
