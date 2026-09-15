@@ -287,7 +287,8 @@ public partial class PdfViewer
             _pressedHighlight = null;
             if (Dist(e.GetPosition(pv.Overlay), _selPressPx) < 4 || _selAnchor == _selFocus)
             {
-                ClearTextSelection();
+                _selFocus = _selAnchor;
+                RedrawTextLayers();
                 if (pressed is not null && _annos.Items.Contains(pressed)) Select(pressed, focusEditor: false);
             }
             else RedrawTextLayers();
