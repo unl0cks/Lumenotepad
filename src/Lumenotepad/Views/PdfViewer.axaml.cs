@@ -243,6 +243,7 @@ public partial class PdfViewer : UserControl
     {
         LayoutPages();
         foreach (var pv in _pages) RedrawPage(pv);
+        RedrawTextLayers();
     }
 
     private static StreamGeometry RoundedRect(double w, double h, double r)
@@ -265,6 +266,9 @@ public partial class PdfViewer : UserControl
 
     private void SetTool(Tool t)
     {
+        _pendPage = -1; _pendDragging = false;
+        ClearTextSelection();
+        RedrawTextLayers();
         _tool = _tool == t ? Tool.Select : t;
         HighlightTool.IsChecked = _tool == Tool.Highlight;
         NoteTool.IsChecked = _tool == Tool.Note;
@@ -278,6 +282,7 @@ public partial class PdfViewer : UserControl
         ZoomLabel.Text = $"{Math.Round(_zoom * 100)}%";
         LayoutPages();
         foreach (var pv in _pages) RedrawPage(pv);
+        RedrawTextLayers();
     }
 
     private void BuildSwatches()
@@ -429,6 +434,7 @@ public partial class PdfViewer : UserControl
     {
         _color = solidHex;
         RefreshSwatchRings();
+        RedrawTextLayers();
         if (_selected is { } cur)
         {
             PushUndo();
@@ -468,6 +474,8 @@ public partial class PdfViewer : UserControl
     {
         if (!e.GetCurrentPoint(pv.Overlay).Properties.IsLeftButtonPressed) return;
         var p = e.GetPosition(pv.Overlay);
+        if (_tool == Tool.Select && TrySelectPress(pv, e)) return;
+        ClearTextSelection();
         switch (_tool)
         {
             case Tool.Highlight:
@@ -504,6 +512,7 @@ public partial class PdfViewer : UserControl
     private void OnOverlayMoved(PageView pv, PointerEventArgs e)
     {
         var p = e.GetPosition(pv.Overlay);
+        if (_drag is null && _dragPreview is null && _arrowPreview is null && TextMove(pv, p)) return;
         if (_drag is { } a)
         {
             double dx = (p.X - _dragStartPt.X) / pv.Overlay.Width;
@@ -527,6 +536,7 @@ public partial class PdfViewer : UserControl
 
     private void OnOverlayReleased(PageView pv, PointerReleasedEventArgs e)
     {
+        if (TextRelease(pv, e)) return;
         double w = pv.Overlay.Width, h = pv.Overlay.Height;
         if (_drag is not null)
         {
@@ -1237,6 +1247,15 @@ public partial class PdfViewer : UserControl
         if (e.Source is TextBox or RichTextEditor) return;
         bool ctrl = Services.Keymap.HasCommand(e.KeyModifiers);
         bool shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        if (e.Key == Key.Escape && (HasTextSelection || _pendPage >= 0))
+        {
+            _pendPage = -1; _pendDragging = false;
+            ClearTextSelection();
+            RedrawTextLayers();
+            e.Handled = true;
+            return;
+        }
+        if (ctrl && e.Key == Key.C && HasTextSelection) { _ = CopySelectionAsync(); e.Handled = true; return; }
         if (ctrl && e.Key == Key.Z && !shift) { Undo(); e.Handled = true; return; }
         if (ctrl && (e.Key == Key.Y || (e.Key == Key.Z && shift))) { Redo(); e.Handled = true; return; }
         if (_selected is { } a && (e.Key == Key.Delete || e.Key == Key.Back))
