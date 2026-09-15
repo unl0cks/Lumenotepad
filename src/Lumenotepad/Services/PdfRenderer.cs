@@ -7,10 +7,11 @@ namespace Lumenotepad.Services;
 
 public static class PdfRenderer
 {
+    internal static readonly object Gate = new();
 
     public static int PageCount(byte[] pdf)
     {
-        try { return PDFtoImage.Conversion.GetPageCount(pdf); }
+        try { lock (Gate) return PDFtoImage.Conversion.GetPageCount(pdf); }
         catch { return 0; }
     }
 
@@ -19,8 +20,9 @@ public static class PdfRenderer
         try
         {
             var result = new List<(double, double)>();
-            foreach (var s in PDFtoImage.Conversion.GetPageSizes(pdf))
-                result.Add((s.Width, s.Height));
+            lock (Gate)
+                foreach (var s in PDFtoImage.Conversion.GetPageSizes(pdf))
+                    result.Add((s.Width, s.Height));
             return result;
         }
         catch { return Array.Empty<(double, double)>(); }
@@ -30,8 +32,11 @@ public static class PdfRenderer
     {
         try
         {
-            using var skbmp = PDFtoImage.Conversion.ToImage(
-                pdf, page: page, options: new PDFtoImage.RenderOptions(Dpi: (int)dpi));
+            SkiaSharp.SKBitmap rendered;
+            lock (Gate)
+                rendered = PDFtoImage.Conversion.ToImage(
+                    pdf, page: page, options: new PDFtoImage.RenderOptions(Dpi: (int)dpi));
+            using var skbmp = rendered;
             using var image = SkiaSharp.SKImage.FromBitmap(skbmp);
             using var data = image.Encode(SkiaSharp.SKEncodedImageFormat.Png, 92);
             using var ms = new MemoryStream();
@@ -46,8 +51,9 @@ public static class PdfRenderer
     {
         try
         {
-            return PDFtoImage.Conversion.ToImage(
-                pdf, page: page, options: new PDFtoImage.RenderOptions(Dpi: (int)dpi));
+            lock (Gate)
+                return PDFtoImage.Conversion.ToImage(
+                    pdf, page: page, options: new PDFtoImage.RenderOptions(Dpi: (int)dpi));
         }
         catch { return null; }
     }

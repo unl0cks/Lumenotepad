@@ -47,6 +47,16 @@ public partial class MainView : UserControl
         }
 
         DataContextChanged += (_, _) => HookVm();
+        PdfViewer.HighlightModeChanged += mode =>
+        {
+            string name = mode switch
+            {
+                PdfHighlightMode.TwoClicks => "TwoClicks",
+                PdfHighlightMode.AreaBox => "AreaBox",
+                _ => "SelectText",
+            };
+            if (Vm is { } m && m.PdfHighlightMode != name) m.PdfHighlightMode = name;
+        };
 
         PageCanvas.ActiveEditorChanged += ed => { if (ed is not null) Toolbar.Target = ed; RefreshMindmapRings(); };
 
@@ -539,6 +549,12 @@ public partial class MainView : UserControl
         PageCanvas.SnapToGrid = vm.GridSnap;
         PageCanvas.CreateOnDoubleClick = vm.DoubleClickCreate;
         PdfViewer.RoundedPagePref = vm.RoundedPdfCorners;
+        PdfViewer.HighlightModePref = vm.PdfHighlightMode switch
+        {
+            "TwoClicks" => PdfHighlightMode.TwoClicks,
+            "AreaBox" => PdfHighlightMode.AreaBox,
+            _ => PdfHighlightMode.SelectText,
+        };
         PagePdfViewer.RefreshChrome();
         if (!vm.DeletedHistory) TrashPanel.IsVisible = false;
         ApplyFlatCovers();
@@ -1129,6 +1145,7 @@ public partial class MainView : UserControl
                  or nameof(MainViewModel.AlwaysShowBorders)
                  or nameof(MainViewModel.PageGrid) or nameof(MainViewModel.GridSnap)
                  or nameof(MainViewModel.DoubleClickCreate) or nameof(MainViewModel.RoundedPdfCorners)
+                 or nameof(MainViewModel.PdfHighlightMode)
                  or nameof(MainViewModel.MindmapTidyLayout))
             ApplyCanvasPrefs();
         else if (e.PropertyName == nameof(MainViewModel.CornerRoundness))

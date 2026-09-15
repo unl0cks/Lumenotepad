@@ -133,4 +133,39 @@ public class PdfAnnotationTests
         }
         finally { PdfAnnotationHub.Reset(); }
     }
+
+    [Fact]
+    public void TextHighlight_keepsEveryLineAndTheUnion()
+    {
+        var a = PdfAnnotation.TextHighlight(3,
+            new[] { new Avalonia.Rect(0.1, 0.20, 0.5, 0.02), new Avalonia.Rect(0.1, 0.23, 0.3, 0.02) }, "#66FFD54A");
+
+        Assert.True(a.IsTextHighlight);
+        Assert.Equal(3, a.Page);
+        Assert.Equal(PdfAnnotation.Highlight, a.Kind);
+        Assert.Equal(2, a.Rects!.Count);
+        Assert.Equal(0.1, a.X, 6);
+        Assert.Equal(0.20, a.Y, 6);
+        Assert.Equal(0.5, a.W, 6);
+        Assert.Equal(0.05, a.H, 6);
+    }
+
+    [Fact]
+    public void TextHighlight_roundTripsRects_andPlainHighlightsStayPlain()
+    {
+        var doc = new PdfAnnotationDoc();
+        doc.Items.Add(PdfAnnotation.TextHighlight(0,
+            new[] { new Avalonia.Rect(0.1, 0.2, 0.3, 0.02), new Avalonia.Rect(0.1, 0.23, 0.2, 0.02) }, "#66FFD54A"));
+        doc.Items.Add(new PdfAnnotation { Page = 0, Kind = PdfAnnotation.Highlight, X = 0.5, Y = 0.5, W = 0.1, H = 0.1 });
+
+        string json = doc.ToJson();
+        var restored = PdfAnnotationDoc.FromJson(json);
+
+        Assert.True(restored.Items[0].IsTextHighlight);
+        Assert.Equal(0.23, restored.Items[0].Rects![1][1], 6);
+        Assert.False(restored.Items[1].IsTextHighlight);
+        Assert.Null(restored.Items[1].Rects);
+        Assert.DoesNotContain("IsTextHighlight", json);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(json, "\"rects\""));
+    }
 }
