@@ -106,4 +106,24 @@ public class PdfTextTests
         return new Rect(minX / (double)bmp.Width, minY / (double)bmp.Height,
                         (maxX + 1 - minX) / (double)bmp.Width, (maxY + 1 - minY) / (double)bmp.Height);
     }
+
+    [Fact]
+    public void TightlySpacedLines_giveRectsThatDoNotOverlap()
+    {
+        var chars = PdfText.ReadAll(TestPdf.Build(new[]
+        {
+            new TestPdf.Line(72, 700, "JSTOR is a not-for-profit service that helps", 10),
+            new TestPdf.Line(72, 691, "scholars, researchers, and students discover", 10),
+            new TestPdf.Line(72, 682, "use, and build upon a wide range of content", 10),
+        }))[0].Chars;
+        var rects = PdfTextSelection.Rects(chars, 0, chars.Count);
+        Assert.Equal(3, rects.Count);
+        for (int i = 0; i < rects.Count; i++)
+            for (int j = i + 1; j < rects.Count; j++)
+            {
+                double w = Math.Min(rects[i].Right, rects[j].Right) - Math.Max(rects[i].Left, rects[j].Left);
+                double h = Math.Min(rects[i].Bottom, rects[j].Bottom) - Math.Max(rects[i].Top, rects[j].Top);
+                Assert.False(w > 1e-9 && h > 1e-9, $"line {i} {rects[i]} overlaps line {j} {rects[j]}");
+            }
+    }
 }

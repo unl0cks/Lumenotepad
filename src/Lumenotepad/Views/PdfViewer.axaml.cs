@@ -748,28 +748,33 @@ public partial class PdfViewer : UserControl
         }
     }
 
+    private static IReadOnlyList<Rect> StoredRects(PdfAnnotation a) => PdfTextSelection.Separate(
+        (a.Rects ?? new List<double[]>()).Where(r => r is { Length: 4 }).Select(r => new Rect(r[0], r[1], r[2], r[3])));
+
     private void DrawTextHighlight(PageView pv, PdfAnnotation a)
     {
         double w = pv.Overlay.Width, h = pv.Overlay.Height;
         bool selected = ReferenceEquals(a, _selected);
         var brush = new SolidColorBrush(Color.Parse(a.Color));
-        double[]? lastRect = null;
-        foreach (var r in a.Rects!)
+        var rects = StoredRects(a);
+        foreach (var r in rects)
         {
-            if (r is not { Length: 4 }) continue;
             var box = new Border
             {
-                Background = brush, CornerRadius = new CornerRadius(3),
+                Background = brush, CornerRadius = new CornerRadius(2),
                 BorderThickness = new Thickness(selected ? 2 : 0), BorderBrush = NoteFocusBrush,
                 Tag = a,
             };
-            Canvas.SetLeft(box, r[0] * w); Canvas.SetTop(box, r[1] * h);
-            box.Width = r[2] * w; box.Height = r[3] * h;
+            Canvas.SetLeft(box, r.X * w); Canvas.SetTop(box, r.Y * h);
+            box.Width = r.Width * w; box.Height = r.Height * h;
             box.PointerPressed += (_, e) => OnTextHighlightPressed(pv, a, e);
             pv.Overlay.Children.Add(box);
-            lastRect = r;
         }
-        if (selected && lastRect is { } l) AddDeleteButton(pv, (l[0] + l[2]) * w, l[1] * h, a);
+        if (selected && rects.Count > 0)
+        {
+            var l = rects[^1];
+            AddDeleteButton(pv, l.Right * w, l.Y * h, a);
+        }
     }
 
     private void DrawTextAnno(PageView pv, PdfAnnotation a, bool sticky)
@@ -1373,12 +1378,9 @@ public partial class PdfViewer : UserControl
         using var p = new SkiaSharp.SKPaint { Color = SkColor(a.Color), IsAntialias = true, Style = SkiaSharp.SKPaintStyle.Fill };
         if (a.IsTextHighlight)
         {
-            foreach (var r in a.Rects!)
-            {
-                if (r is not { Length: 4 }) continue;
-                c.DrawRoundRect(new SkiaSharp.SKRect((float)r[0] * wpt, (float)r[1] * hpt,
-                    (float)(r[0] + r[2]) * wpt, (float)(r[1] + r[3]) * hpt), 2f, 2f, p);
-            }
+            foreach (var r in StoredRects(a))
+                c.DrawRoundRect(new SkiaSharp.SKRect((float)r.X * wpt, (float)r.Y * hpt,
+                    (float)r.Right * wpt, (float)r.Bottom * hpt), 1.5f, 1.5f, p);
             return;
         }
         var box = new SkiaSharp.SKRect((float)a.X * wpt, (float)a.Y * hpt, (float)(a.X + a.W) * wpt, (float)(a.Y + a.H) * hpt);

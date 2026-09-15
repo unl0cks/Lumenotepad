@@ -123,8 +123,47 @@ public static class PdfTextSelection
             }
         }
         if (cur is { } last) rects.Add(last);
+        return Separate(rects);
+    }
+
+    public static IReadOnlyList<Rect> Separate(IEnumerable<Rect> input)
+    {
+        var rects = input.ToList();
+        for (bool merged = true; merged; )
+        {
+            merged = false;
+            for (int i = 0; i < rects.Count && !merged; i++)
+                for (int j = i + 1; j < rects.Count; j++)
+                {
+                    if (!Overlaps(rects[i], rects[j]) || !SameBand(rects[i], rects[j])) continue;
+                    rects[i] = rects[i].Union(rects[j]);
+                    rects.RemoveAt(j);
+                    merged = true;
+                    break;
+                }
+        }
+        for (int i = 0; i < rects.Count; i++)
+            for (int j = i + 1; j < rects.Count; j++)
+            {
+                if (!Overlaps(rects[i], rects[j])) continue;
+                bool iAbove = rects[i].Center.Y <= rects[j].Center.Y;
+                var up = iAbove ? rects[i] : rects[j];
+                var down = iAbove ? rects[j] : rects[i];
+                double mid = (up.Bottom + down.Top) / 2;
+                up = new Rect(up.X, up.Y, up.Width, Math.Max(0, mid - up.Y));
+                down = new Rect(down.X, mid, down.Width, Math.Max(0, down.Bottom - mid));
+                rects[i] = iAbove ? up : down;
+                rects[j] = iAbove ? down : up;
+            }
         return rects;
     }
+
+    private static bool Overlaps(Rect a, Rect b) =>
+        Math.Min(a.Right, b.Right) - Math.Max(a.Left, b.Left) > 1e-9 &&
+        Math.Min(a.Bottom, b.Bottom) - Math.Max(a.Top, b.Top) > 1e-9;
+
+    private static bool SameBand(Rect a, Rect b) =>
+        (a.Center.Y >= b.Top && a.Center.Y <= b.Bottom) || (b.Center.Y >= a.Top && b.Center.Y <= a.Bottom);
 
     public static string TextOf(IReadOnlyList<PdfChar> chars, int start, int end)
     {

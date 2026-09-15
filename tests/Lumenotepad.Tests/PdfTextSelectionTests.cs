@@ -132,4 +132,63 @@ public class PdfTextSelectionTests
         Assert.True(new PdfPageText(0, new List<PdfChar> { new('\n', 0, 0, 0, 0, true) }).IsEmpty);
         Assert.False(new PdfPageText(0, Page("a")).IsEmpty);
     }
+
+    private static void AssertNoOverlap(IReadOnlyList<Rect> rects)
+    {
+        for (int i = 0; i < rects.Count; i++)
+            for (int j = i + 1; j < rects.Count; j++)
+            {
+                double w = System.Math.Min(rects[i].Right, rects[j].Right) - System.Math.Max(rects[i].Left, rects[j].Left);
+                double h = System.Math.Min(rects[i].Bottom, rects[j].Bottom) - System.Math.Max(rects[i].Top, rects[j].Top);
+                Assert.False(w > 1e-9 && h > 1e-9, $"rect {i} {rects[i]} overlaps rect {j} {rects[j]}");
+            }
+    }
+
+    [Fact]
+    public void Rects_neverOverlap_whenLineBoxesDo()
+    {
+        var p = new List<PdfChar>();
+        for (int li = 0; li < 3; li++)
+        {
+            if (li > 0)
+            {
+                p.Add(new PdfChar('\r', 0, 0, 0, 0, true));
+                p.Add(new PdfChar('\n', 0, 0, 0, 0, true));
+            }
+            double y = 0.1 + li * 0.02;
+            for (int k = 0; k < 6; k++) p.Add(new PdfChar('a', 0.1 + k * 0.02, y, 0.12 + k * 0.02, y + 0.03, false));
+        }
+        var rects = PdfTextSelection.Rects(p, 0, p.Count);
+        Assert.Equal(3, rects.Count);
+        AssertNoOverlap(rects);
+        Assert.Equal(rects[0].Bottom, rects[1].Top, 9);
+        Assert.Equal(rects[1].Bottom, rects[2].Top, 9);
+        Assert.Equal(0.10, rects[0].Top, 9);
+        Assert.Equal(0.17, rects[2].Bottom, 9);
+    }
+
+    [Fact]
+    public void Rects_mergesPiecesOfOneLineThatOverlap()
+    {
+        var p = new List<PdfChar>
+        {
+            new('a', 0.30, 0.1, 0.32, 0.12, false), new('b', 0.32, 0.1, 0.34, 0.12, false),
+            new('c', 0.10, 0.1, 0.12, 0.12, false), new('d', 0.12, 0.1, 0.33, 0.12, false),
+        };
+        var rects = PdfTextSelection.Rects(p, 0, 4);
+        Assert.Single(rects);
+        Assert.Equal(0.10, rects[0].X, 9);
+        Assert.Equal(0.34, rects[0].Right, 9);
+    }
+
+    [Fact]
+    public void Separate_fixesStoredRectsToo()
+    {
+        var fixedUp = PdfTextSelection.Separate(new[]
+        {
+            new Rect(0.1, 0.10, 0.5, 0.03), new Rect(0.1, 0.12, 0.5, 0.03), new Rect(0.1, 0.14, 0.3, 0.03),
+        });
+        Assert.Equal(3, fixedUp.Count);
+        AssertNoOverlap(fixedUp);
+    }
 }

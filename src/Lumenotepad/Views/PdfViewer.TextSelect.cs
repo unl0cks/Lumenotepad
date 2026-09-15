@@ -111,7 +111,7 @@ public partial class PdfViewer
         double w = pv.Overlay.Width, h = pv.Overlay.Height;
         foreach (var r in rects)
         {
-            var b = new Border { Background = brush, CornerRadius = new CornerRadius(2), IsHitTestVisible = false };
+            var b = new Border { Background = brush, IsHitTestVisible = false };
             Canvas.SetLeft(b, r.X * w); Canvas.SetTop(b, r.Y * h);
             b.Width = r.Width * w; b.Height = r.Height * h;
             pv.Selection.Children.Add(b);
