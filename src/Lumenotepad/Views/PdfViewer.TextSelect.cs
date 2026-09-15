@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Layout;
@@ -16,6 +18,7 @@ namespace Lumenotepad.Views;
 public partial class PdfViewer
 {
     public static bool HighlightByTextPref = true;
+    public static event Action<bool>? HighlightModeChanged;
 
     private IReadOnlyList<PdfPageText>? _pageText;
     private bool _textReady;
@@ -290,12 +293,14 @@ public partial class PdfViewer
             else RedrawTextLayers();
             return true;
         }
+        if (PendingRelease(pv, e)) return true;
         return false;
     }
 
     private void OnTextHighlightPressed(PageView pv, PdfAnnotation a, PointerPressedEventArgs e)
     {
         if (!Left(e, pv)) return;
+        if (_tool == Tool.Highlight && HighlightByTextPref && TryHighlightTextPress(pv, e)) return;
         if (_tool == Tool.Select && CharsFor(pv.Index) is { } chars)
         {
             if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) && _selPage == pv.Index && TrySelectPress(pv, e)) return;
@@ -312,5 +317,120 @@ public partial class PdfViewer
         ClearTextSelection();
         Select(a, focusEditor: false);
         e.Handled = true;
+    }
+
+    private void CancelPending()
+    {
+        if (_pendPage < 0 && !_pendDragging) return;
+        _pendPage = -1; _pendDragging = false;
+        RedrawTextLayers();
+    }
+
+    private bool TryHighlightTextPress(PageView pv, PointerPressedEventArgs e)
+    {
+        var chars = CharsFor(pv.Index);
+        if (chars is null)
+        {
+            if (_textReady) return false;
+            Flash("Reading the page text…");
+            e.Handled = true;
+            return true;
+        }
+        var px = e.GetPosition(pv.Overlay);
+        var u = Unit(pv, px);
+        if (_pendPage >= 0 && _pendPage != pv.Index) CancelPending();
+        if (_pendPage == pv.Index)
+        {
+            int word = e.ClickCount == 2 ? PdfTextSelection.CharAt(chars, u) : -1;
+            if (word >= 0)
+            {
+                var (wa, wb) = PdfTextSelection.WordAt(chars, word);
+                CancelPending();
+                AddTextHighlight(pv.Index, wa, wb);
+                e.Handled = true;
+                return true;
+            }
+            int end = PdfTextSelection.CaretAt(chars, u);
+            int start = _pendAnchor;
+            CancelPending();
+            if (end < 0) return false;
+            if (end != start) AddTextHighlight(pv.Index, start, end);
+            e.Handled = true;
+            return true;
+        }
+        if (PdfTextSelection.CharAt(chars, u) < 0)
+        {
+            if (!chars.Any(c => c.HasBox))
+                Flash("This page is a picture, so there's no text to select. Drag to highlight an area.");
+            return false;
+        }
+        ClearTextSelection();
+        if (_selected is not null) Select(null, focusEditor: false);
+        int caret = PdfTextSelection.CaretAt(chars, u);
+        _pendPage = pv.Index; _pendAnchor = caret; _pendFocus = caret;
+        _pendDragging = true; _pendPressPx = px;
+        e.Pointer.Capture(pv.Overlay);
+        RedrawTextLayers();
+        Focus();
+        e.Handled = true;
+        return true;
+    }
+
+    private bool PendingRelease(PageView pv, PointerReleasedEventArgs e)
+    {
+        if (!_pendDragging) return false;
+        _pendDragging = false;
+        e.Pointer.Capture(null);
+        if (_pendPage >= 0 && _pendFocus != _pendAnchor && Dist(e.GetPosition(pv.Overlay), _pendPressPx) >= 6)
+        {
+            int page = _pendPage, a = _pendAnchor, b = _pendFocus;
+            CancelPending();
+            AddTextHighlight(page, a, b);
+        }
+        else Flash("Now click where the highlight should end.");
+        return true;
+    }
+
+    private void UpdateHighlightTip() => ToolTip.SetTip(HighlightTool, HighlightByTextPref
+        ? "Click where the text starts, then where it ends. Double-click a word to highlight just that word."
+        : "Drag over the page to highlight an area");
+
+    private void SetHighlightMode(bool byText)
+    {
+        CancelPending();
+        if (HighlightByTextPref != byText)
+        {
+            HighlightByTextPref = byText;
+            HighlightModeChanged?.Invoke(byText);
+        }
+        UpdateHighlightTip();
+        if (_tool != Tool.Highlight) SetTool(Tool.Highlight);
+    }
+
+    private void ShowHighlightOptions()
+    {
+        var panel = new StackPanel { Spacing = 6, Margin = new Thickness(6), Width = 250 };
+        var flyout = new Flyout { Content = panel, Placement = PlacementMode.Bottom };
+        panel.Children.Add(ModeButton(true, "Text", "Click where the text starts, then where it ends."));
+        panel.Children.Add(ModeButton(false, "Area", "Drag a box over any part of the page."));
+        MenuFx.AttachFlyout(flyout);
+        flyout.ShowAt(HighlightOptsBtn);
+
+        Button ModeButton(bool byText, string title, string hint)
+        {
+            bool on = HighlightByTextPref == byText;
+            var content = new StackPanel { Spacing = 2 };
+            content.Children.Add(new TextBlock { Text = title, FontWeight = FontWeight.SemiBold });
+            content.Children.Add(new TextBlock { Text = hint, FontSize = 11.5, Opacity = 0.75, TextWrapping = TextWrapping.Wrap });
+            var b = new Button
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left,
+                Padding = new Thickness(10, 7), BorderThickness = new Thickness(on ? 2 : 1),
+                BorderBrush = (on ? this.FindResource("AccentBrush") : this.FindResource("FrameBorderBrush")) as IBrush,
+                Content = content,
+            };
+            b.Click += (_, _) => { SetHighlightMode(byText); flyout.Hide(); };
+            return b;
+        }
     }
 }

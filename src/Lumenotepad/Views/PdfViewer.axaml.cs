@@ -77,6 +77,8 @@ public partial class PdfViewer : UserControl
         SnapBtn.IsChecked = SnapToGrid;
         SnapBtn.Click += (_, _) => SnapToGrid = SnapBtn.IsChecked == true;
         ArrowOptsBtn.Click += (_, _) => ShowArrowOptions();
+        HighlightOptsBtn.Click += (_, _) => ShowHighlightOptions();
+        UpdateHighlightTip();
         AddHandler(KeyDownEvent, OnKey, Avalonia.Interactivity.RoutingStrategies.Bubble);
     }
 
@@ -121,6 +123,7 @@ public partial class PdfViewer : UserControl
     {
         base.OnAttachedToVisualTree(e);
         PdfAnnotationHub.Changed += OnHubChanged;
+        UpdateHighlightTip();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -474,6 +477,7 @@ public partial class PdfViewer : UserControl
     {
         if (!e.GetCurrentPoint(pv.Overlay).Properties.IsLeftButtonPressed) return;
         var p = e.GetPosition(pv.Overlay);
+        if (_tool == Tool.Highlight && HighlightByTextPref && TryHighlightTextPress(pv, e)) return;
         if (_tool == Tool.Select && TrySelectPress(pv, e)) return;
         ClearTextSelection();
         switch (_tool)
@@ -1249,9 +1253,8 @@ public partial class PdfViewer : UserControl
         bool shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         if (e.Key == Key.Escape && (HasTextSelection || _pendPage >= 0))
         {
-            _pendPage = -1; _pendDragging = false;
+            CancelPending();
             ClearTextSelection();
-            RedrawTextLayers();
             e.Handled = true;
             return;
         }
