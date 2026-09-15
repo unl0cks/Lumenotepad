@@ -349,4 +349,17 @@ public class AppSettingsTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void PdfHighlightText_defaultsTrue_andRoundTrips()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            Assert.True(new AppSettings().PdfHighlightText);
+            new AppSettings { PdfHighlightText = false }.Save(dir);
+            Assert.False(AppSettings.Load(dir).PdfHighlightText);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }

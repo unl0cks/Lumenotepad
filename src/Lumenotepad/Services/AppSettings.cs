@@ -67,6 +67,7 @@ public sealed class AppSettings
     public double PagesPanelWidth { get; set; } = 224;
     public bool DoubleClickCreate { get; set; }
     public bool RoundedPdfCorners { get; set; } = true;
+    public bool PdfHighlightText { get; set; } = true;
     public string ToolbarPosition { get; set; } = "Top";
     public string ToolbarScope { get; set; } = "Window";
     public bool ResizablePages { get; set; } = true;

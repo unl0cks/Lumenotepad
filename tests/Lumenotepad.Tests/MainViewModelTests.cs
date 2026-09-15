@@ -829,4 +829,20 @@ public class MainViewModelTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void PdfHighlightText_persists_andResetRestoresIt()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            vm.PdfHighlightText = false;
+            Assert.False(AppSettings.Load(dir).PdfHighlightText);
+            vm.ResetSettingsToDefaults();
+            Assert.True(vm.PdfHighlightText);
+            Assert.True(AppSettings.Load(dir).PdfHighlightText);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }
