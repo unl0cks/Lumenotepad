@@ -285,6 +285,22 @@ public sealed class RichTextEditor : Control
         return b;
     }
 
+    private static bool _boundsFaultLogged;
+
+    private static IEnumerable<Rect> SafeBounds(TextLayout layout, int start, int length)
+    {
+        try { return layout.HitTestTextRange(start, length); }
+        catch (Exception ex)
+        {
+            if (!_boundsFaultLogged)
+            {
+                _boundsFaultLogged = true;
+                Services.StartupLog.Crash("text bounds", ex);
+            }
+            return Array.Empty<Rect>();
+        }
+    }
+
     private double ParagraphTop(int para) => para >= 0 && para < _tops.Length ? _tops[para] : 0;
 
     protected override Size MeasureOverride(Size availableSize)
@@ -308,7 +324,7 @@ public sealed class RichTextEditor : Control
                 int len = run.Text.Length;
                 if (run.Highlight is { } hl && BrushFor(hl) is { } hlBrush && len > 0)
                 {
-                    foreach (var r in _layouts[pi].HitTestTextRange(acc, len))
+                    foreach (var r in SafeBounds(_layouts[pi], acc, len))
                         ctx.FillRectangle(hlBrush, new Rect(r.X + IndentOf(pi), r.Y + top, r.Width, r.Height), 3f);
                 }
                 acc += len;
@@ -325,7 +341,7 @@ public sealed class RichTextEditor : Control
                 double top = ParagraphTop(pi);
                 if (end > start)
                 {
-                    foreach (var r in _layouts[pi].HitTestTextRange(start, end - start))
+                    foreach (var r in SafeBounds(_layouts[pi], start, end - start))
                         ctx.FillRectangle(SelectionBrush, new Rect(r.X + IndentOf(pi), r.Y + top, Math.Max(r.Width, 2), r.Height), 3f);
                 }
                 else if (_doc.Paragraphs[pi].Length == 0)
