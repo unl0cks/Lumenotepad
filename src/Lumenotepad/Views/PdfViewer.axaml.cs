@@ -37,7 +37,8 @@ public partial class PdfViewer : UserControl
     private string _color = "#FFF5E3A3";
     private double _zoom = 1.0;
 
-    private sealed record PageView(int Index, double WPt, double HPt, Border Frame, Canvas Overlay, Image Img);
+    private sealed record PageView(int Index, double WPt, double HPt, Border Frame, Canvas Overlay, Image Img,
+                                   Canvas Selection, Canvas Bar);
     private readonly List<PageView> _pages = new();
     private PdfAnnotation? _selected;
     private DispatcherTimer? _saveDebounce;
@@ -103,6 +104,7 @@ public partial class PdfViewer : UserControl
         _docs.Clear();
         _editors.Clear();
         _selected = null;
+        ResetText();
         _undoStack.Clear();
         _redoStack.Clear();
         HideFmtBar();
@@ -164,7 +166,8 @@ public partial class PdfViewer : UserControl
             StatusLabel.Text = "This file isn't a readable PDF.";
             return;
         }
-        StatusLabel.Text = count == 1 ? "1 page" : $"{count} pages";
+        _pageStatus = count == 1 ? "1 page" : $"{count} pages";
+        StatusLabel.Text = _pageStatus;
         _loaded = true;
 
         for (int i = 0; i < count; i++)
@@ -182,15 +185,23 @@ public partial class PdfViewer : UserControl
             if (bmp is not null) _pages[page].Img.Source = bmp;
             RedrawPage(_pages[page]);
         }
+
+        var text = await Task.Run(() => PdfText.ReadAll(bytes));
+        if (gen != _loadGen) return;
+        SetPageText(text);
     }
 
     private PageView BuildPageFrame(int index, double wpt, double hpt)
     {
         var img = new Image { Stretch = Stretch.Fill };
+        var selection = new Canvas { IsHitTestVisible = false };
         var overlay = new Canvas { Background = Brushes.Transparent };
+        var bar = new Canvas();
         var panel = new Panel();
         panel.Children.Add(img);
+        panel.Children.Add(selection);
         panel.Children.Add(overlay);
+        panel.Children.Add(bar);
         var frame = new Border
         {
             Background = Brushes.White, Child = panel,
@@ -199,7 +210,7 @@ public partial class PdfViewer : UserControl
             BorderBrush = new SolidColorBrush(Color.Parse("#33000000")), BorderThickness = new Thickness(1),
             HorizontalAlignment = HorizontalAlignment.Center,
         };
-        var pv = new PageView(index, wpt, hpt, frame, overlay, img);
+        var pv = new PageView(index, wpt, hpt, frame, overlay, img, selection, bar);
         overlay.PointerPressed += (_, e) => OnOverlayPressed(pv, e);
         overlay.PointerMoved += (_, e) => OnOverlayMoved(pv, e);
         overlay.PointerReleased += (_, e) => OnOverlayReleased(pv, e);
@@ -219,6 +230,8 @@ public partial class PdfViewer : UserControl
             double h = pv.HPt * PxPerPoint * _zoom;
             pv.Frame.Width = w; pv.Frame.Height = h;
             pv.Overlay.Width = w; pv.Overlay.Height = h;
+            pv.Selection.Width = w; pv.Selection.Height = h;
+            pv.Bar.Width = w; pv.Bar.Height = h;
             pv.Frame.CornerRadius = new CornerRadius(rad);
 
             if (pv.Frame.Child is Control inner)
@@ -688,6 +701,7 @@ public partial class PdfViewer : UserControl
 
     private void DrawRectAnno(PageView pv, PdfAnnotation a)
     {
+        if (a.IsTextHighlight) { DrawTextHighlight(pv, a); return; }
         double w = pv.Overlay.Width, h = pv.Overlay.Height;
         bool selected = ReferenceEquals(a, _selected);
         var rect = new Border
@@ -718,6 +732,30 @@ public partial class PdfViewer : UserControl
             dot.PointerPressed += (_, e) => { if (Left(e, pv)) StartDrag(pv, a, 5, e); };
             pv.Overlay.Children.Add(dot);
         }
+    }
+
+    private void DrawTextHighlight(PageView pv, PdfAnnotation a)
+    {
+        double w = pv.Overlay.Width, h = pv.Overlay.Height;
+        bool selected = ReferenceEquals(a, _selected);
+        var brush = new SolidColorBrush(Color.Parse(a.Color));
+        double[]? lastRect = null;
+        foreach (var r in a.Rects!)
+        {
+            if (r is not { Length: 4 }) continue;
+            var box = new Border
+            {
+                Background = brush, CornerRadius = new CornerRadius(3),
+                BorderThickness = new Thickness(selected ? 2 : 0), BorderBrush = NoteFocusBrush,
+                Tag = a,
+            };
+            Canvas.SetLeft(box, r[0] * w); Canvas.SetTop(box, r[1] * h);
+            box.Width = r[2] * w; box.Height = r[3] * h;
+            box.PointerPressed += (_, e) => OnTextHighlightPressed(pv, a, e);
+            pv.Overlay.Children.Add(box);
+            lastRect = r;
+        }
+        if (selected && lastRect is { } l) AddDeleteButton(pv, (l[0] + l[2]) * w, l[1] * h, a);
     }
 
     private void DrawTextAnno(PageView pv, PdfAnnotation a, bool sticky)
@@ -1311,8 +1349,18 @@ public partial class PdfViewer : UserControl
     private static void FlattenHighlight(SkiaSharp.SKCanvas c, PdfAnnotation a, float wpt, float hpt)
     {
         using var p = new SkiaSharp.SKPaint { Color = SkColor(a.Color), IsAntialias = true, Style = SkiaSharp.SKPaintStyle.Fill };
-        var r = new SkiaSharp.SKRect((float)a.X * wpt, (float)a.Y * hpt, (float)(a.X + a.W) * wpt, (float)(a.Y + a.H) * hpt);
-        c.DrawRoundRect(r, 3.5f, 3.5f, p);
+        if (a.IsTextHighlight)
+        {
+            foreach (var r in a.Rects!)
+            {
+                if (r is not { Length: 4 }) continue;
+                c.DrawRoundRect(new SkiaSharp.SKRect((float)r[0] * wpt, (float)r[1] * hpt,
+                    (float)(r[0] + r[2]) * wpt, (float)(r[1] + r[3]) * hpt), 2f, 2f, p);
+            }
+            return;
+        }
+        var box = new SkiaSharp.SKRect((float)a.X * wpt, (float)a.Y * hpt, (float)(a.X + a.W) * wpt, (float)(a.Y + a.H) * hpt);
+        c.DrawRoundRect(box, 3.5f, 3.5f, p);
     }
 
     private static void FlattenArrow(SkiaSharp.SKCanvas c, PdfAnnotation a, float wpt, float hpt)
