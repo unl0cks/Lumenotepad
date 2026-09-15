@@ -831,17 +831,17 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public void PdfHighlightText_persists_andResetRestoresIt()
+    public void PdfHighlightMode_persists_andResetRestoresIt()
     {
         var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
         try
         {
             var vm = new MainViewModel(new WorkspaceStore(dir), dir);
-            vm.PdfHighlightText = false;
-            Assert.False(AppSettings.Load(dir).PdfHighlightText);
+            vm.PdfHighlightMode = "TwoClicks";
+            Assert.Equal("TwoClicks", AppSettings.Load(dir).PdfHighlightMode);
             vm.ResetSettingsToDefaults();
-            Assert.True(vm.PdfHighlightText);
-            Assert.True(AppSettings.Load(dir).PdfHighlightText);
+            Assert.Equal("SelectText", vm.PdfHighlightMode);
+            Assert.Equal("SelectText", AppSettings.Load(dir).PdfHighlightMode);
         }
         finally { Directory.Delete(dir, true); }
     }

@@ -129,7 +129,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double _pagesPanelWidth = 224;
     [ObservableProperty] private bool _doubleClickCreate;
     [ObservableProperty] private bool _roundedPdfCorners = true;
-    [ObservableProperty] private bool _pdfHighlightText = true;
+    [ObservableProperty] private string _pdfHighlightMode = "SelectText";
 
     [ObservableProperty] private int _palettePrefsVersion;
 
@@ -281,7 +281,7 @@ public partial class MainViewModel : ObservableObject
             PagesPanelWidth = _settings.PagesPanelWidth;
             DoubleClickCreate = _settings.DoubleClickCreate;
             RoundedPdfCorners = _settings.RoundedPdfCorners;
-            PdfHighlightText = _settings.PdfHighlightText;
+            PdfHighlightMode = _settings.PdfHighlightMode;
         }
         _workspace = store.LoadOrSeed();
 
@@ -851,10 +851,10 @@ public partial class MainViewModel : ObservableObject
         _settings.Save(_settingsDir);
     }
 
-    partial void OnPdfHighlightTextChanged(bool value)
+    partial void OnPdfHighlightModeChanged(string value)
     {
         if (_settings is null || _settingsDir is null) return;
-        _settings.PdfHighlightText = value;
+        _settings.PdfHighlightMode = value;
         _settings.Save(_settingsDir);
     }
 
@@ -1001,7 +1001,7 @@ public partial class MainViewModel : ObservableObject
         CloseToTray = d.CloseToTray; MinimizeToTray = d.MinimizeToTray; SummonHotkey = d.SummonHotkey;
         PagesPanelWidth = d.PagesPanelWidth; DoubleClickCreate = d.DoubleClickCreate;
         RoundedPdfCorners = d.RoundedPdfCorners;
-        PdfHighlightText = d.PdfHighlightText;
+        PdfHighlightMode = d.PdfHighlightMode;
         if (_settings is not null && _settingsDir is not null && _settings.BulletColors.Count > 0)
         {
             _settings.BulletColors.Clear();

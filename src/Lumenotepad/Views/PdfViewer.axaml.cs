@@ -477,8 +477,8 @@ public partial class PdfViewer : UserControl
     {
         if (!e.GetCurrentPoint(pv.Overlay).Properties.IsLeftButtonPressed) return;
         var p = e.GetPosition(pv.Overlay);
-        if (_tool == Tool.Highlight && HighlightByTextPref && TryHighlightTextPress(pv, e)) return;
-        if (_tool == Tool.Select && TrySelectPress(pv, e)) return;
+        if (TwoClickTool && TryHighlightTextPress(pv, e)) return;
+        if (TextSelectTool && TrySelectPress(pv, e)) return;
         ClearTextSelection();
         switch (_tool)
         {

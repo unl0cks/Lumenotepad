@@ -15,10 +15,17 @@ using Lumenotepad.Services;
 
 namespace Lumenotepad.Views;
 
+public enum PdfHighlightMode { SelectText, TwoClicks, AreaBox }
+
 public partial class PdfViewer
 {
-    public static bool HighlightByTextPref = true;
-    public static event Action<bool>? HighlightModeChanged;
+    public static PdfHighlightMode HighlightModePref = PdfHighlightMode.SelectText;
+    public static event Action<PdfHighlightMode>? HighlightModeChanged;
+
+    private bool TextSelectTool =>
+        _tool == Tool.Select || (_tool == Tool.Highlight && HighlightModePref == PdfHighlightMode.SelectText);
+
+    private bool TwoClickTool => _tool == Tool.Highlight && HighlightModePref == PdfHighlightMode.TwoClicks;
 
     private IReadOnlyList<PdfPageText>? _pageText;
     private bool _textReady;
@@ -213,8 +220,7 @@ public partial class PdfViewer
 
     private void UpdateTextCursor(PageView pv, Point px)
     {
-        bool textTool = _tool == Tool.Select || (_tool == Tool.Highlight && HighlightByTextPref);
-        var chars = textTool ? CharsFor(pv.Index) : null;
+        var chars = TextSelectTool || TwoClickTool ? CharsFor(pv.Index) : null;
         bool over = chars is not null && PdfTextSelection.CharAt(chars, Unit(pv, px)) >= 0;
         var want = over ? TextCursor : null;
         if (!ReferenceEquals(pv.Overlay.Cursor, want)) pv.Overlay.Cursor = want;
@@ -315,8 +321,8 @@ public partial class PdfViewer
     private void OnTextHighlightPressed(PageView pv, PdfAnnotation a, PointerPressedEventArgs e)
     {
         if (!Left(e, pv)) return;
-        if (_tool == Tool.Highlight && HighlightByTextPref && TryHighlightTextPress(pv, e)) return;
-        if (_tool == Tool.Select && CharsFor(pv.Index) is { } chars)
+        if (TwoClickTool && TryHighlightTextPress(pv, e)) return;
+        if (TextSelectTool && CharsFor(pv.Index) is { } chars)
         {
             if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) && _selPage == pv.Index && TrySelectPress(pv, e)) return;
             var px = e.GetPosition(pv.Overlay);
@@ -406,17 +412,21 @@ public partial class PdfViewer
         return true;
     }
 
-    private void UpdateHighlightTip() => ToolTip.SetTip(HighlightTool, HighlightByTextPref
-        ? "Click where the text starts, then where it ends. Double-click a word to highlight just that word."
-        : "Drag over the page to highlight an area");
+    private void UpdateHighlightTip() => ToolTip.SetTip(HighlightTool, HighlightModePref switch
+    {
+        PdfHighlightMode.SelectText => "Select the words you want, then press Highlight on the little bar.",
+        PdfHighlightMode.TwoClicks => "Click where the text starts, then where it ends. Double-click a word to highlight just that word.",
+        _ => "Drag over the page to highlight an area.",
+    });
 
-    private void SetHighlightMode(bool byText)
+    private void SetHighlightMode(PdfHighlightMode mode)
     {
         CancelPending();
-        if (HighlightByTextPref != byText)
+        ClearTextSelection();
+        if (HighlightModePref != mode)
         {
-            HighlightByTextPref = byText;
-            HighlightModeChanged?.Invoke(byText);
+            HighlightModePref = mode;
+            HighlightModeChanged?.Invoke(mode);
         }
         UpdateHighlightTip();
         if (_tool != Tool.Highlight) SetTool(Tool.Highlight);
@@ -424,16 +434,20 @@ public partial class PdfViewer
 
     private void ShowHighlightOptions()
     {
-        var panel = new StackPanel { Spacing = 6, Margin = new Thickness(6), Width = 250 };
+        var panel = new StackPanel { Spacing = 6, Margin = new Thickness(6), Width = 258 };
         var flyout = new Flyout { Content = panel, Placement = PlacementMode.Bottom };
-        panel.Children.Add(ModeButton(true, "Text", "Click where the text starts, then where it ends."));
-        panel.Children.Add(ModeButton(false, "Area", "Drag a box over any part of the page."));
+        panel.Children.Add(ModeButton(PdfHighlightMode.SelectText, "Select text",
+            "Select the words, then press Highlight on the little bar."));
+        panel.Children.Add(ModeButton(PdfHighlightMode.TwoClicks, "Two clicks",
+            "Click where the text starts, then where it ends."));
+        panel.Children.Add(ModeButton(PdfHighlightMode.AreaBox, "Area box",
+            "Drag a box over any part of the page."));
         MenuFx.AttachFlyout(flyout);
         flyout.ShowAt(HighlightOptsBtn);
 
-        Button ModeButton(bool byText, string title, string hint)
+        Button ModeButton(PdfHighlightMode mode, string title, string hint)
         {
-            bool on = HighlightByTextPref == byText;
+            bool on = HighlightModePref == mode;
             var content = new StackPanel { Spacing = 2 };
             content.Children.Add(new TextBlock { Text = title, FontWeight = FontWeight.SemiBold });
             content.Children.Add(new TextBlock { Text = hint, FontSize = 11.5, Opacity = 0.75, TextWrapping = TextWrapping.Wrap });
@@ -444,7 +458,7 @@ public partial class PdfViewer
                 BorderBrush = (on ? this.FindResource("AccentBrush") : this.FindResource("FrameBorderBrush")) as IBrush,
                 Content = content,
             };
-            b.Click += (_, _) => { SetHighlightMode(byText); flyout.Hide(); };
+            b.Click += (_, _) => { SetHighlightMode(mode); flyout.Hide(); };
             return b;
         }
     }

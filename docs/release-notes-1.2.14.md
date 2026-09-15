@@ -1,4 +1,4 @@
-<!-- summary: Highlight PDF text by selecting it, or with two clicks, instead of dragging a box. -->
+<!-- summary: Highlight PDF text by selecting it, instead of dragging a box over the page. -->
 # Lumenotepad 1.2.14
 
 ## Highlight the text, not a box
@@ -6,7 +6,7 @@
 Highlighting a PDF used to mean dragging a box over the page. That is fiddly on a trackpad, and a box
 never quite matches the words. Highlights now follow the text itself.
 
-**Select, then Highlight.** With no tool picked, select text the way you would anywhere else:
+Select text the way you would anywhere else:
 
 - click where it starts, then Shift-click where it ends
 - double-click a word, or triple-click a line
@@ -15,12 +15,15 @@ never quite matches the words. Highlights now follow the text itself.
 A small bar appears next to the selection with **Highlight** and **Copy**. Ctrl+C (Cmd+C on a Mac)
 copies too.
 
-**Or use the Highlight tool with two clicks.** Click where the text starts, then click where it ends.
-Nothing needs holding down, and the highlight previews as you move between the two clicks.
-Double-click a word to highlight just that word. Esc cancels.
+## Three ways to highlight, and you pick
 
-**Boxes are still there.** The small ▾ next to Highlight switches between **Text** and **Area**. Area
-is the old drag-a-box, handy for diagrams and pictures. Lumenotepad remembers which one you picked.
+The small ▾ next to Highlight chooses how the Highlight tool works, and it remembers your choice:
+
+- **Select text**, the one it starts with: select the words, then press Highlight on the little bar.
+- **Two clicks**: click where the text starts, then click where it ends. Nothing needs holding down,
+  and the highlight previews as you move between the two clicks. Double-click a word to highlight
+  just that word, and Esc cancels.
+- **Area box**: the old drag-a-box, still there for diagrams and pictures.
 
 ## Good to know
 

@@ -351,14 +351,14 @@ public class AppSettingsTests
     }
 
     [Fact]
-    public void PdfHighlightText_defaultsTrue_andRoundTrips()
+    public void PdfHighlightMode_defaultsToSelectText_andRoundTrips()
     {
         var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
         try
         {
-            Assert.True(new AppSettings().PdfHighlightText);
-            new AppSettings { PdfHighlightText = false }.Save(dir);
-            Assert.False(AppSettings.Load(dir).PdfHighlightText);
+            Assert.Equal("SelectText", new AppSettings().PdfHighlightMode);
+            new AppSettings { PdfHighlightMode = "AreaBox" }.Save(dir);
+            Assert.Equal("AreaBox", AppSettings.Load(dir).PdfHighlightMode);
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
