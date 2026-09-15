@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Avalonia;
 
 namespace Lumenotepad.Editor;
 
@@ -41,6 +42,25 @@ public sealed class PdfAnnotation
     [JsonPropertyName("it")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Italic { get; set; }
     [JsonPropertyName("u")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Underline { get; set; }
     [JsonPropertyName("st")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Strike { get; set; }
+
+    [JsonPropertyName("rects")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<double[]>? Rects { get; set; }
+
+    [JsonIgnore] public bool IsTextHighlight => Kind == Highlight && Rects is { Count: > 0 };
+
+    public static PdfAnnotation TextHighlight(int page, IReadOnlyList<Rect> rects, string color)
+    {
+        var list = new List<double[]>(rects.Count);
+        var a = new PdfAnnotation { Page = page, Kind = Highlight, Color = color, Rects = list };
+        if (rects.Count == 0) return a;
+        var union = rects[0];
+        foreach (var r in rects)
+        {
+            list.Add(new[] { r.X, r.Y, r.Width, r.Height });
+            union = union.Union(r);
+        }
+        a.X = union.X; a.Y = union.Y; a.W = union.Width; a.H = union.Height;
+        return a;
+    }
 }
 
 public sealed class PdfAnnotationDoc
