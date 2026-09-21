@@ -129,6 +129,12 @@ public sealed class WorkspaceStore
         {
             var assetsDir = Path.Combine(_root, nb.Folder, "assets");
             Directory.CreateDirectory(assetsDir);
+
+            // Opening the same file again must land on the copy that's already in the notebook, or
+            // everything drawn on the earlier copy (PDF highlights, notes, arrows) looks lost.
+            if (FindIdenticalAsset(assetsDir, sourcePath) is { } existing)
+                return "assets/" + existing;
+
             string stem = Path.GetFileNameWithoutExtension(sourcePath);
             string ext = Path.GetExtension(sourcePath);
             string name = stem + ext;
@@ -138,6 +144,46 @@ public sealed class WorkspaceStore
             return "assets/" + name;
         }
         catch { return null; }
+    }
+
+    /// <summary>The file name of an asset with exactly the same bytes as <paramref name="sourcePath"/>,
+    /// or null. Earlier versions copied a PDF again on every open, so a notebook can already hold
+    /// several identical copies; the one carrying the most annotations wins, then the plainest name.</summary>
+    private static string? FindIdenticalAsset(string assetsDir, string sourcePath)
+    {
+        var src = new FileInfo(sourcePath);
+        byte[]? srcHash = null;
+        string? best = null;
+        int bestNotes = -1;
+        foreach (var path in Directory.EnumerateFiles(assetsDir))
+        {
+            var fi = new FileInfo(path);
+            if (fi.Length != src.Length
+                || !string.Equals(fi.Extension, src.Extension, StringComparison.OrdinalIgnoreCase)) continue;
+            srcHash ??= Hash(sourcePath);
+            if (!srcHash.AsSpan().SequenceEqual(Hash(path))) continue;
+            int notes = AnnotationCount(path);
+            if (notes > bestNotes || (notes == bestNotes && fi.Name.Length < best!.Length))
+            {
+                best = fi.Name;
+                bestNotes = notes;
+            }
+        }
+        return best;
+    }
+
+    private static byte[] Hash(string path)
+    {
+        using var s = File.OpenRead(path);
+        return System.Security.Cryptography.SHA256.HashData(s);
+    }
+
+    private static int AnnotationCount(string assetPath)
+    {
+        var side = Editor.PdfAnnotationDoc.SidecarPath(assetPath);
+        if (!File.Exists(side)) return 0;
+        try { return Editor.PdfAnnotationDoc.FromJson(File.ReadAllText(side)).Items.Count; }
+        catch { return 0; }
     }
 
     private static void DeleteCoverFiles(string dir)

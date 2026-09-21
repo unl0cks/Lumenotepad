@@ -164,4 +164,71 @@ public class WorkspaceStoreTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    private static (WorkspaceStore store, Notebook nb, string src) AssetFixture(string dir, string name, string body)
+    {
+        var store = new WorkspaceStore(dir);
+        var ws = new Workspace();
+        var nb = new Notebook { Name = "N" };
+        ws.Notebooks.Add(nb);
+        store.Save(ws);
+        var srcDir = Path.Combine(dir, "downloads");
+        Directory.CreateDirectory(srcDir);
+        var src = Path.Combine(srcDir, name);
+        File.WriteAllText(src, body);
+        return (store, nb, src);
+    }
+
+    [Fact]
+    public void SavePageAsset_sameFileTwice_reusesTheExistingCopy()
+    {
+        var dir = TempDir();
+        try
+        {
+            var (store, nb, src) = AssetFixture(dir, "report.pdf", "%PDF-1 same bytes");
+            var first = store.SavePageAsset(nb, src);
+            var second = store.SavePageAsset(nb, src);
+
+            Assert.Equal("assets/report.pdf", first);
+            Assert.Equal(first, second);
+            Assert.Single(Directory.GetFiles(Path.Combine(dir, "notebooks", nb.Folder, "assets")));
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void SavePageAsset_differentFileSameName_getsItsOwnCopy()
+    {
+        var dir = TempDir();
+        try
+        {
+            var (store, nb, src) = AssetFixture(dir, "report.pdf", "%PDF-1 version one");
+            var first = store.SavePageAsset(nb, src);
+            File.WriteAllText(src, "%PDF-1 version two");
+            var second = store.SavePageAsset(nb, src);
+
+            Assert.Equal("assets/report.pdf", first);
+            Assert.Equal("assets/report (2).pdf", second);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void SavePageAsset_legacyDuplicates_prefersTheAnnotatedCopy()
+    {
+        var dir = TempDir();
+        try
+        {
+            var (store, nb, src) = AssetFixture(dir, "report.pdf", "%PDF-1 same bytes");
+            var assets = Path.Combine(dir, "notebooks", nb.Folder, "assets");
+            Directory.CreateDirectory(assets);
+            File.Copy(src, Path.Combine(assets, "report.pdf"));
+            File.Copy(src, Path.Combine(assets, "report (2).pdf"));
+            File.WriteAllText(Path.Combine(assets, "report (2).pdf.lumenotes.json"),
+                "{\"v\":1,\"items\":[{\"pg\":0,\"kind\":\"highlight\"}]}");
+
+            Assert.Equal("assets/report (2).pdf", store.SavePageAsset(nb, src));
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }
