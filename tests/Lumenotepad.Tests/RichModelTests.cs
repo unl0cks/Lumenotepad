@@ -428,4 +428,73 @@ public class RichModelTests
     [InlineData(2, 4, "b.")]
     public void NumLabel_cyclesNumberLetterRoman(int n, int indent, string expected) =>
         Assert.Equal(expected, RichTextEditor.NumLabel(n, indent));
+
+    private static RunFormat InFont(string f) => new(false, false, false, false, null, null, null, f);
+
+    [Fact]
+    public void DeletingAllText_leavesTheLineItsFormat()
+    {
+        var doc = new RichDocument();
+        var end = doc.InsertText(new DocPos(0, 0), "hello", InFont("Gambarino"));
+        doc.DeleteRange(new DocPos(0, 0), end);
+        Assert.Empty(doc.Paragraphs[0].Runs);
+        Assert.Equal("Gambarino", doc.FormatAt(new DocPos(0, 0)).Font);
+    }
+
+    [Fact]
+    public void BackspacingToEmpty_keepsTheLastLettersFormat()
+    {
+        var doc = new RichDocument();
+        doc.InsertText(new DocPos(0, 0), "ab", InFont("Caveat"));
+        doc.DeleteRange(new DocPos(0, 1), new DocPos(0, 2));
+        doc.DeleteRange(new DocPos(0, 0), new DocPos(0, 1));
+        Assert.Equal("Caveat", doc.FormatAt(new DocPos(0, 0)).Font);
+    }
+
+    [Fact]
+    public void Enter_givesTheNewEmptyLineTheFormat_andEnterAtTheStartKeepsIt()
+    {
+        var doc = new RichDocument();
+        var end = doc.InsertText(new DocPos(0, 0), "title", InFont("Yuyu"));
+        var next = doc.SplitParagraph(end);
+        Assert.Equal("Yuyu", doc.FormatAt(next).Font);
+        var third = doc.SplitParagraph(next);
+        Assert.Equal("Yuyu", doc.FormatAt(third).Font);
+
+        var doc2 = new RichDocument();
+        doc2.InsertText(new DocPos(0, 0), "x", InFont("Caveat"));
+        doc2.SplitParagraph(new DocPos(0, 0));
+        Assert.Equal("Caveat", doc2.FormatAt(new DocPos(0, 0)).Font);
+    }
+
+    [Fact]
+    public void PlainText_leavesNoMark_andLinksAreNotCarried()
+    {
+        var doc = new RichDocument();
+        var end = doc.InsertText(new DocPos(0, 0), "plain", default(RunFormat));
+        doc.DeleteRange(new DocPos(0, 0), end);
+        Assert.Null(doc.Paragraphs[0].Mark);
+
+        var linked = new RichDocument();
+        var e2 = linked.InsertText(new DocPos(0, 0), "site", default(RunFormat) with { Link = "https://x" });
+        linked.DeleteRange(new DocPos(0, 0), e2);
+        Assert.Null(linked.Paragraphs[0].Mark);
+    }
+
+    [Fact]
+    public void Mark_survivesSaveAndLoad_andUndoSnapshots()
+    {
+        var doc = new RichDocument();
+        var end = doc.InsertText(new DocPos(0, 0), "keep", InFont("Gambarino") with { Size = 18 });
+        doc.DeleteRange(new DocPos(0, 0), end);
+
+        var back = RichDocJson.FromJson(RichDocJson.ToJson(doc));
+        Assert.Equal("Gambarino", back.FormatAt(new DocPos(0, 0)).Font);
+        Assert.Equal(18, back.FormatAt(new DocPos(0, 0)).Size);
+
+        var snap = doc.TakeSnapshot();
+        doc.InsertText(new DocPos(0, 0), "z", default(RunFormat));
+        doc.Restore(snap);
+        Assert.Equal("Gambarino", doc.FormatAt(new DocPos(0, 0)).Font);
+    }
 }

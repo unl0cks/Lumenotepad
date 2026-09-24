@@ -93,6 +93,8 @@ public sealed class Paragraph
 
     public bool Footnote;
 
+    public RunFormat? Mark;
+
     public int Length => Runs.Sum(r => r.Text.Length);
     public string Text => string.Concat(Runs.Select(r => r.Text));
 
@@ -105,6 +107,7 @@ public sealed class Paragraph
         Tag = Tag,
         NumBold = NumBold, NumItalic = NumItalic, NumUnderline = NumUnderline, NumStrike = NumStrike,
         Align = Align, Style = Style, Footnote = Footnote,
+        Mark = Mark,
     };
 
     public int SplitAt(int offset)
@@ -203,6 +206,7 @@ public sealed class RichDocument
                 var run = new RichRun { Text = lines[i] };
                 run.SetFormat(fmt);
                 para.Runs.Insert(runIdx, run);
+                para.Mark = null;
                 para.Normalize();
                 para.Version++;
                 cur = cur with { Off = cur.Off + lines[i].Length };
@@ -219,9 +223,16 @@ public sealed class RichDocument
         return r;
     }
 
+    private static RunFormat? AsMark(RunFormat f)
+    {
+        f = f with { Link = null };
+        return f == default ? null : f;
+    }
+
     private DocPos SplitParagraphCore(DocPos pos)
     {
         Clamp(ref pos);
+        var at = FormatAt(pos);
         var para = Paragraphs[pos.Para];
         int runIdx = para.SplitAt(pos.Off);
 
@@ -235,6 +246,8 @@ public sealed class RichDocument
             Footnote = para.Footnote,
         };
         para.Runs.RemoveRange(runIdx, para.Runs.Count - runIdx);
+        if (next.Runs.Count == 0) next.Mark = AsMark(at);
+        if (para.Runs.Count == 0) para.Mark = next.Runs.Count > 0 ? AsMark(next.Runs[0].Format) : AsMark(at);
         para.Version++;
         Paragraphs.Insert(pos.Para + 1, next);
         return new DocPos(pos.Para + 1, 0);
@@ -245,6 +258,7 @@ public sealed class RichDocument
         Clamp(ref a); Clamp(ref b);
         if (a > b) (a, b) = (b, a);
         if (a == b) return;
+        var removed = FormatStartingAt(a);
 
         if (a.Para == b.Para)
         {
@@ -268,6 +282,8 @@ public sealed class RichDocument
             first.Normalize();
             first.Version++;
         }
+        var target = Paragraphs[a.Para];
+        if (target.Runs.Count == 0) target.Mark = AsMark(removed);
         OnChanged();
     }
 
@@ -275,7 +291,7 @@ public sealed class RichDocument
     {
         Clamp(ref pos);
         var para = Paragraphs[pos.Para];
-        if (para.Runs.Count == 0) return default;
+        if (para.Runs.Count == 0) return para.Mark ?? default;
         int acc = 0;
         foreach (var r in para.Runs)
         {

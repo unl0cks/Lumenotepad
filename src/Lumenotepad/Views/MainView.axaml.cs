@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
@@ -47,6 +48,7 @@ public partial class MainView : UserControl
         }
 
         DataContextChanged += (_, _) => HookVm();
+        RichTextEditor.FontKept += f => { if (Vm is { } m && m.KeptFont != f) m.KeptFont = f; };
         PdfViewer.HighlightModeChanged += mode =>
         {
             string name = mode switch
@@ -126,6 +128,7 @@ public partial class MainView : UserControl
 
         HomeCards.AddHandler(TappedEvent, OnHomeCardTapped);
         HomeCards.ContextRequested += OnHomeCardContextRequested;
+        HomeHost.ContextRequested += OnHomeEmptyContextRequested;
         RecentList.AddHandler(TappedEvent, (_, e) =>
         {
             if ((e.Source as StyledElement)?.DataContext is RecentPage r)
@@ -513,10 +516,12 @@ public partial class MainView : UserControl
             _hookedVm.DocsDirtied += OnDocsDirtied;
             ApplyBulletPrefs(rebuild: false);
             ApplyEditorPrefs(rebuild: false);
+            ApplyTypingPrefs();
             SyncEditorDocument();
             ApplyPdfPage();
             ApplyToolbarPlacement();
             ApplyCanvasPrefs();
+            ApplyButtonPlacement();
             ApplyPaperTint();
             ApplyGlossyAccents();
             ApplyCardSize();
@@ -1030,6 +1035,50 @@ public partial class MainView : UserControl
         Services.ThemeManager.RefreshMacChildGlass();
     }
 
+    private void ApplyButtonPlacement()
+    {
+        if (Vm is not { } vm) return;
+        bool rail = vm.IsRailVisible, pages = vm.IsPagesVisible;
+        var (home, railBtn, pagesBtn, prefs) = vm.ButtonPlacement switch
+        {
+            "AllTopLeft" => (TitleNavHost, TitleNavHost, TitleNavHost, TitleNavHost),
+            "InPanels" => (RailTopHost, RailTopHost, PagesHeaderHost, RailBottomHost),
+            "BottomLeft" => (RailBottomHost, RailBottomHost, RailBottomHost, RailBottomHost),
+            _ => (TitleNavHost, TitleNavHost, TitleNavHost, TitleRightHost),
+        };
+        bool Hidden(Panel host) =>
+            (!rail && (ReferenceEquals(host, RailTopHost) || ReferenceEquals(host, RailBottomHost)))
+            || (!pages && ReferenceEquals(host, PagesHeaderHost));
+        foreach (var b in new Control[] { HomeBtn, RailToggle, PagesToggle, PrefsBtn })
+            (b.Parent as Panel)?.Children.Remove(b);
+        (Hidden(home) ? BubbleHost : home).Children.Add(HomeBtn);
+        railBtn.Children.Add(RailToggle);
+        pagesBtn.Children.Add(PagesToggle);
+        (Hidden(prefs) ? BubbleHost : prefs).Children.Add(PrefsBtn);
+
+        BubbleRailBtn.IsVisible = !rail;
+        BubblePagesBtn.IsVisible = !pages;
+        bool show = !rail || !pages;
+        if (show && !PanelBubble.IsVisible)
+        {
+            PanelBubble.IsVisible = true;
+            Motion.RiseIn(PanelBubble);
+        }
+        else if (!show && PanelBubble.IsVisible)
+            Motion.FadeOut(PanelBubble, onDone: () =>
+            {
+                if (Vm is { IsRailVisible: true, IsPagesVisible: true }) PanelBubble.IsVisible = false;
+            });
+    }
+
+    private void ApplyTypingPrefs()
+    {
+        if (Vm is not { } vm) return;
+        RichTextEditor.AutoCapitalizePref = vm.AutoCapitalize;
+        RichTextEditor.KeepPickedFontPref = vm.KeepPickedFont;
+        RichTextEditor.KeptFontPref = vm.KeptFont;
+    }
+
     private void ApplyBulletPrefs(bool rebuild)
     {
         if (Vm is not { } vm) return;
@@ -1115,6 +1164,7 @@ public partial class MainView : UserControl
         if (e.PropertyName == nameof(MainViewModel.SelectedNotebook))
         { RehookSections(); ApplyPaperTint(); ApplyEditorPrefs(rebuild: true); TagsPanel.IsVisible = false; }
         if (e.PropertyName == nameof(MainViewModel.SelectedSection)) RehookPages();
+        if (e.PropertyName == nameof(MainViewModel.SelectedSection)) Vm?.RefreshPageTree();
 
         if (e.PropertyName == nameof(MainViewModel.SelectedSection))
             Dispatcher.UIThread.Post(() => Motion.RiseIn(PagesList, Motion.Base), DispatcherPriority.Background);
@@ -1148,6 +1198,8 @@ public partial class MainView : UserControl
                  or nameof(MainViewModel.PdfHighlightMode)
                  or nameof(MainViewModel.MindmapTidyLayout))
             ApplyCanvasPrefs();
+        else if (e.PropertyName is nameof(MainViewModel.AutoCapitalize) or nameof(MainViewModel.KeepPickedFont))
+            ApplyTypingPrefs();
         else if (e.PropertyName == nameof(MainViewModel.CornerRoundness))
         {
             UpdateCanvasPlateClip();
@@ -1191,9 +1243,17 @@ public partial class MainView : UserControl
                 pvm.PaletteFor(false, FormatToolbar.BuiltInTextColors));
         }
         else if (e.PropertyName == nameof(MainViewModel.IsRailVisible))
+        {
             Motion.Reveal(RailPanel, 64, Vm?.IsRailVisible ?? true);
+            ApplyButtonPlacement();
+        }
         else if (e.PropertyName == nameof(MainViewModel.IsPagesVisible))
+        {
             Motion.Reveal(PagesPanel, Vm?.PagesPanelWidth ?? 224, Vm?.IsPagesVisible ?? true);
+            ApplyButtonPlacement();
+        }
+        else if (e.PropertyName == nameof(MainViewModel.ButtonPlacement))
+            ApplyButtonPlacement();
         else if (e.PropertyName == nameof(MainViewModel.PagesPanelWidth))
             ApplyPanels();
         else if (e.PropertyName == nameof(MainViewModel.IsHomeVisible))
@@ -1545,24 +1605,103 @@ public partial class MainView : UserControl
 
     private void OnSectionsContextRequested(object? sender, ContextRequestedEventArgs e)
     {
-        if ((e.Source as StyledElement)?.DataContext is not Section sec) return;
-        if (Vm is { } vm) vm.SelectedSection = sec;
-        var rename = new MenuItem { Header = "Rename" };
-        rename.Click += (_, _) => BeginRenameSection(sec);
-        var customize = new MenuItem { Header = "Customize section…" };
-        customize.Click += async (_, _) =>
+        var sec = (e.Source as StyledElement)?.DataContext as Section;
+        if (sec is not null && Vm is { } vm) vm.SelectedSection = sec;
+        var items = SectionsMenuItems(sec);
+        if (items.Count > 0) OpenMenu(e, items.ToArray());
+    }
+
+    private static MenuItem Act(string header, System.Action onClick, bool enabled = true)
+    {
+        var m = new MenuItem { Header = header, IsEnabled = enabled };
+        m.Click += (_, _) => onClick();
+        return m;
+    }
+
+    private List<Control> PagesMenuItems(Models.Page? pg)
+    {
+        var items = new List<Control>();
+        if (Vm is not { SelectedSection: { } sec } vm) return items;
+        if (pg is null)
         {
-            if (Vm is not { } v || Window is not { } w) return;
-            await new CustomizeSheetWindow(v, sec).ShowDialog(w);
+            items.Add(Act("New page", () => vm.AddPageCommand.Execute(null)));
+            items.Add(Act("Open a PDF as a page…", async () => await OpenPdfAsPage()));
+            return items;
+        }
+        int i = sec.Pages.IndexOf(pg);
+        items.Add(Act("New page", () => vm.NewPageAfter(pg)));
+        items.Add(Act("New sub-page", () => vm.NewSubPage(pg), PageTree.CanAddSubPage(sec.Pages, i)));
+        items.Add(Act("Make sub-page", () => vm.MakeSubPage(pg), PageTree.CanIndent(sec.Pages, i)));
+        items.Add(Act("Move up a level", () => vm.MoveUpALevel(pg), PageTree.CanOutdent(sec.Pages, i)));
+        items.Add(new Separator());
+        items.Add(Act("Rename", () => BeginRenamePage(pg)));
+        items.Add(Act("Customize page…", async () =>
+        {
+            if (Window is not { } w) return;
+            await new CustomizeSheetWindow(vm, pg).ShowDialog(w);
+            RefreshAfterStyleDialog(pg);
+        }));
+        items.Add(Act("Export page…", async () => await ExportPageAsync(pg)));
+        string extra = pg.HasSubPages ? " Its sub-pages stay and move up a level." : "";
+        items.Add(Act("Delete page", () => ConfirmThenDelete(
+            "Delete this page?",
+            $"“{Label(pg.Title)}” will be permanently deleted.{extra} This can't be undone.",
+            vm.ConfirmDeletePage,
+            () => CollapseThenDelete(PagesList.ContainerFromItem(pg) as Control, () => vm.DeletePageCommand.Execute(pg)))));
+        return items;
+    }
+
+    private List<Control> SectionsMenuItems(Section? sec)
+    {
+        var items = new List<Control>();
+        if (Vm is not { } vm) return items;
+        items.Add(Act("New section", () => vm.AddSectionCommand.Execute(null)));
+        if (sec is null)
+        {
+            items.Add(Act("Open a PDF as a section…", async () => await OpenPdfAsSection()));
+            return items;
+        }
+        items.Add(new Separator());
+        items.Add(Act("Rename", () => BeginRenameSection(sec)));
+        items.Add(Act("Customize section…", async () =>
+        {
+            if (Window is not { } w) return;
+            await new CustomizeSheetWindow(vm, sec).ShowDialog(w);
             RefreshAfterStyleDialog(null);
-        };
-        var delete = new MenuItem { Header = "Delete section" };
-        delete.Click += (_, _) => ConfirmThenDelete(
+        }));
+        items.Add(Act("Delete section", () => ConfirmThenDelete(
             "Delete this section?",
             $"“{Label(sec.Name)}” and all its pages will be permanently deleted. This can't be undone.",
-            Vm?.ConfirmDeleteSection ?? true,
-            () => CollapseThenDelete(SectionsList.ContainerFromItem(sec) as Control, () => Vm?.DeleteSectionCommand.Execute(sec)));
-        OpenMenu(e, rename, customize, delete);
+            vm.ConfirmDeleteSection,
+            () => CollapseThenDelete(SectionsList.ContainerFromItem(sec) as Control, () => vm.DeleteSectionCommand.Execute(sec)))));
+        return items;
+    }
+
+    private List<Control> NotebookMenuItems(Notebook? nb)
+    {
+        var items = new List<Control> { Act("New notebook", () => OpenNotebookWizard()) };
+        if (nb is null || Vm is not { } vm) return items;
+        items.Add(new Separator());
+        items.Add(CustomizeMenuItem(nb));
+        items.Add(PaperTintMenu(nb));
+        items.Add(Act("Delete notebook", () => ConfirmThenDelete(
+            "Delete this notebook?",
+            $"“{Label(nb.Name)}” and all its sections and pages will be permanently deleted. This can't be undone.",
+            vm.ConfirmDeleteNotebook,
+            () => CollapseThenDelete(NotebooksList.ContainerFromItem(nb) as Control, () => vm.DeleteNotebookCommand.Execute(nb)))));
+        return items;
+    }
+
+    private void OnHomeEmptyContextRequested(object? sender, ContextRequestedEventArgs e)
+    {
+        if (_rearranging || (e.Source as StyledElement)?.DataContext is Notebook) return;
+        OpenMenu(e, Act("New notebook", () => OpenNotebookWizard()));
+    }
+
+    private void OnPageFoldClick(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is Models.Page pg) Vm?.ToggleFold(pg);
+        e.Handled = true;
     }
 
     private MenuItem CustomizeMenuItem(Notebook nb)
@@ -1574,15 +1713,9 @@ public partial class MainView : UserControl
 
     private void OnNotebooksContextRequested(object? sender, ContextRequestedEventArgs e)
     {
-        if ((e.Source as StyledElement)?.DataContext is not Notebook nb) return;
-        if (Vm is { } vm) vm.SelectedNotebook = nb;
-        var delete = new MenuItem { Header = "Delete notebook" };
-        delete.Click += (_, _) => ConfirmThenDelete(
-            "Delete this notebook?",
-            $"“{Label(nb.Name)}” and all its sections and pages will be permanently deleted. This can't be undone.",
-            Vm?.ConfirmDeleteNotebook ?? true,
-            () => CollapseThenDelete(NotebooksList.ContainerFromItem(nb) as Control, () => Vm?.DeleteNotebookCommand.Execute(nb)));
-        OpenMenu(e, CustomizeMenuItem(nb), PaperTintMenu(nb), delete);
+        var nb = (e.Source as StyledElement)?.DataContext as Notebook;
+        if (nb is not null && Vm is { } vm) vm.SelectedNotebook = nb;
+        OpenMenu(e, NotebookMenuItems(nb).ToArray());
     }
 
     private void OnNotebookNameContextRequested(object? sender, ContextRequestedEventArgs e)
@@ -1599,30 +1732,10 @@ public partial class MainView : UserControl
 
     private void OnPagesContextRequested(object? sender, ContextRequestedEventArgs e)
     {
-        if ((e.Source as StyledElement)?.DataContext is not Models.Page pg) return;
-        if (Vm is { } vm) vm.SelectedPage = pg;
-
-        var rename = new MenuItem { Header = "Rename" };
-        rename.Click += (_, _) => BeginRenamePage(pg);
-
-        var customize = new MenuItem { Header = "Customize page…" };
-        customize.Click += async (_, _) =>
-        {
-            if (Vm is not { } v || Window is not { } w) return;
-            await new CustomizeSheetWindow(v, pg).ShowDialog(w);
-            RefreshAfterStyleDialog(pg);
-        };
-
-        var export = new MenuItem { Header = "Export page…" };
-        export.Click += async (_, _) => await ExportPageAsync(pg);
-
-        var delete = new MenuItem { Header = "Delete page" };
-        delete.Click += (_, _) => ConfirmThenDelete(
-            "Delete this page?",
-            $"“{Label(pg.Title)}” will be permanently deleted. This can't be undone.",
-            Vm?.ConfirmDeletePage ?? true,
-            () => CollapseThenDelete(PagesList.ContainerFromItem(pg) as Control, () => Vm?.DeletePageCommand.Execute(pg)));
-        OpenMenu(e, rename, customize, export, delete);
+        var pg = (e.Source as StyledElement)?.DataContext as Models.Page;
+        if (pg is not null && Vm is { } vm) vm.SelectedPage = pg;
+        var items = PagesMenuItems(pg);
+        if (items.Count > 0) OpenMenu(e, items.ToArray());
     }
 
     private void RefreshAfterStyleDialog(Models.Page? pg)
@@ -1821,10 +1934,17 @@ public partial class MainView : UserControl
         Item("Rearrange pages…", async () =>
         {
             if (Window is { } w)
-                await ReorderDialog.Show(w, "Rearrange pages",
-                    sec.Pages.Select(p => p.Title).ToList(), (f, t) => sec.Pages.Move(f, t));
+            {
+                var labels = PageTree.Groups(sec.Pages).Select(g =>
+                {
+                    int subs = g.End - g.Start - 1;
+                    string t = sec.Pages[g.Start].Title;
+                    return subs == 0 ? t : subs == 1 ? $"{t}  (1 sub-page)" : $"{t}  ({subs} sub-pages)";
+                }).ToList();
+                await ReorderDialog.Show(w, "Rearrange pages", labels, (f, t) => PageTree.MoveGroup(sec.Pages, f, t));
+            }
             Vm.Save();
-        }, sec.Pages.Count > 1);
+        }, PageTree.Groups(sec.Pages).Count > 1);
         menu.Items.Add(new Separator());
         Item("Open a PDF as a page…", async () => await OpenPdfAsPage());
         MenuFx.Attach(menu);
@@ -1849,6 +1969,7 @@ public partial class MainView : UserControl
         if (await PickAndImportPdf() is not { } rel) return;
         var pg = new Models.Page { Title = System.IO.Path.GetFileNameWithoutExtension(rel), PdfPath = rel };
         sec.Pages.Add(pg);
+        PageTree.Refresh(sec.Pages);
         vm.SelectedPage = pg;
         vm.Save();
     }
@@ -2003,7 +2124,7 @@ public partial class MainView : UserControl
 
     private static string Label(string? s) => string.IsNullOrWhiteSpace(s) ? "Untitled" : s;
 
-    private static void OpenMenu(ContextRequestedEventArgs e, params MenuItem[] items)
+    private static void OpenMenu(ContextRequestedEventArgs e, params Control[] items)
     {
         var menu = new ContextMenu();
         foreach (var i in items) menu.Items.Add(i);

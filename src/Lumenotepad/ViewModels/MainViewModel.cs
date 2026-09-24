@@ -118,6 +118,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double _paragraphSpacingScale = 1.0;
     [ObservableProperty] private double _indentScale = 1.0;
     [ObservableProperty] private bool _smartLists = true;
+    [ObservableProperty] private bool _autoCapitalize = true;
+    [ObservableProperty] private bool _keepPickedFont = true;
+    [ObservableProperty] private string? _keptFont;
     [ObservableProperty] private string _pageGrid = "None";
     [ObservableProperty] private bool _gridSnap;
     [ObservableProperty] private string? _backupFolder;
@@ -130,6 +133,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _doubleClickCreate;
     [ObservableProperty] private bool _roundedPdfCorners = true;
     [ObservableProperty] private string _pdfHighlightMode = "SelectText";
+    [ObservableProperty] private string _buttonPlacement = "TopLeft";
 
     [ObservableProperty] private int _palettePrefsVersion;
 
@@ -270,6 +274,9 @@ public partial class MainViewModel : ObservableObject
             ParagraphSpacingScale = _settings.ParagraphSpacingScale;
             IndentScale = _settings.IndentScale;
             SmartLists = _settings.SmartLists;
+            AutoCapitalize = _settings.AutoCapitalize;
+            KeepPickedFont = _settings.KeepPickedFont;
+            KeptFont = _settings.KeptFont;
             PageGrid = _settings.PageGrid;
             GridSnap = _settings.GridSnap;
             BackupFolder = _settings.BackupFolder;
@@ -282,8 +289,10 @@ public partial class MainViewModel : ObservableObject
             DoubleClickCreate = _settings.DoubleClickCreate;
             RoundedPdfCorners = _settings.RoundedPdfCorners;
             PdfHighlightMode = _settings.PdfHighlightMode;
+            ButtonPlacement = _settings.ButtonPlacement;
         }
         _workspace = store.LoadOrSeed();
+        foreach (var loaded in _workspace.Notebooks.SelectMany(n => n.Sections)) PageTree.Normalize(loaded.Pages);
 
         var lastPageId = _settings is { LaunchTarget: "LastPage" } ? _settings.LastPageId : null;
         SelectedNotebook = Notebooks.FirstOrDefault();
@@ -528,6 +537,7 @@ public partial class MainViewModel : ObservableObject
                     }
             }
         }
+        foreach (var regrouped in Notebooks.SelectMany(n => n.Sections)) PageTree.Normalize(regrouped.Pages);
         SelectedSection = SelectedNotebook?.Sections.FirstOrDefault();
         SelectedPage = SelectedSection?.Pages.FirstOrDefault();
     }
@@ -774,6 +784,27 @@ public partial class MainViewModel : ObservableObject
         _settings.Save(_settingsDir);
     }
 
+    partial void OnAutoCapitalizeChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.AutoCapitalize = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnKeepPickedFontChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.KeepPickedFont = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnKeptFontChanged(string? value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.KeptFont = value;
+        _settings.Save(_settingsDir);
+    }
+
     partial void OnPageGridChanged(string value)
     {
         if (_settings is null || _settingsDir is null) return;
@@ -848,6 +879,13 @@ public partial class MainViewModel : ObservableObject
     {
         if (_settings is null || _settingsDir is null) return;
         _settings.RoundedPdfCorners = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnButtonPlacementChanged(string value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.ButtonPlacement = value;
         _settings.Save(_settingsDir);
     }
 
@@ -996,12 +1034,14 @@ public partial class MainViewModel : ObservableObject
         EditorFont = d.EditorFont; EditorFontSize = d.EditorFontSize;
         LineSpacingScale = d.LineSpacingScale; ParagraphSpacingScale = d.ParagraphSpacingScale;
         IndentScale = d.IndentScale; SmartLists = d.SmartLists;
+        AutoCapitalize = d.AutoCapitalize; KeepPickedFont = d.KeepPickedFont; KeptFont = d.KeptFont;
         PageGrid = d.PageGrid; GridSnap = d.GridSnap;
         BackupFolder = d.BackupFolder; BackupEveryDays = d.BackupEveryDays; BackupKeep = d.BackupKeep;
         CloseToTray = d.CloseToTray; MinimizeToTray = d.MinimizeToTray; SummonHotkey = d.SummonHotkey;
         PagesPanelWidth = d.PagesPanelWidth; DoubleClickCreate = d.DoubleClickCreate;
         RoundedPdfCorners = d.RoundedPdfCorners;
         PdfHighlightMode = d.PdfHighlightMode;
+        ButtonPlacement = d.ButtonPlacement;
         if (_settings is not null && _settingsDir is not null && _settings.BulletColors.Count > 0)
         {
             _settings.BulletColors.Clear();
@@ -1426,6 +1466,7 @@ public partial class MainViewModel : ObservableObject
         if (SelectedSection is not { } sec) return;
         var pg = new Page { Title = "Untitled page" };
         sec.Pages.Add(pg);
+        PageTree.Refresh(sec.Pages);
 
         StampPageStyle(pg);
         SelectedPage = pg;
@@ -1465,8 +1506,58 @@ public partial class MainViewModel : ObservableObject
         if (pg is null || SelectedSection is not { } sec) return;
         ForgetPageDoc(pg, deleteFile: true);
         int idx = sec.Pages.IndexOf(pg);
-        sec.Pages.Remove(pg);
+        PageTree.RemovePromoting(sec.Pages, idx);
         SelectedPage = sec.Pages.ElementAtOrDefault(Math.Max(0, idx - 1));
+        Save();
+    }
+
+    public void RefreshPageTree()
+    {
+        if (SelectedSection is { } sec) PageTree.Refresh(sec.Pages);
+    }
+
+    private void AddAt(Func<IList<Page>, int, Page, int> insert, Page anchor)
+    {
+        var sec = SelectedSection!;
+        var page = new Page { Title = "Untitled page" };
+        insert(sec.Pages, sec.Pages.IndexOf(anchor), page);
+        StampPageStyle(page);
+        SelectedPage = page;
+        Save();
+    }
+
+    public void NewPageAfter(Page pg)
+    {
+        if (SelectedSection is not { } sec || !sec.Pages.Contains(pg)) return;
+        AddAt(PageTree.InsertAfter, pg);
+    }
+
+    public void NewSubPage(Page pg)
+    {
+        if (SelectedSection is not { } sec || !PageTree.CanAddSubPage(sec.Pages, sec.Pages.IndexOf(pg))) return;
+        AddAt(PageTree.InsertSubPage, pg);
+    }
+
+    public void MakeSubPage(Page pg)
+    {
+        if (SelectedSection is not { } sec) return;
+        PageTree.Indent(sec.Pages, sec.Pages.IndexOf(pg));
+        Save();
+    }
+
+    public void MoveUpALevel(Page pg)
+    {
+        if (SelectedSection is not { } sec) return;
+        PageTree.Outdent(sec.Pages, sec.Pages.IndexOf(pg));
+        Save();
+    }
+
+    public void ToggleFold(Page pg)
+    {
+        if (SelectedSection is not { } sec) return;
+        pg.Collapsed = !pg.Collapsed;
+        PageTree.Refresh(sec.Pages);
+        if (SelectedPage is { IsFoldedAway: true } sel) SelectedPage = PageTree.VisibleAncestor(sec.Pages, sel);
         Save();
     }
 

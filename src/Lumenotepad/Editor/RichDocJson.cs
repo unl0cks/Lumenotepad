@@ -36,6 +36,7 @@ public static class RichDocJson
         [JsonPropertyName("al")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Al { get; set; }
         [JsonPropertyName("ps")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Ps { get; set; }
         [JsonPropertyName("fn")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Fn { get; set; }
+        [JsonPropertyName("mk")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public RunDto? Mk { get; set; }
     }
 
     private sealed class DocDto
@@ -55,6 +56,7 @@ public static class RichDocJson
             Tag = p.Tag,
             Nb = p.NumBold, Ni = p.NumItalic, Nu = p.NumUnderline, Ns = p.NumStrike,
             Al = (int)p.Align, Ps = (int)p.Style, Fn = p.Footnote,
+            Mk = p.Runs.Count == 0 && p.Mark is { } m ? MarkDto(m) : null,
             Runs = p.Runs.Select(r => new RunDto
             {
                 T = r.Text, B = r.Bold, I = r.Italic, U = r.Underline, S = r.Strike,
@@ -62,6 +64,15 @@ public static class RichDocJson
                 Bl = (int)r.Baseline, Lnk = r.Link,
             }).ToList(),
         }).ToList();
+
+    private static RunDto MarkDto(RunFormat f) => new()
+    {
+        B = f.Bold, I = f.Italic, U = f.Underline, S = f.Strike, Hl = f.Highlight, C = f.Color,
+        Fs = f.Size, F = f.Font, Bl = (int)f.Baseline,
+    };
+
+    private static RunFormat MarkFormat(RunDto d) =>
+        new(d.B, d.I, d.U, d.S, d.Hl, d.C, d.Fs, d.F, (Baseline)d.Bl, null);
 
     internal static RichDocument FromDtos(List<ParaDto>? paras)
     {
@@ -84,6 +95,7 @@ public static class RichDocJson
                     Highlight = r.Hl, Color = r.C, Size = r.Fs, Font = r.F,
                     Baseline = (Baseline)r.Bl, Link = r.Lnk,
                 });
+            if (para.Runs.Count == 0 && p.Mk is { } mk) para.Mark = MarkFormat(mk);
             doc.Paragraphs.Add(para);
         }
         if (doc.Paragraphs.Count == 0) doc.Paragraphs.Add(new Paragraph());

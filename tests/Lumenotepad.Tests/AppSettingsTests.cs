@@ -362,4 +362,36 @@ public class AppSettingsTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void TypingSettings_haveTheirDefaults_andRoundTrip()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            var d = new AppSettings();
+            Assert.True(d.AutoCapitalize);
+            Assert.True(d.KeepPickedFont);
+            Assert.Null(d.KeptFont);
+            new AppSettings { AutoCapitalize = false, KeepPickedFont = false, KeptFont = "Caveat" }.Save(dir);
+            var l = AppSettings.Load(dir);
+            Assert.False(l.AutoCapitalize);
+            Assert.False(l.KeepPickedFont);
+            Assert.Equal("Caveat", l.KeptFont);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void ButtonPlacement_defaultsToTopLeft_andRoundTrips()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            Assert.Equal("TopLeft", new AppSettings().ButtonPlacement);
+            new AppSettings { ButtonPlacement = "BottomLeft" }.Save(dir);
+            Assert.Equal("BottomLeft", AppSettings.Load(dir).ButtonPlacement);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }
