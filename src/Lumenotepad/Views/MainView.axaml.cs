@@ -1056,20 +1056,39 @@ public partial class MainView : UserControl
         pagesBtn.Children.Add(PagesToggle);
         (Hidden(prefs) ? BubbleHost : prefs).Children.Add(PrefsBtn);
 
+        foreach (var b in new[] { HomeBtn, RailToggle, PagesToggle, PrefsBtn })
+        {
+            var host = b.Parent;
+            var (size, font) =
+                ReferenceEquals(host, RailTopHost) || ReferenceEquals(host, RailBottomHost) ? (40.0, 16.0)
+                : ReferenceEquals(host, PagesHeaderHost) ? (26.0, 13.0)
+                : ReferenceEquals(host, BubbleHost) ? (32.0, 14.0)
+                : (34.0, 15.0);
+            b.Width = size;
+            b.Height = size;
+            b.FontSize = font;
+        }
+        RailTopDivider.IsVisible = RailTopHost.Children.Count > 0;
+        RailBottomDivider.IsVisible = RailBottomHost.Children.Count > 0;
+
         BubbleRailBtn.IsVisible = !rail;
         BubblePagesBtn.IsVisible = !pages;
+        BubbleDivider.IsVisible = ReferenceEquals(HomeBtn.Parent, BubbleHost) || ReferenceEquals(PrefsBtn.Parent, BubbleHost);
         bool show = !rail || !pages;
-        if (show && !PanelBubble.IsVisible)
+        if (show && !_bubbleShown)
         {
+            _bubbleShown = true;
             PanelBubble.IsVisible = true;
             Motion.RiseIn(PanelBubble);
         }
-        else if (!show && PanelBubble.IsVisible)
-            Motion.FadeOut(PanelBubble, onDone: () =>
-            {
-                if (Vm is { IsRailVisible: true, IsPagesVisible: true }) PanelBubble.IsVisible = false;
-            });
+        else if (!show && _bubbleShown)
+        {
+            _bubbleShown = false;
+            Motion.FadeOut(PanelBubble, onDone: () => { if (!_bubbleShown) PanelBubble.IsVisible = false; });
+        }
     }
+
+    private bool _bubbleShown;
 
     private void ApplyTypingPrefs()
     {
