@@ -410,7 +410,9 @@ public sealed class RichTextEditor : Control
     private RunFormat TypingFormat()
     {
         if (_hasPending) return _pending;
-        return TypingRules.Resolve(_doc.FormatAt(_caret), _doc.Paragraphs[_caret.Para].Runs.Count == 0,
+        var at = _caret;
+        _doc.Clamp(ref at);
+        return TypingRules.Resolve(_doc.FormatAt(at), _doc.Paragraphs[at.Para].Runs.Count == 0,
             KeepPickedFontPref, KeptFontPref);
     }
 
@@ -673,8 +675,10 @@ public sealed class RichTextEditor : Control
         if (HasSelection) DeleteSelection();
 
         string? autoCapFrom = null;
+        var here = _caret;
+        _doc.Clamp(ref here);
         if (AutoCapitalizePref && text.Length == 1 && char.IsLower(text[0])
-            && TypingRules.StartsSentence(_doc.Paragraphs[_caret.Para].Text[.._caret.Off]))
+            && TypingRules.StartsSentence(_doc.Paragraphs[here.Para].Text[..here.Off]))
         {
             autoCapFrom = text;
             text = char.ToUpper(text[0]).ToString();
