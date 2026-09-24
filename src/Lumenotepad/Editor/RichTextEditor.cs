@@ -400,6 +400,23 @@ public sealed class RichTextEditor : Control
 
     public static bool SmartListsPref = true;
 
+    public static bool AutoCapitalizePref = true;
+    public static bool KeepPickedFontPref = true;
+    public static string? KeptFontPref;
+    public static event Action<string?>? FontKept;
+
+    private (DocPos At, string Lower)? _autoCap;
+
+    private RunFormat TypingFormat()
+    {
+        if (_hasPending) return _pending;
+        return TypingRules.Resolve(_doc.FormatAt(_caret), _doc.Paragraphs[_caret.Para].Runs.Count == 0,
+            KeepPickedFontPref, KeptFontPref);
+    }
+
+    private static bool IsModifierKey(Key k) => k is Key.LeftCtrl or Key.RightCtrl or Key.LeftShift or Key.RightShift
+        or Key.LeftAlt or Key.RightAlt or Key.LWin or Key.RWin;
+
     public static string? SmartListKind(string beforeCaret) => beforeCaret switch
     {
         "1." => "num",
@@ -655,9 +672,17 @@ public sealed class RichTextEditor : Control
         PushUndo(typing: !HasSelection);
         if (HasSelection) DeleteSelection();
 
-        var fmt = _hasPending ? _pending : _doc.FormatAt(_caret);
+        string? autoCapFrom = null;
+        if (AutoCapitalizePref && text.Length == 1 && char.IsLower(text[0])
+            && TypingRules.StartsSentence(_doc.Paragraphs[_caret.Para].Text[.._caret.Off]))
+        {
+            autoCapFrom = text;
+            text = char.ToUpper(text[0]).ToString();
+        }
+        var fmt = TypingFormat();
         _caret = _anchor = _doc.InsertText(_caret, text, fmt);
         _hasPending = false;
+        _autoCap = autoCapFrom is null ? null : (_caret, autoCapFrom);
 
         if (SmartListsPref && text == " " && _caret.Off >= 2)
         {
@@ -678,6 +703,8 @@ public sealed class RichTextEditor : Control
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
+        var autoCap = _autoCap;
+        if (!IsModifierKey(e.Key)) _autoCap = null;
 
         bool cmd = Services.Keymap.HasCommand(e.KeyModifiers);
         bool ctrl = OperatingSystem.IsMacOS() ? e.KeyModifiers.HasFlag(KeyModifiers.Alt) : cmd;
@@ -797,6 +824,15 @@ public sealed class RichTextEditor : Control
                 Redo(); AfterEdit(pushedUndo: false);
                 break;
             case Key.Z when cmd:
+                if (autoCap is { } ac && !HasSelection && _caret == ac.At && ac.At.Off > 0)
+                {
+                    var from = ac.At with { Off = ac.At.Off - 1 };
+                    var f = _doc.FormatAt(ac.At);
+                    _doc.DeleteRange(from, ac.At);
+                    _caret = _anchor = _doc.InsertText(from, ac.Lower, f);
+                    AfterEdit(pushedUndo: false);
+                    break;
+                }
                 Undo(); AfterEdit(pushedUndo: false);
                 break;
             case Key.Y when cmd:
@@ -837,7 +873,7 @@ public sealed class RichTextEditor : Control
         get
         {
             if (_hasPending && !HasSelection) return _pending;
-            if (!HasSelection) return _doc.FormatAt(_caret);
+            if (!HasSelection) return TypingFormat();
             var (a, b) = SelOrdered();
             var f = _doc.FormatAt(_doc.Move(a, 1));
             return f with
@@ -996,7 +1032,13 @@ public sealed class RichTextEditor : Control
 
     public void ApplySize(double? size) => ApplyValue(r => r.Size = size, f => f with { Size = size });
 
-    public void ApplyFont(string? family) => ApplyValue(r => r.Font = family, f => f with { Font = family });
+    public void ApplyFont(string? family)
+    {
+        ApplyValue(r => r.Font = family, f => f with { Font = family });
+        if (!KeepPickedFontPref) return;
+        KeptFontPref = family;
+        FontKept?.Invoke(family);
+    }
 
     public void ToggleDefaultHighlight()
     {
@@ -1025,7 +1067,8 @@ public sealed class RichTextEditor : Control
         if (string.IsNullOrEmpty(text)) return;
         PushUndo();
         if (HasSelection) DeleteSelection();
-        _caret = _anchor = _doc.InsertText(_caret, text, _doc.FormatAt(_caret));
+        _caret = _anchor = _doc.InsertText(_caret, text, TypingFormat());
+        _hasPending = false;
         AfterEdit();
     }
 
@@ -1238,6 +1281,7 @@ public sealed class RichTextEditor : Control
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
+        _autoCap = null;
         base.OnPointerPressed(e);
         var pt = e.GetPosition(this);
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
