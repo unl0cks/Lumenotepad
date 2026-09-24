@@ -54,4 +54,20 @@ public sealed partial class Page : ObservableObject
     [ObservableProperty] private int _pageStyleMode;
 
     [ObservableProperty] private string? _pdfPath;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IndentWidth))]
+    private int _level;
+
+    [ObservableProperty] private bool _collapsed;
+
+    [ObservableProperty]
+    [property: System.Text.Json.Serialization.JsonIgnore]
+    private bool _hasSubPages;
+
+    [ObservableProperty]
+    [property: System.Text.Json.Serialization.JsonIgnore]
+    private bool _isFoldedAway;
+
+    [System.Text.Json.Serialization.JsonIgnore] public double IndentWidth => Level * 14;
 }
