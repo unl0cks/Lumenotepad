@@ -116,4 +116,29 @@ public class PageTreeTests
         PageTree.Normalize(p);
         Assert.Equal("A0 B1 C0 D1", Shape(p));
     }
+
+    [Fact]
+    public void Refresh_marksLastSiblings_andWhichOuterLinesKeepRunning()
+    {
+        var p = List(("A", 0), ("a1", 1), ("x", 2), ("y", 2), ("a2", 1), ("z", 2), ("B", 0), ("b1", 1));
+        PageTree.Refresh(p);
+        Assert.False(p[1].IsLastSibling);
+        Assert.False(p[2].IsLastSibling);
+        Assert.True(p[3].IsLastSibling);
+        Assert.True(p[4].IsLastSibling);
+        Assert.True(p[5].IsLastSibling);
+        Assert.True(p[7].IsLastSibling);
+        Assert.Equal(0b10, p[2].GuideMask);
+        Assert.Equal(0b10, p[3].GuideMask);
+        Assert.Equal(0, p[5].GuideMask);
+        Assert.Equal(0, p[1].GuideMask);
+    }
+
+    [Fact]
+    public void IndentWidth_leavesRoomForTheThreadCurve()
+    {
+        Assert.Equal(0, new Page { Level = 0 }.IndentWidth);
+        Assert.Equal(24, new Page { Level = 1 }.IndentWidth);
+        Assert.Equal(48, new Page { Level = 2 }.IndentWidth);
+    }
 }
