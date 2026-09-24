@@ -521,6 +521,7 @@ public partial class MainView : UserControl
             ApplyPdfPage();
             ApplyToolbarPlacement();
             ApplyCanvasPrefs();
+            ApplyButtonPlacement();
             ApplyPaperTint();
             ApplyGlossyAccents();
             ApplyCardSize();
@@ -1034,6 +1035,42 @@ public partial class MainView : UserControl
         Services.ThemeManager.RefreshMacChildGlass();
     }
 
+    private void ApplyButtonPlacement()
+    {
+        if (Vm is not { } vm) return;
+        bool rail = vm.IsRailVisible, pages = vm.IsPagesVisible;
+        var (home, railBtn, pagesBtn, prefs) = vm.ButtonPlacement switch
+        {
+            "AllTopLeft" => (TitleNavHost, TitleNavHost, TitleNavHost, TitleNavHost),
+            "InPanels" => (RailTopHost, RailTopHost, PagesHeaderHost, RailBottomHost),
+            "BottomLeft" => (RailBottomHost, RailBottomHost, RailBottomHost, RailBottomHost),
+            _ => (TitleNavHost, TitleNavHost, TitleNavHost, TitleRightHost),
+        };
+        bool Hidden(Panel host) =>
+            (!rail && (ReferenceEquals(host, RailTopHost) || ReferenceEquals(host, RailBottomHost)))
+            || (!pages && ReferenceEquals(host, PagesHeaderHost));
+        foreach (var b in new Control[] { HomeBtn, RailToggle, PagesToggle, PrefsBtn })
+            (b.Parent as Panel)?.Children.Remove(b);
+        (Hidden(home) ? BubbleHost : home).Children.Add(HomeBtn);
+        railBtn.Children.Add(RailToggle);
+        pagesBtn.Children.Add(PagesToggle);
+        (Hidden(prefs) ? BubbleHost : prefs).Children.Add(PrefsBtn);
+
+        BubbleRailBtn.IsVisible = !rail;
+        BubblePagesBtn.IsVisible = !pages;
+        bool show = !rail || !pages;
+        if (show && !PanelBubble.IsVisible)
+        {
+            PanelBubble.IsVisible = true;
+            Motion.RiseIn(PanelBubble);
+        }
+        else if (!show && PanelBubble.IsVisible)
+            Motion.FadeOut(PanelBubble, onDone: () =>
+            {
+                if (Vm is { IsRailVisible: true, IsPagesVisible: true }) PanelBubble.IsVisible = false;
+            });
+    }
+
     private void ApplyTypingPrefs()
     {
         if (Vm is not { } vm) return;
@@ -1206,9 +1243,17 @@ public partial class MainView : UserControl
                 pvm.PaletteFor(false, FormatToolbar.BuiltInTextColors));
         }
         else if (e.PropertyName == nameof(MainViewModel.IsRailVisible))
+        {
             Motion.Reveal(RailPanel, 64, Vm?.IsRailVisible ?? true);
+            ApplyButtonPlacement();
+        }
         else if (e.PropertyName == nameof(MainViewModel.IsPagesVisible))
+        {
             Motion.Reveal(PagesPanel, Vm?.PagesPanelWidth ?? 224, Vm?.IsPagesVisible ?? true);
+            ApplyButtonPlacement();
+        }
+        else if (e.PropertyName == nameof(MainViewModel.ButtonPlacement))
+            ApplyButtonPlacement();
         else if (e.PropertyName == nameof(MainViewModel.PagesPanelWidth))
             ApplyPanels();
         else if (e.PropertyName == nameof(MainViewModel.IsHomeVisible))

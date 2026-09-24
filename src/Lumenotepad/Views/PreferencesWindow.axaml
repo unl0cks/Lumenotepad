@@ -616,6 +616,13 @@
                         </Grid>
                         <TextBlock Classes="section" Text="PANELS"/>
                         <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Classes="label" Text="Button placement"/>
+                                <Border Classes="qmark" ToolTip.Tip="Where the All notebooks, Show notebooks, Show pages and Preferences buttons live. When a panel is hidden, a small bubble in the bottom-left corner brings it back."><TextBlock/></Border>
+                            </StackPanel>
+                            <ComboBox x:Name="ButtonPlacementBox" Grid.Column="1" Width="150"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Classes="label" Text="Show notebooks rail"/>

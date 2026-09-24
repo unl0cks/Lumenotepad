@@ -71,6 +71,7 @@ public sealed class AppSettings
     public bool DoubleClickCreate { get; set; }
     public bool RoundedPdfCorners { get; set; } = true;
     public string PdfHighlightMode { get; set; } = "SelectText";
+    public string ButtonPlacement { get; set; } = "TopLeft";
     public string ToolbarPosition { get; set; } = "Top";
     public string ToolbarScope { get; set; } = "Window";
     public bool ResizablePages { get; set; } = true;

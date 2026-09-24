@@ -22,6 +22,8 @@ namespace Lumenotepad.Views;
 
 public partial class PreferencesWindow : Window
 {
+    private static readonly string[] PlacementKeys = { "TopLeft", "AllTopLeft", "InPanels", "BottomLeft" };
+
     private MainViewModel? Vm => DataContext as MainViewModel;
 
     private readonly Dictionary<string, Control> _panels;
@@ -78,6 +80,12 @@ public partial class PreferencesWindow : Window
         };
 
         ToolbarPosBox.ItemsSource = new[] { "Top", "Left", "Right", "Bottom" };
+        ButtonPlacementBox.ItemsSource = new[] { "Top left", "All top left", "Inside the panels", "Bottom left" };
+        ButtonPlacementBox.SelectionChanged += (_, _) =>
+        {
+            if (Vm is { } vm && ButtonPlacementBox.SelectedIndex is >= 0 and < 4)
+                vm.ButtonPlacement = PlacementKeys[ButtonPlacementBox.SelectedIndex];
+        };
         ToolbarScopeBox.ItemsSource = new[] { "Window", "Page" };
         ToolbarPosBox.SelectionChanged += (_, _) =>
         {
@@ -404,7 +412,7 @@ public partial class PreferencesWindow : Window
         WirePaletteEditor(HighlightPaletteChips, HighlightPaletteHexBox, HighlightPaletteReset, highlight: true);
 
         foreach (var combo in new[] { LaunchTargetBox, MotionSpeedBox, CardSizeBox, DateFormatBox,
-                                      EditorFontBox, ToolbarPosBox, ToolbarScopeBox, PageGridBox, TidyLayoutBox,
+                                      EditorFontBox, ToolbarPosBox, ToolbarScopeBox, PageGridBox, TidyLayoutBox, ButtonPlacementBox,
                                       BackupEveryBox, NumBoldBox, NumItalicBox, NumUnderlineBox, NumStrikeBox })
             MenuFx.AttachDropDown(combo);
 
@@ -1252,6 +1260,7 @@ public partial class PreferencesWindow : Window
         SyncThemeRows(animate: false);
         ThemeList.SelectedItem = vm.Theme;
         ToolbarPosBox.SelectedItem = vm.ToolbarPosition;
+        ButtonPlacementBox.SelectedIndex = System.Math.Max(0, System.Array.IndexOf(PlacementKeys, vm.ButtonPlacement));
         ToolbarScopeBox.SelectedItem = vm.ToolbarScope;
         AccentHexBox.Text = vm.CustomAccent ?? "";
         BuildAccentSwatches();

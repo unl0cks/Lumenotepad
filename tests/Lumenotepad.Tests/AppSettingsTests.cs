@@ -381,4 +381,17 @@ public class AppSettingsTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void ButtonPlacement_defaultsToTopLeft_andRoundTrips()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            Assert.Equal("TopLeft", new AppSettings().ButtonPlacement);
+            new AppSettings { ButtonPlacement = "BottomLeft" }.Save(dir);
+            Assert.Equal("BottomLeft", AppSettings.Load(dir).ButtonPlacement);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }

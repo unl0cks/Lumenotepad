@@ -133,6 +133,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _doubleClickCreate;
     [ObservableProperty] private bool _roundedPdfCorners = true;
     [ObservableProperty] private string _pdfHighlightMode = "SelectText";
+    [ObservableProperty] private string _buttonPlacement = "TopLeft";
 
     [ObservableProperty] private int _palettePrefsVersion;
 
@@ -288,6 +289,7 @@ public partial class MainViewModel : ObservableObject
             DoubleClickCreate = _settings.DoubleClickCreate;
             RoundedPdfCorners = _settings.RoundedPdfCorners;
             PdfHighlightMode = _settings.PdfHighlightMode;
+            ButtonPlacement = _settings.ButtonPlacement;
         }
         _workspace = store.LoadOrSeed();
         foreach (var loaded in _workspace.Notebooks.SelectMany(n => n.Sections)) PageTree.Normalize(loaded.Pages);
@@ -880,6 +882,13 @@ public partial class MainViewModel : ObservableObject
         _settings.Save(_settingsDir);
     }
 
+    partial void OnButtonPlacementChanged(string value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.ButtonPlacement = value;
+        _settings.Save(_settingsDir);
+    }
+
     partial void OnPdfHighlightModeChanged(string value)
     {
         if (_settings is null || _settingsDir is null) return;
@@ -1032,6 +1041,7 @@ public partial class MainViewModel : ObservableObject
         PagesPanelWidth = d.PagesPanelWidth; DoubleClickCreate = d.DoubleClickCreate;
         RoundedPdfCorners = d.RoundedPdfCorners;
         PdfHighlightMode = d.PdfHighlightMode;
+        ButtonPlacement = d.ButtonPlacement;
         if (_settings is not null && _settingsDir is not null && _settings.BulletColors.Count > 0)
         {
             _settings.BulletColors.Clear();
