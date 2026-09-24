@@ -113,6 +113,21 @@ public static class PageTree
             p.IsFoldedAway = foldLevel is not null;
             p.HasSubPages = i + 1 < pages.Count && pages[i + 1].Level > p.Level;
             if (foldLevel is null && p.Collapsed && p.HasSubPages) foldLevel = p.Level;
+            int mask = 0;
+            bool last = true;
+            for (int k = 1; k <= p.Level; k++)
+            {
+                bool more = false;
+                for (int j = i + 1; j < pages.Count; j++)
+                {
+                    if (pages[j].Level < k) break;
+                    if (pages[j].Level == k) { more = true; break; }
+                }
+                if (k == p.Level) last = !more;
+                else if (more) mask |= 1 << k;
+            }
+            p.IsLastSibling = last;
+            p.GuideMask = mask;
         }
     }
 

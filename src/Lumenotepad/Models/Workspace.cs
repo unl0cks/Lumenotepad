@@ -69,5 +69,13 @@ public sealed partial class Page : ObservableObject
     [property: System.Text.Json.Serialization.JsonIgnore]
     private bool _isFoldedAway;
 
-    [System.Text.Json.Serialization.JsonIgnore] public double IndentWidth => Level * 14;
+    [ObservableProperty]
+    [property: System.Text.Json.Serialization.JsonIgnore]
+    private bool _isLastSibling;
+
+    [ObservableProperty]
+    [property: System.Text.Json.Serialization.JsonIgnore]
+    private int _guideMask;
+
+    [System.Text.Json.Serialization.JsonIgnore] public double IndentWidth => Level * 24;
 }

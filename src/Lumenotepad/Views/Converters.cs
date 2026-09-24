@@ -17,6 +17,9 @@ public static class Converters
         return string.Concat(words[0][0], words[1][0]).ToUpperInvariant();
     });
 
+    public static readonly IValueConverter IndentMargin =
+        new FuncValueConverter<double, Avalonia.Thickness>(w => new Avalonia.Thickness(7 + w, 3, 7, 3));
+
     public static readonly IValueConverter HexBrush = new FuncValueConverter<string?, IBrush>(hex =>
         new SolidColorBrush(SafeParse(hex)));
 

@@ -64,7 +64,8 @@
         </Style>
         <Style Selector="ListBox.pages ListBoxItem">
             <Setter Property="Padding" Value="9,6"/>
-            <Setter Property="Margin" Value="7,3"/>
+            <Setter Property="Margin" Value="{ReflectionBinding IndentWidth, Converter={x:Static v:Converters.IndentMargin}}"/>
+            <Setter Property="ClipToBounds" Value="False"/>
             <Setter Property="CornerRadius" Value="8"/>
             <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
         </Style>
@@ -476,20 +477,24 @@
                              SelectedItem="{Binding SelectedPage, Mode=TwoWay}">
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="models:Page">
-                                <Grid ColumnDefinitions="Auto,*,Auto">
-                                    <Border Width="{Binding IndentWidth}"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="12.5"
-                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                                    <Button Grid.Column="2" Classes="fold" Click="OnPageFoldClick"
-                                            IsVisible="{Binding HasSubPages}" ToolTip.Tip="Show or hide sub-pages">
-                                        <Panel>
-                                            <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}"
-                                                       RenderTransform="rotate(-90deg)" IsVisible="{Binding Collapsed}"/>
-                                            <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}"
-                                                       IsVisible="{Binding !Collapsed}"/>
-                                        </Panel>
-                                    </Button>
-                                </Grid>
+                                <Panel>
+                                    <v:ThreadGuide Level="{Binding Level}" IsLastSibling="{Binding IsLastSibling}"
+                                                   GuideMask="{Binding GuideMask}" Stroke="{DynamicResource TextMutedBrush}"
+                                                   Opacity="0.6" IsHitTestVisible="False"/>
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Text="{Binding Title}" FontSize="12.5"
+                                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                        <Button Grid.Column="1" Classes="fold" Click="OnPageFoldClick"
+                                                IsVisible="{Binding HasSubPages}" ToolTip.Tip="Show or hide sub-pages">
+                                            <Panel>
+                                                <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}"
+                                                           RenderTransform="rotate(-90deg)" IsVisible="{Binding Collapsed}"/>
+                                                <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}"
+                                                           IsVisible="{Binding !Collapsed}"/>
+                                            </Panel>
+                                        </Button>
+                                    </Grid>
+                                </Panel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
