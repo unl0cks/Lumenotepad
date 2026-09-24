@@ -68,6 +68,21 @@
             <Setter Property="CornerRadius" Value="8"/>
             <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
         </Style>
+        <Style Selector="ListBox.pages ListBoxItem">
+            <Setter Property="IsVisible" Value="{ReflectionBinding !IsFoldedAway}"/>
+        </Style>
+        <Style Selector="Button.fold">
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
         <Style Selector="ListBox.pages ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="BoxShadow" Value="{DynamicResource AccentGlowShadow}"/>
         </Style>
@@ -451,7 +466,18 @@
                              SelectedItem="{Binding SelectedPage, Mode=TwoWay}">
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="models:Page">
-                                <TextBlock Text="{Binding Title}" FontSize="12.5" TextTrimming="CharacterEllipsis"/>
+                                <Grid ColumnDefinitions="Auto,Auto,*">
+                                    <Border Width="{Binding IndentWidth}"/>
+                                    <Button Grid.Column="1" Classes="fold" Click="OnPageFoldClick"
+                                            IsVisible="{Binding HasSubPages}" ToolTip.Tip="Show or hide sub-pages">
+                                        <Panel>
+                                            <TextBlock Text="&#x25B8;" IsVisible="{Binding Collapsed}"/>
+                                            <TextBlock Text="&#x25BE;" IsVisible="{Binding !Collapsed}"/>
+                                        </Panel>
+                                    </Button>
+                                    <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="12.5"
+                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
