@@ -118,6 +118,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double _paragraphSpacingScale = 1.0;
     [ObservableProperty] private double _indentScale = 1.0;
     [ObservableProperty] private bool _smartLists = true;
+    [ObservableProperty] private bool _autoCapitalize = true;
+    [ObservableProperty] private bool _keepPickedFont = true;
+    [ObservableProperty] private string? _keptFont;
     [ObservableProperty] private string _pageGrid = "None";
     [ObservableProperty] private bool _gridSnap;
     [ObservableProperty] private string? _backupFolder;
@@ -270,6 +273,9 @@ public partial class MainViewModel : ObservableObject
             ParagraphSpacingScale = _settings.ParagraphSpacingScale;
             IndentScale = _settings.IndentScale;
             SmartLists = _settings.SmartLists;
+            AutoCapitalize = _settings.AutoCapitalize;
+            KeepPickedFont = _settings.KeepPickedFont;
+            KeptFont = _settings.KeptFont;
             PageGrid = _settings.PageGrid;
             GridSnap = _settings.GridSnap;
             BackupFolder = _settings.BackupFolder;
@@ -774,6 +780,27 @@ public partial class MainViewModel : ObservableObject
         _settings.Save(_settingsDir);
     }
 
+    partial void OnAutoCapitalizeChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.AutoCapitalize = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnKeepPickedFontChanged(bool value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.KeepPickedFont = value;
+        _settings.Save(_settingsDir);
+    }
+
+    partial void OnKeptFontChanged(string? value)
+    {
+        if (_settings is null || _settingsDir is null) return;
+        _settings.KeptFont = value;
+        _settings.Save(_settingsDir);
+    }
+
     partial void OnPageGridChanged(string value)
     {
         if (_settings is null || _settingsDir is null) return;
@@ -996,6 +1023,7 @@ public partial class MainViewModel : ObservableObject
         EditorFont = d.EditorFont; EditorFontSize = d.EditorFontSize;
         LineSpacingScale = d.LineSpacingScale; ParagraphSpacingScale = d.ParagraphSpacingScale;
         IndentScale = d.IndentScale; SmartLists = d.SmartLists;
+        AutoCapitalize = d.AutoCapitalize; KeepPickedFont = d.KeepPickedFont; KeptFont = d.KeptFont;
         PageGrid = d.PageGrid; GridSnap = d.GridSnap;
         BackupFolder = d.BackupFolder; BackupEveryDays = d.BackupEveryDays; BackupKeep = d.BackupKeep;
         CloseToTray = d.CloseToTray; MinimizeToTray = d.MinimizeToTray; SummonHotkey = d.SummonHotkey;

@@ -47,6 +47,7 @@ public partial class MainView : UserControl
         }
 
         DataContextChanged += (_, _) => HookVm();
+        RichTextEditor.FontKept += f => { if (Vm is { } m && m.KeptFont != f) m.KeptFont = f; };
         PdfViewer.HighlightModeChanged += mode =>
         {
             string name = mode switch
@@ -513,6 +514,7 @@ public partial class MainView : UserControl
             _hookedVm.DocsDirtied += OnDocsDirtied;
             ApplyBulletPrefs(rebuild: false);
             ApplyEditorPrefs(rebuild: false);
+            ApplyTypingPrefs();
             SyncEditorDocument();
             ApplyPdfPage();
             ApplyToolbarPlacement();
@@ -1030,6 +1032,14 @@ public partial class MainView : UserControl
         Services.ThemeManager.RefreshMacChildGlass();
     }
 
+    private void ApplyTypingPrefs()
+    {
+        if (Vm is not { } vm) return;
+        RichTextEditor.AutoCapitalizePref = vm.AutoCapitalize;
+        RichTextEditor.KeepPickedFontPref = vm.KeepPickedFont;
+        RichTextEditor.KeptFontPref = vm.KeptFont;
+    }
+
     private void ApplyBulletPrefs(bool rebuild)
     {
         if (Vm is not { } vm) return;
@@ -1148,6 +1158,8 @@ public partial class MainView : UserControl
                  or nameof(MainViewModel.PdfHighlightMode)
                  or nameof(MainViewModel.MindmapTidyLayout))
             ApplyCanvasPrefs();
+        else if (e.PropertyName is nameof(MainViewModel.AutoCapitalize) or nameof(MainViewModel.KeepPickedFont))
+            ApplyTypingPrefs();
         else if (e.PropertyName == nameof(MainViewModel.CornerRoundness))
         {
             UpdateCanvasPlateClip();

@@ -791,6 +791,24 @@
                             </StackPanel>
                             <ComboBox x:Name="DateFormatBox" Grid.Column="1" Width="170" VerticalAlignment="Center"/>
                         </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Classes="label" Text="Capitalize the first letter of sentences"/>
+                                    <Border Classes="qmark" ToolTip.Tip="After a period, exclamation mark or question mark and a space, the next letter you type becomes a capital. Abbreviations like e.g. and etc. are left alone, and undo right away puts the small letter back."><TextBlock/></Border>
+                                </StackPanel>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoCapitalize, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Classes="label" Text="Keep the last font I pick"/>
+                                    <Border Classes="qmark" ToolTip.Tip="The font you pick in the toolbar becomes your writing font for new text boxes, new pages and empty lines, until you pick another. Text you already wrote keeps its look."><TextBlock/></Border>
+                                </StackPanel>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding KeepPickedFont, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
 
                         <TextBlock Classes="section" Text="TEXT DEFAULTS"/>
                         <Grid ColumnDefinitions="*,Auto">

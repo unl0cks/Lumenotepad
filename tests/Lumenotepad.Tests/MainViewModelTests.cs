@@ -845,4 +845,25 @@ public class MainViewModelTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void TypingSettings_persist_andResetRestoresThem()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            vm.AutoCapitalize = false;
+            vm.KeepPickedFont = false;
+            vm.KeptFont = "Yuyu";
+            var saved = AppSettings.Load(dir);
+            Assert.False(saved.AutoCapitalize);
+            Assert.Equal("Yuyu", saved.KeptFont);
+            vm.ResetSettingsToDefaults();
+            Assert.True(vm.AutoCapitalize);
+            Assert.True(vm.KeepPickedFont);
+            Assert.Null(vm.KeptFont);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }

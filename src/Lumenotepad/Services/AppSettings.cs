@@ -53,6 +53,9 @@ public sealed class AppSettings
     public double ParagraphSpacingScale { get; set; } = 1.0;
     public double IndentScale { get; set; } = 1.0;
     public bool SmartLists { get; set; } = true;
+    public bool AutoCapitalize { get; set; } = true;
+    public bool KeepPickedFont { get; set; } = true;
+    public string? KeptFont { get; set; }
     public List<string> HighlightPalette { get; set; } = new();
     public List<string> TextPalette { get; set; } = new();
     public string PageGrid { get; set; } = "None";
