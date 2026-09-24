@@ -290,6 +290,7 @@ public partial class MainViewModel : ObservableObject
             PdfHighlightMode = _settings.PdfHighlightMode;
         }
         _workspace = store.LoadOrSeed();
+        foreach (var loaded in _workspace.Notebooks.SelectMany(n => n.Sections)) PageTree.Normalize(loaded.Pages);
 
         var lastPageId = _settings is { LaunchTarget: "LastPage" } ? _settings.LastPageId : null;
         SelectedNotebook = Notebooks.FirstOrDefault();
@@ -534,6 +535,7 @@ public partial class MainViewModel : ObservableObject
                     }
             }
         }
+        foreach (var regrouped in Notebooks.SelectMany(n => n.Sections)) PageTree.Normalize(regrouped.Pages);
         SelectedSection = SelectedNotebook?.Sections.FirstOrDefault();
         SelectedPage = SelectedSection?.Pages.FirstOrDefault();
     }
@@ -1454,6 +1456,7 @@ public partial class MainViewModel : ObservableObject
         if (SelectedSection is not { } sec) return;
         var pg = new Page { Title = "Untitled page" };
         sec.Pages.Add(pg);
+        PageTree.Refresh(sec.Pages);
 
         StampPageStyle(pg);
         SelectedPage = pg;
@@ -1493,8 +1496,58 @@ public partial class MainViewModel : ObservableObject
         if (pg is null || SelectedSection is not { } sec) return;
         ForgetPageDoc(pg, deleteFile: true);
         int idx = sec.Pages.IndexOf(pg);
-        sec.Pages.Remove(pg);
+        PageTree.RemovePromoting(sec.Pages, idx);
         SelectedPage = sec.Pages.ElementAtOrDefault(Math.Max(0, idx - 1));
+        Save();
+    }
+
+    public void RefreshPageTree()
+    {
+        if (SelectedSection is { } sec) PageTree.Refresh(sec.Pages);
+    }
+
+    private void AddAt(Func<IList<Page>, int, Page, int> insert, Page anchor)
+    {
+        var sec = SelectedSection!;
+        var page = new Page { Title = "Untitled page" };
+        insert(sec.Pages, sec.Pages.IndexOf(anchor), page);
+        StampPageStyle(page);
+        SelectedPage = page;
+        Save();
+    }
+
+    public void NewPageAfter(Page pg)
+    {
+        if (SelectedSection is not { } sec || !sec.Pages.Contains(pg)) return;
+        AddAt(PageTree.InsertAfter, pg);
+    }
+
+    public void NewSubPage(Page pg)
+    {
+        if (SelectedSection is not { } sec || !PageTree.CanAddSubPage(sec.Pages, sec.Pages.IndexOf(pg))) return;
+        AddAt(PageTree.InsertSubPage, pg);
+    }
+
+    public void MakeSubPage(Page pg)
+    {
+        if (SelectedSection is not { } sec) return;
+        PageTree.Indent(sec.Pages, sec.Pages.IndexOf(pg));
+        Save();
+    }
+
+    public void MoveUpALevel(Page pg)
+    {
+        if (SelectedSection is not { } sec) return;
+        PageTree.Outdent(sec.Pages, sec.Pages.IndexOf(pg));
+        Save();
+    }
+
+    public void ToggleFold(Page pg)
+    {
+        if (SelectedSection is not { } sec) return;
+        pg.Collapsed = !pg.Collapsed;
+        PageTree.Refresh(sec.Pages);
+        if (SelectedPage is { IsFoldedAway: true } sel) SelectedPage = PageTree.VisibleAncestor(sec.Pages, sel);
         Save();
     }
 

@@ -866,4 +866,60 @@ public class MainViewModelTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void SubPages_areCreated_indented_folded_andSurviveARestart()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            var sec = vm.SelectedSection!;
+            var parent = sec.Pages[0];
+            vm.NewSubPage(parent);
+            var child = vm.SelectedPage!;
+            Assert.Equal(1, child.Level);
+            Assert.Equal(sec.Pages.IndexOf(parent) + 1, sec.Pages.IndexOf(child));
+            Assert.True(parent.HasSubPages);
+
+            vm.NewPageAfter(parent);
+            var sibling = vm.SelectedPage!;
+            Assert.Equal(0, sibling.Level);
+            vm.MakeSubPage(sibling);
+            Assert.Equal(1, sibling.Level);
+            vm.MoveUpALevel(sibling);
+            Assert.Equal(0, sibling.Level);
+
+            vm.SelectedPage = child;
+            vm.ToggleFold(parent);
+            Assert.True(child.IsFoldedAway);
+            Assert.Same(parent, vm.SelectedPage);
+
+            var again = new MainViewModel(new WorkspaceStore(dir), dir);
+            var p2 = again.SelectedNotebook!.Sections[0].Pages;
+            Assert.Equal(1, p2[1].Level);
+            Assert.True(p2[0].Collapsed);
+            Assert.True(p2[1].IsFoldedAway);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void DeletingAParent_keepsItsSubPages()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            var sec = vm.SelectedSection!;
+            var parent = sec.Pages[0];
+            vm.NewSubPage(parent);
+            var child = vm.SelectedPage!;
+            vm.DeletePageCommand.Execute(parent);
+            Assert.DoesNotContain(parent, sec.Pages);
+            Assert.Contains(child, sec.Pages);
+            Assert.Equal(0, child.Level);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }
