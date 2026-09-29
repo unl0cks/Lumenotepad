@@ -394,4 +394,17 @@ public class AppSettingsTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void UiLayout_defaultsToClassic_andRoundTrips()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lumenotepad-test-" + Path.GetRandomFileName());
+        try
+        {
+            Assert.Equal("Classic", new AppSettings().UiLayout);
+            new AppSettings { UiLayout = "Focus" }.Save(dir);
+            Assert.Equal("Focus", AppSettings.Load(dir).UiLayout);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }

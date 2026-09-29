@@ -922,4 +922,19 @@ public class MainViewModelTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void UiLayout_persists_andResetRestoresClassic()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "lnp-vm-" + Path.GetRandomFileName());
+        try
+        {
+            var vm = new MainViewModel(new WorkspaceStore(dir), dir);
+            vm.UiLayout = "Tabs";
+            Assert.Equal("Tabs", AppSettings.Load(dir).UiLayout);
+            vm.ResetSettingsToDefaults();
+            Assert.Equal("Classic", vm.UiLayout);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }
