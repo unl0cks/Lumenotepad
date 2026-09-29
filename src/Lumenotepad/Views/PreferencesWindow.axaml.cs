@@ -81,6 +81,11 @@ public partial class PreferencesWindow : Window
 
         ToolbarPosBox.ItemsSource = new[] { "Top", "Left", "Right", "Bottom" };
         ButtonPlacementBox.ItemsSource = new[] { "Top left", "All top left", "Inside the panels", "Bottom left" };
+        LayoutTiles.SelectionChanged += (_, _) =>
+        {
+            if (Vm is { } vm && LayoutTiles.SelectedItem is ListBoxItem { Tag: string key } && vm.UiLayout != key)
+                vm.UiLayout = key;
+        };
         ButtonPlacementBox.SelectionChanged += (_, _) =>
         {
             if (Vm is { } vm && ButtonPlacementBox.SelectedIndex is >= 0 and < 4)
@@ -557,6 +562,7 @@ public partial class PreferencesWindow : Window
                 SyncThemeRows(animate: true);
         }
         else if (e.PropertyName == nameof(MainViewModel.AdvancedUnlocked)) UpdateGateVisuals();
+        else if (e.PropertyName == nameof(MainViewModel.UiLayout)) SyncLayoutRows();
         else if (e.PropertyName == nameof(MainViewModel.BulletPrefsVersion)) BuildBulletRows();
         else if (e.PropertyName == nameof(MainViewModel.ExtendedFonts))
         {
@@ -1352,6 +1358,16 @@ public partial class PreferencesWindow : Window
         }
     }
 
+    private void SyncLayoutRows()
+    {
+        bool classic = Vm?.UiLayout is null or "Classic";
+        foreach (var row in new Control[] { ButtonPlacementRow, ShowRailRow, SectionsSidebarRow })
+        {
+            if (_origVisible.ContainsKey(row)) _origVisible[row] = classic;
+            if (!_searching) row.IsVisible = classic;
+        }
+    }
+
     private void SyncFromVm()
     {
         if (Vm is not { } vm) return;
@@ -1359,6 +1375,9 @@ public partial class PreferencesWindow : Window
         ThemeList.SelectedItem = vm.Theme;
         ToolbarPosBox.SelectedItem = vm.ToolbarPosition;
         ButtonPlacementBox.SelectedIndex = System.Math.Max(0, System.Array.IndexOf(PlacementKeys, vm.ButtonPlacement));
+        LayoutTiles.SelectedItem = LayoutTiles.Items.OfType<ListBoxItem>().FirstOrDefault(i => (i.Tag as string) == vm.UiLayout)
+                                   ?? LayoutTiles.Items.OfType<ListBoxItem>().First();
+        SyncLayoutRows();
         ToolbarScopeBox.SelectedItem = vm.ToolbarScope;
         AccentHexBox.Text = vm.CustomAccent ?? "";
         BuildAccentSwatches();

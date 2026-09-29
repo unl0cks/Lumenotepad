@@ -85,6 +85,36 @@
             <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
         </Style>
+        <Style Selector="ListBox.layouttiles ListBoxItem">
+            <Setter Property="Padding" Value="8,8,8,6"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
+            <Setter Property="CornerRadius" Value="12"/>
+        </Style>
+        <Style Selector="ListBox.layouttiles ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+        </Style>
+        <Style Selector="ListBox.layouttiles ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+        </Style>
+        <Style Selector="ListBox.layouttiles Border.nav">
+            <Setter Property="Background" Value="{DynamicResource TextMutedBrush}"/>
+            <Setter Property="Opacity" Value="0.45"/>
+        </Style>
+        <Style Selector="ListBox.layouttiles Border.paper">
+            <Setter Property="Background" Value="{DynamicResource TextMutedBrush}"/>
+            <Setter Property="Opacity" Value="0.16"/>
+        </Style>
+        <Style Selector="ListBox.layouttiles ListBoxItem:selected Border.tile">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="ListBox.layouttiles ListBoxItem:selected Border.nav">
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Opacity" Value="0.7"/>
+        </Style>
+        <Style Selector="ListBox.layouttiles ListBoxItem:selected TextBlock.tilename">
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
         <Style Selector="Border.prefstab">
             <Setter Property="Padding" Value="0,2,0,6"/>
             <Setter Property="BorderThickness" Value="0,0,0,2"/>
@@ -593,15 +623,79 @@
                     </StackPanel>
 
                     <StackPanel x:Name="LayoutPanel" Spacing="6" IsVisible="False">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Classes="section" Text="LAYOUT"/>
+                            <Border Classes="qmark" Margin="6,2,0,0" ToolTip.Tip="How the window is arranged. Classic is the original. The others are simpler ways to get around the same notebooks, sections and pages."><TextBlock/></Border>
+                        </StackPanel>
+                        <ListBox x:Name="LayoutTiles" Classes="layouttiles" Background="Transparent" BorderThickness="0" Padding="0">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBoxItem Tag="Classic">
+                                <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                    <Border Classes="tile" Width="104" Height="64" CornerRadius="8" Padding="5" BorderThickness="1"
+                                            BorderBrush="{DynamicResource FrameBorderBrush}" Background="{DynamicResource CardBackgroundBrush}">
+                                        <Grid ColumnDefinitions="10,4,22,4,*">
+                                            <Border Classes="nav" CornerRadius="3" Grid.Column="0"/>
+                                            <Border Classes="nav" CornerRadius="3" Grid.Column="2"/>
+                                            <Border Classes="paper" CornerRadius="3" Grid.Column="4"/>
+                                        </Grid>
+                                    </Border>
+                                    <TextBlock Classes="tilename" Text="Classic" FontSize="12.5" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem Tag="Sidebar">
+                                <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                    <Border Classes="tile" Width="104" Height="64" CornerRadius="8" Padding="5" BorderThickness="1"
+                                            BorderBrush="{DynamicResource FrameBorderBrush}" Background="{DynamicResource CardBackgroundBrush}">
+                                        <Grid ColumnDefinitions="30,4,*">
+                                            <Border Classes="nav" CornerRadius="3" Grid.Column="0"/>
+                                            <Border Classes="paper" CornerRadius="3" Grid.Column="2"/>
+                                        </Grid>
+                                    </Border>
+                                    <TextBlock Classes="tilename" Text="One sidebar" FontSize="12.5" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem Tag="Tabs">
+                                <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                    <Border Classes="tile" Width="104" Height="64" CornerRadius="8" Padding="5" BorderThickness="1"
+                                            BorderBrush="{DynamicResource FrameBorderBrush}" Background="{DynamicResource CardBackgroundBrush}">
+                                        <Grid ColumnDefinitions="*,4,20" RowDefinitions="7,3,*">
+                                            <StackPanel Orientation="Horizontal" Spacing="3">
+                                                <Border Classes="nav" CornerRadius="3" Width="16"/>
+                                                <Border Classes="nav" CornerRadius="3" Width="16" Opacity="0.6"/>
+                                                <Border Classes="nav" CornerRadius="3" Width="16" Opacity="0.6"/>
+                                            </StackPanel>
+                                            <Border Classes="paper" CornerRadius="3" Grid.Row="2"/>
+                                            <Border Classes="nav" CornerRadius="3" Grid.Column="2" Grid.RowSpan="3"/>
+                                        </Grid>
+                                    </Border>
+                                    <TextBlock Classes="tilename" Text="Tabs" FontSize="12.5" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem Tag="Focus">
+                                <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                    <Border Classes="tile" Width="104" Height="64" CornerRadius="8" Padding="5" BorderThickness="1"
+                                            BorderBrush="{DynamicResource FrameBorderBrush}" Background="{DynamicResource CardBackgroundBrush}">
+                                        <Grid RowDefinitions="6,4,*">
+                                            <Border Classes="nav" CornerRadius="3" Width="46" HorizontalAlignment="Left"/>
+                                            <Border Classes="paper" CornerRadius="3" Grid.Row="2"/>
+                                        </Grid>
+                                    </Border>
+                                    <TextBlock Classes="tilename" Text="Focus" FontSize="12.5" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                        </ListBox>
+
                         <TextBlock Classes="section" Text="PANELS"/>
-                        <Grid ColumnDefinitions="*,Auto">
+                        <Grid x:Name="ButtonPlacementRow" ColumnDefinitions="*,Auto">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Classes="label" Text="Button placement"/>
                                 <Border Classes="qmark" ToolTip.Tip="Where the All notebooks, Show notebooks, Show pages and Preferences buttons live. When a panel is hidden, a small bubble in the bottom-left corner brings it back."><TextBlock/></Border>
                             </StackPanel>
                             <ComboBox x:Name="ButtonPlacementBox" Grid.Column="1" Width="150"/>
                         </Grid>
-                        <Grid ColumnDefinitions="*,Auto">
+                        <Grid x:Name="ShowRailRow" ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Classes="label" Text="Show notebooks rail"/>
@@ -619,7 +713,7 @@
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding StartPagesVisible, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
-                        <Grid ColumnDefinitions="*,Auto">
+                        <Grid x:Name="SectionsSidebarRow" ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Classes="label" Text="Sections in their own sidebar"/>

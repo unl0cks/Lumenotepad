@@ -13,6 +13,43 @@
         <x:Double x:Key="NbCardHeight">132</x:Double>
         <x:Double x:Key="NbCardCellWidth">224</x:Double>
         <x:Double x:Key="NbCardCellHeight">162</x:Double>
+        <DataTemplate x:Key="PageRow" x:DataType="models:Page">
+            <Panel>
+                <v:ThreadGuide Level="{Binding Level}" IsLastSibling="{Binding IsLastSibling}"
+                               GuideMask="{Binding GuideMask}" Stroke="{DynamicResource TextMutedBrush}"
+                               Opacity="0.6" IsHitTestVisible="False"/>
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding Title}" FontSize="12.5"
+                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Classes="fold" Click="OnPageFoldClick"
+                            IsVisible="{Binding HasSubPages}" ToolTip.Tip="Show or hide sub-pages">
+                        <Panel>
+                            <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}"
+                                       RenderTransform="rotate(-90deg)" IsVisible="{Binding Collapsed}"/>
+                            <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}"
+                                       IsVisible="{Binding !Collapsed}"/>
+                        </Panel>
+                    </Button>
+                </Grid>
+            </Panel>
+        </DataTemplate>
+        <DataTemplate x:Key="SectionRowTemplate" x:DataType="models:SectionRow">
+            <Button Classes="sectionrow" Click="OnSectionRowClick" ToolTip.Tip="Show or hide this section's pages">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding Section.Name}" FontSize="11" FontWeight="SemiBold" LetterSpacing="0.6"
+                               Foreground="{DynamicResource TextMutedBrush}" TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center"/>
+                    <Panel Grid.Column="1" Width="16">
+                        <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="9"
+                                   Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"
+                                   HorizontalAlignment="Center" RenderTransform="rotate(-90deg)" IsVisible="{Binding Folded}"/>
+                        <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="9"
+                                   Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"
+                                   HorizontalAlignment="Center" IsVisible="{Binding !Folded}"/>
+                    </Panel>
+                </Grid>
+            </Button>
+        </DataTemplate>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -71,6 +108,22 @@
         </Style>
         <Style Selector="ListBox.pages ListBoxItem">
             <Setter Property="IsVisible" Value="{ReflectionBinding !IsFoldedAway}"/>
+        </Style>
+        <Style Selector="Button.sectionrow">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="4,10,4,3"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.navpick">
+            <Setter Property="Theme" Value="{StaticResource IconButton}"/>
+            <Setter Property="Width" Value="NaN"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
         </Style>
         <Style Selector="Button.fold">
             <Setter Property="Width" Value="18"/>
@@ -180,6 +233,15 @@
             </StackPanel>
 
             <StackPanel x:Name="TitleRightHost" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0">
+                <Button x:Name="TitleNotebookBtn" Classes="navpick" IsVisible="False" Margin="4,0" ToolTip.Tip="Switch notebook">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Border Width="14" Height="14" CornerRadius="4" VerticalAlignment="Center"
+                                Background="{Binding SelectedNotebook.Color, Converter={x:Static v:Converters.HexBrush}}"/>
+                        <TextBlock Text="{Binding SelectedNotebook.Name}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="9"
+                                   Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
                 <Button x:Name="PrefsBtn" Theme="{StaticResource IconButton}" Width="34" Height="34" FontSize="15"
                         FontFamily="{StaticResource IconFont}" Content="&#xE713;"
                         IsVisible="{Binding !IsHomeVisible}" ToolTip.Tip="Preferences"/>
@@ -351,7 +413,7 @@
 
         <DockPanel x:Name="BodyDock" IsVisible="False">
         <v:FormatToolbar x:Name="Toolbar" DockPanel.Dock="Top"/>
-        <Grid ColumnDefinitions="Auto,Auto,Auto,*">
+        <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto">
 
             <Border x:Name="RailPanel" Grid.Column="0" Width="64" ClipToBounds="True"
                     Background="{DynamicResource FrameBackgroundBrush}"
@@ -396,6 +458,39 @@
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
+                </DockPanel>
+            </Border>
+
+            <Border x:Name="OutlinePanel" Grid.Column="0" Width="224" IsVisible="False" ClipToBounds="True"
+                    Background="{DynamicResource FrameBackgroundBrush}"
+                    BorderBrush="{DynamicResource FrameBorderBrush}" BorderThickness="0,0,1,0">
+                <DockPanel Margin="10,10,10,10">
+                    <Button x:Name="SidebarNotebookBtn" Classes="navpick" DockPanel.Dock="Top" Height="38"
+                            HorizontalAlignment="Stretch" ToolTip.Tip="Switch notebook">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <Border Width="16" Height="16" CornerRadius="5" VerticalAlignment="Center"
+                                    Background="{Binding SelectedNotebook.Color, Converter={x:Static v:Converters.HexBrush}}"/>
+                            <TextBlock Grid.Column="1" Text="{Binding SelectedNotebook.Name}" FontSize="14.5" FontWeight="SemiBold"
+                                       Margin="9,0,6,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="10"
+                                       Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Button>
+                    <StackPanel DockPanel.Dock="Bottom" Spacing="2" Margin="0,6,0,0">
+                        <Button x:Name="OutlineNewPageBtn" Classes="navpick" HorizontalAlignment="Stretch" ToolTip.Tip="Add a page to this section">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="&#xE710;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBlock Text="New page" FontSize="12.5" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="OutlineNewSectionBtn" Classes="navpick" HorizontalAlignment="Stretch" ToolTip.Tip="Add a section to this notebook">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="&#xE710;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBlock Text="New section" FontSize="12.5" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <ListBox x:Name="OutlineList" Classes="pages" Background="Transparent" BorderThickness="0" Padding="0,4,0,0"/>
                 </DockPanel>
             </Border>
 
@@ -474,30 +569,8 @@
 
                     <ListBox x:Name="PagesList" Classes="pages" Background="Transparent" BorderThickness="0" Padding="0"
                              ItemsSource="{Binding SelectedSection.Pages}"
-                             SelectedItem="{Binding SelectedPage, Mode=TwoWay}">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate x:DataType="models:Page">
-                                <Panel>
-                                    <v:ThreadGuide Level="{Binding Level}" IsLastSibling="{Binding IsLastSibling}"
-                                                   GuideMask="{Binding GuideMask}" Stroke="{DynamicResource TextMutedBrush}"
-                                                   Opacity="0.6" IsHitTestVisible="False"/>
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <TextBlock Text="{Binding Title}" FontSize="12.5"
-                                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                                        <Button Grid.Column="1" Classes="fold" Click="OnPageFoldClick"
-                                                IsVisible="{Binding HasSubPages}" ToolTip.Tip="Show or hide sub-pages">
-                                            <Panel>
-                                                <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}"
-                                                           RenderTransform="rotate(-90deg)" IsVisible="{Binding Collapsed}"/>
-                                                <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}"
-                                                           IsVisible="{Binding !Collapsed}"/>
-                                            </Panel>
-                                        </Button>
-                                    </Grid>
-                                </Panel>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                             SelectedItem="{Binding SelectedPage, Mode=TwoWay}"
+                             ItemTemplate="{StaticResource PageRow}"/>
                 </DockPanel>
                 <Border x:Name="PagesResizeGrip" Width="5" HorizontalAlignment="Right"
                         Background="Transparent" Cursor="SizeWestEast"/>
@@ -521,6 +594,57 @@
                 </StackPanel>
             </Border>
             <Border x:Name="CanvasPlate" Background="{DynamicResource CanvasBackgroundBrush}"/>
+            <DockPanel x:Name="CanvasColumnDock">
+            <Border x:Name="LayoutTopBar" DockPanel.Dock="Top" Margin="14,10,14,0" IsVisible="False">
+                <Panel>
+                    <StackPanel x:Name="SectionTabsRow" Orientation="Horizontal" Spacing="2">
+                        <ListBox x:Name="SectionTabsBar" Classes="sections" Background="Transparent" BorderThickness="0" Padding="0"
+                                 ItemsSource="{Binding SelectedNotebook.Sections}"
+                                 SelectedItem="{Binding SelectedSection, Mode=TwoWay}">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="models:Section">
+                                    <TextBlock Text="{Binding Name}" FontSize="12.5" VerticalAlignment="Center"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <Button x:Name="SectionTabsAddBtn" Theme="{StaticResource IconButton}" Width="28" Height="28" FontSize="12"
+                                VerticalAlignment="Center" FontFamily="{StaticResource IconFont}" Content="&#xE710;"
+                                ToolTip.Tip="New section"/>
+                    </StackPanel>
+                    <StackPanel x:Name="FocusPath" Orientation="Horizontal" Spacing="2">
+                        <Button x:Name="FocusNotebookBtn" Classes="navpick" ToolTip.Tip="Switch notebook">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border Width="14" Height="14" CornerRadius="4" VerticalAlignment="Center"
+                                        Background="{Binding SelectedNotebook.Color, Converter={x:Static v:Converters.HexBrush}}"/>
+                                <TextBlock Text="{Binding SelectedNotebook.Name}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="9"
+                                           Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <TextBlock x:Name="FocusSectionSep" Text="&#x203A;" FontSize="16" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextMutedBrush}" Margin="2,0"/>
+                        <Button x:Name="FocusSectionBtn" Classes="navpick" ToolTip.Tip="Switch section">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="{Binding SelectedSection.Name}" FontSize="13" VerticalAlignment="Center"/>
+                                <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="9"
+                                           Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Text="&#x203A;" FontSize="16" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextMutedBrush}" Margin="2,0"/>
+                        <Button x:Name="FocusPageBtn" Classes="navpick" ToolTip.Tip="Switch page">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="{Binding SelectedPage.Title}" FontSize="13" VerticalAlignment="Center"/>
+                                <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="9"
+                                           Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Panel>
+            </Border>
             <Border x:Name="PageBoxSurface" Margin="14" CornerRadius="{DynamicResource RadiusPage}"
                     Background="{DynamicResource PaperBackgroundBrush}" BorderBrush="{DynamicResource PaperBorderBrush}" BorderThickness="1">
                 <Panel>
@@ -596,7 +720,25 @@
                 <v:PdfViewer x:Name="PagePdfViewer" IsVisible="False" ClipToBounds="True"/>
                 </Panel>
             </Border>
+            </DockPanel>
             </Panel>
+
+            <Border x:Name="TabsPagesPanel" Grid.Column="4" Width="224" IsVisible="False" ClipToBounds="True"
+                    Background="{DynamicResource FrameBackgroundBrush}"
+                    BorderBrush="{DynamicResource FrameBorderBrush}" BorderThickness="1,0,0,0">
+                <DockPanel Margin="10,12,10,8">
+                    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="4,0,0,6">
+                        <TextBlock Text="Pages" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
+                        <Button x:Name="TabsNewPageBtn" Grid.Column="1" Theme="{StaticResource IconButton}" Width="24" Height="24"
+                                FontSize="12" FontFamily="{StaticResource IconFont}" Content="&#xE710;" ToolTip.Tip="New page"/>
+                    </Grid>
+                    <ListBox x:Name="TabsPagesList" Classes="pages" Background="Transparent" BorderThickness="0" Padding="0"
+                             ItemsSource="{Binding SelectedSection.Pages}"
+                             SelectedItem="{Binding SelectedPage, Mode=TwoWay}"
+                             ItemTemplate="{StaticResource PageRow}"/>
+                </DockPanel>
+            </Border>
         </Grid>
         </DockPanel>
 

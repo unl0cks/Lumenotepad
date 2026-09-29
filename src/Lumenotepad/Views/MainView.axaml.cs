@@ -23,6 +23,7 @@ public partial class MainView : UserControl
     public MainView()
     {
         InitializeComponent();
+        WireLayouts();
 
         TitleBar.PointerPressed += (_, e) =>
         {
@@ -522,6 +523,7 @@ public partial class MainView : UserControl
             ApplyToolbarPlacement();
             ApplyCanvasPrefs();
             ApplyButtonPlacement();
+            ApplyUiLayout();
             ApplyPaperTint();
             ApplyGlossyAccents();
             ApplyCardSize();
@@ -947,10 +949,17 @@ public partial class MainView : UserControl
         if (Vm is not { } vm) return;
         RailPanel.Width = vm.IsRailVisible ? 64 : 0; RailPanel.Opacity = vm.IsRailVisible ? 1 : 0;
         PagesPanel.Width = vm.IsPagesVisible ? vm.PagesPanelWidth : 0; PagesPanel.Opacity = vm.IsPagesVisible ? 1 : 0;
+        OutlinePanel.Width = vm.IsPagesVisible ? vm.PagesPanelWidth : 0;
+        TabsPagesPanel.Width = vm.IsPagesVisible ? vm.PagesPanelWidth : 0;
     }
 
     private void ApplySectionsSidebar(bool animate = false)
     {
+        if (!IsClassic)
+        {
+            SectionsSidebar.IsVisible = false;
+            return;
+        }
         if (Vm?.SingleMode == true)
         {
 
@@ -1038,6 +1047,16 @@ public partial class MainView : UserControl
     private void ApplyButtonPlacement()
     {
         if (Vm is not { } vm) return;
+        if (!IsClassic)
+        {
+            PlaceButtonsForLayout(vm);
+            return;
+        }
+        (TitleNotebookBtn.Parent as Panel)?.Children.Remove(TitleNotebookBtn);
+        TitleRightHost.Children.Insert(0, TitleNotebookBtn);
+        TitleNotebookBtn.IsVisible = false;
+        ToolTip.SetTip(PagesToggle, "Show / hide pages");
+        ToolTip.SetTip(BubblePagesBtn, "Show pages");
         bool rail = vm.IsRailVisible, pages = vm.IsPagesVisible;
         var (home, railBtn, pagesBtn, prefs) = vm.ButtonPlacement switch
         {
@@ -1074,7 +1093,39 @@ public partial class MainView : UserControl
         BubbleRailBtn.IsVisible = !rail;
         BubblePagesBtn.IsVisible = !pages;
         BubbleDivider.IsVisible = ReferenceEquals(HomeBtn.Parent, BubbleHost) || ReferenceEquals(PrefsBtn.Parent, BubbleHost);
-        bool show = !rail || !pages;
+        ShowBubble(!rail || !pages);
+    }
+
+    private void PlaceButtonsForLayout(MainViewModel vm)
+    {
+        foreach (var b in new Control[] { HomeBtn, RailToggle, PagesToggle, PrefsBtn, TitleNotebookBtn })
+            (b.Parent as Panel)?.Children.Remove(b);
+        TitleNavHost.Children.Add(HomeBtn);
+        if (Layout == "Tabs")
+        {
+            TitleNavHost.Children.Add(TitleNotebookBtn);
+            TitleNotebookBtn.IsVisible = true;
+        }
+        if (Layout != "Focus") TitleNavHost.Children.Add(PagesToggle);
+        TitleRightHost.Children.Add(PrefsBtn);
+        ToolTip.SetTip(PagesToggle, Layout == "Sidebar" ? "Show / hide sidebar" : "Show / hide pages");
+        ToolTip.SetTip(BubblePagesBtn, Layout == "Sidebar" ? "Show sidebar" : "Show pages");
+        foreach (var b in new[] { HomeBtn, PagesToggle, PrefsBtn })
+        {
+            b.Width = 34;
+            b.Height = 34;
+            b.FontSize = 15;
+        }
+        RailTopDivider.IsVisible = false;
+        RailBottomDivider.IsVisible = false;
+        BubbleRailBtn.IsVisible = false;
+        BubbleDivider.IsVisible = false;
+        BubblePagesBtn.IsVisible = Layout != "Focus" && !vm.IsPagesVisible;
+        ShowBubble(BubblePagesBtn.IsVisible);
+    }
+
+    private void ShowBubble(bool show)
+    {
         if (show && !_bubbleShown)
         {
             _bubbleShown = true;
@@ -1179,6 +1230,9 @@ public partial class MainView : UserControl
         if (e.PropertyName is nameof(MainViewModel.SelectedNotebook)
             or nameof(MainViewModel.SelectedSection) or nameof(MainViewModel.SelectedPage))
             ReassertListSelection();
+        if (e.PropertyName == nameof(MainViewModel.SelectedNotebook)) RebuildOutline();
+        else if (e.PropertyName is nameof(MainViewModel.SelectedSection) or nameof(MainViewModel.SelectedPage))
+            SyncOutlineSelection();
 
         if (e.PropertyName == nameof(MainViewModel.SelectedNotebook))
         { RehookSections(); ApplyPaperTint(); ApplyEditorPrefs(rebuild: true); TagsPanel.IsVisible = false; }
@@ -1227,7 +1281,12 @@ public partial class MainView : UserControl
         else if (e.PropertyName == nameof(MainViewModel.SectionsSidebar))
             ApplySectionsSidebar(animate: true);
         else if (e.PropertyName == nameof(MainViewModel.SingleMode))
+        {
             ApplySectionsSidebar();
+            ApplyUiLayout();
+        }
+        else if (e.PropertyName == nameof(MainViewModel.UiLayout))
+            ApplyUiLayout(animate: true);
         else if (e.PropertyName == nameof(MainViewModel.FlatCovers))
             ApplyFlatCovers();
         else if (e.PropertyName == nameof(MainViewModel.GlossyAccents))
@@ -1268,7 +1327,7 @@ public partial class MainView : UserControl
         }
         else if (e.PropertyName == nameof(MainViewModel.IsPagesVisible))
         {
-            Motion.Reveal(PagesPanel, Vm?.PagesPanelWidth ?? 224, Vm?.IsPagesVisible ?? true);
+            RevealSidePanel(Vm?.IsPagesVisible ?? true);
             ApplyButtonPlacement();
         }
         else if (e.PropertyName == nameof(MainViewModel.ButtonPlacement))
