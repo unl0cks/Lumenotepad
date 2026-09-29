@@ -85,6 +85,27 @@
             <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
         </Style>
+        <Style Selector="Border.prefstab">
+            <Setter Property="Padding" Value="0,2,0,6"/>
+            <Setter Property="BorderThickness" Value="0,0,0,2"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Border.prefstab > TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        </Style>
+        <Style Selector="Border.prefstab:pointerover > TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        </Style>
+        <Style Selector="Border.prefstab.current">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="Border.prefstab.current > TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
         <Style Selector="Border.prefcard">
             <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource FrameBorderBrush}"/>
@@ -270,8 +291,11 @@
             </Border>
 
             <Grid Grid.Column="1" RowDefinitions="Auto,*">
-            <TextBlock x:Name="PageTitle" Grid.Row="0" FontSize="21" FontWeight="SemiBold"
-                       Margin="20,6,20,10" Foreground="{DynamicResource TextPrimaryBrush}"/>
+            <StackPanel Grid.Row="0" Margin="20,6,20,8" Spacing="8">
+                <TextBlock x:Name="PageTitle" FontSize="21" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                <StackPanel x:Name="PageTabs" Orientation="Horizontal" Spacing="18" IsVisible="False"/>
+            </StackPanel>
             <ScrollViewer x:Name="PrefsScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel x:Name="PanelsHost" Spacing="14" Margin="20,4,20,18">
                     <TextBlock x:Name="SearchEmptyNote" Classes="hint" IsVisible="False"
