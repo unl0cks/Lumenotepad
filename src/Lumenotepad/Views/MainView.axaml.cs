@@ -1101,11 +1101,8 @@ public partial class MainView : UserControl
         foreach (var b in new Control[] { HomeBtn, RailToggle, PagesToggle, PrefsBtn, TitleNotebookBtn })
             (b.Parent as Panel)?.Children.Remove(b);
         TitleNavHost.Children.Add(HomeBtn);
-        if (Layout == "Tabs")
-        {
-            TitleNavHost.Children.Add(TitleNotebookBtn);
-            TitleNotebookBtn.IsVisible = true;
-        }
+        TitleNotebookBtn.IsVisible = Layout == "Tabs";
+        if (Layout == "Tabs") TitleNavHost.Children.Add(TitleNotebookBtn);
         if (Layout != "Focus") TitleNavHost.Children.Add(PagesToggle);
         TitleRightHost.Children.Add(PrefsBtn);
         ToolTip.SetTip(PagesToggle, Layout == "Sidebar" ? "Show / hide sidebar" : "Show / hide pages");

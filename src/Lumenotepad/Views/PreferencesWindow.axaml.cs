@@ -162,11 +162,11 @@ public partial class PreferencesWindow : Window
             if (key == "shortcuts") BuildShortcutRows();
             ShowPanel(key);
         };
-        SelectNav("general");
-        _lastNav = NavList.SelectedItem;
         GroupIntoCards();
         IndexTabs();
         SetupSettingsSearch();
+        SelectNav("general");
+        _lastNav = NavList.SelectedItem;
         WireAbout();
 
         FontSearchBtn.Click += async (_, _) => await RunFontSearch();
@@ -1242,6 +1242,7 @@ public partial class PreferencesWindow : Window
 
         if (!_searching) { _searching = true; PrimeSearchPanels(); }
         PageTabs.IsVisible = false;
+        PageTitle.Text = "Search results";
 
         int total = 0;
         foreach (var (_, panel) in _searchIndex)

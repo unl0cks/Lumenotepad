@@ -4,6 +4,7 @@ using System.Collections.Specialized;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -190,7 +191,12 @@ public partial class MainView
 
     private static void OpenListMenu(Control anchor, IEnumerable<Control> items)
     {
-        var menu = new ContextMenu();
+        var menu = new ContextMenu
+        {
+            PlacementTarget = anchor,
+            Placement = PlacementMode.BottomEdgeAlignedLeft,
+            VerticalOffset = 4,
+        };
         foreach (var i in items) menu.Items.Add(i);
         MenuFx.Attach(menu);
         menu.Open(anchor);

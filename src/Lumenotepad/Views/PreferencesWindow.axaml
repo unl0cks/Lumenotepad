@@ -268,7 +268,7 @@
                     </ListBoxItem>
                     <ListBoxItem IsEnabled="False" Margin="0,14,0,2" Padding="10,2">
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="WRITING" FontSize="10.5" FontWeight="SemiBold" LetterSpacing="1"
+                            <TextBlock Text="EDITOR" FontSize="10.5" FontWeight="SemiBold" LetterSpacing="1"
                                        Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
