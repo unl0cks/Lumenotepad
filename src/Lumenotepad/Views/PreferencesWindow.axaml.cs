@@ -36,11 +36,9 @@ public partial class PreferencesWindow : Window
             ["general"] = GeneralPanel,
             ["appearance"] = AppearancePanel,
             ["layout"] = LayoutPanel,
-            ["canvas"] = CanvasPanel,
             ["editor"] = EditorPanel,
             ["shortcuts"] = ShortcutsPanel,
             ["fonts"] = FontsPanel,
-            ["bullets"] = BulletsPanel,
             ["data"] = DataPanel,
             ["about"] = AboutPanel,
         };
@@ -855,7 +853,7 @@ public partial class PreferencesWindow : Window
 
     private static string NumOpt(bool? v) => v switch { true => "Always on", false => "Always off", _ => "Match text" };
 
-    private static bool IsGated(string key) => key is "data" or "bullets" or "fonts";
+    private static bool IsGated(string key) => key is "data" or "fonts";
 
     private void UpdateGateVisuals() => GateLock.IsVisible = Vm is not { AdvancedUnlocked: true };
 
@@ -1109,8 +1107,8 @@ public partial class PreferencesWindow : Window
     private static readonly Dictionary<string, string> CategoryNames = new()
     {
         ["general"] = "General", ["appearance"] = "Appearance", ["layout"] = "Layout",
-        ["canvas"] = "Canvas", ["editor"] = "Editor", ["shortcuts"] = "Shortcuts",
-        ["fonts"] = "Fonts", ["bullets"] = "Bullets & numbers", ["data"] = "Data & tools",
+        ["editor"] = "Writing", ["shortcuts"] = "Shortcuts",
+        ["fonts"] = "Fonts", ["data"] = "Data & tools",
         ["about"] = "About",
     };
 
