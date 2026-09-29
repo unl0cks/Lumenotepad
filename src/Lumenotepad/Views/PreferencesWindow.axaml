@@ -85,6 +85,57 @@
             <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
         </Style>
+        <Style Selector="ListBox.layouttiles ListBoxItem">
+            <Setter Property="Padding" Value="8,8,8,6"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
+            <Setter Property="CornerRadius" Value="12"/>
+        </Style>
+        <Style Selector="ListBox.layouttiles ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+        </Style>
+        <Style Selector="ListBox.layouttiles ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+        </Style>
+        <Style Selector="ListBox.layouttiles Border.nav">
+            <Setter Property="Background" Value="{DynamicResource TextMutedBrush}"/>
+            <Setter Property="Opacity" Value="0.45"/>
+        </Style>
+        <Style Selector="ListBox.layouttiles Border.paper">
+            <Setter Property="Background" Value="{DynamicResource TextMutedBrush}"/>
+            <Setter Property="Opacity" Value="0.16"/>
+        </Style>
+        <Style Selector="ListBox.layouttiles ListBoxItem:selected Border.tile">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="ListBox.layouttiles ListBoxItem:selected Border.nav">
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Opacity" Value="0.7"/>
+        </Style>
+        <Style Selector="ListBox.layouttiles ListBoxItem:selected TextBlock.tilename">
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Border.prefstab">
+            <Setter Property="Padding" Value="0,2,0,6"/>
+            <Setter Property="BorderThickness" Value="0,0,0,2"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Border.prefstab > TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        </Style>
+        <Style Selector="Border.prefstab:pointerover > TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        </Style>
+        <Style Selector="Border.prefstab.current">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="Border.prefstab.current > TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
         <Style Selector="Border.prefcard">
             <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource FrameBorderBrush}"/>
@@ -209,34 +260,22 @@
                             <TextBlock Classes="label" Text="Appearance" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
-                    <ListBoxItem IsEnabled="False" Margin="0,14,0,2" Padding="10,2">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="WORKSPACE" FontSize="10.5" FontWeight="SemiBold" LetterSpacing="1"
-                                       Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </ListBoxItem>
                     <ListBoxItem Tag="layout">
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <TextBlock Classes="navicon" Text="&#xE8A1;"/>
                             <TextBlock Classes="label" Text="Layout" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
-                    <ListBoxItem Tag="canvas">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <TextBlock Classes="navicon" Text="&#xE80A;"/>
-                            <TextBlock Classes="label" Text="Canvas" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </ListBoxItem>
                     <ListBoxItem IsEnabled="False" Margin="0,14,0,2" Padding="10,2">
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="WRITING" FontSize="10.5" FontWeight="SemiBold" LetterSpacing="1"
+                            <TextBlock Text="EDITOR" FontSize="10.5" FontWeight="SemiBold" LetterSpacing="1"
                                        Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
                     <ListBoxItem Tag="editor">
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <TextBlock Classes="navicon" Text="&#xE70F;"/>
-                            <TextBlock Classes="label" Text="Editor" VerticalAlignment="Center"/>
+                            <TextBlock Classes="label" Text="Writing" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
                     <ListBoxItem Tag="shortcuts">
@@ -258,12 +297,6 @@
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <TextBlock Classes="navicon" Text="&#xE8D2;"/>
                             <TextBlock Classes="label" Text="Fonts" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </ListBoxItem>
-                    <ListBoxItem Tag="bullets">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <TextBlock Classes="navicon" Text="&#xE8FD;"/>
-                            <TextBlock Classes="label" Text="Bullets &amp; numbers" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
                     <ListBoxItem Tag="data">
@@ -288,15 +321,18 @@
             </Border>
 
             <Grid Grid.Column="1" RowDefinitions="Auto,*">
-            <TextBlock x:Name="PageTitle" Grid.Row="0" FontSize="21" FontWeight="SemiBold"
-                       Margin="20,6,20,10" Foreground="{DynamicResource TextPrimaryBrush}"/>
+            <StackPanel Grid.Row="0" Margin="20,6,20,8" Spacing="8">
+                <TextBlock x:Name="PageTitle" FontSize="21" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                <StackPanel x:Name="PageTabs" Orientation="Horizontal" Spacing="18" IsVisible="False"/>
+            </StackPanel>
             <ScrollViewer x:Name="PrefsScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel x:Name="PanelsHost" Spacing="14" Margin="20,4,20,18">
                     <TextBlock x:Name="SearchEmptyNote" Classes="hint" IsVisible="False"
                                Text="No settings match your search." Margin="0,8,0,0"/>
 
                     <StackPanel x:Name="GeneralPanel" Spacing="6">
-                        <TextBlock Classes="section" Text="STARTUP" Margin="0,4,0,2"/>
+                        <TextBlock Classes="section" Text="STARTUP"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
@@ -354,17 +390,6 @@
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding SummonHotkey, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
 
-                        <TextBlock Classes="section" Text="SAVING"/>
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Classes="label" Text="Autosave after typing stops"/>
-                                <Border Classes="qmark" ToolTip.Tip="How long Lumenotepad waits after you stop typing before saving your work. Shorter is safer, longer is quieter."><TextBlock/></Border>
-                            </StackPanel>
-                            <TextBlock x:Name="AutosaveValue" Grid.Column="1" Classes="hint" Text="0.9s"/>
-                        </Grid>
-                        <Slider x:Name="AutosaveSlider" Minimum="100" Maximum="5000"
-                                TickFrequency="100"/>
-
                         <TextBlock Classes="section" Text="HOMEPAGE"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
@@ -395,6 +420,23 @@
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowHomeStats, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
 
+                        <TextBlock Classes="section" Text="GALLERY"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Classes="label" Text="Accent follows notebook"/>
+                                    <Border Classes="qmark" ToolTip.Tip="While a notebook is open, its cover color becomes the highlight color for the whole app instead of your usual accent."><TextBlock/></Border>
+                                </StackPanel>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding AccentFollowsNotebook, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Classes="label" Text="Cover size"/>
+                                <Border Classes="qmark" ToolTip.Tip="How big the notebook covers appear on the home screen. Bigger covers mean fewer fit on screen at once."><TextBlock/></Border>
+                            </StackPanel>
+                            <ComboBox x:Name="CardSizeBox" Grid.Column="1" Width="120" VerticalAlignment="Center"/>
+                        </Grid>
                         <TextBlock Classes="section" Text="ASK BEFORE DELETING"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Orientation="Horizontal">
@@ -430,7 +472,7 @@
 
                     <StackPanel x:Name="AppearancePanel" Spacing="6" IsVisible="False">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Classes="section" Text="THEME" Margin="0,4,0,2"/>
+                            <TextBlock Classes="section" Text="THEME"/>
                             <Border Classes="qmark" Margin="6,2,0,0" ToolTip.Tip="Pick the overall look of Lumenotepad. Click a theme to switch to it straight away. The other appearance options below adjust to match."><TextBlock/></Border>
                         </StackPanel>
                         <ListBox x:Name="ThemeList" Classes="themepick" Background="Transparent" BorderThickness="0" Padding="0">
@@ -516,6 +558,7 @@
                         <WrapPanel x:Name="AccentSwatches"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Orientation="Horizontal">
+                                <TextBlock Classes="label" Text="Custom color"/>
                                 <Border Classes="qmark" ToolTip.Tip="The highlight color used for buttons and selections. Type a color code like #4DA6FF, or press Enter on an empty box to go back to the theme's own color."><TextBlock/></Border>
                             </StackPanel>
                             <TextBox x:Name="AccentHexBox" Classes="field" Grid.Column="1" Width="110" FontSize="12.5"
@@ -577,52 +620,82 @@
                             <ComboBox x:Name="MotionSpeedBox" Grid.Column="1" Width="120" VerticalAlignment="Center"/>
                         </Grid>
 
-                        <TextBlock Classes="section" Text="GALLERY"/>
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Spacing="2" VerticalAlignment="Center">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Classes="label" Text="Accent follows notebook"/>
-                                    <Border Classes="qmark" ToolTip.Tip="While a notebook is open, its cover color becomes the highlight color for the whole app instead of your usual accent."><TextBlock/></Border>
-                                </StackPanel>
-                            </StackPanel>
-                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding AccentFollowsNotebook, Mode=TwoWay}" VerticalAlignment="Center"/>
-                        </Grid>
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Classes="label" Text="Cover size"/>
-                                <Border Classes="qmark" ToolTip.Tip="How big the notebook covers appear on the home screen. Bigger covers mean fewer fit on screen at once."><TextBlock/></Border>
-                            </StackPanel>
-                            <ComboBox x:Name="CardSizeBox" Grid.Column="1" Width="120" VerticalAlignment="Center"/>
-                        </Grid>
                     </StackPanel>
 
                     <StackPanel x:Name="LayoutPanel" Spacing="6" IsVisible="False">
-                        <TextBlock Classes="section" Text="TOOLBAR" Margin="0,4,0,2"/>
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Classes="label" Text="Toolbar position"/>
-                                <Border Classes="qmark" ToolTip.Tip="Which edge of the window the formatting toolbar sits against: top, bottom, left, or right."><TextBlock/></Border>
-                            </StackPanel>
-                            <ComboBox x:Name="ToolbarPosBox" Grid.Column="1" Width="120"/>
-                        </Grid>
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Spacing="2" VerticalAlignment="Center">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Classes="label" Text="Attach toolbar to"/>
-                                    <Border Classes="qmark" ToolTip.Tip="Whether the toolbar stays fixed to the window's edge, or moves to hug the page you are writing on."><TextBlock/></Border>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Classes="section" Text="LAYOUT"/>
+                            <Border Classes="qmark" Margin="6,2,0,0" ToolTip.Tip="How the window is arranged. Classic is the original. The others are simpler ways to get around the same notebooks, sections and pages."><TextBlock/></Border>
+                        </StackPanel>
+                        <ListBox x:Name="LayoutTiles" Classes="layouttiles" Background="Transparent" BorderThickness="0" Padding="0">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBoxItem Tag="Classic">
+                                <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                    <Border Classes="tile" Width="104" Height="64" CornerRadius="8" Padding="5" BorderThickness="1"
+                                            BorderBrush="{DynamicResource FrameBorderBrush}" Background="{DynamicResource CardBackgroundBrush}">
+                                        <Grid ColumnDefinitions="10,4,22,4,*">
+                                            <Border Classes="nav" CornerRadius="3" Grid.Column="0"/>
+                                            <Border Classes="nav" CornerRadius="3" Grid.Column="2"/>
+                                            <Border Classes="paper" CornerRadius="3" Grid.Column="4"/>
+                                        </Grid>
+                                    </Border>
+                                    <TextBlock Classes="tilename" Text="Classic" FontSize="12.5" HorizontalAlignment="Center"/>
                                 </StackPanel>
-                            </StackPanel>
-                            <ComboBox x:Name="ToolbarScopeBox" Grid.Column="1" Width="120" VerticalAlignment="Center"/>
-                        </Grid>
+                            </ListBoxItem>
+                            <ListBoxItem Tag="Sidebar">
+                                <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                    <Border Classes="tile" Width="104" Height="64" CornerRadius="8" Padding="5" BorderThickness="1"
+                                            BorderBrush="{DynamicResource FrameBorderBrush}" Background="{DynamicResource CardBackgroundBrush}">
+                                        <Grid ColumnDefinitions="30,4,*">
+                                            <Border Classes="nav" CornerRadius="3" Grid.Column="0"/>
+                                            <Border Classes="paper" CornerRadius="3" Grid.Column="2"/>
+                                        </Grid>
+                                    </Border>
+                                    <TextBlock Classes="tilename" Text="One sidebar" FontSize="12.5" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem Tag="Tabs">
+                                <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                    <Border Classes="tile" Width="104" Height="64" CornerRadius="8" Padding="5" BorderThickness="1"
+                                            BorderBrush="{DynamicResource FrameBorderBrush}" Background="{DynamicResource CardBackgroundBrush}">
+                                        <Grid ColumnDefinitions="*,4,20" RowDefinitions="7,3,*">
+                                            <StackPanel Orientation="Horizontal" Spacing="3">
+                                                <Border Classes="nav" CornerRadius="3" Width="16"/>
+                                                <Border Classes="nav" CornerRadius="3" Width="16" Opacity="0.6"/>
+                                                <Border Classes="nav" CornerRadius="3" Width="16" Opacity="0.6"/>
+                                            </StackPanel>
+                                            <Border Classes="paper" CornerRadius="3" Grid.Row="2"/>
+                                            <Border Classes="nav" CornerRadius="3" Grid.Column="2" Grid.RowSpan="3"/>
+                                        </Grid>
+                                    </Border>
+                                    <TextBlock Classes="tilename" Text="Tabs" FontSize="12.5" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem Tag="Focus">
+                                <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                    <Border Classes="tile" Width="104" Height="64" CornerRadius="8" Padding="5" BorderThickness="1"
+                                            BorderBrush="{DynamicResource FrameBorderBrush}" Background="{DynamicResource CardBackgroundBrush}">
+                                        <Grid RowDefinitions="6,4,*">
+                                            <Border Classes="nav" CornerRadius="3" Width="46" HorizontalAlignment="Left"/>
+                                            <Border Classes="paper" CornerRadius="3" Grid.Row="2"/>
+                                        </Grid>
+                                    </Border>
+                                    <TextBlock Classes="tilename" Text="Focus" FontSize="12.5" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                        </ListBox>
+
                         <TextBlock Classes="section" Text="PANELS"/>
-                        <Grid ColumnDefinitions="*,Auto">
+                        <Grid x:Name="ButtonPlacementRow" ColumnDefinitions="*,Auto">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Classes="label" Text="Button placement"/>
                                 <Border Classes="qmark" ToolTip.Tip="Where the All notebooks, Show notebooks, Show pages and Preferences buttons live. When a panel is hidden, a small bubble in the bottom-left corner brings it back."><TextBlock/></Border>
                             </StackPanel>
                             <ComboBox x:Name="ButtonPlacementBox" Grid.Column="1" Width="150"/>
                         </Grid>
-                        <Grid ColumnDefinitions="*,Auto">
+                        <Grid x:Name="ShowRailRow" ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Classes="label" Text="Show notebooks rail"/>
@@ -640,7 +713,7 @@
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding StartPagesVisible, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
-                        <Grid ColumnDefinitions="*,Auto">
+                        <Grid x:Name="SectionsSidebarRow" ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Classes="label" Text="Sections in their own sidebar"/>
@@ -658,10 +731,24 @@
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding SingleMode, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
-                    </StackPanel>
-
-                    <StackPanel x:Name="CanvasPanel" Spacing="6" IsVisible="False">
-                        <TextBlock Classes="section" Text="PAGES" Margin="0,4,0,2"/>
+                        <TextBlock Classes="section" Text="TOOLBAR"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Classes="label" Text="Toolbar position"/>
+                                <Border Classes="qmark" ToolTip.Tip="Which edge of the window the formatting toolbar sits against: top, bottom, left, or right."><TextBlock/></Border>
+                            </StackPanel>
+                            <ComboBox x:Name="ToolbarPosBox" Grid.Column="1" Width="120"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Classes="label" Text="Attach toolbar to"/>
+                                    <Border Classes="qmark" ToolTip.Tip="Whether the toolbar stays fixed to the window's edge, or moves to hug the page you are writing on."><TextBlock/></Border>
+                                </StackPanel>
+                            </StackPanel>
+                            <ComboBox x:Name="ToolbarScopeBox" Grid.Column="1" Width="120" VerticalAlignment="Center"/>
+                        </Grid>
+                        <TextBlock Classes="section" Text="PAGES"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
@@ -748,7 +835,7 @@
                     </StackPanel>
 
                     <StackPanel x:Name="EditorPanel" Spacing="6" IsVisible="False">
-                        <TextBlock Classes="section" Text="CARET" Margin="0,4,0,2"/>
+                        <TextBlock Classes="section" Text="CARET"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
@@ -778,17 +865,7 @@
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding CaretBlink, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
 
-                        <TextBlock Classes="section" Text="WRITING"/>
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Spacing="2" VerticalAlignment="Center">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Classes="label" Text="Quick highlight color"/>
-                                    <Border Classes="qmark" ToolTip.Tip="The color used when you press Ctrl+Shift+H to highlight text."><TextBlock/></Border>
-                                </StackPanel>
-                            </StackPanel>
-                            <StackPanel x:Name="HighlightChoices" Grid.Column="1" Orientation="Horizontal"
-                                        Spacing="6" VerticalAlignment="Center"/>
-                        </Grid>
+                        <TextBlock Classes="section" Text="TYPING"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
@@ -807,16 +884,6 @@
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoCapitalize, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Spacing="2" VerticalAlignment="Center">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Classes="label" Text="Keep the last font I pick"/>
-                                    <Border Classes="qmark" ToolTip.Tip="The font you pick in the toolbar becomes your writing font for new text boxes, new pages and empty lines, until you pick another. Text you already wrote keeps its look."><TextBlock/></Border>
-                                </StackPanel>
-                            </StackPanel>
-                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding KeepPickedFont, Mode=TwoWay}" VerticalAlignment="Center"/>
-                        </Grid>
-
                         <TextBlock Classes="section" Text="TEXT DEFAULTS"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
@@ -836,6 +903,16 @@
                         </Grid>
                         <Slider x:Name="EditorFontSizeSlider" Minimum="11" Maximum="24"
                                 TickFrequency="1"/>
+
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Classes="label" Text="Keep the last font I pick"/>
+                                    <Border Classes="qmark" ToolTip.Tip="The font you pick in the toolbar becomes your writing font for new text boxes, new pages and empty lines, until you pick another. Text you already wrote keeps its look."><TextBlock/></Border>
+                                </StackPanel>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding KeepPickedFont, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
 
                         <TextBlock Classes="section" Text="SPACING"/>
                         <Grid ColumnDefinitions="*,Auto">
@@ -866,7 +943,7 @@
                         <Slider x:Name="IndentScaleSlider" Minimum="0.7" Maximum="2"
                                 TickFrequency="0.1"/>
 
-                        <TextBlock Classes="section" Text="SMART INPUT"/>
+                        <TextBlock Classes="section" Text="SMART LISTS"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
@@ -877,6 +954,52 @@
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding SmartLists, Mode=TwoWay}" VerticalAlignment="Center"/>
                         </Grid>
 
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Classes="section" Text="BULLET COLORS"/>
+                            <Border Classes="qmark" Margin="6,2,0,0" ToolTip.Tip="Each row below is a bullet style. Click its color swatch to change the color that style uses everywhere."><TextBlock/></Border>
+                        </StackPanel>
+                        <StackPanel x:Name="BulletColorRows" Spacing="4" Margin="0,4,0,0"/>
+
+                        <TextBlock Classes="section" Text="NUMBERED LISTS"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Classes="label" Text="Bold numbers"/>
+                                <Border Classes="qmark" ToolTip.Tip="How the numbers in numbered lists look. 'Match text' copies whatever the line's text looks like."><TextBlock/></Border>
+                            </StackPanel>
+                            <ComboBox x:Name="NumBoldBox" Grid.Column="1" Width="130"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Classes="label" Text="Italic numbers"/>
+                                <Border Classes="qmark" ToolTip.Tip="Whether the numbers in numbered lists lean in italics. 'Match text' copies whatever the line's text looks like."><TextBlock/></Border>
+                            </StackPanel>
+                            <ComboBox x:Name="NumItalicBox" Grid.Column="1" Width="130"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Classes="label" Text="Underlined numbers"/>
+                                <Border Classes="qmark" ToolTip.Tip="Whether the numbers in numbered lists are underlined. 'Match text' copies whatever the line's text looks like."><TextBlock/></Border>
+                            </StackPanel>
+                            <ComboBox x:Name="NumUnderlineBox" Grid.Column="1" Width="130"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Classes="label" Text="Struck-through numbers"/>
+                                <Border Classes="qmark" ToolTip.Tip="Whether the numbers in numbered lists have a line through them. 'Match text' copies whatever the line's text looks like."><TextBlock/></Border>
+                            </StackPanel>
+                            <ComboBox x:Name="NumStrikeBox" Grid.Column="1" Width="130"/>
+                        </Grid>
+                        <TextBlock Classes="section" Text="QUICK HIGHLIGHT"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Classes="label" Text="Quick highlight color"/>
+                                    <Border Classes="qmark" ToolTip.Tip="The color used when you press Ctrl+Shift+H to highlight text."><TextBlock/></Border>
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel x:Name="HighlightChoices" Grid.Column="1" Orientation="Horizontal"
+                                        Spacing="6" VerticalAlignment="Center"/>
+                        </Grid>
                         <TextBlock Classes="section" Text="TOOLBAR PALETTES"/>
                         <Grid ColumnDefinitions="90,*,Auto">
                             <StackPanel Orientation="Horizontal">
@@ -945,44 +1068,6 @@
                                  Background="Transparent" BorderThickness="0" Padding="0"/>
                     </StackPanel>
 
-                    <StackPanel x:Name="BulletsPanel" Spacing="6" IsVisible="False">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Classes="section" Text="BULLET COLORS" Margin="0,4,0,2"/>
-                            <Border Classes="qmark" Margin="6,2,0,0" ToolTip.Tip="Each row below is a bullet style. Click its color swatch to change the color that style uses everywhere."><TextBlock/></Border>
-                        </StackPanel>
-                        <StackPanel x:Name="BulletColorRows" Spacing="4" Margin="0,4,0,0"/>
-
-                        <TextBlock Classes="section" Text="NUMBERED LISTS"/>
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Classes="label" Text="Bold numbers"/>
-                                <Border Classes="qmark" ToolTip.Tip="How the numbers in numbered lists look. 'Match text' copies whatever the line's text looks like."><TextBlock/></Border>
-                            </StackPanel>
-                            <ComboBox x:Name="NumBoldBox" Grid.Column="1" Width="130"/>
-                        </Grid>
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Classes="label" Text="Italic numbers"/>
-                                <Border Classes="qmark" ToolTip.Tip="Whether the numbers in numbered lists lean in italics. 'Match text' copies whatever the line's text looks like."><TextBlock/></Border>
-                            </StackPanel>
-                            <ComboBox x:Name="NumItalicBox" Grid.Column="1" Width="130"/>
-                        </Grid>
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Classes="label" Text="Underlined numbers"/>
-                                <Border Classes="qmark" ToolTip.Tip="Whether the numbers in numbered lists are underlined. 'Match text' copies whatever the line's text looks like."><TextBlock/></Border>
-                            </StackPanel>
-                            <ComboBox x:Name="NumUnderlineBox" Grid.Column="1" Width="130"/>
-                        </Grid>
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Classes="label" Text="Struck-through numbers"/>
-                                <Border Classes="qmark" ToolTip.Tip="Whether the numbers in numbered lists have a line through them. 'Match text' copies whatever the line's text looks like."><TextBlock/></Border>
-                            </StackPanel>
-                            <ComboBox x:Name="NumStrikeBox" Grid.Column="1" Width="130"/>
-                        </Grid>
-                    </StackPanel>
-
                     <StackPanel x:Name="AboutPanel" Spacing="6" IsVisible="False">
                         <Grid ColumnDefinitions="Auto,*" Margin="2,0,0,16">
                             <Image Source="avares://Lumenotepad/Assets/lumenotepad-icon-256.png"
@@ -1037,7 +1122,18 @@
                     </StackPanel>
 
                     <StackPanel x:Name="DataPanel" Spacing="6" IsVisible="False">
-                        <TextBlock Classes="section" Text="STORAGE" Margin="0,4,0,2"/>
+                        <TextBlock Classes="section" Text="SAVING"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Classes="label" Text="Autosave after typing stops"/>
+                                <Border Classes="qmark" ToolTip.Tip="How long Lumenotepad waits after you stop typing before saving your work. Shorter is safer, longer is quieter."><TextBlock/></Border>
+                            </StackPanel>
+                            <TextBlock x:Name="AutosaveValue" Grid.Column="1" Classes="hint" Text="0.9s"/>
+                        </Grid>
+                        <Slider x:Name="AutosaveSlider" Minimum="100" Maximum="5000"
+                                TickFrequency="100"/>
+
+                        <TextBlock Classes="section" Text="STORAGE"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,10,0">
                                 <StackPanel Orientation="Horizontal">

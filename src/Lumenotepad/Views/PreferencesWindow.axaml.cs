@@ -9,9 +9,11 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Lumenotepad.Editor;
 using Lumenotepad.Platform;
@@ -36,11 +38,9 @@ public partial class PreferencesWindow : Window
             ["general"] = GeneralPanel,
             ["appearance"] = AppearancePanel,
             ["layout"] = LayoutPanel,
-            ["canvas"] = CanvasPanel,
             ["editor"] = EditorPanel,
             ["shortcuts"] = ShortcutsPanel,
             ["fonts"] = FontsPanel,
-            ["bullets"] = BulletsPanel,
             ["data"] = DataPanel,
             ["about"] = AboutPanel,
         };
@@ -81,6 +81,11 @@ public partial class PreferencesWindow : Window
 
         ToolbarPosBox.ItemsSource = new[] { "Top", "Left", "Right", "Bottom" };
         ButtonPlacementBox.ItemsSource = new[] { "Top left", "All top left", "Inside the panels", "Bottom left" };
+        LayoutTiles.SelectionChanged += (_, _) =>
+        {
+            if (Vm is { } vm && LayoutTiles.SelectedItem is ListBoxItem { Tag: string key } && vm.UiLayout != key)
+                vm.UiLayout = key;
+        };
         ButtonPlacementBox.SelectionChanged += (_, _) =>
         {
             if (Vm is { } vm && ButtonPlacementBox.SelectedIndex is >= 0 and < 4)
@@ -157,10 +162,11 @@ public partial class PreferencesWindow : Window
             if (key == "shortcuts") BuildShortcutRows();
             ShowPanel(key);
         };
+        GroupIntoCards();
+        IndexTabs();
+        SetupSettingsSearch();
         SelectNav("general");
         _lastNav = NavList.SelectedItem;
-        GroupIntoCards();
-        SetupSettingsSearch();
         WireAbout();
 
         FontSearchBtn.Click += async (_, _) => await RunFontSearch();
@@ -556,6 +562,7 @@ public partial class PreferencesWindow : Window
                 SyncThemeRows(animate: true);
         }
         else if (e.PropertyName == nameof(MainViewModel.AdvancedUnlocked)) UpdateGateVisuals();
+        else if (e.PropertyName == nameof(MainViewModel.UiLayout)) SyncLayoutRows();
         else if (e.PropertyName == nameof(MainViewModel.BulletPrefsVersion)) BuildBulletRows();
         else if (e.PropertyName == nameof(MainViewModel.ExtendedFonts))
         {
@@ -855,7 +862,7 @@ public partial class PreferencesWindow : Window
 
     private static string NumOpt(bool? v) => v switch { true => "Always on", false => "Always off", _ => "Match text" };
 
-    private static bool IsGated(string key) => key is "data" or "bullets" or "fonts";
+    private static bool IsGated(string key) => key is "data" or "fonts";
 
     private void UpdateGateVisuals() => GateLock.IsVisible = Vm is not { AdvancedUnlocked: true };
 
@@ -1070,6 +1077,7 @@ public partial class PreferencesWindow : Window
         foreach (var (k, p) in _panels) p.IsVisible = k == key;
         PageTitle.Text = CategoryNames.GetValueOrDefault(key, key);
         PageTitle.IsVisible = true;
+        ApplyTab(key, animate: false);
         Motion.RiseIn(panel, Motion.Fast);
     }
 
@@ -1104,17 +1112,85 @@ public partial class PreferencesWindow : Window
 
     private const string CardTag = "prefcard";
 
-    private static bool IsSectionHeader(Control c) => c is TextBlock tb && tb.Classes.Contains("section");
+    private static bool IsSectionHeader(Control c) => HeadingOf(c) is not null;
+
+    private static string? HeadingOf(Control c) => c switch
+    {
+        TextBlock tb when tb.Classes.Contains("section") => tb.Text,
+        StackPanel { Orientation: Orientation.Horizontal } sp when sp.Children.Count > 0
+            && sp.Children[0] is TextBlock t0 && t0.Classes.Contains("section") => t0.Text,
+        _ => null,
+    };
+
+    private readonly Dictionary<Border, string> _cardTab = new();
+    private readonly Dictionary<string, string> _currentTab = new();
+
+    private IEnumerable<Border> CardsOf(string key) =>
+        _panels.TryGetValue(key, out var p) && p is Panel panel
+            ? panel.Children.OfType<Border>().Where(b => Equals(b.Tag, CardTag)).ToList()
+            : Enumerable.Empty<Border>();
+
+    private void IndexTabs()
+    {
+        foreach (var (key, _) in _panels)
+            foreach (var card in CardsOf(key))
+                if (card.Child is StackPanel sp && sp.Children.Count > 0 && HeadingOf(sp.Children[0]) is { } h
+                    && PrefsTabs.TabOf(key, h) is { } tab)
+                    _cardTab[card] = tab;
+    }
+
+    private void ApplyTab(string key, bool animate)
+    {
+        PageTabs.Children.Clear();
+        if (PrefsTabs.For(key) is not { } tabs || _searching)
+        {
+            PageTabs.IsVisible = false;
+            return;
+        }
+        string current = _currentTab.GetValueOrDefault(key) ?? tabs[0].Name;
+        _currentTab[key] = current;
+        PageTabs.IsVisible = true;
+        foreach (var t in tabs)
+        {
+            var tab = new Border { Child = new TextBlock { Text = t.Name } };
+            tab.Classes.Add("prefstab");
+            if (t.Name == current) tab.Classes.Add("current");
+            string name = t.Name;
+            tab.PointerReleased += (_, _) =>
+            {
+                if (_currentTab.GetValueOrDefault(key) == name) return;
+                _currentTab[key] = name;
+                ApplyTab(key, animate: true);
+            };
+            PageTabs.Children.Add(tab);
+        }
+        int i = 0;
+        foreach (var card in CardsOf(key))
+        {
+            bool show = !_cardTab.TryGetValue(card, out var t) || t == current;
+            card.IsVisible = show;
+            if (!show || !animate) continue;
+            var c = card;
+            int delay = 28 * i++;
+            if (delay == 0) Motion.RiseIn(c, Motion.Fast);
+            else
+            {
+                c.Opacity = 0;
+                DispatcherTimer.RunOnce(() => Motion.RiseIn(c, Motion.Fast), TimeSpan.FromMilliseconds(delay));
+            }
+        }
+        if (animate) PrefsScroll.Offset = new Avalonia.Vector(0, 0);
+    }
 
     private static readonly Dictionary<string, string> CategoryNames = new()
     {
         ["general"] = "General", ["appearance"] = "Appearance", ["layout"] = "Layout",
-        ["canvas"] = "Canvas", ["editor"] = "Editor", ["shortcuts"] = "Shortcuts",
-        ["fonts"] = "Fonts", ["bullets"] = "Bullets & numbers", ["data"] = "Data & tools",
+        ["editor"] = "Writing", ["shortcuts"] = "Shortcuts",
+        ["fonts"] = "Fonts", ["data"] = "Data & tools",
         ["about"] = "About",
     };
 
-    private readonly List<(string Key, Panel Panel, TextBlock Header)> _searchIndex = new();
+    private readonly List<(string Key, Panel Panel)> _searchIndex = new();
     private readonly Dictionary<Control, bool> _origVisible = new();
     private bool _searching;
     private bool _searchPrimed;
@@ -1124,10 +1200,18 @@ public partial class PreferencesWindow : Window
         foreach (var (key, ctrl) in _panels)
         {
             if (ctrl is not Panel panel) continue;
-            var header = new TextBlock { Text = CategoryNames.GetValueOrDefault(key, key), IsVisible = false };
-            header.Classes.Add("searchcat");
-            panel.Children.Insert(0, header);
-            _searchIndex.Add((key, panel, header));
+            string page = CategoryNames.GetValueOrDefault(key, key);
+            if (PrefsTabs.For(key) is { } tabs)
+            {
+                foreach (var t in tabs)
+                {
+                    var first = CardsOf(key).FirstOrDefault(c => _cardTab.GetValueOrDefault(c) == t.Name);
+                    if (first is null) continue;
+                    panel.Children.Insert(panel.Children.IndexOf(first), SearchHeading(page + " \u203A " + t.Name));
+                }
+            }
+            else panel.Children.Insert(0, SearchHeading(page));
+            _searchIndex.Add((key, panel));
         }
         SearchBox.TextChanged += (_, _) => ApplySearch(SearchBox.Text ?? "");
     }
@@ -1150,26 +1234,46 @@ public partial class PreferencesWindow : Window
             SearchEmptyNote.IsVisible = false;
             foreach (var (c, vis) in _origVisible) c.IsVisible = vis;
             _origVisible.Clear();
-            foreach (var (_, _, header) in _searchIndex) header.IsVisible = false;
+            foreach (var (_, panel) in _searchIndex)
+                foreach (var h in panel.Children.OfType<TextBlock>().Where(IsSearchHeading)) h.IsVisible = false;
             if (NavList.SelectedItem is ListBoxItem { Tag: string curKey }) ShowPanel(curKey);
             return;
         }
 
         if (!_searching) { _searching = true; PrimeSearchPanels(); }
+        PageTabs.IsVisible = false;
+        PageTitle.Text = "Search results";
 
         int total = 0;
-        foreach (var (_, panel, header) in _searchIndex)
-            total += FilterPanel(panel, header, q);
+        foreach (var (_, panel) in _searchIndex)
+            total += FilterPanel(panel, q);
         SearchEmptyNote.IsVisible = total == 0;
         PrefsScroll.Offset = new Avalonia.Vector(0, 0);
     }
 
-    private int FilterPanel(Panel panel, TextBlock catHeader, string q)
+    private static TextBlock SearchHeading(string text)
     {
-        int matches = 0;
+        var h = new TextBlock { Text = text, IsVisible = false };
+        h.Classes.Add("searchcat");
+        return h;
+    }
+
+    private static bool IsSearchHeading(Control c) => c is TextBlock tb && tb.Classes.Contains("searchcat");
+
+    private int FilterPanel(Panel panel, string q)
+    {
+        int matches = 0, groupHits = 0;
+        TextBlock? group = null;
         foreach (var child in panel.Children)
         {
-            if (ReferenceEquals(child, catHeader)) continue;
+            if (child is TextBlock gh && IsSearchHeading(gh))
+            {
+                if (group is not null) group.IsVisible = groupHits > 0;
+                group = gh;
+                groupHits = 0;
+                continue;
+            }
+            int before = matches;
 
             if (child is Border { Tag: CardTag, Child: StackPanel inner })
             {
@@ -1192,8 +1296,9 @@ public partial class PreferencesWindow : Window
                 SetSearchVis(child, m);
                 if (m) matches++;
             }
+            groupHits += matches - before;
         }
-        catHeader.IsVisible = matches > 0;
+        if (group is not null) group.IsVisible = groupHits > 0;
         panel.IsVisible = matches > 0;
         return matches;
     }
@@ -1254,6 +1359,16 @@ public partial class PreferencesWindow : Window
         }
     }
 
+    private void SyncLayoutRows()
+    {
+        bool classic = Vm?.UiLayout is null or "Classic";
+        foreach (var row in new Control[] { ButtonPlacementRow, ShowRailRow, SectionsSidebarRow })
+        {
+            if (_origVisible.ContainsKey(row)) _origVisible[row] = classic;
+            if (!_searching) row.IsVisible = classic;
+        }
+    }
+
     private void SyncFromVm()
     {
         if (Vm is not { } vm) return;
@@ -1261,6 +1376,9 @@ public partial class PreferencesWindow : Window
         ThemeList.SelectedItem = vm.Theme;
         ToolbarPosBox.SelectedItem = vm.ToolbarPosition;
         ButtonPlacementBox.SelectedIndex = System.Math.Max(0, System.Array.IndexOf(PlacementKeys, vm.ButtonPlacement));
+        LayoutTiles.SelectedItem = LayoutTiles.Items.OfType<ListBoxItem>().FirstOrDefault(i => (i.Tag as string) == vm.UiLayout)
+                                   ?? LayoutTiles.Items.OfType<ListBoxItem>().First();
+        SyncLayoutRows();
         ToolbarScopeBox.SelectedItem = vm.ToolbarScope;
         AccentHexBox.Text = vm.CustomAccent ?? "";
         BuildAccentSwatches();

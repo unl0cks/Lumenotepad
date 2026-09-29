@@ -70,6 +70,12 @@ public partial class FormatToolbar : UserControl
         foreach (var btn in new[] { BulletBtn, HighlightBtn, ColorBtn, FontBtn, TypeBtn, AlignBtn, InsertBtn, TableBtn, TagBtn })
             if (btn.Flyout is { } f) MenuFx.AttachFlyout(f);
 
+        MoreBtn.Click += (_, _) =>
+        {
+            _moreOpen = !_moreOpen;
+            ApplySimple();
+        };
+
         bool fontScrollSmoothed = false;
         if (FontBtn.Flyout is { } fontFly) fontFly.Opened += (_, _) =>
         {
@@ -114,6 +120,7 @@ public partial class FormatToolbar : UserControl
     {
         Classes.Set("onpaper", pageScope);
         bool vertical = dock is Dock.Left or Dock.Right;
+        MoreBtn.Content = vertical ? "\u22EF" : "More";
         Panel.Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;
         SizeGroup.Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;
 
@@ -447,6 +454,43 @@ public partial class FormatToolbar : UserControl
         Add("†", false, "Footnote", () => _ = AddFootnoteAsync());
         Add("─", false, "Horizontal line", () => InsertDividerRequested?.Invoke("h"));
         Add("│", false, "Vertical line", () => InsertDividerRequested?.Invoke("v"));
+    }
+
+    private bool _simple;
+    private bool _moreOpen;
+
+    public void SetSimple(bool simple)
+    {
+        _simple = simple;
+        if (!simple) _moreOpen = false;
+        MoreBtn.IsVisible = simple;
+        ApplySimple();
+    }
+
+    private Control[] Extras => new Control[]
+    {
+        StrikeBtn, SuperBtn, SubBtn, TypeBtn, AlignBtn, InsertBtn, TableBtn, TagBtn, CustomizeBtn, DockBtn,
+    };
+
+    private static bool IsSep(Control c) => c is Border b && b.Classes.Contains("toolsep");
+
+    private void ApplySimple()
+    {
+        bool showExtras = !_simple || _moreOpen;
+        foreach (var c in Extras) c.IsVisible = showExtras;
+        MoreBtn.Classes.Set("on", _moreOpen);
+        ToolTip.SetTip(MoreBtn, _moreOpen ? "Show fewer formatting tools" : "Show more formatting tools");
+        var kids = Panel.Children.OfType<Control>().ToList();
+        for (int i = 0; i < kids.Count; i++)
+        {
+            if (!IsSep(kids[i])) continue;
+            bool before = false, after = false;
+            for (int j = i - 1; j >= 0 && !IsSep(kids[j]); j--)
+                if (kids[j].IsVisible && !ReferenceEquals(kids[j], MoreBtn)) before = true;
+            for (int j = i + 1; j < kids.Count && !IsSep(kids[j]); j++)
+                if (kids[j].IsVisible && !ReferenceEquals(kids[j], MoreBtn)) after = true;
+            kids[i].IsVisible = before && after;
+        }
     }
 
     public void SetCompact()

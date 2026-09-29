@@ -177,6 +177,10 @@
                 </Button.Flyout>
             </Button>
 
+            <Button x:Name="MoreBtn" Theme="{StaticResource IconButton}" Width="NaN" Height="30" Padding="10,0"
+                    FontFamily="{StaticResource UiFont}" FontSize="12.5" Content="More" IsVisible="False"
+                    ToolTip.Tip="Show more formatting tools"/>
+
             </WrapPanel>
         </DockPanel>
     </Border>
